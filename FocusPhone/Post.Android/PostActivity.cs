@@ -49,6 +49,10 @@ public class PostActivity : Activity
     // instance is never recreated and OnNewIntent never runs for them, only OnResume does.
     internal static int? PendingArea;
 
+    // A File/Delete chosen in the email reader, carried out by the Mailbox once it is back in
+    // front (which owns the undo window and the delete routing). Cleared when taken.
+    internal static (string SourceId, ReaderAction Action)? PendingReaderAction;
+
     // One Google sign-in for the whole head, scoped for BOTH jobs it has to do: Drive, for
     // the encrypted secrets vault, and the two Gmail scopes the API path needs. Asking
     // twice would mean two consent screens and two tokens for one account.
@@ -339,6 +343,7 @@ public class PostActivity : Activity
         }
         ApplyPendingArea();
         RenderContent();
+        ApplyPendingReaderAction();
         CheckSmsRole();
         CheckPendingCallNotes();
     }
@@ -346,6 +351,16 @@ public class PostActivity : Activity
     // Consumes a switch requested by a secondary screen's binder tap. Cleared unconditionally
     // so a stale request never fires on some later, unrelated resume. RenderContent() above
     // always runs regardless, so this only needs to move activeIndex/binder before it does.
+    private void ApplyPendingReaderAction()
+    {
+        var pending = PendingReaderAction;
+        PendingReaderAction = null;
+        if (pending is { } action && areas.OfType<MailboxArea>().FirstOrDefault() is { } mailbox)
+        {
+            mailbox.ApplyReaderAction(action.SourceId, action.Action);
+        }
+    }
+
     private void ApplyPendingArea()
     {
         var pending = PendingArea;

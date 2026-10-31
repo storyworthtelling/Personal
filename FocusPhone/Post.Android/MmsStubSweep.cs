@@ -19,6 +19,7 @@ internal static class MmsStubSweep
 
     public static void Run(Context context)
     {
+        UnreadNoticeStore.Retry(context);
         try
         {
             var stubs = ReadStubs(context);

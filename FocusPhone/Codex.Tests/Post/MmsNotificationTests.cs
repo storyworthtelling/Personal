@@ -343,6 +343,46 @@ public class MmsNotificationTests
         Assert.DoesNotContain("5550100001", redacted);
     }
 
+    // The owner's phone, Oct 31: a WAP content-type wrapper, then a notice whose From declares a
+    // Value-length of 8 over a 24-octet value and whose Expiry declares 3 over 5 octets. AOSP
+    // ignores both lengths; this parser rewound to the declared end (into the middle of the
+    // address), misread everything after it, never reached Content-Location, and so dropped
+    // every MMS the phone was sent. Invented number, transaction id and URL.
+    private static byte[] CarrierNoticeWithShortLengths()
+    {
+        var bytes = new List<byte>();
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("application/vnd.wap.mms-message"));
+        bytes.Add(0x00);
+        bytes.AddRange([0x8C, 0x82, 0x98]);
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("T1234567890ABCDEFGH"));
+        bytes.Add(0x00);
+        bytes.AddRange([0x8D, 0x12]);
+        bytes.AddRange([0x89, 0x08, 0x80]);
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("+15550100021/TYPE=PLMN"));
+        bytes.Add(0x00);
+        bytes.AddRange([0x8A, 0x80]);
+        bytes.AddRange([0x8E, 0x02, 0x02, 0x4B]);
+        bytes.AddRange([0x88, 0x03, 0x81, 0x03, 0x03, 0xF4, 0x80]);
+        bytes.Add(0x83);
+        bytes.AddRange(System.Text.Encoding.ASCII.GetBytes("http://mms.carrier.example/servlets/mms?message-id=0123456789abcdef"));
+        bytes.Add(0x00);
+        return [.. bytes];
+    }
+
+    [Fact]
+    public void ReadsANoticeWhoseFromAndExpiryDeclareLengthsShorterThanTheirValues()
+    {
+        var received = new DateTimeOffset(2026, 10, 31, 14, 0, 0, TimeSpan.Zero);
+
+        var result = MmsNotificationParser.Parse(CarrierNoticeWithShortLengths(), received);
+
+        Assert.NotNull(result);
+        Assert.Equal("T1234567890ABCDEFGH", result!.TransactionId);
+        Assert.Equal("http://mms.carrier.example/servlets/mms?message-id=0123456789abcdef", result.ContentLocation);
+        // 0x03F480 seconds = three days, relative to arrival.
+        Assert.Equal(received.ToUnixTimeSeconds() + 259200, result.ExpirySeconds);
+    }
+
     [Fact]
     public void Redacted_StopsAtItsLimit()
     {
