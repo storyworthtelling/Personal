@@ -1,4 +1,5 @@
 using System.Text;
+using Storyworthtelling.Diagnostics;
 
 namespace Codex.Domain.Diagnostics;
 
@@ -14,6 +15,11 @@ namespace Codex.Domain.Diagnostics;
 /// (<c>diagnostic.log.1</c>); the previous backup is discarded, bounding disk use
 /// to roughly twice the cap on a locked-down device. <see cref="ReadAll"/> stitches
 /// the backup and live file back together in chronological order.
+///
+/// With a <see cref="LogOutbox"/> (LOG-LOOP-PLAN.md §3.1) a full file is <b>sealed</b> into the outbox
+/// instead of rolling to <c>.1</c>, so nothing is discarded before the weekly upload has a confirmed copy
+/// in Drive; <see cref="ReadAll"/> then reads the sealed segments and the live file, and
+/// <see cref="Clear"/> takes both. Without one the roll is unchanged, for heads not yet on the loop.
 ///
 /// Lives in Domain (dependency-free <see cref="System.IO"/>, like
 /// <see cref="CrashLogStore"/>) so it is unit-testable against a temp folder and
@@ -31,6 +37,8 @@ public class DiagnosticLog
     private readonly string filePath;
     private readonly string backupPath;
     private readonly long maxBytes;
+    private readonly LogOutbox? outbox;
+    private readonly string logName;
     private readonly object gate = new();
 
     public DiagnosticLog(string directory) : this(directory, DefaultMaxBytes)
@@ -46,14 +54,27 @@ public class DiagnosticLog
     /// Post's texts trail writes a line per arriving text, which would roll the failure
     /// history out within a day.
     /// </summary>
-    public DiagnosticLog(string directory, long maxBytes, string fileName)
+    public DiagnosticLog(string directory, long maxBytes, string fileName) : this(directory, maxBytes, fileName, null)
+    {
+    }
+
+    /// <summary>
+    /// A log that seals into <paramref name="outbox"/> when full rather than discarding its older half.
+    /// </summary>
+    public DiagnosticLog(string directory, long maxBytes, string fileName, LogOutbox? outbox)
     {
         filePath = Path.Combine(directory, fileName);
         backupPath = filePath + BackupSuffix;
         this.maxBytes = maxBytes;
+        this.outbox = outbox;
+        logName = fileName;
     }
 
-    public bool HasEntries => File.Exists(filePath) || File.Exists(backupPath);
+    /// <summary>The live file — what the upload worker hands to <see cref="LogOutbox.SealAll"/>.</summary>
+    public string LivePath => filePath;
+
+    public bool HasEntries =>
+        File.Exists(filePath) || File.Exists(backupPath) || (outbox?.SegmentsFor(logName).Count > 0);
 
     public void Append(DiagnosticEntry entry)
     {
@@ -74,6 +95,11 @@ public class DiagnosticLog
         lock (gate)
         {
             var builder = new StringBuilder();
+            if (outbox is not null)
+            {
+                SealOldBackup();
+                builder.Append(outbox.ReadSealed(logName));
+            }
             if (File.Exists(backupPath))
             {
                 builder.Append(File.ReadAllText(backupPath));
@@ -98,6 +124,7 @@ public class DiagnosticLog
             {
                 File.Delete(backupPath);
             }
+            outbox?.ClearLog(logName);
         }
     }
 
@@ -126,8 +153,17 @@ public class DiagnosticLog
 
     private void RollIfTooLarge()
     {
+        if (outbox is not null)
+        {
+            SealOldBackup();
+        }
         if (!File.Exists(filePath) || new FileInfo(filePath).Length < maxBytes)
         {
+            return;
+        }
+        if (outbox is not null)
+        {
+            outbox.Seal(filePath, logName);
             return;
         }
         if (File.Exists(backupPath))
@@ -135,5 +171,15 @@ public class DiagnosticLog
             File.Delete(backupPath);
         }
         File.Move(filePath, backupPath);
+    }
+
+    // A .1 backup left by the roll the outbox replaced is the older half of the record: seal it under
+    // this log's name, ahead of anything newer, rather than letting it sit outside the upload or be lost.
+    private void SealOldBackup()
+    {
+        if (outbox is not null && File.Exists(backupPath))
+        {
+            outbox.Seal(backupPath, logName);
+        }
     }
 }
