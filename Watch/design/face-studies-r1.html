@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watch Face Studies, Round 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a dark slate field notebook, one study per row, the face large on the left and its
+   real-size and always-on views beside it. Single theme on purpose: the faces live on black glass. */
+:root {
+  --ground: #101418;
+  --slab: #171d23;
+  --rule: #26303a;
+  --ink: #dfe6ec;
+  --muted: #8a98a6;
+  --glass: #9fd3e6;
+  --font-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-label: "Spline Sans Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-body); }
+body { padding: 24px 16px 64px; }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 28px; }
+header h1 { font-weight: 600; font-size: 30px; margin: 0 0 6px; text-wrap: balance; letter-spacing: 0; }
+header p { margin: 0; color: var(--muted); max-width: 68ch; line-height: 1.5; }
+.controls { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--ground) 92%, transparent);
+  backdrop-filter: blur(6px); border-bottom: 1px solid var(--rule); padding: 12px 0; display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; }
+.controls label { font-family: var(--font-label); font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.controls input[type=range] { width: 220px; accent-color: var(--glass); }
+.controls output { font-family: var(--font-label); font-size: 14px; color: var(--ink); min-width: 70px; font-variant-numeric: tabular-nums; }
+button { font-family: var(--font-label); font-size: 12px; background: var(--slab); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button[aria-pressed=true] { border-color: var(--glass); color: var(--glass); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--glass); outline-offset: 2px; }
+.study { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: 22px; padding: 22px; background: var(--slab);
+  border: 1px solid var(--rule); border-radius: 10px; }
+.study h2 { margin: 0 0 4px; font-size: 21px; font-weight: 600; }
+.study .num { font-family: var(--font-label); font-size: 12px; color: var(--glass); }
+.study p { margin: 6px 0; line-height: 1.5; color: var(--ink); max-width: 64ch; }
+.study dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 10px 0 0; font-size: 14px; }
+.study dt { font-family: var(--font-label); font-size: 12px; color: var(--muted); padding-top: 2px; }
+.study dd { margin: 0; color: var(--ink); }
+.big canvas { width: 100%; max-width: 320px; aspect-ratio: 1; display: block; }
+.minis { display: flex; flex-wrap: wrap; gap: 18px; align-items: end; margin-top: 14px; }
+.mini { display: grid; justify-items: center; gap: 6px; }
+.mini span { font-family: var(--font-label); font-size: 11px; color: var(--muted); text-align: center; }
+.ruler { display: grid; gap: 6px; }
+.ruler .bar { height: 10px; border: 1px solid var(--muted); border-top: none; }
+.ruler span { font-family: var(--font-label); font-size: 11px; color: var(--muted); }
+.note { font-size: 14px; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+@media (max-width: 700px) { .study { grid-template-columns: 1fr; } .big canvas { margin: 0 auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Watch face studies, round 1</h1>
+    <p>Ten ways to tell the time on the wrist without looking at anything else. Each face shows time
+    and date only, nothing anxious, and has a very dim always-on view. These are studies for choosing
+    a direction, not finished designs. They share nothing with Paper &amp; Ink.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Study controls">
+    <label for="time">Time <input id="time" type="range" min="0" max="1439" step="1"></label>
+    <output id="timeOut" for="time">--</output>
+    <button id="live" type="button" aria-pressed="true">Live time</button>
+    <button id="ambient" type="button" aria-pressed="false">Show always-on in the large view</button>
+    <label for="scale">Real-size calibration <input id="scale" type="range" min="0.6" max="1.6" step="0.01" value="1"></label>
+  </div>
+
+  <div class="ruler" aria-hidden="true">
+    <div class="bar" id="cardBar"></div>
+    <span>Real size: drag the calibration slider until this bar matches the short side of a bank card (54 mm). The watch outlines below then show true size.</span>
+  </div>
+
+  <main id="studies" class="wrap"></main>
+
+  <p class="note">Real sizes are approximate. Pixel Watch 2 (41 mm case) is drawn with a 30 mm display. The
+  newer Pixel Watch is drawn at 41 mm and 45 mm with roughly 32 mm and 36 mm displays and thinner
+  bezels. All of these get checked on the real watches. The sunrise and sunset in study 2 are
+  invented fixed times. A real face would read the day's times on the watch, and nothing leaves it.</p>
+</div>
+
+<script>
+"use strict";
+const TAU = Math.PI * 2;
+const SUNRISE = 6 + 58 / 60;   // invented, fixed for the study
+const SUNSET = 17 + 41 / 60;
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Clock angle: 0 at twelve o'clock, clockwise.
+const ang = frac => frac * TAU - Math.PI / 2;
+const pt = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+const hour12 = h => (h % 12) || 12;
+function dateLine(d) { return DAYS[d.getDay()] + " " + d.getDate(); }
+
+function smallText(c, text, x, y, size, color) {
+  c.font = `500 ${size}px "Spline Sans Mono", ui-monospace, monospace`;
+  c.fillStyle = color; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(text, x, y);
+}
+
+// ---- the ten studies; each draws a face of radius R at (R, R) ----
+const studies = [
+{
+  id: "polygon", title: "Hours in sides, minutes in colour",
+  idea: "The hour is a shape: three sides at three o'clock, twelve at twelve, a dot at one and a line at two. The minute is its colour, going round the whole colour wheel once an hour, red at the top of the hour.",
+  read: "Count the sides, or learn the shapes. Within a week a hexagon reads as six. Colour gives the minute roughly, to about five minutes.",
+  cost: "About 12% of pixels lit in the main view, 2% always-on. The colour has to stay legible to colour-blind eyes, so the shape always carries the hour.",
+  draw(c, R, t, amb) {
+    const n = hour12(t.h), hue = ((t.m + t.s / 60) / 60) * 360, r = R * 0.5;
+    const pts = [];
+    for (let i = 0; i < n; i++) pts.push(pt(R, R, r, ang(i / n)));
+    c.lineJoin = "round"; c.lineCap = "round";
+    if (n === 1) {
+      c.beginPath(); c.arc(R, R, R * 0.11, 0, TAU);
+    } else if (n === 2) {
+      c.beginPath(); c.moveTo(R, R - r); c.lineTo(R, R + r);
+    } else {
+      c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath();
+    }
+    if (amb) {
+      c.strokeStyle = `hsl(${hue} 35% 32%)`; c.lineWidth = R * 0.025; c.stroke();
+    } else {
+      if (n !== 2) {
+        const g = c.createRadialGradient(R - r * 0.35, R - r * 0.45, r * 0.05, R, R, r * 1.1);
+        g.addColorStop(0, `hsl(${hue} 90% 82%)`); g.addColorStop(0.55, `hsl(${hue} 75% 52%)`); g.addColorStop(1, `hsl(${hue} 70% 30%)`);
+        c.fillStyle = g; c.fill();
+      }
+      c.strokeStyle = `hsl(${hue} 90% 85%)`; c.lineWidth = n === 2 ? R * 0.07 : R * 0.018; c.stroke();
+      smallText(c, t.date, R, R * 1.78, R * 0.085, "hsl(200 12% 62%)");
+    }
+  }
+},
+{
+  id: "daylight", title: "Daylight arc",
+  idea: "The sun travels an arc from the sunrise horizon to the sunset horizon. After dark the arc drops below and a small moon runs along it. Three faint marks sit at morning, noon and evening.",
+  read: "It reads like the sky: how much day is left at a glance. The exact minute is not on it, and the date sits just above the horizon. Wants a digital minute on wrist-raise, or a second state, if you need precision.",
+  cost: "The sky's colour changes through the day, which costs more pixels at midday (around 30%). Always-on drops to the horizon line and a dim sun.",
+  draw(c, R, t, amb) {
+    const hrs = t.h + t.m / 60 + t.s / 3600, day = hrs >= SUNRISE && hrs <= SUNSET;
+    const horizon = R * 1.18, arcR = R * 0.72;
+    let frac;
+    if (day) frac = (hrs - SUNRISE) / (SUNSET - SUNRISE);
+    else { const nightLen = 24 - (SUNSET - SUNRISE); const since = hrs > SUNSET ? hrs - SUNSET : hrs + 24 - SUNSET; frac = since / nightLen; }
+    const a = Math.PI + frac * Math.PI; // left horizon to right, over the top (day) or underneath (night)
+    if (!amb && day) {
+      const noon = 1 - Math.abs(frac - 0.5) * 2;
+      const g = c.createLinearGradient(0, 0, 0, horizon);
+      g.addColorStop(0, `hsl(${205 - noon * 5} ${40 + noon * 30}% ${10 + noon * 22}%)`);
+      g.addColorStop(1, `hsl(${25 + noon * 175} ${60 - noon * 20}% ${14 + noon * 22}%)`);
+      c.fillStyle = g; c.fillRect(0, 0, R * 2, horizon);
+    }
+    c.strokeStyle = amb ? "hsl(200 10% 22%)" : "hsl(200 20% 55%)"; c.lineWidth = R * 0.012;
+    c.beginPath(); c.moveTo(R * 0.12, horizon); c.lineTo(R * 1.88, horizon); c.stroke();
+    if (!amb) {
+      c.setLineDash([R * 0.012, R * 0.04]); c.strokeStyle = "hsla(200 30% 75% / 0.35)";
+      c.beginPath(); c.arc(R, horizon, arcR, Math.PI, TAU); c.stroke(); c.setLineDash([]);
+      [0, 0.5, 1].forEach(f => { const [x, y] = pt(R, horizon, arcR, Math.PI + f * Math.PI);
+        c.beginPath(); c.arc(x, y, R * 0.012, 0, TAU); c.fillStyle = "hsla(200 30% 80% / 0.6)"; c.fill(); });
+    }
+    const [sx, sy] = day ? pt(R, horizon, arcR, a) : pt(R, horizon, arcR * 0.55, Math.PI - frac * Math.PI);
+    const sunY = day ? sy : horizon + Math.sin(frac * Math.PI) * arcR * 0.45;
+    const sunX = day ? sx : R + Math.cos(Math.PI - frac * Math.PI) * arcR * 0.55;
+    if (day) {
+      const g = c.createRadialGradient(sunX, sunY, 0, sunX, sunY, R * 0.22);
+      g.addColorStop(0, amb ? "hsla(40 50% 45% / 0.9)" : "hsla(45 100% 92% / 1)");
+      g.addColorStop(0.3, amb ? "hsla(40 50% 30% / 0.4)" : "hsla(40 100% 70% / 0.7)");
+      g.addColorStop(1, "hsla(40 100% 60% / 0)");
+      c.fillStyle = g; c.beginPath(); c.arc(sunX, sunY, R * 0.22, 0, TAU); c.fill();
+    } else {
+      c.fillStyle = amb ? "hsl(210 10% 30%)" : "hsl(210 25% 82%)";
+      c.beginPath(); c.arc(sunX, sunY, R * 0.06, 0, TAU); c.fill();
+      c.fillStyle = "#000"; c.beginPath(); c.arc(sunX + R * 0.03, sunY - R * 0.015, R * 0.055, 0, TAU); c.fill();
+    }
+    if (!amb) smallText(c, t.date, R, horizon - R * 0.12, R * 0.07, "hsl(200 12% 62%)");
+  }
+},
+{
+  id: "sparse", title: "Sparse marks",
+  idea: "Twelve dim points, no hands. The hour's point is brighter and longer, and a single fine stroke on the rim stands for the minute. It is a dial with almost nothing on it.",
+  read: "As quick as an analogue watch once the twelve positions are familiar, and the most restful of the ten.",
+  cost: "Under 3% of pixels lit, the cheapest main view. Always-on keeps only the hour mark and the minute stroke.",
+  draw(c, R, t, amb) {
+    const hf = (t.h % 12 + t.m / 60) / 12, mf = (t.m + t.s / 60) / 60;
+    for (let i = 0; i < 12; i++) {
+      if (amb) continue;
+      const [x, y] = pt(R, R, R * 0.74, ang(i / 12));
+      c.beginPath(); c.arc(x, y, R * 0.014, 0, TAU); c.fillStyle = "hsl(195 15% 36%)"; c.fill();
+    }
+    const ha = ang(hf); const [x1, y1] = pt(R, R, R * 0.64, ha); const [x2, y2] = pt(R, R, R * 0.8, ha);
+    c.lineCap = "round"; c.strokeStyle = amb ? "hsl(195 25% 40%)" : "hsl(190 70% 86%)"; c.lineWidth = R * 0.04;
+    c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    const ma = ang(mf); const [m1x, m1y] = pt(R, R, R * 0.86, ma); const [m2x, m2y] = pt(R, R, R * 0.93, ma);
+    c.strokeStyle = amb ? "hsl(195 20% 34%)" : "hsl(190 50% 70%)"; c.lineWidth = R * 0.012;
+    c.beginPath(); c.moveTo(m1x, m1y); c.lineTo(m2x, m2y); c.stroke();
+    if (!amb) smallText(c, t.date, R, R * 1.28, R * 0.08, "hsl(200 12% 52%)");
+  }
+},
+{
+  id: "prism", title: "Prism",
+  idea: "A small glass prism sits in the middle. White light enters from the rim at the hour, and a spectrum leaves toward the minute. Glass with light through it, taken literally.",
+  read: "The white beam works as an hour hand and the colour fan as a minute hand, so it reads as an analogue watch.",
+  cost: "About 10% of pixels lit. In always-on the spectrum fades to a single thin line. This is the most decorative of the ten, and it may tire faster than the others.",
+  draw(c, R, t, amb) {
+    const ha = ang((t.h % 12 + t.m / 60) / 12), ma = ang((t.m + t.s / 60) / 60);
+    const [bx, by] = pt(R, R, R * 0.92, ha);
+    const beam = c.createLinearGradient(bx, by, R, R);
+    beam.addColorStop(0, "hsla(0 0% 100% / 0)"); beam.addColorStop(1, amb ? "hsla(0 0% 60% / 0.6)" : "hsla(0 0% 100% / 0.95)");
+    c.strokeStyle = beam; c.lineWidth = R * 0.03; c.lineCap = "round"; c.beginPath(); c.moveTo(bx, by); c.lineTo(R, R); c.stroke();
+    if (amb) {
+      const [ex, ey] = pt(R, R, R * 0.9, ma); c.strokeStyle = "hsl(280 25% 34%)"; c.lineWidth = R * 0.014;
+      c.beginPath(); c.moveTo(R, R); c.lineTo(ex, ey); c.stroke();
+    } else {
+      const spread = 0.22, bands = 7;
+      for (let i = 0; i < bands; i++) {
+        const a0 = ma - spread / 2 + (spread / bands) * i, a1 = a0 + spread / bands;
+        const g = c.createRadialGradient(R, R, R * 0.1, R, R, R * 0.95);
+        const hue = 0 + (i / (bands - 1)) * 270;
+        g.addColorStop(0, `hsla(${hue} 95% 70% / 0.9)`); g.addColorStop(1, `hsla(${hue} 95% 55% / 0)`);
+        c.fillStyle = g; c.beginPath(); c.moveTo(R, R); c.arc(R, R, R * 0.95, a0, a1); c.closePath(); c.fill();
+      }
+    }
+    const s = R * 0.16; c.beginPath();
+    for (let i = 0; i < 3; i++) { const [x, y] = pt(R, R, s, ang(i / 3)); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.closePath();
+    const pg = c.createLinearGradient(R - s, R - s, R + s, R + s);
+    pg.addColorStop(0, amb ? "hsla(200 20% 40% / 0.3)" : "hsla(195 60% 90% / 0.55)"); pg.addColorStop(1, "hsla(195 40% 50% / 0.12)");
+    c.fillStyle = pg; c.fill(); c.strokeStyle = amb ? "hsl(200 15% 35%)" : "hsla(195 70% 92% / 0.9)"; c.lineWidth = R * 0.012; c.stroke();
+    if (!amb) smallText(c, t.date, R, R * 1.7, R * 0.08, "hsl(200 12% 58%)");
+  }
+},
+{
+  id: "field", title: "Field watch",
+  idea: "The scout's watch: a plain analogue dial with numerals at 12, 3, 6 and 9, a small inner 24-hour ring and pale luminous hands. It is the most conventional study, kept here as a baseline.",
+  read: "Instantly, like any watch you have owned.",
+  cost: "About 8% of pixels lit. Always-on keeps the hands and the four numerals at low light, the way lume looks at night.",
+  draw(c, R, t, amb) {
+    const lume = amb ? "hsl(185 18% 40%)" : "hsl(185 45% 88%)";
+    for (let i = 0; i < 60; i++) {
+      if (amb && i % 5) continue;
+      const major = i % 5 === 0; const a = ang(i / 60);
+      const [x1, y1] = pt(R, R, R * (major ? 0.8 : 0.86), a); const [x2, y2] = pt(R, R, R * 0.9, a);
+      c.strokeStyle = major ? lume : "hsl(200 10% 34%)"; c.lineWidth = R * (major ? 0.022 : 0.008);
+      c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    }
+    c.font = `600 ${R * 0.17}px "Familjen Grotesk", sans-serif`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = lume;
+    [[12, 0], [3, 0.25], [6, 0.5], [9, 0.75]].forEach(([n, f]) => { const [x, y] = pt(R, R, R * 0.63, ang(f)); c.fillText(String(n), x, y); });
+    if (!amb) {
+      c.font = `500 ${R * 0.06}px "Spline Sans Mono", monospace`; c.fillStyle = "hsl(200 10% 46%)";
+      for (let i = 1; i <= 12; i++) { const [x, y] = pt(R, R, R * 0.44, ang(i / 12)); if (i % 3) c.fillText(String(i + 12), x, y); }
+      smallText(c, t.date, R + R * 0.36, R, R * 0.07, "hsl(200 12% 62%)");
+    }
+    const hand = (frac, len, w, col) => { const a = ang(frac); const [x, y] = pt(R, R, R * len, a); const [bx, by] = pt(R, R, R * 0.1, a + Math.PI);
+      c.strokeStyle = col; c.lineWidth = R * w; c.lineCap = "round"; c.beginPath(); c.moveTo(bx, by); c.lineTo(x, y); c.stroke(); };
+    hand((t.h % 12 + t.m / 60) / 12, 0.5, 0.05, lume);
+    hand((t.m + t.s / 60) / 60, 0.78, 0.032, lume);
+    if (!amb) hand(t.s / 60, 0.82, 0.008, "hsl(25 80% 62%)");
+    c.fillStyle = amb ? "hsl(200 10% 30%)" : "hsl(200 15% 75%)"; c.beginPath(); c.arc(R, R, R * 0.035, 0, TAU); c.fill();
+  }
+},
+{
+  id: "sundial", title: "Slate sundial",
+  idea: "A disc of slate with hour lines cut into it and a soft shadow thrown by an unseen gnomon. The shadow turns like an hour hand, and a small notch cut in the rim walks round for the minute.",
+  read: "Like a dial without numerals: the shadow gives the hour and the notch gives the minute.",
+  cost: "The textured stone is the expensive part, with about 40% of pixels lit dimly. Always-on drops the stone and keeps the shadow edge.",
+  draw(c, R, t, amb) {
+    if (!amb) {
+      const g = c.createRadialGradient(R * 0.8, R * 0.7, R * 0.1, R, R, R);
+      g.addColorStop(0, "hsl(205 10% 24%)"); g.addColorStop(1, "hsl(205 12% 12%)");
+      c.fillStyle = g; c.beginPath(); c.arc(R, R, R * 0.95, 0, TAU); c.fill();
+      let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let i = 0; i < 700; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()) * R * 0.94; const [x, y] = pt(R, R, d, a);
+        c.fillStyle = `hsla(205 8% ${rnd() > 0.5 ? 34 : 8}% / 0.35)`; c.fillRect(x, y, R * 0.012, R * 0.012); }
+      for (let i = 0; i < 12; i++) { const a = ang(i / 12); const [x1, y1] = pt(R, R, R * 0.7, a); const [x2, y2] = pt(R, R, R * 0.86, a);
+        c.strokeStyle = "hsla(205 8% 6% / 0.9)"; c.lineWidth = R * 0.016; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+        c.strokeStyle = "hsla(205 10% 40% / 0.6)"; c.lineWidth = R * 0.005; c.beginPath(); c.moveTo(x1 + 1, y1 + 1); c.lineTo(x2 + 1, y2 + 1); c.stroke(); }
+    }
+    const a = ang((t.h % 12 + t.m / 60) / 12);
+    const [tx, ty] = pt(R, R, R * 0.8, a), [lx, ly] = pt(R, R, R * 0.07, a - Math.PI / 2), [rx, ry] = pt(R, R, R * 0.07, a + Math.PI / 2);
+    const sg = c.createLinearGradient(R, R, tx, ty);
+    sg.addColorStop(0, amb ? "hsla(200 15% 40% / 0.7)" : "hsla(210 30% 2% / 0.85)"); sg.addColorStop(1, amb ? "hsla(200 15% 40% / 0)" : "hsla(210 30% 2% / 0.1)");
+    c.fillStyle = sg; c.beginPath(); c.moveTo(lx, ly); c.lineTo(tx, ty); c.lineTo(rx, ry); c.closePath(); c.fill();
+    const ma = ang((t.m + t.s / 60) / 60), [nx, ny] = pt(R, R, R * 0.93, ma);
+    c.fillStyle = amb ? "hsl(200 15% 38%)" : "hsl(40 30% 80%)"; c.beginPath(); c.arc(nx, ny, R * 0.022, 0, TAU); c.fill();
+    if (!amb) smallText(c, t.date, R, R * 1.42, R * 0.08, "hsl(205 10% 62%)");
+  }
+},
+{
+  id: "contour", title: "Contour and bearing",
+  idea: "A small topographic map: a few contour lines round a hill. The hour is a bearing line from the summit, as if taken with a compass, and the minute is a walker's dot on the outer contour.",
+  read: "The bearing works as an hour hand and the dot as a minute hand. It reads as analogue and feels like a map rather than a dial.",
+  cost: "About 8% of pixels lit in thin lines. Always-on keeps one contour, the bearing and the dot.",
+  draw(c, R, t, amb) {
+    const rings = amb ? [0.86] : [0.2, 0.36, 0.52, 0.68, 0.86];
+    rings.forEach((rr, k) => { c.beginPath();
+      for (let i = 0; i <= 120; i++) { const a = (i / 120) * TAU; const wob = 1 + 0.06 * Math.sin(a * 3 + k) + 0.04 * Math.sin(a * 5 + k * 2);
+        const [x, y] = pt(R, R, R * rr * wob * (rr === 0.86 ? 0.98 : 1), a); i ? c.lineTo(x, y) : c.moveTo(x, y); }
+      c.strokeStyle = amb ? "hsl(195 15% 26%)" : `hsl(${188 + k * 4} 35% ${30 + k * 6}%)`; c.lineWidth = R * 0.008; c.stroke(); });
+    const ha = ang((t.h % 12 + t.m / 60) / 12), [bx, by] = pt(R, R, R * 0.7, ha);
+    c.setLineDash([R * 0.04, R * 0.025]); c.strokeStyle = amb ? "hsl(30 30% 42%)" : "hsl(30 85% 66%)"; c.lineWidth = R * 0.022;
+    c.beginPath(); c.moveTo(R, R); c.lineTo(bx, by); c.stroke(); c.setLineDash([]);
+    const mf = (t.m + t.s / 60) / 60, a = mf * TAU - Math.PI / 2, wob = 1 + 0.06 * Math.sin(a * 3 + 4) + 0.04 * Math.sin(a * 5 + 8);
+    const [mx, my] = pt(R, R, R * 0.86 * wob * 0.98, a);
+    c.fillStyle = amb ? "hsl(190 20% 45%)" : "hsl(190 70% 85%)"; c.beginPath(); c.arc(mx, my, R * 0.03, 0, TAU); c.fill();
+    c.fillStyle = amb ? "hsl(200 10% 30%)" : "hsl(195 20% 70%)"; c.beginPath(); c.arc(R, R, R * 0.018, 0, TAU); c.fill();
+    if (!amb) smallText(c, t.date, R, R * 1.93 - R * 0.06, R * 0.07, "hsl(200 12% 56%)");
+  }
+},
+{
+  id: "stars", title: "A constellation a day",
+  idea: "Twelve star positions round the face. Each hour lights one more and joins it to the last, so the constellation grows from one o'clock to twelve and starts again. A small light runs round the rim for the minute.",
+  read: "Count the stars for the hour, or learn the figure each hour makes. It is slower than a dial, and it is the most contemplative of the ten.",
+  cost: "About 3% of pixels lit. Always-on shows the stars without their joining lines.",
+  draw(c, R, t, amb) {
+    const n = hour12(t.h); let seed = 31; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const stars = []; for (let i = 0; i < 12; i++) { const a = ang(i / 12 + 1 / 12) + (rnd() - 0.5) * 0.35; stars.push(pt(R, R, R * (0.35 + rnd() * 0.4), a)); }
+    if (!amb) { c.strokeStyle = "hsla(210 40% 70% / 0.35)"; c.lineWidth = R * 0.006; c.beginPath();
+      stars.slice(0, n).forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.stroke(); }
+    stars.forEach(([x, y], i) => { const lit = i < n; if (!lit && amb) return;
+      c.fillStyle = lit ? (amb ? "hsl(210 15% 42%)" : "hsl(210 60% 92%)") : "hsl(210 12% 20%)";
+      c.beginPath(); c.arc(x, y, R * (lit ? 0.022 : 0.01), 0, TAU); c.fill(); });
+    const [mx, my] = pt(R, R, R * 0.92, ang((t.m + t.s / 60) / 60));
+    const g = c.createRadialGradient(mx, my, 0, mx, my, R * 0.06);
+    g.addColorStop(0, amb ? "hsla(40 30% 50% / 0.8)" : "hsla(45 90% 85% / 1)"); g.addColorStop(1, "hsla(45 90% 70% / 0)");
+    c.fillStyle = g; c.beginPath(); c.arc(mx, my, R * 0.06, 0, TAU); c.fill();
+    if (!amb) smallText(c, t.date, R, R * 1.86, R * 0.07, "hsl(210 12% 50%)");
+  }
+},
+{
+  id: "orb", title: "Glass orb",
+  idea: "The whole face is a sphere of glass lit from one side. The light sits at the hour, and its warmth follows the day: cool at dawn, clear at noon, amber at dusk, deep blue at night. A thin bright arc on the rim fills toward the minute.",
+  read: "The highlight gives the hour and the arc gives the minute. Even the colour alone says roughly what part of the day it is.",
+  cost: "The most expensive of the ten, around 60% of pixels lit, though mostly dark. Always-on keeps only the arc and a dim highlight.",
+  draw(c, R, t, amb) {
+    const hrs = t.h + t.m / 60, ha = ang((t.h % 12 + t.m / 60) / 12);
+    const hue = hrs < 5 ? 230 : hrs < 8 ? 200 : hrs < 16 ? 190 : hrs < 19 ? 30 : 240;
+    const lig = hrs < 5 || hrs >= 21 ? 18 : hrs < 8 || hrs >= 19 ? 30 : 42;
+    const [lx, ly] = pt(R, R, R * 0.5, ha);
+    if (!amb) {
+      const g = c.createRadialGradient(lx, ly, R * 0.02, R, R, R * 0.95);
+      g.addColorStop(0, `hsl(${hue} 70% ${lig + 45}%)`); g.addColorStop(0.35, `hsl(${hue} 50% ${lig}%)`); g.addColorStop(1, `hsl(${hue} 40% 4%)`);
+      c.fillStyle = g; c.beginPath(); c.arc(R, R, R * 0.92, 0, TAU); c.fill();
+    } else {
+      const g = c.createRadialGradient(lx, ly, 0, lx, ly, R * 0.15); g.addColorStop(0, `hsla(${hue} 20% 40% / 0.8)`); g.addColorStop(1, `hsla(${hue} 20% 40% / 0)`);
+      c.fillStyle = g; c.beginPath(); c.arc(lx, ly, R * 0.15, 0, TAU); c.fill();
+    }
+    const mf = (t.m + t.s / 60) / 60;
+    c.strokeStyle = amb ? `hsl(${hue} 15% 35%)` : `hsla(${hue} 80% 88% / 0.95)`; c.lineWidth = R * 0.016; c.lineCap = "round";
+    c.beginPath(); c.arc(R, R, R * 0.95, -Math.PI / 2, -Math.PI / 2 + Math.max(0.01, mf) * TAU); c.stroke();
+    if (!amb) smallText(c, t.date, R, R * 1.62, R * 0.08, `hsla(${hue} 30% 85% / 0.8)`);
+  }
+},
+{
+  id: "two", title: "Two lights",
+  idea: "Two points of light and nothing else: a soft, larger one near the centre for the hour and a small sharp one near the rim for the minute.",
+  read: "Like an analogue watch with the hands taken away and only their tips left, and quick once learned.",
+  cost: "Under 1% of pixels lit, so the always-on view is almost the same as the main one. It is the closest of the ten to having no face at all.",
+  draw(c, R, t, amb) {
+    const glow = (x, y, r, core, halo) => { const g = c.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, core); g.addColorStop(0.35, halo); g.addColorStop(1, "hsla(0 0% 0% / 0)"); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); };
+    const [hx, hy] = pt(R, R, R * 0.42, ang((t.h % 12 + t.m / 60) / 12));
+    const [mx, my] = pt(R, R, R * 0.84, ang((t.m + t.s / 60) / 60));
+    glow(hx, hy, R * 0.16, amb ? "hsla(35 30% 45% / 0.9)" : "hsla(38 90% 88% / 1)", amb ? "hsla(35 30% 30% / 0.3)" : "hsla(35 90% 60% / 0.45)");
+    glow(mx, my, R * 0.07, amb ? "hsla(190 25% 50% / 0.9)" : "hsla(190 80% 92% / 1)", amb ? "hsla(190 25% 30% / 0.3)" : "hsla(190 80% 65% / 0.5)");
+    if (!amb) smallText(c, t.date, R, R * 1.5, R * 0.075, "hsl(200 10% 45%)");
+  }
+}
+];
+
+// ---- watches (approximate, for real-size views) ----
+const WATCHES = [
+  { label: "Pixel Watch 2 · 41 mm", caseMm: 41, displayMm: 30 },
+  { label: "Newer Pixel Watch · 41 mm", caseMm: 41, displayMm: 32 },
+  { label: "Newer Pixel Watch · 45 mm", caseMm: 45, displayMm: 36 },
+];
+
+const PX_PER_MM = 96 / 25.4;
+let calib = 1, ambientBig = false, live = true, manualMinutes = 0;
+try { const s = parseFloat(localStorage.getItem("faceCalib")); if (s >= 0.6 && s <= 1.6) calib = s; } catch (e) { /* storage unavailable: default scale */ }
+
+function timeNow() {
+  const d = new Date();
+  if (!live) { d.setHours(Math.floor(manualMinutes / 60), manualMinutes % 60, 0, 0); }
+  return { h: d.getHours(), m: d.getMinutes(), s: live ? d.getSeconds() + d.getMilliseconds() / 1000 : 0, date: dateLine(d), d };
+}
+
+function paint(canvas, study, amb, withCase, displayRatio) {
+  const dpr = window.devicePixelRatio || 1, cssW = canvas.clientWidth || parseFloat(canvas.style.width);
+  const W = Math.round(cssW * dpr); if (canvas.width !== W) { canvas.width = W; canvas.height = W; }
+  const c = canvas.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, W);
+  const outerR = W / 2, R = withCase ? outerR * displayRatio : outerR;
+  if (withCase) {
+    const g = c.createRadialGradient(outerR * 0.7, outerR * 0.6, outerR * 0.2, outerR, outerR, outerR);
+    g.addColorStop(0, "hsl(210 6% 42%)"); g.addColorStop(1, "hsl(210 6% 18%)");
+    c.fillStyle = g; c.beginPath(); c.arc(outerR, outerR, outerR, 0, TAU); c.fill();
+  }
+  c.fillStyle = "#000"; c.beginPath(); c.arc(outerR, outerR, R, 0, TAU); c.fill();
+  c.save(); c.beginPath(); c.arc(outerR, outerR, R, 0, TAU); c.clip();
+  c.translate(outerR - R, outerR - R); study.draw(c, R, timeNow(), amb); c.restore();
+}
+
+const root = document.getElementById("studies"); const views = [];
+studies.forEach((s, i) => {
+  const sec = document.createElement("section"); sec.className = "study"; sec.id = s.id;
+  sec.innerHTML = `<div class="big"><canvas role="img" aria-label="${s.title}, main view"></canvas></div>
+    <div><div class="num">Study ${i + 1} of ${studies.length}</div><h2>${s.title}</h2><p>${s.idea}</p>
+    <dl><dt>Reading it</dt><dd>${s.read}</dd><dt>Cost</dt><dd>${s.cost}</dd></dl>
+    <div class="minis"></div></div>`;
+  root.appendChild(sec);
+  views.push({ canvas: sec.querySelector(".big canvas"), study: s, kind: "big" });
+  const minis = sec.querySelector(".minis");
+  const amb = document.createElement("div"); amb.className = "mini";
+  amb.innerHTML = `<canvas style="width:120px;height:120px" role="img" aria-label="${s.title}, always-on"></canvas><span>Always-on, enlarged</span>`;
+  minis.appendChild(amb); views.push({ canvas: amb.querySelector("canvas"), study: s, kind: "amb" });
+  WATCHES.forEach(w => { const m = document.createElement("div"); m.className = "mini";
+    m.innerHTML = `<canvas role="img" aria-label="${s.title} on ${w.label}, real size"></canvas><span>${w.label}<br>real size</span>`;
+    minis.appendChild(m); views.push({ canvas: m.querySelector("canvas"), study: s, kind: "real", watch: w }); });
+});
+
+function sizeReal() {
+  views.filter(v => v.kind === "real").forEach(v => { const px = v.watch.caseMm * PX_PER_MM * calib; v.canvas.style.width = px + "px"; v.canvas.style.height = px + "px"; });
+  document.getElementById("cardBar").style.width = (54 * PX_PER_MM * calib) + "px";
+}
+
+function frame() {
+  const t = timeNow();
+  document.getElementById("timeOut").textContent = ((t.h % 12) || 12) + ":" + String(t.m).padStart(2, "0") + (t.h < 12 ? " am" : " pm");
+  if (live) document.getElementById("time").value = t.h * 60 + t.m;
+  views.forEach(v => {
+    if (v.kind === "big") paint(v.canvas, v.study, ambientBig, false, 1);
+    else if (v.kind === "amb") paint(v.canvas, v.study, true, false, 1);
+    else paint(v.canvas, v.study, false, true, v.watch.displayMm / v.watch.caseMm);
+  });
+}
+
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+document.getElementById("time").addEventListener("input", e => { live = false; manualMinutes = +e.target.value; document.getElementById("live").setAttribute("aria-pressed", "false"); frame(); });
+document.getElementById("live").addEventListener("click", e => { live = true; e.currentTarget.setAttribute("aria-pressed", "true"); frame(); });
+document.getElementById("ambient").addEventListener("click", e => { ambientBig = !ambientBig; e.currentTarget.setAttribute("aria-pressed", String(ambientBig)); frame(); });
+document.getElementById("scale").value = calib;
+document.getElementById("scale").addEventListener("input", e => { calib = +e.target.value; try { localStorage.setItem("faceCalib", String(calib)); } catch (err) { /* storage unavailable */ } sizeReal(); frame(); });
+window.addEventListener("resize", frame);
+sizeReal(); frame();
+setInterval(() => { if (live) frame(); }, reduce ? 60000 : 1000);
+if (document.fonts) document.fonts.ready.then(frame);
+</script>
+</body>
+</html>
