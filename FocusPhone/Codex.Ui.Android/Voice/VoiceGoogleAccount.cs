@@ -100,7 +100,10 @@ public sealed class VoiceGoogleAccount
     private static Action<SignInTrail>? pendingTrailSink;
     private static readonly object TrailGate = new();
 
-    public Task<string> SignIn(Activity activity) => SignIn(activity, null, null);
+    /// <summary>Signs in, trailed into the head's log as a device-account sign-in (LOG-LOOP-PLAN.md §4.2).</summary>
+    public Task<string> SignIn(Activity activity) => SignIn(activity, SignInFlowKinds.GoogleDeviceAccount, ToHeadLog);
+
+    private static void ToHeadLog(SignInTrail trail) => HeadDiagnostics.Current?.SignIn(trail);
 
     /// <summary>
     /// Signs in, and when <paramref name="onTrail"/> is given, records the sign-in as a

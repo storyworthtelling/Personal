@@ -109,6 +109,8 @@ public sealed class HeadDiagnostics
             }
         });
         TapWatch.Install(head.Tap);
+        // §4.2: a sign-in that left the app and heard nothing back is a NoReturn the moment any screen resumes.
+        application.RegisterActivityLifecycleCallbacks(new SignInResumeCheck());
         if (setup.ScheduleUpload)
         {
             LoopUploadWorker.Schedule(application);
@@ -349,5 +351,35 @@ public static class HeadLog
     {
         Android.Util.Log.Info(tag, message);
         HeadDiagnostics.Current?.Info(tag, message);
+    }
+}
+
+/// <summary>Turns a device-account sign-in that never came back into a NoReturn on the next screen resume.</summary>
+internal sealed class SignInResumeCheck : Java.Lang.Object, Application.IActivityLifecycleCallbacks
+{
+    public void OnActivityResumed(Activity activity) => VoiceGoogleAccount.CheckPendingSignIn(DateTimeOffset.Now, resumed: true);
+
+    public void OnActivityCreated(Activity activity, Android.OS.Bundle? savedInstanceState)
+    {
+    }
+
+    public void OnActivityDestroyed(Activity activity)
+    {
+    }
+
+    public void OnActivityPaused(Activity activity)
+    {
+    }
+
+    public void OnActivitySaveInstanceState(Activity activity, Android.OS.Bundle outState)
+    {
+    }
+
+    public void OnActivityStarted(Activity activity)
+    {
+    }
+
+    public void OnActivityStopped(Activity activity)
+    {
     }
 }

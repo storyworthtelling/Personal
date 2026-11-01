@@ -259,6 +259,7 @@ public class ScoreActivity : Activity
     protected override void OnResume()
     {
         base.OnResume();
+        Google.DeviceAccountSignIn.CheckPending(DateTimeOffset.Now);
         StartTicking();
         foreach (var area in areas)
         {
