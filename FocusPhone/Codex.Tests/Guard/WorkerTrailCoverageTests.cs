@@ -34,7 +34,7 @@ public partial class WorkerTrailCoverageTests
     {
         var count = LogLoopHeads.All.Sum(h => LogLoopSource.Sources(h.Folder).Sum(s => WorkerDeclaration().Matches(s.Text).Count));
 
-        Assert.True(count >= 7, $"Expected the suite's workers (Post 2, Flyleaf 1, Score 3, Pulp 1), found {count}.");
+        Assert.True(count >= 12, $"Expected the suite's workers (Post 2, Flyleaf 1, Score 3, Pulp 1, Constitution 5), found {count}.");
     }
 
     private static string ClassBody(string text, int start)

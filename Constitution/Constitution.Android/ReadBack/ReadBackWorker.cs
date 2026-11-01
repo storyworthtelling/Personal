@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
 using AndroidX.Work;
@@ -28,7 +29,9 @@ public class ReadBackWorker : Worker
     {
     }
 
-    public override Result DoWork()
+    public override Result DoWork() => HeadDiagnostics.Worker(nameof(ReadBackWorker), Work);
+
+    private Result Work()
     {
         var context = ApplicationContext!;
         Constitution.Waiting.NoticePoster.Attach(context);

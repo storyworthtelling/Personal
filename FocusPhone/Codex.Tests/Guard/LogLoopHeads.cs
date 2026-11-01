@@ -38,6 +38,11 @@ internal static class LogLoopHeads
         [
             "pulp.hand-off", "pulp.locked-open", "pulp.plan", "pulp.send-logs-now",
         ]),
+        new("constitution", "Constitution/Constitution.Android", "Constitution/Constitution.Domain/Diagnostics/ConstitutionKeyActions.cs", "ConstitutionKeyActions",
+        [
+            "constitution.google-sign-in", "constitution.sleep-number-login", "constitution.health-connect-permission",
+            "constitution.scan-recipe", "constitution.cook-soon", "constitution.send-logs-now",
+        ]),
     ];
 
     public static TheoryData<string> Folders() => [.. All.Select(h => h.Folder)];

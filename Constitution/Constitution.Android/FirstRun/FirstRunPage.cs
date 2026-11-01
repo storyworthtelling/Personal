@@ -1,3 +1,4 @@
+using Constitution.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.Views;
@@ -101,6 +102,7 @@ public sealed class FirstRunPage(Activity host, Action changed)
 
     private async Task SignInAsync()
     {
+        var signing = TapWatch.Action(ConstitutionKeyActions.GoogleSignIn, TimeSpan.FromMinutes(5));
         var settled = false;
         try
         {
@@ -109,6 +111,7 @@ public sealed class FirstRunPage(Activity host, Action changed)
             try
             {
                 await googleAccount.SignIn(host);
+                signing.Succeeded();
                 note = null;
                 settled = true;
             }
@@ -116,6 +119,7 @@ public sealed class FirstRunPage(Activity host, Action changed)
                 e is InvalidOperationException or OperationCanceledException or TimeoutException or IOException
                     or Java.Lang.Exception))
             {
+                signing.Failed(e.GetType().Name);
                 note = ConnectionFailure.Sentence(ConnectionAct.SignIn, e, callerCancelled: false);
                 settled = true;
                 return;

@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Codex.Ui.Voice;
 using Constitution.Domain;
@@ -67,7 +68,7 @@ public sealed class ConstitutionHousehold
         // The loop outlives any one pass: a failure is logged by type and backed off, never fatal.
         loop = new HouseholdSyncLoop(
             async token => await Service.SyncAsync(token),
-            exception => Android.Util.Log.Warn(LogTag, "A household pass failed unexpectedly: " + exception.GetType().Name),
+            exception => HeadLog.Warn(LogTag, "A household pass failed unexpectedly: " + exception.GetType().Name),
             () => DateTimeOffset.UtcNow);
         Service.SyncWanted += loop.Edited;
         Service.PassSettled += OnPassSettled;
@@ -157,7 +158,7 @@ public sealed class ConstitutionHousehold
             // The vault read goes through the Google client and the HTTP stack, whose failures cannot be listed; the phone carries
             // on with the role it remembers, and the failure is on the trail by type, never by message.
             log.Outcome("vault unreachable");
-            Android.Util.Log.Warn(LogTag, "The vault's owner marker could not be read: " + exception.GetType().Name);
+            HeadLog.Warn(LogTag, "The vault's owner marker could not be read: " + exception.GetType().Name);
         }
     }
 

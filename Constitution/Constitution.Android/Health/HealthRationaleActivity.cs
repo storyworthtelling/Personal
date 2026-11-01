@@ -54,6 +54,7 @@ public class HealthRationaleActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         SetContentView(BuildPage());
     }

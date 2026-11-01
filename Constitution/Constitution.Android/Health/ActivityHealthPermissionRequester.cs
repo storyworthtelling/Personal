@@ -1,3 +1,6 @@
+using Codex.Domain.Diagnostics;
+using Constitution.Domain.Diagnostics;
+using Codex.Ui;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -26,6 +29,7 @@ public sealed class ActivityHealthPermissionRequester(Activity activity) : IHeal
 
     private TaskCompletionSource<bool>? pending;
     private BodySignal pendingSignal;
+    private KeyAction? asking;
 
     public Task<bool> RequestAsync(BodySignal signal, CancellationToken cancellationToken)
     {
@@ -38,6 +42,7 @@ public sealed class ActivityHealthPermissionRequester(Activity activity) : IHeal
         var source = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         pending = source;
         pendingSignal = signal;
+        asking = TapWatch.Action(ConstitutionKeyActions.HealthConnectPermission, TimeSpan.FromMinutes(5));
         cancellationToken.Register(() => source.TrySetCanceled(cancellationToken));
         activity.RequestPermissions(permissions, RequestCode);
         return source.Task;
@@ -57,6 +62,11 @@ public sealed class ActivityHealthPermissionRequester(Activity activity) : IHeal
         var primary = HealthSignalPermissions.Primary(pendingSignal);
         var index = Array.IndexOf(permissions, primary);
         var granted = index >= 0 && index < grantResults.Length && grantResults[index] == Permission.Granted;
+        // §4.5: the platform's answer, by signal and outcome; an event, never a reading (O7).
+        new Constitution.Body.BodyLog(activity).Outcome(
+            $"health permission {pendingSignal.ToString().ToLowerInvariant()}: {(granted ? "granted" : "not granted")}");
+        asking?.Succeeded();
+        asking = null;
         pending?.TrySetResult(granted);
         return true;
     }
