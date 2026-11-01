@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log loop reader: privacy policy</title>
+</head>
+<body>
+<h1>Privacy policy</h1>
+<p>Effective 1 November 2026. This policy covers the log loop reader, a private tool described on the
+<a href="index.html">home page</a>.</p>
+
+<h2>Who uses it</h2>
+<p>Only the owner of the storyworthtelling apps, on their own Google account. It is not offered to the
+public, and nobody else is asked to sign in to it.</p>
+
+<h2>What it reads</h2>
+<p>With the <code>drive.readonly</code> permission, the reader lists the folder named
+<code>storyworthtelling-logs</code> in the owner's Google Drive and downloads the diagnostic log files the
+owner's own apps put there. It does not open any other file. Those files are encrypted before they leave
+the phone, and the reader decrypts them with a key only the owner holds.</p>
+
+<h2>What it keeps</h2>
+<p>The decrypted logs exist only in a temporary workspace while the weekly run is in progress, and are
+deleted with it. Nothing from them is written to the code repository. What the run publishes there, in bug
+reports and fixes, is limited to sanitized descriptions of a problem's shape: message templates, error types
+and control names, with numbers, addresses, names and links removed.</p>
+
+<h2>What it shares</h2>
+<p>Data read by the reader is not sold, not shared with anyone and not used for advertising. It is used
+only to find and fix bugs in the owner's own apps. Its use of information received from Google APIs follows
+the Google API Services User Data Policy, including the Limited Use requirements.</p>
+
+<h2>Stopping it</h2>
+<p>The owner can withdraw the reader's access at any time from the third-party access page of their Google
+account. The apps keep working without it.</p>
+
+<h2>Questions</h2>
+<p>Open an issue in the <a href="https://github.com/storyworthtelling/Personal">Personal repository on
+GitHub</a>.</p>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log loop reader</title>
+</head>
+<body>
+<h1>Log loop reader</h1>
+<p>The log loop reader is a private maintenance tool for one person's own apps, the storyworthtelling
+apps in this repository. Once a week those apps upload their encrypted diagnostic logs to their owner's
+Google Drive. The reader downloads those files, decrypts them and summarises what went wrong, so that bugs
+can be found and fixed.</p>
+<p>It asks Google for one permission, <code>drive.readonly</code>, which lets it read files in Drive and
+nothing else: it cannot change, share or delete anything. It is used only by the owner of the apps and is
+not offered to anyone else.</p>
+<p>The source code is public in the <a href="https://github.com/storyworthtelling/Personal">Personal
+repository on GitHub</a> (<code>Tools/LogLoopReader</code>).</p>
+<p><a href="privacy.html">Privacy policy</a></p>
+</body>
+</html>
