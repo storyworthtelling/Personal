@@ -16,12 +16,9 @@ public static class PulpKeyActions
     /// <summary>Planning a title or a game onto the household calendar.</summary>
     public const string Plan = "pulp.plan";
 
-    /// <summary>Settings: writing the Pulp calendar now.</summary>
-    public const string CalendarWrite = "pulp.calendar-write";
-
     /// <summary>Diagnostics: Send logs now.</summary>
     public const string SendLogsNow = "pulp.send-logs-now";
 
     public static IReadOnlyList<string> All { get; } =
-        [HandOff, LockedOpen, Plan, CalendarWrite, SendLogsNow];
+        [HandOff, LockedOpen, Plan, SendLogsNow];
 }

@@ -74,6 +74,7 @@ public class TrailerActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         var videoId = Intent?.GetStringExtra(ExtraVideoId);

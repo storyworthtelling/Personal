@@ -1,3 +1,5 @@
+using Pulp.Domain.Diagnostics;
+using Codex.Ui;
 using Android.Content;
 using AndroidX.Work;
 using Pulp.App;
@@ -36,7 +38,9 @@ public class CalendarSyncWorker : Worker
     {
     }
 
-    public override Result DoWork()
+    public override Result DoWork() => HeadDiagnostics.Worker(nameof(CalendarSyncWorker), Work);
+
+    private Result Work()
     {
         // WorkManager can start the process with no shell, so the hooks are still unset; composing the
         // services is what sets them. Without this the worker would find them null and report success
@@ -47,12 +51,14 @@ public class CalendarSyncWorker : Worker
         var calendar = CalendarSyncHooks.Calendar;
         if (feed is null || calendar is null)
         {
+            HeadLog.Info("Calendar", PulpLogLines.CalendarSkipped);
             return Result.InvokeSuccess()!;
         }
 
         try
         {
-            CalendarNightly.RunAsync(feed, calendar, DateOnly.FromDateTime(DateTime.Now), CancellationToken.None).GetAwaiter().GetResult();
+            var outcome = CalendarNightly.RunAsync(feed, calendar, DateOnly.FromDateTime(DateTime.Now), CancellationToken.None).GetAwaiter().GetResult();
+            HeadLog.Info("Calendar", PulpLogLines.Calendar(outcome));
             return Result.InvokeSuccess()!;
         }
         catch (Exception exception)
