@@ -90,6 +90,10 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         status.SetPadding(0, gap, 0, gap);
         column.AddView(status);
 
+        // Diagnostics: the failure log, the weekly upload and Send logs now (LOG-LOOP-PLAN.md §3).
+        column.AddView(Label("Diagnostics", gap));
+        column.AddView(PaperUi.SecondaryButton(Host, "Open diagnostics", () => LoopDiagnosticsActivity.Open(Host)));
+
         var note = PaperUi.Secondary(Host,
             "Plate keeps nothing else. Photos go to your camera roll, scans to Documents.");
         note.SetPadding(0, gap, 0, gap);

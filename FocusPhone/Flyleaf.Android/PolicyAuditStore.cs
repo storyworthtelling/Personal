@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Codex.Domain.Policy;
 using Codex.Infrastructure.Policy;
@@ -27,8 +28,28 @@ public class PolicyAuditStore
     public void Save(PolicyAuditLog log) =>
         preferences.Edit()!.PutString(LogKey, PolicyAuditLogCodec.Encode(log))!.Apply();
 
-    /// <summary>Appends events to the stored log (trimmed to the cap).</summary>
-    public void Append(IEnumerable<PolicyEvent> events) => Save(Load().Record(events));
+    /// <summary>
+    /// Appends events to the stored log (trimmed to the cap), and writes each one the audit actually records
+    /// to the log loop's file (LOG-LOOP-PLAN.md §4.5) — repeats collapsed the same way, so a failure that recurs
+    /// on every policy pass is one line, not hundreds.
+    /// </summary>
+    public void Append(IEnumerable<PolicyEvent> events)
+    {
+        var batch = events.ToList();
+        var log = Load();
+        foreach (var fresh in log.NewlyRecorded(batch))
+        {
+            if (PolicyLogLines.IsProblem(fresh.Kind))
+            {
+                HeadDiagnostics.Current?.Warn("Policy", PolicyLogLines.Line(fresh));
+            }
+            else
+            {
+                HeadDiagnostics.Current?.Info("Policy", PolicyLogLines.Line(fresh));
+            }
+        }
+        Save(log.Record(batch));
+    }
 
     /// <summary>Records a single event now (used by owner actions like block/unblock).</summary>
     public void Record(PolicyEventKind kind, string summary) =>

@@ -62,6 +62,18 @@ public static class UpdateService
     {
         var result = await RunAsync(context, force);
         new UpdateStatusStore(context).Record(result.Summarize());
+        // One line per app (LOG-LOOP-PLAN.md §4.5), not just the summary the settings panel shows.
+        foreach (var line in result.Lines())
+        {
+            if (result.AnyFailed || result.State is UpdateRunState.FetchFailed)
+            {
+                HeadDiagnostics.Current?.Warn("Update", line);
+            }
+            else
+            {
+                HeadDiagnostics.Current?.Info("Update", line);
+            }
+        }
         return result;
     }
 
@@ -70,12 +82,12 @@ public static class UpdateService
         var token = new UpdateSettingsStore(context).GitHubToken;
         if (string.IsNullOrEmpty(token))
         {
-            Log.Info(Tag, "No update token configured; skipping check.");
+            HeadLog.Info(Tag, "No update token configured; skipping check.");
             return UpdateRunResult.NoToken();
         }
         if (!PolicyManager.IsDeviceOwner(context))
         {
-            Log.Info(Tag, "Not device owner; silent install unavailable, skipping check.");
+            HeadLog.Info(Tag, "Not device owner; silent install unavailable, skipping check.");
             return UpdateRunResult.NotDeviceOwner();
         }
 
@@ -99,7 +111,7 @@ public static class UpdateService
         catch (HttpRequestException ex)
         {
             // Transient (network/5xx): report it so the worker retries, without flagging the token.
-            Log.Warn(Tag, $"Release fetch failed: {ex.Message}");
+            HeadLog.Warn(Tag, $"Release fetch failed: {ex.Message}");
             return UpdateRunResult.FetchFailed(ex.Message);
         }
 
@@ -113,7 +125,7 @@ public static class UpdateService
             .ToList();
         if (pending.Count == 0)
         {
-            Log.Info(Tag, "No new release assets to consider.");
+            HeadLog.Info(Tag, "No new release assets to consider.");
             return UpdateRunResult.Ran([]);
         }
 
@@ -130,7 +142,7 @@ public static class UpdateService
             catch (Exception e)
             {
                 // A failed download isn't remembered, so it's retried next cycle.
-                Log.Warn(Tag, $"Downloading {asset.Name} failed: {e.Message}");
+                HeadLog.Warn(Tag, $"Downloading {asset.Name} failed: {e.Message}");
                 results.Add(new AppInstallResult(asset.Name, 0, InstallOutcome.Failed, e.Message));
                 DeleteQuietly(path);
                 continue;
@@ -139,7 +151,7 @@ public static class UpdateService
             var info = context.PackageManager!.GetPackageArchiveInfo(path, (PackageInfoFlags)0);
             if (info?.PackageName is null)
             {
-                Log.Warn(Tag, $"{asset.Name} is not a readable APK; skipping.");
+                HeadLog.Warn(Tag, $"{asset.Name} is not a readable APK; skipping.");
                 DeleteQuietly(path);
                 processed.Add(asset.Id); // don't keep re-downloading a bad asset
                 results.Add(new AppInstallResult(asset.Name, 0, InstallOutcome.Unreadable));
@@ -185,14 +197,14 @@ public static class UpdateService
 
         try
         {
-            Log.Info(Tag, $"Installing {item.Candidate.Package} v{item.Candidate.VersionCode} from {item.Asset.Name}.");
+            HeadLog.Info(Tag, $"Installing {item.Candidate.Package} v{item.Candidate.VersionCode} from {item.Asset.Name}.");
             using var apk = System.IO.File.OpenRead(item.Path);
             await ApkInstaller.InstallAsync(context, apk);
             return new AppInstallResult(item.Candidate.Package, item.Candidate.VersionCode, InstallOutcome.Installed);
         }
         catch (Exception e)
         {
-            Log.Warn(Tag, $"Installing {item.Candidate.Package} failed: {e.Message}");
+            HeadLog.Warn(Tag, $"Installing {item.Candidate.Package} failed: {e.Message}");
             return new AppInstallResult(item.Candidate.Package, item.Candidate.VersionCode, InstallOutcome.Failed, e.Message);
         }
     }
@@ -238,7 +250,7 @@ public static class UpdateService
         }
         catch (Exception e)
         {
-            Log.Warn(Tag, $"Could not delete temp APK {path}: {e.Message}");
+            HeadLog.Warn(Tag, $"Could not delete temp APK {path}: {e.Message}");
         }
     }
 }
@@ -249,7 +261,9 @@ public class UpdateWorker : Worker
     {
     }
 
-    public override Result DoWork()
+    public override Result DoWork() => HeadDiagnostics.Worker(nameof(UpdateWorker), Check);
+
+    private Result Check()
     {
         try
         {
@@ -262,7 +276,7 @@ public class UpdateWorker : Worker
         }
         catch (Exception e)
         {
-            Log.Warn("FocusPhoneUpdate", $"Update check failed; will retry on next period: {e}");
+            HeadLog.Warn("FocusPhoneUpdate", $"Update check failed; will retry on next period: {e}");
             return Result.InvokeRetry();
         }
     }

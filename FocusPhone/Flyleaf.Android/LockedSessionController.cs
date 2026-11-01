@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.App;
 using Android.App.Admin;
 using Android.Content;
@@ -36,7 +37,7 @@ internal static class LockedSessionController
         {
             if (!PolicyManager.IsDeviceOwner(context))
             {
-                Log.Warn(Tag, "Not device owner; a locked open was ignored. This is expected during development.");
+                HeadLog.Warn(Tag, "Not device owner; a locked open was ignored. This is expected during development.");
                 return false;
             }
 
@@ -48,7 +49,7 @@ internal static class LockedSessionController
             var refusal = LockedOpenGate.Decide(request, new HiddenAppsStore(context).Load(), blocked, policySuspended);
             if (refusal != LockedOpenRefusal.None)
             {
-                Log.Warn(Tag, $"A locked open for {request.Package} was refused: {refusal}.");
+                HeadLog.Warn(Tag, $"A locked open for {request.Package} was refused: {refusal}.");
                 return false;
             }
 
@@ -68,7 +69,7 @@ internal static class LockedSessionController
             var plan = LockedSessionPlan.Start(facts);
             if (!plan.Allowed)
             {
-                Log.Warn(Tag, $"A locked open for {request.Package} was not started: the plan refused it (a session may already be running).");
+                HeadLog.Warn(Tag, $"A locked open for {request.Package} was not started: the plan refused it (a session may already be running).");
                 return false;
             }
 
@@ -98,7 +99,7 @@ internal static class LockedSessionController
             {
                 // Any failure, not only a Java one: the record is on disk, so it must be undone here or
                 // by the next start, never left half-applied with no clock armed.
-                Log.Warn(Tag, $"Starting the locked session failed, so it is being undone: {exception.Message}");
+                HeadLog.Warn(Tag, $"Starting the locked session failed, so it is being undone: {exception.Message}");
                 ReleaseCore(context, LockedReleaseReason.Stale);
                 return false;
             }
@@ -230,7 +231,7 @@ internal static class LockedSessionController
         {
             // The record stays, so the next Home press, tick or start tries again; the clock is re-armed
             // so a retry does not wait on something that may never happen.
-            Log.Warn(Tag, $"Releasing the locked session failed; it will be retried: {exception.Message}");
+            HeadLog.Warn(Tag, $"Releasing the locked session failed; it will be retried: {exception.Message}");
             ArmTick(context, LockedSessionRules.TickInterval);
             return;
         }
@@ -256,7 +257,7 @@ internal static class LockedSessionController
             }
             catch (Exception exception)
             {
-                Log.Warn(Tag, $"Could not read the policy plan to decide a re-suspend; leaving the service as it is: {exception.Message}");
+                HeadLog.Warn(Tag, $"Could not read the policy plan to decide a re-suspend; leaving the service as it is: {exception.Message}");
             }
         }
 
@@ -292,7 +293,7 @@ internal static class LockedSessionController
         }
         catch (Exception exception)
         {
-            Log.Info(Tag, $"Could not bring {package} forward: {exception.Message}");
+            HeadLog.Info(Tag, $"Could not bring {package} forward: {exception.Message}");
         }
     }
 
@@ -344,7 +345,7 @@ internal static class LockedSessionController
         }
         catch (Exception exception)
         {
-            Log.Info(Tag, $"Could not read the boot count: {exception.Message}");
+            HeadLog.Info(Tag, $"Could not read the boot count: {exception.Message}");
             return -1;
         }
     }

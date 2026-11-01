@@ -62,6 +62,7 @@ public class ScoreActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         // ScoreActivity is a plain Activity, not AndroidX's ComponentActivity, so it never gets

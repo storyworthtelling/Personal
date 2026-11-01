@@ -158,6 +158,24 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
         Func<TimeSpan, CancellationToken, Task> delay,
         CancellationToken cancellationToken)
     {
+        var result = await PollLoopAsync(clientId, clientSecret, deviceCode, intervalSeconds, expiresInSeconds, delay, cancellationToken);
+        // The trail (LOG-LOOP-PLAN.md §4.2): how the device flow ended, for whoever is listening.
+        Trail?.Invoke(TidalSignInTrails.DevicePoll(
+            TidalSignInTrails.StartDevice(deviceCode, clientId, trailStarted), result, DateTimeOffset.Now));
+        return result;
+    }
+
+    /// <summary>Told how each device-code sign-in ended (plan §4.2). Null when nobody is listening.</summary>
+    public Action<Storyworthtelling.Diagnostics.SignInTrail>? Trail { get; init; }
+
+    private readonly DateTimeOffset trailStarted = DateTimeOffset.Now;
+
+    private async Task<TidalTokenPollResult> PollLoopAsync(
+        string clientId, string clientSecret, string deviceCode,
+        int intervalSeconds, int expiresInSeconds,
+        Func<TimeSpan, CancellationToken, Task> delay,
+        CancellationToken cancellationToken)
+    {
         var interval = TimeSpan.FromSeconds(intervalSeconds);
         var budget = TimeSpan.FromSeconds(expiresInSeconds);
         var elapsed = TimeSpan.Zero;

@@ -225,7 +225,7 @@ public static class PolicyManager
         // A rolling audit line per pass; consecutive-identical lines collapse, so this records once
         // and re-records only when the counts change (a newly suspended app, a resolved failure).
         events.Add(Event(PolicyEventKind.Applied,
-            $"{plan.UserRestrictions.Count} restrictions · {installed.Length} suspended · {toRelease.Length} released · {plan.PermissionGrants.Count} grants"));
+            $"{plan.UserRestrictions.Count} restrictions · {installed.Length} suspended · {toRelease.Length} released · {plan.PermissionGrants.Count} grants · admin {(plan.LoginBrowser.BlockNonAllowlisted ? "on" : "off")}"));
         new PolicyAuditStore(context).Append(events);
     }
 

@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.App.Admin;
 using Android.Bluetooth;
@@ -74,6 +75,7 @@ public class LauncherSettingsActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         restart = new InlineCountdown(new SystemClockAdapter(),
             TimeSpan.FromSeconds(DesignTokens.Motion.CutoverCountdownSeconds));
@@ -208,6 +210,7 @@ public class LauncherSettingsActivity : Activity
             if (!ok)
             {
                 inlineStatus = "Couldn't change Wi-Fi. This needs the device-owner lockdown.";
+                HeadLog.Warn("Connectivity", inlineStatus);
                 Render();
             }
         });
@@ -253,6 +256,7 @@ public class LauncherSettingsActivity : Activity
             if (!ok)
             {
                 inlineStatus = "Couldn't change mobile data on this device. Try Choose a network for the mobile-data panel.";
+                HeadLog.Warn("Connectivity", inlineStatus);
                 Render();
             }
         });
@@ -279,6 +283,7 @@ public class LauncherSettingsActivity : Activity
             if (!ok)
             {
                 inlineStatus = "Couldn't change Bluetooth on this device.";
+                HeadLog.Warn("Connectivity", inlineStatus);
                 Render();
             }
         });
@@ -448,6 +453,7 @@ public class LauncherSettingsActivity : Activity
     // re-checks every asset so it also doubles as a manual retry.
     private async void InstallFromGitHubNow()
     {
+        var installing = TapWatch.Action(FlyleafKeyActions.InstallFromGitHub, TimeSpan.FromMinutes(15));
         inlineStatus = "Checking GitHub… new or updated apps install and appear in Apps.";
         undoPackage = null;
         checkingGitHub = true;
@@ -456,10 +462,19 @@ public class LauncherSettingsActivity : Activity
         {
             var result = await UpdateService.CheckAndInstallAsync(this, force: true);
             inlineStatus = result.Summarize();
+            if (result.AnyFailed || result.State is not Storyworthtelling.Updates.UpdateRunState.Ran)
+            {
+                installing.Failed(result.Summarize());
+            }
+            else
+            {
+                installing.Succeeded();
+            }
         }
         catch (Exception e)
         {
             inlineStatus = $"GitHub install failed: {e.Message}";
+            installing.Failed($"{e.GetType().Name}: {e.Message}");
         }
         checkingGitHub = false;
         Render();
@@ -542,6 +557,8 @@ public class LauncherSettingsActivity : Activity
         var card = StartGroup("Advanced");
         AddNavRow(card, "Admin (device-owner controls)…", null,
             () => StartActivity(new Intent(this, typeof(UnlockActivity))));
+        // The log loop's screen: what went wrong since the logs last went to Drive, and Send logs now.
+        AddNavRow(card, "Diagnostics", null, () => LoopDiagnosticsActivity.Open(this));
     }
 
     // ---- Shelves (#11): create / rename / reorder / remove the tray categories -
@@ -812,7 +829,8 @@ public class LauncherSettingsActivity : Activity
     private void AddToggleRow(LinearLayout card, string title, string? desc, bool isOn, Action<bool> onChange)
     {
         var row = AddCardRow(card, title, desc);
-        var toggle = PaperUi.Segmented(this, ["On", "Off"], index => onChange(index == 0), isOn ? 0 : 1, PaperTheme.Accent);
+        var toggle = PaperUi.Segmented(this, ["On", "Off"], index => KeyActs.Run(
+            TapWatch.Action(FlyleafKeyActions.Connectivity, KeyActs.Local), () => onChange(index == 0)), isOn ? 0 : 1, PaperTheme.Accent);
         // The segmented cells are equal-weight, so the control needs a bounded width to lay out.
         row.AddView(toggle, new LinearLayout.LayoutParams(Dp(128), ViewGroup.LayoutParams.WrapContent));
     }

@@ -44,6 +44,7 @@ public class RestrictedBrowserActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         var origin = Intent?.Data?.ToString() is { } raw && Uri.TryCreate(raw, UriKind.Absolute, out var parsed)

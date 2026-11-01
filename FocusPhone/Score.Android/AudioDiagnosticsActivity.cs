@@ -27,6 +27,7 @@ public class AudioDiagnosticsActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
@@ -44,10 +45,13 @@ public class AudioDiagnosticsActivity : Activity
             ScoreShellAreas.All, ScoreShellAreas.Settings, SwitchArea),
             new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        var copy = PaperUi.SecondaryButton(this, "Copy", CopyToClipboard);
+        // Send logs now is the screen's one primary act (§7): the weekly upload, this minute. The shared
+        // screen carries the upload, so this one hands over to it rather than keep a second copy.
+        var send = PaperUi.PrimaryButton(this, "Send logs now", () => LoopDiagnosticsActivity.Open(this));
         var share = PaperUi.SecondaryButton(this, "Share", ShareReport);
+        var copy = PaperUi.QuietButton(this, "Copy", CopyToClipboard);
         var clear = PaperUi.QuietButton(this, "Clear", ClearLog);
-        root.AddView(PaperUi.BottomBar(this, copy, share, clear));
+        root.AddView(PaperUi.BottomBar(this, send, share, copy, clear));
 
         SetContentView(root);
     }

@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.Content;
 using Android.Views;
 using Codex.Infrastructure.Music;
@@ -315,8 +316,10 @@ public sealed class MusicArea : ScoreArea
             return;
         }
 
+        var making = TapWatch.Action(ScoreKeyActions.DiscoveryPlaylist, TimeSpan.FromMinutes(2));
         if (library.Listening.Taste is null)
         {
+            making.Failed("no shared Claude key");
             generating = "Generating needs the shared Claude key — set it in Settings.";
             Invalidate();
             return;
@@ -329,6 +332,7 @@ public sealed class MusicArea : ScoreArea
             library.Catalog.Songs(), new PlaylistRequest(seed.Trim()), CancellationToken.None);
         if (made.IsEmpty)
         {
+            making.Failed("the playlist came back empty");
             generating = "Couldn't make a playlist from that. Try another idea.";
             Invalidate();
             return;
@@ -337,6 +341,7 @@ public sealed class MusicArea : ScoreArea
         var saved = Playlist.Generated(
             Guid.NewGuid().ToString("n"), made.Title, [.. made.Tracks.Select(track => track.Id)]);
         library.SavePlaylists([.. library.Playlists(), saved]);
+        making.Succeeded();
         generating = null;
         Invalidate();
     }

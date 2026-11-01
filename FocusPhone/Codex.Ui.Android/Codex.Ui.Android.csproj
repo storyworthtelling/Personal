@@ -21,6 +21,12 @@
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
   </ItemGroup>
 
+  <!-- The log loop's shared upload worker (Diagnostics/LoopUploadWorker): the same package and version every
+       head already references, so nothing new enters any APK. -->
+  <ItemGroup>
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- The shared Paper & Ink fonts; packaged into every consuming head's APK.
          Forward slashes in Link are mandatory: on the Linux CI runner a

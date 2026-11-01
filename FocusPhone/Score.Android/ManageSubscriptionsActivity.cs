@@ -32,6 +32,7 @@ public class ManageSubscriptionsActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         store = new SubscriptionStore(this);
         librarySync = new PodcastLibrarySync(
