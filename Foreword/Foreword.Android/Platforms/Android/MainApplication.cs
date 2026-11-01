@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using global::Android.App;
 using global::Android.Runtime;
 using Microsoft.Maui;
@@ -34,7 +35,11 @@ public class MainApplication : MauiApplication
         Java.Lang.Thread.DefaultUncaughtExceptionHandler = new CrashLogger(prevHandler);
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
             CrashLogger.Log(args.ExceptionObject?.ToString() ?? "(no details)");
+            // The same fault, in the file log the weekly upload carries (LOG-LOOP-PLAN.md §4.4).
+            MauiLog.Current?.Write("Unhandled", Microsoft.Extensions.Logging.LogLevel.Critical, "Unhandled exception", args.ExceptionObject as Exception);
+        };
 
         base.OnCreate();
     }

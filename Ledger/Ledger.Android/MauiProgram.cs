@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -281,8 +282,11 @@ public static class MauiProgram
 #if DEBUG
         builder.Logging.AddDebug();
 #endif
-        // Persist the refresh log to a file so it can be viewed/shared from Settings for diagnosis.
-        builder.Logging.AddProvider(PipelineFileLogger.Instance);
+        // The refresh log: viewed and shared from Settings, and sealed into the log loop's outbox when full
+        // (LOG-LOOP-PLAN.md §4.4). Index's own categories from Information; EF Core and MAUI from Warning.
+        builder.Logging.AddProvider(MauiLog.Install(new FileLoggerOptions(
+            FileSystem.AppDataDirectory, "refresh.log", 1_000_000,
+            category => category.StartsWith("Index", StringComparison.Ordinal))));
 
         return builder.Build();
     }

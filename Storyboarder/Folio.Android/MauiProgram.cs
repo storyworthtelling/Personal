@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -206,7 +207,12 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
         // Persist the pipeline's log to a file so it can be viewed/shared from Settings for diagnosis.
-        builder.Logging.AddProvider(PipelineFileLogger.Instance);
+        // The pipeline log (LOG-LOOP-PLAN.md §4.4): Folio's own categories from Information, sealed into the log
+        // loop's outbox when full. A message is cut at 2 KB because a provider's error body can quote the manuscript.
+        builder.Logging.AddProvider(MauiLog.Install(new FileLoggerOptions(
+            FileSystem.AppDataDirectory, "pipeline.log", 1_500_000,
+            category => category.StartsWith("Folio", StringComparison.Ordinal),
+            MaxMessageChars: 2048)));
 
         return builder.Build();
     }

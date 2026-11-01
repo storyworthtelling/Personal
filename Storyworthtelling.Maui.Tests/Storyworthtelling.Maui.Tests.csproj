@@ -16,6 +16,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
+    <ProjectReference Include="..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
   </ItemGroup>
 
   <!-- The kit's PURE files, compiled straight into this project. The kit itself is
@@ -35,6 +37,8 @@
     <Compile Include="..\Storyworthtelling.Maui\Layout\*.cs" Link="Kit\Layout\%(Filename)%(Extension)" />
     <Compile Include="..\Storyworthtelling.Maui\State\*.cs" Link="Kit\State\%(Filename)%(Extension)" />
     <Compile Include="..\Storyworthtelling.Maui\Time\*.cs" Link="Kit\Time\%(Filename)%(Extension)" />
+    <Compile Include="..\Storyworthtelling.Maui\Diagnostics\FileLogger.cs" Link="Kit\Diagnostics\FileLogger.cs" />
+    <Compile Include="..\Storyworthtelling.Maui\Diagnostics\MauiLog.cs" Link="Kit\Diagnostics\MauiLog.cs" />
   </ItemGroup>
 
 </Project>

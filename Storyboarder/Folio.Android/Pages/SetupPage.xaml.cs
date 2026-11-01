@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Folio.Android.Google;
@@ -243,7 +244,7 @@ public partial class SetupPage : FolioBinderPage
             var report = await BuildDiagnosticsReport();
             var bundle = new System.Text.StringBuilder()
                 .AppendLine("===== STATUS SNAPSHOT =====").AppendLine().AppendLine(report).AppendLine()
-                .AppendLine("===== PIPELINE LOG =====").AppendLine().AppendLine(ReadOrEmpty(PipelineLogPath)).AppendLine()
+                .AppendLine("===== PIPELINE LOG =====").AppendLine().AppendLine(MauiLog.Current?.ReadAll() ?? ReadOrEmpty(PipelineLogPath)).AppendLine()
                 .AppendLine("===== CRASH LOG =====").AppendLine().AppendLine(ReadOrEmpty(CrashLogPath))
                 .ToString();
             await ShareText($"folio-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.txt", bundle, "Folio diagnostics");
@@ -263,7 +264,7 @@ public partial class SetupPage : FolioBinderPage
     }
 
     private async void OnPipelineLogClicked(object sender, EventArgs e) =>
-        await ShowLog("Pipeline log", PipelineLogPath, PipelineFileLogger.Clear);
+        await ShowLog("Pipeline log", PipelineLogPath, () => MauiLog.Current?.Clear());
 
     private async void OnCrashLogClicked(object sender, EventArgs e) =>
         await ShowLog("Crash log", CrashLogPath, () => System.IO.File.Delete(CrashLogPath));
