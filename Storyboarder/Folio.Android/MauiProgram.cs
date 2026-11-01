@@ -1,3 +1,5 @@
+using Storyworthtelling.Diagnostics;
+using Folio.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -214,6 +216,15 @@ public static class MauiProgram
             category => category.StartsWith("Folio", StringComparison.Ordinal),
             MaxMessageChars: 2048)));
 
-        return builder.Build();
+        // The log loop (LOG-LOOP-PLAN.md §3, §4): the tap watch, then — once the services exist — the launch line,
+        // exit reasons and the Drive upload the head's worker runs inside the Saturday window.
+        MauiTapWatch.Install(MauiLogLoop.Tap);
+        var app = builder.Build();
+        MauiLogLoop.Install(new MauiLoopSetup(
+            "folio", "Folio", FolioKeyActions.SendLogsNow,
+            DriveFactory(app.Services),
+            () => SettingsStore.VaultPassphrase,
+            _ => Task.FromResult(LogPhone.Owner)));
+        return app;
     }
 }

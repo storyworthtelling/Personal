@@ -1,3 +1,5 @@
+using Foreword.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Foreword.Infrastructure.Calendar;
@@ -507,12 +509,14 @@ public partial class SetupPage : BinderPage
             return;
         }
 
+        var pairing = MauiTapWatch.Action(ForewordKeyActions.PairRemarkable, TimeSpan.FromMinutes(1));
         try
         {
             // Pair through the shared library rather than an inline POST.
             var registration = IPlatformApplication.Current!.Services
                 .GetRequiredService<Storyworthtelling.Remarkable.IRemarkableRegistration>();
             var token = await registration.Register(code);
+            pairing.Succeeded();
 
             CredentialStore.RemarkableDeviceToken = token;
             // Back up the freshly paired token so a later reset does not force re-registration.
@@ -526,11 +530,13 @@ public partial class SetupPage : BinderPage
         }
         catch (HttpRequestException ex)
         {
+            pairing.Failed($"HTTP {(int?)ex.StatusCode}");
             RemarkableStatusLabel.Text =
                 $"Pairing refused ({(int?)ex.StatusCode}) — the code may have expired. Ask for a new one.";
         }
         catch (Exception ex)
         {
+            pairing.Failed(ex.GetType().Name);
             RemarkableStatusLabel.Text = $"Pairing failed — {ex.Message}";
         }
     }

@@ -39,9 +39,11 @@
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
   </ItemGroup>
 
-  <!-- The log loop's pure core (the outbox, the tap judge, the sign-in trail): BCL-only, shared with the native heads. -->
+  <!-- The log loop: its pure core (the outbox, the tap judge, the sign-in trail), shared with the native heads. -->
   <ItemGroup>
     <ProjectReference Include="..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
+    <!-- The Drive half of the loop (the log folder, the uploader) and the vault's ownership rule. -->
+    <ProjectReference Include="..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
   </ItemGroup>
 
 </Project>

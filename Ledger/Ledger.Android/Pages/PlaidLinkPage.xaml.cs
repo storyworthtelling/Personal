@@ -1,3 +1,5 @@
+using Index.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using Android.Content;
 using Android.Content.PM;
 using Microsoft.Extensions.Logging;
@@ -335,10 +337,24 @@ public partial class PlaidLinkPage : LedgerBinderPage
     private async void OnOpenPlaidClicked(object? sender, EventArgs e)
     {
         openPlaidButton.IsEnabled = false;
+        // A key action: answered when the browser has been handed the link; the bank's own answer is the trail.
+        var connecting = MauiTapWatch.Action(IndexKeyActions.ConnectBank, TimeSpan.FromMinutes(1));
         try
         {
             if (await EnsureLinkTokenAsync())
+            {
                 OpenHostedLink();
+                connecting.Succeeded();
+            }
+            else
+            {
+                connecting.Failed("no link token");
+            }
+        }
+        catch (Exception ex)
+        {
+            connecting.Failed($"{ex.GetType().Name}: {ex.Message}");
+            throw;
         }
         finally
         {

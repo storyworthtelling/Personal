@@ -1,3 +1,5 @@
+using Storyworthtelling.Diagnostics;
+using Foreword.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -292,6 +294,15 @@ public static class MauiProgram
         builder.Logging.AddProvider(MauiLog.Install(new FileLoggerOptions(
             FileSystem.AppDataDirectory, "delivery.log", 1_000_000, _ => true, PrayerLogCategories.Quiet)));
 
-        return builder.Build();
+        // The log loop (LOG-LOOP-PLAN.md §3, §4): the tap watch, then — once the services exist — the launch line,
+        // exit reasons and the Drive upload the head's worker runs inside the Saturday window.
+        MauiTapWatch.Install(MauiLogLoop.Tap);
+        var app = builder.Build();
+        MauiLogLoop.Install(new MauiLoopSetup(
+            "foreword", "Foreword", ForewordKeyActions.SendLogsNow,
+            VoiceDriveFactory(app.Services),
+            () => CredentialStore.VaultPassphrase,
+            MauiLogLoop.PhoneFromVault(() => app.Services.GetRequiredService<SecretsVaultService>())));
+        return app;
     }
 }

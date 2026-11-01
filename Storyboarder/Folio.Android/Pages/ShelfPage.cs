@@ -1,3 +1,5 @@
+using Folio.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Folio.Domain.Shelf;
 using Folio.Infrastructure.Services;
@@ -32,7 +34,7 @@ public class ShelfPage : FolioBinderPage
         // the binder with no pinned bar is the one screen where §7's primary is nowhere, and the
         // owner who has just looked at their library is exactly who reaches for it.
         var add = new Button { Text = "Add manuscript" };
-        add.Clicked += (_, _) => _ = AddManuscript();
+        add.Clicked += (_, _) => _ = MauiTapWatch.RunAsync(MauiTapWatch.Action(FolioKeyActions.AddManuscript, TimeSpan.FromSeconds(10)), AddManuscript);
         SetBar(add);
     }
 

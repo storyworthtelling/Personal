@@ -126,6 +126,7 @@
                     Clicked="OnCrashLogClicked" Style="{StaticResource SecondaryButton}" />
             <Button x:Name="ExportDiagnosticsButton" Text="Export diagnostics"
                     Clicked="OnExportDiagnosticsClicked" Style="{StaticResource SecondaryButton}" />
+            <Button Text="Send logs now" Clicked="OnSendLogsNowClicked" Style="{StaticResource SecondaryButton}" />
             <Label x:Name="DiagnosticsStatusLabel" Style="{StaticResource StatusLine}" />
 
             <!-- Build number at the foot: version name + code + package id, so it's readable which build is
