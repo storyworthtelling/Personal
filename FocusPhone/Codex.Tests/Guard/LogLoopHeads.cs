@@ -34,6 +34,10 @@ internal static class LogLoopHeads
         [
             "plate.shutter", "plate.send", "plate.scan", "plate.deliver", "plate.recognise", "plate.send-logs-now",
         ]),
+        new("pulp", "Pulp/Pulp.Android", "Pulp/Pulp.Domain/Diagnostics/PulpKeyActions.cs", "PulpKeyActions",
+        [
+            "pulp.hand-off", "pulp.locked-open", "pulp.plan", "pulp.send-logs-now",
+        ]),
     ];
 
     public static TheoryData<string> Folders() => [.. All.Select(h => h.Folder)];

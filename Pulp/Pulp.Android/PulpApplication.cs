@@ -1,3 +1,5 @@
+using Pulp.Domain.Diagnostics;
+using Codex.Ui.Voice;
 using Android.App;
 using Android.Runtime;
 using Codex.Ui;
@@ -20,6 +22,13 @@ public class PulpApplication : Application
     public override void OnCreate()
     {
         base.OnCreate();
-        CrashReporter.Install(this, "Pulp");
+        // The log loop (LOG-LOOP-PLAN.md §3): the file log sealing into the outbox, the crash reporter
+        // appending to it, exit reasons, the tap watch and the weekly upload. Phone is left to the
+        // vault's ownership, since Pulp runs on both adults' phones.
+        HeadDiagnostics.Install(this, new HeadSetup(
+            "Pulp", "pulp", PulpKeyActions.SendLogsNow,
+            new VoiceGoogleAccount().GetAccessToken,
+            () => VoiceGoogleAccount.IsSignedIn,
+            Phone: null));
     }
 }

@@ -1,3 +1,5 @@
+using Pulp.Domain.Diagnostics;
+using Codex.Ui;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -42,6 +44,7 @@ internal static class LockedOpenCourier
     public static bool Send(Context context, string package, Uri link, Action fallBack)
     {
         ArgumentNullException.ThrowIfNull(fallBack);
+        var asking = TapWatch.Action(PulpKeyActions.LockedOpen, LockedOpenHandOff.AnswerTimeout + TimeSpan.FromSeconds(5));
         try
         {
             var intent = new Intent(LockedOpenHandOff.Action);
@@ -57,8 +60,14 @@ internal static class LockedOpenCourier
             {
                 if (answer.ShouldFallBack(code))
                 {
-                    Android.Util.Log.Info("Pulp", $"Flyleaf did not start a locked session (answer: {code?.ToString() ?? "none"}); opening the title plainly.");
+                    HeadLog.Info("Pulp", PulpLogLines.LockedOpen(code));
+                    asking.Failed(PulpLogLines.LockedOpen(code));
                     fallBack();
+                }
+                else if (code == LockedOpenHandOff.ResultStarted)
+                {
+                    HeadLog.Info("Pulp", PulpLogLines.LockedOpen(code));
+                    asking.Succeeded();
                 }
             }
 
@@ -75,7 +84,8 @@ internal static class LockedOpenCourier
         }
         catch (Exception e)
         {
-            Android.Util.Log.Info("Pulp", $"Locked open request to Flyleaf did not go: {e.Message}");
+            HeadLog.Warn("Pulp", PulpLogLines.LockedOpenNotSent(e.GetType().Name), e);
+            asking.Failed(PulpLogLines.LockedOpenNotSent(e.GetType().Name));
             return false;
         }
     }

@@ -91,7 +91,7 @@ public sealed class PulpServices
         var files = context.FilesDir?.AbsolutePath ?? throw new InvalidOperationException("Pulp has no files directory to keep its household in.");
         var cacheRoot = context.CacheDir?.AbsolutePath ?? files;
 
-        Diagnostics = new PulpDiagnostics(files);
+        Diagnostics = new PulpDiagnostics();
         var account = new VoiceGoogleAccount();
         Keys = new VaultPulpKeySource(account, Diagnostics);
         var counter = new DiagnosticsLookupCounter(files, Diagnostics);
