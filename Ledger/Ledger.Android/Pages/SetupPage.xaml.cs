@@ -1,3 +1,5 @@
+using Index.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.ApplicationModel;
@@ -651,7 +653,7 @@ public partial class SetupPage : LedgerBinderPage
     }
 
     // One shareable file: the summary above, plus the running refresh log (every warning/error logged
-    // across Index via PipelineFileLogger — connecting, refreshing, the vault, Post's balance handoff,
+    // across Index via the shared file logger — connecting, refreshing, the vault, Post's balance handoff,
     // and everything else once those parts exist) and the crash log. Replaces "Share refresh log"
     // (D37/D145) — that only ever bundled the two logs; this adds the summary in front of them.
     private async void OnExportDiagnosticsClicked(object? sender, EventArgs e)
@@ -661,7 +663,7 @@ public partial class SetupPage : LedgerBinderPage
             var summary = await BuildDiagnosticsSummaryAsync();
             var bundle = new System.Text.StringBuilder()
                 .AppendLine("===== DIAGNOSTICS SUMMARY =====").AppendLine().AppendLine(summary).AppendLine()
-                .AppendLine("===== REFRESH LOG =====").AppendLine().AppendLine(ReadOrEmpty(RefreshLogPath)).AppendLine()
+                .AppendLine("===== REFRESH LOG =====").AppendLine().AppendLine(MauiLog.Current?.ReadAll() ?? ReadOrEmpty(RefreshLogPath)).AppendLine()
                 .AppendLine("===== CRASH LOG =====").AppendLine().AppendLine(ReadOrEmpty(CrashLogPath))
                 .ToString();
             var path = Path.Combine(FileSystem.CacheDirectory, $"index-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.txt");
@@ -699,5 +701,23 @@ public partial class SetupPage : LedgerBinderPage
                 Summary = $"{accountsText} · {when}"
             };
         }
+    }
+
+    // LOG-LOOP-PLAN.md §3.3: Send logs now, a declared key action. Success is the status line changing (§7).
+    private async void OnSendLogsNowClicked(object? sender, EventArgs e)
+    {
+        var sending = MauiTapWatch.Action(IndexKeyActions.SendLogsNow, TimeSpan.FromMinutes(2));
+        var result = await MauiLogLoop.UploadAsync(CancellationToken.None);
+        if (result.Succeeded)
+        {
+            sending.Succeeded();
+        }
+        else
+        {
+            sending.Failed(result.Error ?? result.Refusal?.ToString() ?? "not uploaded");
+        }
+        DiagnosticsStatusLabel.Text = result.Succeeded
+            ? $"Logs sent: {result.Confirmed} of {result.Planned} batches confirmed in Drive."
+            : MauiLogLoop.Status ?? $"Logs not sent: {result.Error}";
     }
 }

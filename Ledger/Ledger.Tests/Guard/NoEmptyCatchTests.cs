@@ -19,14 +19,13 @@ namespace Index.Tests.Guard;
 /// a comment saying so). This guard is narrower, and it is also the only shape the two existing
 /// legitimate exceptions below actually take.</para>
 ///
-/// <para>Two files are exempt outright: <c>PipelineFileLogger.cs</c> IS the file logger — an
-/// empty catch there avoids the logger recursively failing to log its own failure to log — and
-/// <c>MainApplication.cs</c>'s nested <c>CrashLogger</c> class is the crash logger for the same
-/// reason. Everywhere else, a truly empty catch is exactly the D145 bug.</para>
+/// <para>One place is exempt outright: <c>MainApplication.cs</c>'s nested <c>CrashLogger</c> class is
+/// the crash logger — an empty catch there avoids the logger recursively failing to log its own failure
+/// to log. (The file logger that was the other exemption now lives in the shared MAUI kit.) Everywhere else, a truly empty catch is exactly the D145 bug.</para>
 /// </summary>
 public class NoEmptyCatchTests
 {
-    private static readonly string[] ExemptFiles = ["PipelineFileLogger.cs"];
+    private static readonly string[] ExemptFiles = [];
     private static readonly string[] ExemptEnclosingTypes = ["CrashLogger"];
 
     private static readonly Regex EmptyCatch = new(@"catch(\s*\([^)]*\))?\s*\{\s*\}", RegexOptions.Compiled);

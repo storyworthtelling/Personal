@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.Provider;
@@ -30,7 +31,7 @@ internal static class MmsSender
     internal const string ExtraFile = "com.storyworthtelling.focusphone.communication.extra.MMS_SENT_FILE";
 
     // A send's key action by transaction id until the platform answers; in memory only, like SmsSender's.
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Codex.Domain.Diagnostics.KeyAction> Pending = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Storyworthtelling.Diagnostics.KeyAction> Pending = new();
 
     internal const string ExtraTransaction = "com.storyworthtelling.focusphone.communication.extra.MMS_SENT_TRANSACTION";
 
@@ -53,7 +54,7 @@ internal static class MmsSender
 
     public static void Send(
         Context context, IReadOnlyList<string> recipients, string? text, IReadOnlyList<MmsOutboundPart> media,
-        Codex.Domain.Diagnostics.KeyAction action)
+        Storyworthtelling.Diagnostics.KeyAction action)
     {
         var manager = SmsManager.Default
             ?? throw new InvalidOperationException("This device has no SMS manager.");

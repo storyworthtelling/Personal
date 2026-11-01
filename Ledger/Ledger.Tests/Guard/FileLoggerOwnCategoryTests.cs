@@ -15,10 +15,11 @@ public class FileLoggerOwnCategoryTests
     [Fact]
     public void TheOwnCategoryPrefixIsTheAppsRootNamespace()
     {
-        var path = Path.Combine(DesignTestHelpers.LedgerRoot(), "Ledger.Android", "PipelineFileLogger.cs");
+        // The shared file logger takes the rule as an option; Index's is set where the head installs it.
+        var path = Path.Combine(DesignTestHelpers.LedgerRoot(), "Ledger.Android", "MauiProgram.cs");
         var source = File.ReadAllText(path);
 
-        Assert.Contains("categoryName.StartsWith(\"Index\"", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("categoryName.StartsWith(\"Ledger\"", source, StringComparison.Ordinal);
+        Assert.Contains("category.StartsWith(\"Index\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("category.StartsWith(\"Ledger\"", source, StringComparison.Ordinal);
     }
 }

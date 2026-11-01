@@ -1,3 +1,5 @@
+using Folio.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui;
 using Folio.Android.Google;
@@ -243,7 +245,7 @@ public partial class SetupPage : FolioBinderPage
             var report = await BuildDiagnosticsReport();
             var bundle = new System.Text.StringBuilder()
                 .AppendLine("===== STATUS SNAPSHOT =====").AppendLine().AppendLine(report).AppendLine()
-                .AppendLine("===== PIPELINE LOG =====").AppendLine().AppendLine(ReadOrEmpty(PipelineLogPath)).AppendLine()
+                .AppendLine("===== PIPELINE LOG =====").AppendLine().AppendLine(MauiLog.Current?.ReadAll() ?? ReadOrEmpty(PipelineLogPath)).AppendLine()
                 .AppendLine("===== CRASH LOG =====").AppendLine().AppendLine(ReadOrEmpty(CrashLogPath))
                 .ToString();
             await ShareText($"folio-diagnostics-{DateTime.Now:yyyyMMdd-HHmm}.txt", bundle, "Folio diagnostics");
@@ -263,7 +265,7 @@ public partial class SetupPage : FolioBinderPage
     }
 
     private async void OnPipelineLogClicked(object sender, EventArgs e) =>
-        await ShowLog("Pipeline log", PipelineLogPath, PipelineFileLogger.Clear);
+        await ShowLog("Pipeline log", PipelineLogPath, () => MauiLog.Current?.Clear());
 
     private async void OnCrashLogClicked(object sender, EventArgs e) =>
         await ShowLog("Crash log", CrashLogPath, () => System.IO.File.Delete(CrashLogPath));
@@ -427,21 +429,25 @@ public partial class SetupPage : FolioBinderPage
         if (string.IsNullOrWhiteSpace(code))
             return;
 
+        var pairing = PairingTrail.Start();
         try
         {
             var registration = IPlatformApplication.Current!.Services
                 .GetRequiredService<Storyworthtelling.Remarkable.IRemarkableRegistration>();
             SettingsStore.RemarkableDeviceToken = await registration.Register(code);
+            PairingTrail.Paired(pairing);
             UpdateRemarkableStatus();
             await PublishToVaultAsync();
         }
         catch (HttpRequestException ex)
         {
+            PairingTrail.Failed(pairing, ex);
             await DisplayAlert("Registration failed",
                 $"The reMarkable cloud returned {(int?)ex.StatusCode}. Check the code and try again.", "OK");
         }
         catch (Exception ex)
         {
+            PairingTrail.Failed(pairing, ex);
             await DisplayAlert("Registration failed", ex.Message, "OK");
         }
     }
@@ -458,5 +464,23 @@ public partial class SetupPage : FolioBinderPage
             RemarkableSwitch.IsToggled = false;
             SettingsStore.DeliverToRemarkable = false;
         }
+    }
+
+    // LOG-LOOP-PLAN.md §3.3: Send logs now, a declared key action. Success is the status line changing (§7).
+    private async void OnSendLogsNowClicked(object? sender, EventArgs e)
+    {
+        var sending = MauiTapWatch.Action(FolioKeyActions.SendLogsNow, TimeSpan.FromMinutes(2));
+        var result = await MauiLogLoop.UploadAsync(CancellationToken.None);
+        if (result.Succeeded)
+        {
+            sending.Succeeded();
+        }
+        else
+        {
+            sending.Failed(result.Error ?? result.Refusal?.ToString() ?? "not uploaded");
+        }
+        DiagnosticsStatusLabel.Text = result.Succeeded
+            ? $"Logs sent: {result.Confirmed} of {result.Planned} batches confirmed in Drive."
+            : MauiLogLoop.Status ?? $"Logs not sent: {result.Error}";
     }
 }

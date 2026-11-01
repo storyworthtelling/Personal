@@ -100,7 +100,7 @@ public class TidalSignInTrailTests
     [Theory]
     [InlineData(TidalTokenPollStatus.Success, "Signed in")]
     [InlineData(TidalTokenPollStatus.Denied, "The provider refused")]
-    [InlineData(TidalTokenPollStatus.Expired, "never left the app")]
+    [InlineData(TidalTokenPollStatus.Expired, "window closed before it was approved")]
     public void TheDeviceFlowEndsTheTrailTheSameWay(TidalTokenPollStatus status, string diagnosis)
     {
         var started = TidalSignInTrails.StartDevice("device-1", "client-example", T0);

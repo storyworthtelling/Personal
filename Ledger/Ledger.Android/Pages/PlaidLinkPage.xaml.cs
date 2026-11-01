@@ -1,3 +1,7 @@
+using Index.Infrastructure.External;
+using Storyworthtelling.Diagnostics;
+using Index.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using Android.Content;
 using Android.Content.PM;
 using Microsoft.Extensions.Logging;
@@ -62,6 +66,9 @@ public partial class PlaidLinkPage : LedgerBinderPage
     private string? hostedLinkUrl;
     private bool opened;
     private bool finishing;
+
+    // The connect as a sign-in trail (LOG-LOOP-PLAN.md §4.2), written to the log once it ends.
+    private SignInTrail? trail;
     private Window? watchedWindow;
 
     // D150: set by BeginUpdateMode before the page is pushed (this page is registered AddTransient, so
@@ -335,10 +342,25 @@ public partial class PlaidLinkPage : LedgerBinderPage
     private async void OnOpenPlaidClicked(object? sender, EventArgs e)
     {
         openPlaidButton.IsEnabled = false;
+        // A key action: answered when the browser has been handed the link; the bank's own answer is the trail.
+        var connecting = MauiTapWatch.Action(IndexKeyActions.ConnectBank, TimeSpan.FromMinutes(1));
+        trail = PlaidLinkTrail.Start(DateTimeOffset.Now);
         try
         {
             if (await EnsureLinkTokenAsync())
+            {
                 OpenHostedLink();
+                connecting.Succeeded();
+            }
+            else
+            {
+                connecting.Failed("no link token");
+            }
+        }
+        catch (Exception ex)
+        {
+            connecting.Failed($"{ex.GetType().Name}: {ex.Message}");
+            throw;
         }
         finally
         {
@@ -386,6 +408,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             if (string.IsNullOrEmpty(token.HostedLinkUrl))
             {
                 logger.LogWarning("Connect: Plaid returned no hosted_link_url; cannot open Link.");
+                Trail(t => t.LinkTokenFailed(DateTimeOffset.Now, "no hosted_link_url"));
                 ShowProblem("Couldn’t open Plaid Link. Check your credentials and environment in Settings.");
                 return false;
             }
@@ -397,6 +420,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
         catch (Exception ex)
         {
             logger.LogError(ex, "Connect: failed to start Plaid Link.");
+            Trail(t => t.LinkTokenFailed(DateTimeOffset.Now, ex.GetType().Name));
             ShowProblem($"Couldn’t start Plaid Link: {ex.Message}");
             return false;
         }
@@ -427,6 +451,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
         catch (Exception ex)
         {
             logger.LogError(ex, "Connect: failed to open Chrome for Plaid Link.");
+            Trail(t => t.ChromeFailed(DateTimeOffset.Now, ex.GetType().Name));
             ShowProblem($"Couldn’t open Chrome: {ex.Message}");
         }
     }
@@ -454,10 +479,14 @@ public partial class PlaidLinkPage : LedgerBinderPage
             logger.LogInformation(
                 "Connect: polling for the completed Link session (auto={Auto}, maxAttempts={Attempts}).",
                 auto, ConnectPollAttempts);
+            // A Check again after a trail has ended begins a fresh one: the earlier attempt is already in the log.
+            trail = (trail is { IsFinished: false } open ? open : PlaidLinkTrail.Start(DateTimeOffset.Now).Opened(DateTimeOffset.Now))
+                .CameBack(DateTimeOffset.Now);
             var result = await plaid.PollLinkResultAsync(
                 linkToken, ConnectPollAttempts, ConnectPollBackoff(), delay: null, CancellationToken.None);
             if (result is null)
             {
+                Trail(t => t.NoPublicToken(DateTimeOffset.Now, ConnectPollAttempts));
                 logger.LogInformation(
                     "Connect: no completed Link session after {Attempts} attempts; awaiting a retry.",
                     ConnectPollAttempts);
@@ -466,7 +495,16 @@ public partial class PlaidLinkPage : LedgerBinderPage
                 return;
             }
 
-            var access = await plaid.ExchangePublicTokenAsync(result.PublicToken, CancellationToken.None);
+            PlaidItemAccess access;
+            try
+            {
+                access = await plaid.ExchangePublicTokenAsync(result.PublicToken, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Trail(t => t.ExchangeFailed(DateTimeOffset.Now, ex is HttpRequestException { StatusCode: { } status } ? (int)status : 0, ex.GetType().Name));
+                throw;
+            }
 
             if (updateInstitutionId is { } institutionId)
             {
@@ -487,6 +525,8 @@ public partial class PlaidLinkPage : LedgerBinderPage
                 // cards). They arrive as separate accounts under this one Item on the next refresh.
                 logger.LogInformation("Connect: connected institution {Institution}; refreshing its accounts.", name);
             }
+
+            Trail(t => t.Connected(DateTimeOffset.Now));
 
             // Back up the new bank's access token to the encrypted vault so a later reset can restore it
             // without re-linking. The connection already works locally, but surface a failed backup so a
@@ -513,4 +553,17 @@ public partial class PlaidLinkPage : LedgerBinderPage
 
     private static string HostOf(string? url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : "(none)";
+
+    private void Trail(Func<SignInTrail, SignInTrail> step)
+    {
+        if (trail is null)
+        {
+            return;
+        }
+        trail = step(trail);
+        if (trail.IsFinished)
+        {
+            MauiLogLoop.SignIn(trail);
+        }
+    }
 }

@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
@@ -387,7 +388,7 @@ public class HomeActivity : Activity
     // it a tap reads as "nothing happened" for however long the broadcast takes to arrive — or forever, if
     // it never does.
     // The uninstall's key action, until the platform's result broadcast answers it (by package).
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Codex.Domain.Diagnostics.KeyAction> PendingUninstalls = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Storyworthtelling.Diagnostics.KeyAction> PendingUninstalls = new();
 
     private void UninstallApp(string package, string label)
     {

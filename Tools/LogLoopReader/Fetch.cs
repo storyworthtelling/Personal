@@ -70,6 +70,9 @@ public static class Manifest
 
     public sealed record Entry(string Name, string Id, string State, string? Status);
 
+    public static IReadOnlyList<Entry> Read(string outputDirectory) =>
+        JsonSerializer.Deserialize<List<Entry>>(File.ReadAllText(Path.Combine(outputDirectory, FileName))) ?? [];
+
     public static void Write(string outputDirectory, IEnumerable<Entry> entries) =>
         File.WriteAllText(Path.Combine(outputDirectory, FileName),
             JsonSerializer.Serialize(entries.OrderBy(e => e.Name, StringComparer.Ordinal), new JsonSerializerOptions { WriteIndented = true }));

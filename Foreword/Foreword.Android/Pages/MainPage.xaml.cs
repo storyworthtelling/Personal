@@ -1,3 +1,5 @@
+using Foreword.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using Foreword.Domain.Calendar;
 using Microsoft.Extensions.DependencyInjection;
 using Foreword.Infrastructure.Delivery;
@@ -129,7 +131,8 @@ public partial class MainPage : BinderPage
             return;
         }
 
-        DeliveryFileLogger.Clear();
+        // The delivery log is no longer cleared here: it is the week's record the log loop uploads on Saturday.
+        var delivering = MauiTapWatch.Action(ForewordKeyActions.DeliverNow, TimeSpan.FromMinutes(10));
         deliverNow.IsEnabled = false;
         // Loading is words (DESIGN.md §5).
         StatusLabel.Text = "Delivering — fetching today's brief…";
@@ -159,11 +162,13 @@ public partial class MainPage : BinderPage
             });
 
             // Success is the state change: the status line is the record.
+            delivering.Succeeded();
             StatusLabel.Text = CredentialStore.LastDeliverySummary;
             DeliveryLogButton.IsVisible = true;
         }
         catch (Exception ex)
         {
+            delivering.Failed($"{ex.GetType().Name}: {ex.Message}");
             var fullMessage = FlattenException(ex);
             CredentialStore.LastDeliveryOutcome = $"Failed: {ex.Message}";
             CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;

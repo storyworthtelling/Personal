@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using System.Collections.Concurrent;
 using Android.App;
 using Android.Content;

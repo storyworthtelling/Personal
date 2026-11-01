@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Domain.Diagnostics;
 using Codex.Domain.Credentials;
 using Android.App;
@@ -358,7 +359,7 @@ public class UnlockActivity : Activity
     // readable content URI, so no storage permission is needed under scoped
     // storage.
     // The pick-and-install's key action, answered when the install settles (or the picker is backed out of).
-    private Codex.Domain.Diagnostics.KeyAction? pendingApkInstall;
+    private Storyworthtelling.Diagnostics.KeyAction? pendingApkInstall;
 
     private void PickApkToInstall()
     {
