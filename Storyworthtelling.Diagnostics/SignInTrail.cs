@@ -16,6 +16,9 @@ public static class SignInFlowKinds
     public const string PlaidHostedLink = "plaid-hosted-link";
     public const string RemarkablePairing = "remarkable-pairing";
     public const string SleepNumber = "sleep-number";
+
+    /// <summary>Flyleaf's restricted browser passing a sign-in redirect on (or blocking it); joined to the app's own trail by state.</summary>
+    public const string RedirectHop = "flyleaf-redirect-hop";
 }
 
 /// <summary>Which way the sign-in left the app.</summary>

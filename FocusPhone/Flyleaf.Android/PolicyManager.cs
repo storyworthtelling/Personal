@@ -6,6 +6,7 @@ using Android.Net;
 using Android.OS;
 using Android.Util;
 using Codex.Domain.Policy;
+using Codex.Ui;
 using Codex.Domain.Unlock;
 
 namespace Flyleaf;
@@ -32,7 +33,7 @@ public static class PolicyManager
     {
         if (!IsDeviceOwner(context))
         {
-            Log.Warn(Tag, "Not device owner; policy not applied. This is expected during development.");
+            HeadLog.Warn(Tag, "Not device owner; policy not applied. This is expected during development.");
             new PolicyAuditStore(context).Record(PolicyEventKind.NotDeviceOwner,
                 "Policy not applied: the app is not the device owner.");
             return;
@@ -95,7 +96,7 @@ public static class PolicyManager
         // OnCreate so it re-asserts after any transient re-enable.
         if (!dpm.SetStatusBarDisabled(admin, plan.DisableStatusBar))
         {
-            Log.Warn(Tag, "Could not disable the status bar; not permitted in the current state.");
+            HeadLog.Warn(Tag, "Could not disable the status bar; not permitted in the current state.");
             events.Add(Event(PolicyEventKind.ConfigFailed, "Could not disable the status bar (not permitted in the current state)."));
         }
 
@@ -107,7 +108,7 @@ public static class PolicyManager
         // retried on the very next pass once a network is up, same as the exception-driven retry below.
         if (!HasActiveNetwork(context))
         {
-            Log.Info(Tag, $"Skipping private DNS this pass: no active network yet.");
+            HeadLog.Info(Tag, $"Skipping private DNS this pass: no active network yet.");
         }
         else
         {
@@ -123,7 +124,7 @@ public static class PolicyManager
                     var reason = result == PrivateDnsSet.ErrorHostNotServing
                         ? "host is not serving DNS-over-TLS (unreachable now)"
                         : "the platform rejected the setting";
-                    Log.Warn(Tag, $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result}).");
+                    HeadLog.Warn(Tag, $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result}).");
                     events.Add(Event(PolicyEventKind.ConfigFailed,
                         $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result})."));
                 }
@@ -136,7 +137,7 @@ public static class PolicyManager
                 // WRAPS a more specific cause (ServiceSpecificException / SecurityException) whose message
                 // names the real reason. Include the cause's type and message so the next log is diagnosable.
                 var detail = DescribeThrowable(e);
-                Log.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}");
+                HeadLog.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}");
                 events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}"));
             }
         }
@@ -152,7 +153,7 @@ public static class PolicyManager
             }
             catch (Java.Lang.Exception e)
             {
-                Log.Warn(Tag, $"Could not un-hide {package}: {DescribeThrowable(e)}");
+                HeadLog.Warn(Tag, $"Could not un-hide {package}: {DescribeThrowable(e)}");
                 events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not un-hide {package}: {DescribeThrowable(e)}"));
             }
         }
@@ -165,7 +166,7 @@ public static class PolicyManager
             var failed = dpm.SetPackagesSuspended(admin, installed, true);
             if (failed is { Length: > 0 })
             {
-                Log.Warn(Tag, $"Could not suspend: {string.Join(", ", failed)}");
+                HeadLog.Warn(Tag, $"Could not suspend: {string.Join(", ", failed)}");
                 events.Add(Event(PolicyEventKind.SuspendFailed, $"Could not suspend: {string.Join(", ", failed)}"));
             }
         }
@@ -185,7 +186,7 @@ public static class PolicyManager
             var failed = dpm.SetPackagesSuspended(admin, toRelease, false);
             if (failed is { Length: > 0 })
             {
-                Log.Warn(Tag, $"Could not un-suspend: {string.Join(", ", failed)}");
+                HeadLog.Warn(Tag, $"Could not un-suspend: {string.Join(", ", failed)}");
                 events.Add(Event(PolicyEventKind.ReleaseFailed, $"Could not un-suspend (kept quarantined): {string.Join(", ", failed)}"));
             }
         }
@@ -220,7 +221,7 @@ public static class PolicyManager
         GrantSelfBluetoothPermission(dpm, admin, context, events);
         PinHomeActivity(dpm, admin, context);
         PinRestrictedBrowser(dpm, admin, context);
-        Log.Info(Tag, $"Policy applied: {plan.UserRestrictions.Count} restrictions, {installed.Length} packages suspended, {plan.PermissionGrants.Count} permission grants.");
+        HeadLog.Info(Tag, $"Policy applied: {plan.UserRestrictions.Count} restrictions, {installed.Length} packages suspended, {plan.PermissionGrants.Count} permission grants.");
 
         // A rolling audit line per pass; consecutive-identical lines collapse, so this records once
         // and re-records only when the counts change (a newly suspended app, a resolved failure).
@@ -294,13 +295,13 @@ public static class PolicyManager
                 if (!dpm.SetPermissionGrantState(admin, grant.Package, grant.Permission,
                         PermissionGrantState.Granted))
                 {
-                    Log.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet; will retry next policy pass.");
+                    HeadLog.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet; will retry next policy pass.");
                     events.Add(Event(PolicyEventKind.GrantFailed, $"Could not grant {grant.Permission} to {grant.Package} yet (will retry)."));
                 }
             }
             catch (Java.Lang.Exception e)
             {
-                Log.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}");
+                HeadLog.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}");
                 events.Add(Event(PolicyEventKind.GrantFailed, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}"));
             }
         }
@@ -322,13 +323,13 @@ public static class PolicyManager
             if (!dpm.SetPermissionGrantState(admin, context.PackageName!, Manifest.Permission.BluetoothConnect,
                     PermissionGrantState.Granted))
             {
-                Log.Warn(Tag, "Could not self-grant BLUETOOTH_CONNECT yet; will retry next policy pass.");
+                HeadLog.Warn(Tag, "Could not self-grant BLUETOOTH_CONNECT yet; will retry next policy pass.");
                 events.Add(Event(PolicyEventKind.GrantFailed, "Could not self-grant BLUETOOTH_CONNECT yet (will retry)."));
             }
         }
         catch (Java.Lang.Exception e)
         {
-            Log.Warn(Tag, $"Could not self-grant BLUETOOTH_CONNECT yet: {e.Message}");
+            HeadLog.Warn(Tag, $"Could not self-grant BLUETOOTH_CONNECT yet: {e.Message}");
             events.Add(Event(PolicyEventKind.GrantFailed, $"Could not self-grant BLUETOOTH_CONNECT yet: {e.Message}"));
         }
     }
@@ -370,7 +371,7 @@ public static class PolicyManager
         }
         catch (Java.Lang.Exception e)
         {
-            Log.Warn(Tag, $"Could not lock down the login browser {login.Package}: {e.Message}");
+            HeadLog.Warn(Tag, $"Could not lock down the login browser {login.Package}: {e.Message}");
             events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not lock down the login browser {login.Package}: {e.Message}"));
         }
     }
