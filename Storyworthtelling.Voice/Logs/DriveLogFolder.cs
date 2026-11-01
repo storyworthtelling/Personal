@@ -28,11 +28,20 @@ public sealed class DriveLogFolder : IDriveLogFolder
 
     private readonly Func<CancellationToken, Task<DriveService>> serviceFactory;
     private readonly string folderName;
+    private readonly bool mayCreateFolder;
 
-    public DriveLogFolder(Func<CancellationToken, Task<DriveService>> serviceFactory, string folderName = Storyworthtelling.Diagnostics.LogUploadPlan.FolderName)
+    /// <param name="mayCreateFolder">
+    /// Only the owner's phone makes the folder (§5.6). Her phone writes into the folder the owner shared with
+    /// her; making one of its own would put her logs where the reader never looks.
+    /// </param>
+    public DriveLogFolder(
+        Func<CancellationToken, Task<DriveService>> serviceFactory,
+        string folderName = Storyworthtelling.Diagnostics.LogUploadPlan.FolderName,
+        bool mayCreateFolder = true)
     {
         this.serviceFactory = serviceFactory;
         this.folderName = folderName;
+        this.mayCreateFolder = mayCreateFolder;
     }
 
     public async Task<string?> FindAsync(string name, CancellationToken cancellationToken)
@@ -142,6 +151,10 @@ public sealed class DriveLogFolder : IDriveLogFolder
         {
             return id;
         }
+        if (!mayCreateFolder)
+        {
+            throw new LogFolderNotSharedException(folderName);
+        }
 
         var make = service.Files.Create(new DriveData.File { Name = folderName, MimeType = FolderMimeType });
         make.Fields = "id";
@@ -159,3 +172,7 @@ public sealed class DriveLogFolder : IDriveLogFolder
         return DriveFileChooser.Choose(DriveFileChooser.FromDrive(found.Files));
     }
 }
+
+/// <summary>Her phone found no log folder shared with it, and does not make one of its own (§5.6).</summary>
+public sealed class LogFolderNotSharedException(string folderName)
+    : IOException($"No Drive folder named {folderName} is shared with this account yet; the owner shares it, and this phone's logs wait until then.");
