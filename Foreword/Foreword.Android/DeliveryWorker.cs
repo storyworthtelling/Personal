@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using Android.Content;
 using AndroidX.Work;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +34,28 @@ public class DeliveryWorker : Worker
     public const int DeliveryHour = 6;
     public const int DeliveryMinute = 30;
 
-    public override Result DoWork()
+    public override Result DoWork() => MauiLogLoop.Worker(nameof(DeliveryWorker), () =>
+    {
+        var result = Work();
+        UploadLogs();
+        return result;
+    });
+
+    // The log loop's upload rides this worker (LOG-LOOP-PLAN.md §3.3): it acts only inside the Saturday window,
+    // until a run is confirmed, and never fails the worker's own work.
+    private static void UploadLogs()
+    {
+        try
+        {
+            MauiLogLoop.UploadIfDueAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            MauiLog.Current?.Write("LogUpload", Microsoft.Extensions.Logging.LogLevel.Warning, "The log upload threw.", e);
+        }
+    }
+
+    private Result Work()
     {
         if (!CredentialStore.IsConfigured)
             return Result.InvokeSuccess();

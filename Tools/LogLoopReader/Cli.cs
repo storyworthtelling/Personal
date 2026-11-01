@@ -13,7 +13,7 @@ public static class Cli
     {
         if (args.Length == 0)
         {
-            errors.WriteLine("Usage: LogLoopReader fetch|digest|sanitize|leakscan|gate [options]");
+            errors.WriteLine("Usage: LogLoopReader fetch|digest|processed|sanitize|leakscan|gate [options]");
             return 2;
         }
         var options = Options(args.Skip(1).ToArray());
@@ -23,6 +23,7 @@ public static class Cli
             {
                 "fetch" => await FetchAsync(options, output),
                 "digest" => Digest(options, output),
+                "processed" => Processed(options, output),
                 "sanitize" => Sanitize(input, output),
                 "leakscan" => LeakScanCommand(options, input, output),
                 "gate" => Gate(options, input, output),
@@ -49,6 +50,27 @@ public static class Cli
             output.WriteLine($"{status.Key}: {status.Count()}");
         }
         output.WriteLine($"plaintext under {Path.Combine(outDir, FetchCommand.PlainFolder)}; manifest at {Path.Combine(outDir, Manifest.FileName)}");
+        return 0;
+    }
+
+    // Phase 4: names her phone's finished files for it to trash; --previous is last week's list, as downloaded.
+    private static int Processed(IReadOnlyDictionary<string, string> options, TextWriter output)
+    {
+        var dir = options.GetValueOrDefault("in") ?? OutputGuard.DefaultOutput();
+        OutputGuard.EnsureOutside(dir, RepoRoot());
+        var plain = Path.Combine(dir, FetchCommand.PlainFolder);
+        string? PhoneOf(string name)
+        {
+            var path = Path.Combine(plain, name);
+            return File.Exists(path) ? FetchCommand.ReadPlain(path).Header.Phone : null;
+        }
+        var previous = options.GetValueOrDefault("previous") is { } previousPath && File.Exists(previousPath)
+            ? ProcessedList.Previous(File.ReadAllText(previousPath))
+            : [];
+        var names = ProcessedList.Names(Manifest.Read(dir), PhoneOf, previous);
+        var path = Path.Combine(dir, ProcessedList.FileName);
+        File.WriteAllText(path, ProcessedList.Json(names));
+        output.WriteLine($"{names.Count} of her phone's files listed; {path}");
         return 0;
     }
 

@@ -1,3 +1,5 @@
+using Folio.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Folio.Domain.Analysis;
@@ -131,7 +133,10 @@ public class BookPage : FolioBinderPage
     /// </summary>
     private async Task OpenReport()
     {
-        if (!await ReportFile.OpenAsync(selectedDraft, record.Title))
+        var opening = MauiTapWatch.Action(FolioKeyActions.OpenReport, TimeSpan.FromSeconds(15));
+        var opened = await ReportFile.OpenAsync(selectedDraft, record.Title);
+        if (opened) opening.Succeeded(); else opening.Failed("the report is not on this phone");
+        if (!opened)
         {
             // Said on the page, not in a dialog: the report has been delivered and cleared off the
             // device, or has not been rendered yet. Either way there is nothing here to open.

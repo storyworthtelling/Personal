@@ -11,8 +11,8 @@ wins and this file is the bug.
 | `SWT_LOG_KEY` | The log key, derived from the vault passphrase with `Tools/LogKeyDerive` (§6.2). Never the passphrase. |
 | `SWT_DRIVE_READ_TOKEN` | An *authorized user* JSON — `client_id`, `client_secret`, `refresh_token` — for the dedicated OAuth client granted `drive.readonly` only (O13). |
 
-The connector is Google Drive only. It is used to list the folder (a cross-check) and to trash processed
-files. Nothing else.
+The connector is Google Drive only. It is used to list the folder (a cross-check), to trash processed
+files, and to write the one processed list for her phone (§7). Nothing else.
 
 ---
 
@@ -196,8 +196,22 @@ Only after the report issue is posted. Trash, through the connector's `trash_fil
 marks `done`. Never a `WrongKey` or `Corrupt` file. A crash before this step leaves the files in the folder
 for next week, which is the intended failure.
 
-Her phone's files (Phase 4) are owned by her and cannot be trashed by this session: write the names of the
-processed ones to `swt-log-processed.json` in the folder instead, and her phone trashes its own.
+Her phone's files (Phase 4) are owned by her and cannot be trashed by this session. List them instead, names
+only, and her phone trashes its own on its next upload (and only those of its own install):
+
+1. If `swt-log-processed.json` is in the folder, download it to `$TMPDIR/log-loop/previous-processed.json`
+   with the connector (it holds names, never a line).
+2. Build this week's list from the manifest — her `done` files, plus last week's names whose files are still
+   in the folder:
+
+   ```bash
+   dotnet run --project Tools/LogLoopReader -- processed --previous "$TMPDIR/log-loop/previous-processed.json"
+   ```
+
+3. Put `$TMPDIR/log-loop/swt-log-processed.json` in the folder with the connector: `update_file` when it
+   exists, otherwise `create_file` in the `storyworthtelling-logs` folder. Never put it anywhere else.
+
+Never list a `WrongKey` or `Corrupt` file, or one not yet `done`; the command already refuses them.
 
 ## 8. Push summary
 

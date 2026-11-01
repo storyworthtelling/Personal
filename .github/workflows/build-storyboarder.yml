@@ -17,6 +17,8 @@ on:
       # The shared reMarkable delivery library also ships in the APK (Infrastructure references it).
       - 'Storyworthtelling.Remarkable/**'
       - 'Storyworthtelling.Remarkable.Tests/**'
+      # The shared MAUI kit ships in the APK, and with it the file logger.
+      - 'Storyworthtelling.Maui/**'
       - '.github/workflows/build-storyboarder.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay

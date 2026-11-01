@@ -1,10 +1,8 @@
-using Codex.Domain.Diagnostics;
-using Storyworthtelling.Diagnostics;
 using Xunit;
 
-namespace Codex.Tests.Diagnostics;
+namespace Storyworthtelling.Diagnostics.Tests;
 
-// The pure part of the native tap watch (plan §4.1): what PaperUi's buttons wrap their onClick in, and
+// The pure part of the tap watch, native and MAUI alike (plan §4.1): what PaperUi's buttons wrap their onClick in, and
 // the key-action handle a background act reports through. Codex.Ui.TapWatch is the Android glue over it.
 public class TapWatchWrapTests
 {

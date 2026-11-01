@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using global::Android.App;
 using global::Android.Runtime;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +38,11 @@ public class MainApplication : MauiApplication
         // Every route a fault can take to the process lands in LaunchFaults.Record, so the next launch
         // shows it whether it killed the app or was only logged.
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
             LaunchFaults.Record("Unhandled exception", args.ExceptionObject?.ToString() ?? "(no details)");
+            // The same fault, in the file log the weekly upload carries (LOG-LOOP-PLAN.md §4.4).
+            MauiLog.Current?.Write("Unhandled", Microsoft.Extensions.Logging.LogLevel.Critical, "Unhandled exception", args.ExceptionObject as Exception);
+        };
 
         // A faulted Task nobody awaited (e.g. a fire-and-forget background refresh) otherwise vanishes;
         // capture it so a silent failure still lands in the crash log. Mark it observed so it can't escalate.

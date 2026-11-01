@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using global::Android.App;
 using global::Android.Content.PM;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,7 @@ public class MainActivity : MauiAppCompatActivity
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        MauiTapWatch.Attach(this);
         // Decide which install this is FIRST, then restore and schedule only what that install may do.
         // After a reinstall or the FocusPhone cutover's factory reset, the owner's phone restores the
         // Plaid credentials and every connected bank from the encrypted Drive vault before scheduling
@@ -99,5 +101,13 @@ public class MainActivity : MauiAppCompatActivity
         base.OnActivityResult(requestCode, resultCode, data);
         if (requestCode == Google.DeviceAccountSignIn.RequestCode)
             Google.DeviceAccountSignIn.HandleChooserResult(resultCode, data);
+    }
+
+    // LOG-LOOP-PLAN.md §4.1: every touch is handed to the tap watch before it is dispatched, since the click
+    // handler runs after ACTION_UP is delivered.
+    public override bool DispatchTouchEvent(global::Android.Views.MotionEvent? e)
+    {
+        MauiTapWatch.Touch(this, e);
+        return base.DispatchTouchEvent(e);
     }
 }

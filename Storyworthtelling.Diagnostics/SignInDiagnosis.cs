@@ -65,6 +65,12 @@ public static class SignInDiagnosis
     private static string ExplainNoReturn(SignInTrail trail, SignInStep noReturn)
     {
         var steps = trail.Steps;
+        if (noReturn.Outcome == SignInTrail.ExpiredOutcome)
+        {
+            return steps.Any(s => s.Kind == SignInStepKind.Returned)
+                ? $"The redirect came back, but no token followed: {Sentence(noReturn.Detail)}"
+                : $"No token came back: {Sentence(noReturn.Detail)}";
+        }
         if (steps.Any(s => s.Kind == SignInStepKind.Returned))
         {
             return "The redirect came back, but no token followed.";

@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using global::Android.App;
 using global::Android.Content.PM;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,7 @@ public class MainActivity : MauiAppCompatActivity
     protected override void OnCreate(global::Android.OS.Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        MauiTapWatch.Attach(this);
         RestoreVaultSecrets();
         PipelineWorker.Schedule(this);
         ResumeActiveWork();
@@ -73,5 +75,13 @@ public class MainActivity : MauiAppCompatActivity
             return;
         if (requestCode == Folio.Android.Google.DeviceAccountSignIn.RequestCode)
             Folio.Android.Google.DeviceAccountSignIn.HandleChooserResult(resultCode, data);
+    }
+
+    // LOG-LOOP-PLAN.md §4.1: every touch is handed to the tap watch before it is dispatched, since the click
+    // handler runs after ACTION_UP is delivered.
+    public override bool DispatchTouchEvent(global::Android.Views.MotionEvent? e)
+    {
+        MauiTapWatch.Touch(this, e);
+        return base.DispatchTouchEvent(e);
     }
 }

@@ -1,3 +1,6 @@
+using Storyworthtelling.Diagnostics;
+using Foreword.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -286,8 +289,20 @@ public static class MauiProgram
 #if DEBUG
         builder.Logging.AddDebug();
 #endif
-        builder.Logging.AddProvider(DeliveryFileLogger.Instance);
+        // The delivery log (LOG-LOOP-PLAN.md §4.4), now with the cap it never had and sealed into the log loop's
+        // outbox when full. The prayer categories keep only templates, levels and exception types (A2).
+        builder.Logging.AddProvider(MauiLog.Install(new FileLoggerOptions(
+            FileSystem.AppDataDirectory, "delivery.log", 1_000_000, _ => true, PrayerLogCategories.Quiet)));
 
-        return builder.Build();
+        // The log loop (LOG-LOOP-PLAN.md §3, §4): the tap watch, then — once the services exist — the launch line,
+        // exit reasons and the Drive upload the head's worker runs inside the Saturday window.
+        MauiTapWatch.Install(MauiLogLoop.Tap);
+        var app = builder.Build();
+        MauiLogLoop.Install(new MauiLoopSetup(
+            "foreword", "Foreword", ForewordKeyActions.SendLogsNow,
+            VoiceDriveFactory(app.Services),
+            () => CredentialStore.VaultPassphrase,
+            MauiLogLoop.PhoneFromVault(() => app.Services.GetRequiredService<SecretsVaultService>())));
+        return app;
     }
 }

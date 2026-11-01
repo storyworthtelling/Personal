@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Foreword.Domain\Foreword.Domain.csproj" />
     <ProjectReference Include="..\Foreword.Infrastructure\Foreword.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Handwriting\Storyworthtelling.Handwriting.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,4 +26,9 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
   </ItemGroup>
+  <!-- The kit's file logger is pure .NET, compiled in so the prayer guard drives the real code the head installs. -->
+  <ItemGroup>
+    <Compile Include="..\..\Storyworthtelling.Maui\Diagnostics\FileLogger.cs" Link="Kit\Diagnostics\FileLogger.cs" />
+  </ItemGroup>
+
 </Project>

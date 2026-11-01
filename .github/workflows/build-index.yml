@@ -10,6 +10,10 @@ on:
       - 'Ledger/Ledger.Domain/**'
       - 'Ledger/Ledger.Tests/**'
       - 'Tools/IconStudio/**'
+      # The shared MAUI kit ships in the APK, and with it the file logger and the log loop's core.
+      - 'Storyworthtelling.Maui/**'
+      - 'Storyworthtelling.Diagnostics/**'
+      - 'Storyworthtelling.Voice/**'
       - '.github/workflows/build-index.yml'
 
 jobs:
