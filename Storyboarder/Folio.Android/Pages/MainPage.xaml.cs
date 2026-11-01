@@ -1,3 +1,5 @@
+using Folio.Domain.Diagnostics;
+using Storyworthtelling.Maui.Diagnostics;
 using System.Collections.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
 using Folio.Domain.Time;
@@ -567,7 +569,10 @@ public partial class MainPage : FolioBinderPage
     /// </summary>
     private async Task OpenReport(NovelStatus status)
     {
-        if (!await ReportFile.OpenAsync(status.Id, status.Title))
+        var opening = MauiTapWatch.Action(FolioKeyActions.OpenReport, TimeSpan.FromSeconds(15));
+        var opened = await ReportFile.OpenAsync(status.Id, status.Title);
+        if (opened) opening.Succeeded(); else opening.Failed("the report is not on this phone");
+        if (!opened)
         {
             // The status line, not a dialog (§8): the report has been delivered and cleared off the
             // device, or has not been rendered yet. Either way there is nothing here to open.
@@ -617,7 +622,10 @@ public partial class MainPage : FolioBinderPage
 
     // Clears the stall and kicks the pipeline immediately, rather than waiting for the next periodic
     // window.
-    private async Task RetryProject(NovelStatus status)
+    private Task RetryProject(NovelStatus status) =>
+        MauiTapWatch.RunAsync(MauiTapWatch.Action(FolioKeyActions.Retry, TimeSpan.FromSeconds(30)), () => RetryProjectNow(status));
+
+    private async Task RetryProjectNow(NovelStatus status)
     {
         using (var scope = IPlatformApplication.Current!.Services.CreateScope())
         {

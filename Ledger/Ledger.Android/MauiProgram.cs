@@ -1,3 +1,5 @@
+using Storyworthtelling.Diagnostics;
+using Index.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -288,6 +290,15 @@ public static class MauiProgram
             FileSystem.AppDataDirectory, "refresh.log", 1_000_000,
             category => category.StartsWith("Index", StringComparison.Ordinal))));
 
-        return builder.Build();
+        // The log loop (LOG-LOOP-PLAN.md §3, §4): the tap watch, then — once the services exist — the launch line,
+        // exit reasons and the Drive upload the head's worker runs inside the Saturday window.
+        MauiTapWatch.Install(MauiLogLoop.Tap);
+        var app = builder.Build();
+        MauiLogLoop.Install(new MauiLoopSetup(
+            "index", IndexIdentity.DisplayName, IndexKeyActions.SendLogsNow,
+            DriveFactory(app.Services),
+            () => SettingsStore.VaultPassphrase,
+            MauiLogLoop.PhoneFromVault(() => app.Services.GetRequiredService<SecretsVaultService>())));
+        return app;
     }
 }

@@ -1,3 +1,4 @@
+using Index.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -700,5 +701,23 @@ public partial class SetupPage : LedgerBinderPage
                 Summary = $"{accountsText} · {when}"
             };
         }
+    }
+
+    // LOG-LOOP-PLAN.md §3.3: Send logs now, a declared key action. Success is the status line changing (§7).
+    private async void OnSendLogsNowClicked(object? sender, EventArgs e)
+    {
+        var sending = MauiTapWatch.Action(IndexKeyActions.SendLogsNow, TimeSpan.FromMinutes(2));
+        var result = await MauiLogLoop.UploadAsync(CancellationToken.None);
+        if (result.Succeeded)
+        {
+            sending.Succeeded();
+        }
+        else
+        {
+            sending.Failed(result.Error ?? result.Refusal?.ToString() ?? "not uploaded");
+        }
+        DiagnosticsStatusLabel.Text = result.Succeeded
+            ? $"Logs sent: {result.Confirmed} of {result.Planned} batches confirmed in Drive."
+            : MauiLogLoop.Status ?? $"Logs not sent: {result.Error}";
     }
 }

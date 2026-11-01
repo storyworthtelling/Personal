@@ -39,6 +39,8 @@
                         Clicked="OnShareClicked" />
                 <Button x:Name="ClearButton" Text="Clear" Style="{StaticResource QuietButton}"
                         Clicked="OnClearClicked" />
+                <Button x:Name="SendLogsButton" Text="Send logs now" Style="{StaticResource SecondaryButton}"
+                        Clicked="OnSendLogsNowClicked" />
             </HorizontalStackLayout>
         </VerticalStackLayout>
     </Grid>
