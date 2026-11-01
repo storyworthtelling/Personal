@@ -588,8 +588,17 @@ internal static class BodyOutbound
         "Constitution.Domain.Waiting",
     ];
 
-    /// <summary>Individual payload types outside those namespaces: a broadcast's payload, the household record base.</summary>
-    public static readonly IReadOnlyList<Type> PayloadRoots = [];
+    /// <summary>
+    /// Individual payload types outside those namespaces: a broadcast's payload, the household record base. The log
+    /// seams are here because their lines leave the phone in the weekly log upload (LOG-LOOP-PLAN.md §4.6, O7): each
+    /// takes a phrase and nothing else. Body's own <c>IBodyLog</c> sits in the Body namespace, so this scanner would
+    /// read it as Body itself; <see cref="BodyLogsCarryNoValuesTests"/> holds it instead.
+    /// </summary>
+    public static readonly IReadOnlyList<Type> PayloadRoots =
+    [
+        typeof(Constitution.Infrastructure.SleepNumber.ISleepIqLog),
+        typeof(Constitution.Infrastructure.ReadBack.IReadBackLog),
+    ];
 
     /// <summary>
     /// The household file's record kinds, as their wire names. Empty until Release D writes the file;

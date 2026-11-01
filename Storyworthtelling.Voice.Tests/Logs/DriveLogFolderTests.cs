@@ -146,4 +146,30 @@ public class DriveLogFolderTests
         Assert.DoesNotContain(drive.Requests, r => r.StartsWith("DELETE", StringComparison.Ordinal));
         Assert.DoesNotContain(drive.Requests, r => r.StartsWith("PATCH", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task APhoneThatMayNotCreateTheFolderUsesTheOneSharedWithIt()
+    {
+        var drive = new FakeDriveHandler();
+        var shared = drive.Add(Folder, null, ownedByMe: false, mimeType: "application/vnd.google-apps.folder");
+        var folder = new DriveLogFolder(_ => Task.FromResult(drive.Service()), Folder, mayCreateFolder: false);
+
+        await folder.CreateAsync("swt-log.pulp.b.000001-000001.json", "x", CancellationToken.None);
+
+        Assert.Single(drive.Files, f => f.MimeType == "application/vnd.google-apps.folder");
+        Assert.Equal(shared.Id, drive.Files.Single(f => f.Name.EndsWith(".json", StringComparison.Ordinal)).Parent);
+    }
+
+    [Fact]
+    public async Task APhoneThatMayNotCreateTheFolderRefusesWhenNoneIsSharedWithIt()
+    {
+        var drive = new FakeDriveHandler();
+        var folder = new DriveLogFolder(_ => Task.FromResult(drive.Service()), Folder, mayCreateFolder: false);
+
+        var refused = await Assert.ThrowsAsync<LogFolderNotSharedException>(
+            () => folder.CreateAsync("swt-log.pulp.b.000001-000001.json", "x", CancellationToken.None));
+
+        Assert.Contains(Folder, refused.Message);
+        Assert.Empty(drive.Files);
+    }
 }

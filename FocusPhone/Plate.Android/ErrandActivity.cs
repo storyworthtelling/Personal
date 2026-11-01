@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -68,6 +69,7 @@ public class ErrandActivity : AppCompatActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         errand = Errands.For(Intent?.Action, Intent?.Type);
@@ -243,11 +245,16 @@ public class ErrandActivity : AppCompatActivity
     /// </summary>
     private void Cancel()
     {
+        LogErrand(false);
         SetResult(Result.Canceled);
         Finish();
     }
 
     public override void OnBackPressed() => Cancel();
+
+    // §4.5: which errand another app sent and whether it got an answer — the action only, never the result.
+    private void LogErrand(bool returned) =>
+        HeadLog.Info("Plate", PlateLogLines.Errand(Intent?.Action ?? "(no action)", returned));
 
     private void TakePhoto()
     {
@@ -275,6 +282,7 @@ public class ErrandActivity : AppCompatActivity
             if (Intent?.GetParcelableExtra(MediaStore.ExtraOutput) as Android.Net.Uri is { } asked)
             {
                 Copy(file, asked);
+                LogErrand(true);
                 SetResult(Result.Ok);
                 Finish();
                 return;
@@ -299,6 +307,7 @@ public class ErrandActivity : AppCompatActivity
             var result = new Intent();
             result.SetData(target);
             result.AddFlags(ActivityFlags.GrantReadUriPermission);
+            LogErrand(true);
             SetResult(Result.Ok, result);
             Finish();
         }
@@ -355,7 +364,7 @@ public class ErrandActivity : AppCompatActivity
     {
         if (file.Exists() && !file.Delete())
         {
-            Android.Util.Log.Warn("Plate", $"Could not delete the read frame {file.Name}.");
+            HeadLog.Warn("Plate", $"Could not delete the read frame {file.Name}.");
         }
     }
 
@@ -506,6 +515,8 @@ public class ErrandActivity : AppCompatActivity
                 result.PutExtra(key, value);
             }
         }
+
+        LogErrand(true);
 
         SetResult(Result.Ok, result);
         Finish();

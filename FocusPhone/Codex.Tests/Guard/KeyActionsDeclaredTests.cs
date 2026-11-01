@@ -1,67 +1,58 @@
-using System.Reflection;
 using System.Text.RegularExpressions;
-using Codex.Domain.Post;
 using Xunit;
 
 namespace Codex.Tests.Guard;
 
 /// <summary>
-/// Plan §4.1, O10: an action that starts background work declares what it should do, so it is never
-/// judged dead and its failure or silence is logged. Post's key actions are listed here by id — a new one
-/// is a deliberate edit — and each is actually declared, through its constant, somewhere in the head.
+/// Plan §4.1, O10: an action that starts background work declares what it should do, so it is never judged
+/// dead and its failure or silence is logged. Each head's key actions are listed in <see cref="LogLoopHeads"/>
+/// by id — a new one is a deliberate edit — and each is actually declared, through its constant, in the head.
+/// Send logs now is declared by the shared Diagnostics screen, so for it the head hands the constant over.
 /// </summary>
 public partial class KeyActionsDeclaredTests
 {
-    private static readonly string[] Expected =
-    [
-        "post.send-sms",
-        "post.send-mms",
-        "post.file",
-        "post.delete",
-        "post.request-sms-role",
-        "post.gmail-sign-in",
-        "post.open-attachment",
-        "post.send-logs-now",
-    ];
-
-    private static IReadOnlyList<FieldInfo> Constants() =>
-        typeof(PostKeyActions).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Where(f => f.IsLiteral && f.FieldType == typeof(string))
-            .ToList();
-
-    [Fact]
-    public void PostDeclaresExactlyTheseKeyActions()
+    [Theory]
+    [MemberData(nameof(LogLoopHeads.Apps), MemberType = typeof(LogLoopHeads))]
+    public void EachHeadDeclaresExactlyItsKeyActions(string app)
     {
-        var ids = Constants().Select(f => (string)f.GetRawConstantValue()!).OrderBy(i => i, StringComparer.Ordinal);
+        var head = LogLoopHeads.For(app);
+        var constants = Constants(head);
 
-        Assert.Equal(Expected.OrderBy(i => i, StringComparer.Ordinal), ids);
-        Assert.Equal(Expected.Length, PostKeyActions.All.Count);
+        Assert.Equal(head.KeyActions.Order(StringComparer.Ordinal), constants.Values.Order(StringComparer.Ordinal));
+        Assert.All(constants.Values, id => Assert.StartsWith(app + ".", id));
     }
 
-    [Fact]
-    public void EveryKeyActionIsDeclaredInTheHeadThroughItsConstant()
+    [Theory]
+    [MemberData(nameof(LogLoopHeads.Apps), MemberType = typeof(LogLoopHeads))]
+    public void EveryKeyActionIsDeclaredInTheHeadThroughItsConstant(string app)
     {
-        var head = string.Concat(LogLoopSource.Sources("FocusPhone/Post.Android").Select(s => s.Text));
+        var head = LogLoopHeads.For(app);
+        var text = string.Concat(LogLoopSource.Sources(head.Folder).Select(s => s.Text));
 
-        var missing = Constants()
-            .Where(f => !head.Contains($"TapWatch.Action(PostKeyActions.{f.Name}", StringComparison.Ordinal))
-            .Select(f => f.Name)
+        var missing = Constants(head).Keys
+            .Where(name => !text.Contains($"TapWatch.Action({head.KeyActionsClass}.{name}", StringComparison.Ordinal)
+                && !(name == "SendLogsNow" && text.Contains($"{head.KeyActionsClass}.SendLogsNow", StringComparison.Ordinal)))
             .ToList();
 
-        Assert.True(missing.Count == 0, "Declared but never started, so never watched: " + string.Join(", ", missing));
+        Assert.True(missing.Count == 0, $"{app}: declared but never started, so never watched: " + string.Join(", ", missing));
     }
 
-    [Fact]
-    public void NoKeyActionIsNamedByALiteral()
+    [Theory]
+    [MemberData(nameof(LogLoopHeads.Folders), MemberType = typeof(LogLoopHeads))]
+    public void NoKeyActionIsNamedByALiteral(string folder)
     {
-        var literals = LogLoopSource.Sources("FocusPhone/Post.Android")
-            .Where(s => LiteralAction().IsMatch(s.Text))
-            .Select(s => s.Path)
-            .ToList();
+        var literals = LogLoopSource.Sources(folder).Where(s => LiteralAction().IsMatch(s.Text)).Select(s => s.Path).ToList();
 
         Assert.Empty(literals);
     }
 
-    [GeneratedRegex(@"TapWatch\.Action\(\s*""")]
+    private static Dictionary<string, string> Constants(LogLoopHeads.Head head) =>
+        Constant().Matches(LogLoopSource.File(head.KeyActionsFile))
+            .ToDictionary(m => m.Groups["name"].Value, m => m.Groups["id"].Value, StringComparer.Ordinal);
+
+    [GeneratedRegex(@"public const string (?<name>\w+) = ""(?<id>[^""]+)"";")]
+    private static partial Regex Constant();
+
+    [GeneratedRegex(@"TapWatch\.Action\(\s*\$?""")]
     private static partial Regex LiteralAction();
 }

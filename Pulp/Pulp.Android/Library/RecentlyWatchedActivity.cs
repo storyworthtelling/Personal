@@ -54,6 +54,7 @@ public class RecentlyWatchedActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         services = PulpServices.For(this);
         writes = new LibraryWrites(services, () => RunOnUiThread(Reload));

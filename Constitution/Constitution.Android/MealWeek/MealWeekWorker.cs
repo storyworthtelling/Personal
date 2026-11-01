@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
 using AndroidX.Work;
@@ -31,7 +32,9 @@ public class MealWeekWorker : Worker
     {
     }
 
-    public override Result DoWork()
+    public override Result DoWork() => HeadDiagnostics.Worker(nameof(MealWeekWorker), Work);
+
+    private Result Work()
     {
         var context = ApplicationContext!;
         Constitution.Waiting.NoticePoster.Attach(context);

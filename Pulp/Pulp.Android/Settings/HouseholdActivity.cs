@@ -71,6 +71,7 @@ public class HouseholdActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         services = PulpServices.For(this);
         syncWatch = new SyncWatch(this, services, () => Reload(ReloadCause.Sync));

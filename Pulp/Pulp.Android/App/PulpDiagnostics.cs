@@ -1,10 +1,12 @@
+using Codex.Ui;
 using Codex.Domain.Diagnostics;
 using Pulp.Domain.Catalogue;
 
 namespace Pulp.App;
 
 /// <summary>
-/// Pulp's rolling Diagnostics log (Codex's <see cref="DiagnosticLog"/>, in the app's files directory).
+/// Pulp's Diagnostics log: the shared head log (<see cref="HeadDiagnostics"/>, in the app's files directory,
+/// sealing into the log loop's outbox rather than discarding its older half).
 /// The one place background trouble goes — a lookup that failed, a cached title that could not be
 /// read, a household record a newer writer filled with words this build does not know — since none
 /// of it is ever voiced or raised as a notice.
@@ -13,20 +15,27 @@ public sealed class PulpDiagnostics
 {
     private const string Tag = "Pulp";
 
-    private readonly DiagnosticLog log;
-
-    public PulpDiagnostics(string filesDirectory) => log = new DiagnosticLog(filesDirectory);
-
     public void Warn(string source, string message, Exception? exception = null)
     {
-        try
+        if (HeadDiagnostics.Current is { } head)
         {
-            log.Append(DiagnosticLogFormatter.FromException(DateTimeOffset.Now, DiagnosticLevel.Warning, source, message, exception));
+            head.Warn(source, message, exception);
         }
-        catch (IOException failure)
+        else
         {
-            // The log must never fail the caller's own work; logcat keeps the line instead.
-            Android.Util.Log.Warn(Tag, $"{source}: {message} (diagnostics log unwritable: {failure.Message})");
+            Android.Util.Log.Warn(Tag, $"{source}: {message} {exception}");
+        }
+    }
+
+    public void Info(string source, string message)
+    {
+        if (HeadDiagnostics.Current is { } head)
+        {
+            head.Info(source, message);
+        }
+        else
+        {
+            Android.Util.Log.Info(Tag, $"{source}: {message}");
         }
     }
 }

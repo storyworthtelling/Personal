@@ -160,12 +160,65 @@ public sealed class LogUploaderTests : IDisposable
         Assert.Equal(["diagnostic.log", "texts.log"], batch.Parts.Select(p => p.Log));
     }
 
+    // Phase 4 (plan §5.6): on her phone the reader cannot trash her files, so it lists what it processed and
+    // her phone trashes them on its next upload — its own files only, and only those listed.
+    [Fact]
+    public async Task ProcessedFilesOfThisInstallAreTrashedAndNothingElse()
+    {
+        var folder = new MemoryLogFolder();
+        folder.Files["swt-log.post.a1b2c3d4e5f6.000001-000002.json"] = "x";
+        folder.Files["swt-log.post.a1b2c3d4e5f6.000003-000003.json"] = "x";
+        folder.Files["swt-log.post.ffffffffffff.000001-000001.json"] = "x";
+        folder.Files["swt-log.score.a1b2c3d4e5f6.000001-000001.json"] = "x";
+        folder.Processed.AddRange([
+            "swt-log.post.a1b2c3d4e5f6.000001-000002.json",
+            "swt-log.post.ffffffffffff.000001-000001.json",
+            "swt-log.score.a1b2c3d4e5f6.000001-000001.json",
+        ]);
+
+        var result = await Uploader(folder).RunAsync([], Passphrase, CancellationToken.None);
+
+        Assert.Equal(["swt-log.post.a1b2c3d4e5f6.000001-000002.json"], folder.Trashed);
+        Assert.Equal(1, result.Trashed);
+        Assert.True(folder.Files.ContainsKey("swt-log.post.a1b2c3d4e5f6.000003-000003.json"));
+    }
+
+    [Fact]
+    public async Task AFailedTrashIsReportedButDoesNotUndoTheUpload()
+    {
+        var live = Live("diagnostic.log", "a failure\n");
+        var folder = new MemoryLogFolder { FailTrash = true };
+        folder.Processed.Add("swt-log.post.a1b2c3d4e5f6.000009-000009.json");
+        var outbox = new LogOutbox(files);
+
+        var result = await new LogUploader(folder, outbox, Install).RunAsync([live], Passphrase, CancellationToken.None);
+
+        Assert.Equal(1, result.Confirmed);
+        Assert.Empty(outbox.Segments());
+        Assert.Equal(0, result.Trashed);
+        Assert.Contains("trash refused", result.TrashError);
+    }
+
+    [Fact]
+    public async Task WithoutAPassphraseNothingIsTrashedEither()
+    {
+        var folder = new MemoryLogFolder();
+        folder.Processed.Add("swt-log.post.a1b2c3d4e5f6.000001-000001.json");
+
+        await Uploader(folder).RunAsync([], passphrase: "", CancellationToken.None);
+
+        Assert.Empty(folder.Trashed);
+    }
+
     // An in-memory folder keyed by name, so ids are names. Optionally corrupts read-backs or fails creates.
     private sealed class MemoryLogFolder : IDriveLogFolder
     {
         public Dictionary<string, string> Files { get; } = new(StringComparer.Ordinal);
+        public List<string> Processed { get; } = [];
+        public List<string> Trashed { get; } = [];
         public bool CorruptOnRead { get; init; }
         public bool FailCreate { get; init; }
+        public bool FailTrash { get; init; }
 
         public Task<string?> FindAsync(string name, CancellationToken cancellationToken) =>
             Task.FromResult(Files.ContainsKey(name) ? name : null);
@@ -184,8 +237,17 @@ public sealed class LogUploaderTests : IDisposable
             Task.FromResult(Files.TryGetValue(id, out var content) ? (CorruptOnRead ? content[..^10] + "AAAAAAAA\"}" : content) : null);
 
         public Task<IReadOnlyList<string>> ProcessedNamesAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<string>>([]);
+            Task.FromResult<IReadOnlyList<string>>(Processed.ToList());
 
-        public Task TrashOwnAsync(string name, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task TrashOwnAsync(string name, CancellationToken cancellationToken)
+        {
+            if (FailTrash)
+            {
+                throw new HttpRequestException("trash refused");
+            }
+            Trashed.Add(name);
+            Files.Remove(name);
+            return Task.CompletedTask;
+        }
     }
 }

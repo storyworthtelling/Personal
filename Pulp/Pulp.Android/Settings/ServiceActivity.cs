@@ -61,6 +61,7 @@ public class ServiceActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         services = PulpServices.For(this);
         // Re-read only once every queued write has landed: a read taken between two writes would put

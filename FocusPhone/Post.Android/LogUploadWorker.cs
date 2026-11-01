@@ -1,6 +1,6 @@
 using Android.Content;
 using AndroidX.Work;
-using Codex.Ui.Voice;
+using Codex.Ui;
 using Storyworthtelling.Diagnostics;
 using Storyworthtelling.Voice.Logs;
 
@@ -52,82 +52,16 @@ public class LogUploadWorker : Worker
     }
 }
 
-/// <summary>
-/// One upload run for Post: the live logs, the outbox, the log folder in the owner's Drive over the same
-/// Google account the vault uses, and the vault passphrase from which the log key is derived. Records the
-/// outcome for the window and the Diagnostics status sentence. Shared by the weekly worker and the
-/// Send logs now button.
-/// </summary>
+/// <summary>Post's upload run is the shared head's, kept under this name for its callers.</summary>
 internal static class PostLogUpload
 {
-    private const string PreferencesName = "log-loop";
-    private const string HistoryKey = "uploadHistory";
-    private const string RefusedKey = "uploadRefused";
-
     public static UploadHistory History(Context context) =>
-        UploadHistory.Parse(Preferences(context).GetString(HistoryKey, null));
+        HeadDiagnostics.Current?.History ?? UploadHistory.None;
 
     /// <summary>The one sentence the Diagnostics screen shows about uploads, or null.</summary>
-    public static string? Status(Context context)
-    {
-        var refused = Preferences(context).GetBoolean(RefusedKey, false) ? LogUploadRefusal.WaitingForPassphrase : (LogUploadRefusal?)null;
-        return LogUploadStatus.Sentence(refused, History(context).FailedWeeks);
-    }
+    public static string? Status(Context context) => HeadDiagnostics.Current?.UploadStatus;
 
-    public static async Task<LogUploadResult> RunAsync(Context context, CancellationToken cancellationToken)
-    {
-        var outbox = PostDiagnostics.Outbox
-            ?? throw new InvalidOperationException("Post's diagnostics were not installed, so there is no outbox to upload.");
-        LogUploadResult result;
-        if (!Codex.Ui.Voice.VoiceGoogleAccount.IsSignedIn)
-        {
-            result = new LogUploadResult(0, 0, null, "Not signed in with Google, so there is no Drive to upload to.");
-        }
-        else
-        {
-            var account = MailAccess.Account();
-            var folder = new DriveLogFolder(SecretsVaultAccess.DriveFactory(account.GetAccessToken, PostDiagnostics.Label));
-            try
-            {
-                result = await new LogUploader(folder, outbox, PostDiagnostics.LoopInstall(context))
-                    .RunAsync(PostDiagnostics.LivePaths, VaultPassphraseStore.Passphrase, cancellationToken);
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                result = new LogUploadResult(0, 0, null, $"{e.GetType().Name}: {e.Message}");
-            }
-        }
-
-        Record(context, result);
-        return result;
-    }
-
-    private static void Record(Context context, LogUploadResult result)
-    {
-        var history = History(context);
-        var now = DateTimeOffset.Now;
-        history = result.Refusal is not null
-            ? history
-            : result.Succeeded ? history.Confirmed(now) : history.Failed(now);
-        Preferences(context).Edit()!
-            .PutString(HistoryKey, history.Format())!
-            .PutBoolean(RefusedKey, result.Refusal is not null)!
-            .Apply();
-
-        if (result.Refusal is not null)
-        {
-            PostDiagnostics.LogInfo("LogUpload", LogUploadStatus.Sentence(result.Refusal, 0)!);
-        }
-        else if (result.Succeeded)
-        {
-            PostDiagnostics.LogInfo("LogUpload", $"Uploaded and confirmed {result.Confirmed} of {result.Planned} batches.");
-        }
-        else
-        {
-            PostDiagnostics.LogWarning("LogUpload", $"Upload did not complete: {result.Error}");
-        }
-    }
-
-    private static ISharedPreferences Preferences(Context context) =>
-        context.GetSharedPreferences(PreferencesName, FileCreationMode.Private)!;
+    public static Task<LogUploadResult> RunAsync(Context context, CancellationToken cancellationToken) =>
+        HeadDiagnostics.Current?.UploadAsync(cancellationToken)
+        ?? Task.FromResult(new LogUploadResult(0, 0, null, "Post's diagnostics were not installed."));
 }

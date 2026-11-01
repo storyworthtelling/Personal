@@ -1,3 +1,5 @@
+using Codex.Domain.Diagnostics;
+using Pulp.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.Text;
@@ -346,7 +348,8 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
         planText = string.Empty;
         planPlace = string.Empty;
         planTime = null;
-        Write("add the plan", token => PulpServices.For(Host).PutAsync(HouseholdMaps.Plan, plan, token));
+        Write("add the plan", token => PulpServices.For(Host).PutAsync(HouseholdMaps.Plan, plan, token),
+            TapWatch.Action(PulpKeyActions.Plan, TimeSpan.FromSeconds(30)));
     }
 
     /// <summary>A long-press on a plan row: one entry, taken at once, with the way back on the dog-ear (§13).</summary>
@@ -367,7 +370,7 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
         }));
     }
 
-    private void Write(string what, Func<CancellationToken, Task> write)
+    private void Write(string what, Func<CancellationToken, Task> write, KeyAction? watched = null)
     {
         var services = PulpServices.For(Host);
         _ = Task.Run(async () =>
@@ -375,9 +378,11 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
             try
             {
                 await write(CancellationToken.None);
+                watched?.Succeeded();
             }
             catch (Exception exception)
             {
+                watched?.Failed($"{exception.GetType().Name}: {exception.Message}");
                 services.Diagnostics.Warn("calendar", "The calendar could not " + what + ".", exception);
             }
 

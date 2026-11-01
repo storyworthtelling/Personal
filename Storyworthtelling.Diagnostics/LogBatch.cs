@@ -7,6 +7,9 @@ public static class LogPhone
 {
     public const string Owner = "owner";
     public const string Partner = "partner";
+
+    /// <summary>Nobody is signed in yet, so whose phone this is cannot be read.</summary>
+    public const string Unknown = "unknown";
 }
 
 /// <summary>

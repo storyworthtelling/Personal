@@ -247,7 +247,11 @@ public class ScoreUpdateWorker : Worker
     {
     }
 
-    public override Result DoWork()
+    public override Result DoWork() => HeadDiagnostics.Worker(nameof(ScoreUpdateWorker), Work);
+
+
+    private Result Work()
+
     {
         ScoreUpdateService.CheckAndInstallAsync(ApplicationContext!).GetAwaiter().GetResult();
         return Result.InvokeSuccess();

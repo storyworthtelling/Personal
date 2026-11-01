@@ -44,6 +44,7 @@ public class RestrictedBrowserActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         var origin = Intent?.Data?.ToString() is { } raw && Uri.TryCreate(raw, UriKind.Absolute, out var parsed)
@@ -233,6 +234,10 @@ public class RestrictedBrowserActivity : Activity
         catch (ActivityNotFoundException)
         {
             // The app that asked for the sign-in is not installed to receive it.
+            if (Uri.TryCreate(redirect, UriKind.Absolute, out var redirectUri))
+            {
+                HeadDiagnostics.Current?.SignIn(RedirectHop.Blocked(redirectUri, "no app installed to receive it", DateTimeOffset.Now));
+            }
             ShowBlockedPage(redirect);
         }
     }
@@ -305,6 +310,8 @@ public class RestrictedBrowserActivity : Activity
             if (target is not null && Uri.TryCreate(target, UriKind.Absolute, out var redirectUri)
                 && SuiteRedirect.IsSuiteRedirect(redirectUri))
             {
+                // §4.2: the hop, keyed by the redirect's state so the app's own trail joins it.
+                HeadLog.Info("SignIn", RedirectHop.Handed(redirectUri, redirectUri.Scheme, DateTimeOffset.Now).ToLogText());
                 activity.HandBack(target);
                 return true;
             }
@@ -313,6 +320,7 @@ public class RestrictedBrowserActivity : Activity
             if (target is not null && Uri.TryCreate(target, UriKind.Absolute, out var appUri)
                 && SuiteRedirect.AppRedirectPackage(appUri) is { } appPackage)
             {
+                HeadLog.Info("SignIn", RedirectHop.Handed(appUri, appPackage, DateTimeOffset.Now).ToLogText());
                 activity.HandBack(target, appPackage);
                 return true;
             }
@@ -326,6 +334,11 @@ public class RestrictedBrowserActivity : Activity
             }
             else
             {
+                if (target is not null && Uri.TryCreate(target, UriKind.Absolute, out var blockedUri)
+                    && RedirectHop.IsSignInAnswer(blockedUri))
+                {
+                    HeadDiagnostics.Current?.SignIn(RedirectHop.Blocked(blockedUri, "not an allowed host or a suite redirect", DateTimeOffset.Now));
+                }
                 activity.ShowBlockedPage(target ?? "(unparseable URL)");
             }
             return true;

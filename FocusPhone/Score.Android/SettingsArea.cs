@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using System.Globalization;
 using Android.Text;
 using Android.Views;
@@ -168,7 +169,8 @@ public sealed class SettingsArea : ScoreArea
         }
 
         return string.IsNullOrEmpty(library.Status)
-            ? PaperUi.SecondaryButton(Host, "Rescan", () => _ = library.ScanAsync())
+            ? PaperUi.SecondaryButton(Host, "Rescan", () => KeyActs.Run(
+                TapWatch.Action(ScoreKeyActions.Rescan, KeyActs.Local), () => _ = library.ScanAsync()))
             : PaperUi.Secondary(Host, library.Status);
     }
 

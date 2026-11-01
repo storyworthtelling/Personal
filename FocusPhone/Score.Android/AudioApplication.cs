@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Runtime;
 using Codex.Ui;
@@ -20,10 +21,12 @@ public class AudioApplication : Application
     public override void OnCreate()
     {
         base.OnCreate();
-        CrashReporter.Install(this, "Score");
-
-        // The rolling, reviewable log of non-fatal playback/queue failures (and a
-        // copy of each crash), on top of the one-shot CrashReporter above.
-        AudioDiagnostics.Install(this);
+        // The log loop (LOG-LOOP-PLAN.md): the rolling log sealing into the outbox, every crash
+        // appended to it, the tap watch, the launch line, every exit since the last launch, and the
+        // weekly upload, over the music account's Drive token.
+        HeadDiagnostics.Install(this, new HeadSetup(
+            "Score", "score", ScoreKeyActions.SendLogsNow,
+            new Score.Google.DeviceAccountTokenProvider().GetAccessToken,
+            () => !string.IsNullOrEmpty(MusicSettingsStore.GoogleAccountEmail)));
     }
 }

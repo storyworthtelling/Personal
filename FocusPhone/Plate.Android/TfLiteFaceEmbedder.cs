@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Android.Graphics;
 using Java.Nio;
@@ -67,7 +68,7 @@ public sealed class TfLiteFaceEmbedder : IFaceEmbedder, IDisposable
         {
             // No model in assets is the ordinary case today, not a fault: the head ships
             // without one until the owner has chosen which to ship.
-            Android.Util.Log.Info("Plate", $"No face embedder: {e.Message}");
+            HeadLog.Info("Plate", $"No face embedder: {e.Message}");
             interpreter = null;
         }
     }
@@ -121,7 +122,7 @@ public sealed class TfLiteFaceEmbedder : IFaceEmbedder, IDisposable
         }
         catch (Exception e)
         {
-            Android.Util.Log.Warn("Plate", $"Could not embed a face: {e.Message}");
+            HeadLog.Warn("Plate", $"Could not embed a face: {e.Message}");
             return [];
         }
     }

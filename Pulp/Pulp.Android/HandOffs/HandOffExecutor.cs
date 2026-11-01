@@ -1,3 +1,5 @@
+using Pulp.Domain.Diagnostics;
+using Codex.Ui;
 using Android.App;
 using Android.Content;
 using Pulp.Domain.HandOffs;
@@ -72,9 +74,13 @@ public sealed class HandOffExecutor
         ArgumentNullException.ThrowIfNull(request);
 
         var serviceName = catalogue.ById(request.Service)?.Name ?? request.Service.Value;
+        var handing = TapWatch.Action(PulpKeyActions.HandOff, KeyActs.Local);
         var plan = planner.Plan(request, at);
         if (plan.Intent is null || plan.Pending is null)
         {
+            var why = PulpLogLines.Refused(plan.Verdict.Refusal.ToString());
+            HeadLog.Info("Pulp", PulpLogLines.HandOff(serviceName, why));
+            handing.Failed(why);
             return new HandOffOutcome(HandOffResult.Refused, HandOffNotice.ForRefusal(plan.Verdict.Refusal, serviceName), null);
         }
 
@@ -89,10 +95,21 @@ public sealed class HandOffExecutor
         if (LockedOpenChoice.Decide(locked, plan.Intent.Package) == HandOffRoute.Locked
             && LockedOpenCourier.Send(host, plan.Intent.Package, plan.Intent.Data, () => PlainHandOff(host, intent, serviceName, pending)))
         {
+            HeadLog.Info("Pulp", PulpLogLines.HandOff(serviceName, PulpLogLines.Started + " (asked Flyleaf to lock it)"));
+            handing.Succeeded();
             return new HandOffOutcome(HandOffResult.Started, null, plan.Pending);
         }
 
-        return PlainHandOff(host, intent, serviceName, pending);
+        var outcome = PlainHandOff(host, intent, serviceName, pending);
+        if (outcome.Result == HandOffResult.Started)
+        {
+            handing.Succeeded();
+        }
+        else
+        {
+            handing.Failed(PulpLogLines.NotInstalled);
+        }
+        return outcome;
     }
 
     // An explicit package with nothing installed to answer it: the app is missing, which the owner can
@@ -106,10 +123,11 @@ public sealed class HandOffExecutor
         }
         catch (ActivityNotFoundException)
         {
-            Android.Util.Log.Info("Pulp", $"{serviceName} is not installed; the plain hand-off had nothing to open.");
+            HeadLog.Info("Pulp", PulpLogLines.HandOff(serviceName, PulpLogLines.NotInstalled));
             return new HandOffOutcome(HandOffResult.NotInstalled, HandOffNotice.NotInstalled(serviceName), null);
         }
 
+        HeadLog.Info("Pulp", PulpLogLines.HandOff(serviceName, PulpLogLines.Started));
         return new HandOffOutcome(HandOffResult.Started, null, pending);
     }
 }

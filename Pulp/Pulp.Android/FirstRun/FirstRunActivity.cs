@@ -60,6 +60,7 @@ public class FirstRunActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         services = PulpServices.For(this);
         vault = new PulpVault(services);
         syncWatch = new SyncWatch(this, services, () => _ = AdvanceAsync());

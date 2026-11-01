@@ -1,6 +1,8 @@
 using Android.App;
 using Android.Runtime;
+using Codex.Domain.Post;
 using Codex.Ui;
+using Codex.Ui.Voice;
 
 namespace Post;
 
@@ -15,27 +17,15 @@ public class PostApplication : Application
     public override void OnCreate()
     {
         base.OnCreate();
-        // The rolling log first, so the crash reporter can append every crash to it as well as
-        // keeping the latest for the one-shot popup — then the reporter, before the SQLite init
-        // below, so that and anything after is captured.
-        PostDiagnostics.Install(this);
-        CrashReporter.Install(this, "Post", PostDiagnostics.Log);
-
-        // The log loop (LOG-LOOP-PLAN.md, Phase 1): the build this process is, how the last ones
-        // ended, a watch on every tap, and the weekly upload of what was logged.
-        PostDiagnostics.LogLaunch(this);
-        ExitTrail.Record(this, (problem, line) =>
-        {
-            if (problem)
-            {
-                PostDiagnostics.LogWarning("Exit", line);
-            }
-            else
-            {
-                PostDiagnostics.LogInfo("Exit", line);
-            }
-        });
-        TapWatch.Install(PostDiagnostics.LogTap);
+        // The log loop first (LOG-LOOP-PLAN.md): the rolling log sealing into the outbox, the
+        // crash reporter appending every crash to it — before the SQLite init below, so that and
+        // anything after is captured — the tap watch, the launch line and every exit since the last
+        // launch. Post keeps its own upload worker, which shipped first under its own frozen name.
+        HeadDiagnostics.Install(this, new HeadSetup(
+            PostDiagnostics.Label, "post", PostKeyActions.SendLogsNow,
+            MailAccess.Account().GetAccessToken, () => VoiceGoogleAccount.IsSignedIn,
+            ExtraLogs: [(PostDiagnostics.TextsFileName, PostDiagnostics.TextsMaxBytes)],
+            ScheduleUpload: false));
         LogUploadWorker.Schedule(this);
         // Explicitly initialize the SQLitePCL provider before any database is
         // opened. The bundle's automatic module-initializer can be removed by
