@@ -59,6 +59,8 @@ public static class MauiTapWatch
                 Watch(app);
             }
             activity.Window?.DecorView.ViewTreeObserver?.AddOnGlobalLayoutListener(new LayoutListener(activity));
+            // §4.2: a Google sign-in that left the app and heard nothing back is a NoReturn on the next resume.
+            activity.Application?.RegisterActivityLifecycleCallbacks(new ResumeCheck());
         }
         catch (Exception e)
         {
@@ -324,6 +326,35 @@ public static class MauiTapWatch
                     }
                 }
             }
+        }
+    }
+
+    private sealed class ResumeCheck : Java.Lang.Object, Android.App.Application.IActivityLifecycleCallbacks
+    {
+        public void OnActivityResumed(Android.App.Activity activity) => DeviceAccountTrail.CheckPending();
+
+        public void OnActivityCreated(Android.App.Activity activity, Bundle? savedInstanceState)
+        {
+        }
+
+        public void OnActivityDestroyed(Android.App.Activity activity)
+        {
+        }
+
+        public void OnActivityPaused(Android.App.Activity activity)
+        {
+        }
+
+        public void OnActivitySaveInstanceState(Android.App.Activity activity, Bundle outState)
+        {
+        }
+
+        public void OnActivityStarted(Android.App.Activity activity)
+        {
+        }
+
+        public void OnActivityStopped(Android.App.Activity activity)
+        {
         }
     }
 }

@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using global::Android.Accounts;
 using global::Android.App;
 using global::Android.Content;
@@ -16,10 +17,22 @@ public static class DeviceAccountSignIn
 
     public static async Task<string> SignIn(Activity activity)
     {
-        var email = await ChooseAccount(activity);
-        await EnsureConsent(activity, email);
-        SettingsStore.GoogleAccountEmail = email;
-        return email;
+        // LOG-LOOP-PLAN.md §4.2: every way this ends is a step on the trail, written to the log when it ends.
+        DeviceAccountTrail.Begin(DeviceAccountTokenProvider.TokenScope);
+        try
+        {
+            var email = await ChooseAccount(activity);
+            DeviceAccountTrail.ConsentShown();
+            await EnsureConsent(activity, email);
+            DeviceAccountTrail.Token(DeviceAccountTokenProvider.TokenScope);
+            SettingsStore.GoogleAccountEmail = email;
+            return email;
+        }
+        catch (Exception e) when (e is not InvalidOperationException)
+        {
+            DeviceAccountTrail.Failed(e);
+            throw;
+        }
     }
 
     private static Task<string> ChooseAccount(Activity activity)
@@ -32,6 +45,7 @@ public static class DeviceAccountSignIn
 
         pendingChoice = new TaskCompletionSource<string>();
         activity.StartActivityForResult(intent, RequestCode);
+        DeviceAccountTrail.LeftApp();
         return pendingChoice.Task;
     }
 
@@ -45,15 +59,22 @@ public static class DeviceAccountSignIn
 
         if (resultCode != Result.Ok || data is null)
         {
+            DeviceAccountTrail.Cancelled();
             tcs.TrySetException(new InvalidOperationException("Account selection was cancelled."));
             return;
         }
 
         var email = data.GetStringExtra(AccountManager.KeyAccountName);
         if (string.IsNullOrEmpty(email))
+        {
+            DeviceAccountTrail.NoAccount();
             tcs.TrySetException(new InvalidOperationException("No account was returned from the picker."));
+        }
         else
+        {
+            DeviceAccountTrail.Chosen();
             tcs.TrySetResult(email);
+        }
     }
 
     // Fetches a token interactively (passing the activity) so the Docs/Drive consent screen is

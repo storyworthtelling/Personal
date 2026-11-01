@@ -82,6 +82,47 @@ public partial class MauiTapWatchInstalledTests
         Assert.True(missing.Count == 0, $"{app}: declared but never started, so never watched: " + string.Join(", ", missing));
     }
 
+    // §4.2: the MAUI sign-ins, each trailed: the Google account picker (and its no-return check on resume), Plaid's
+    // Hosted Link in Index, and the reMarkable pairing in Folio and Foreword.
+    [Theory]
+    [MemberData(nameof(Apps))]
+    public void TheGooglePickerIsTrailed(string app)
+    {
+        var signIn = Read(For(app).Folder, "DeviceAccountSignIn.cs");
+
+        foreach (var step in new[] { "DeviceAccountTrail.Begin(", "DeviceAccountTrail.LeftApp()", "DeviceAccountTrail.Chosen()", "DeviceAccountTrail.Cancelled()", "DeviceAccountTrail.Token(", "DeviceAccountTrail.Failed(" })
+        {
+            Assert.Contains(step, signIn, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TheKitChecksForANoReturnOnEveryResume() =>
+        Assert.Contains("DeviceAccountTrail.CheckPending()", File.ReadAllText(Path.Combine(RepoRoot(), "Storyworthtelling.Maui", "Diagnostics", "MauiTapWatch.cs")), StringComparison.Ordinal);
+
+    [Fact]
+    public void IndexTrailsPlaidHostedLink()
+    {
+        var page = Read("Ledger/Ledger.Android", "PlaidLinkPage.xaml.cs");
+
+        foreach (var step in new[] { "PlaidLinkTrail.Start(", ".LinkTokenFailed(", ".ChromeFailed(", ".CameBack(", ".NoPublicToken(", ".ExchangeFailed(", ".Connected(", "MauiLogLoop.SignIn(" })
+        {
+            Assert.Contains(step, page, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("folio")]
+    [InlineData("foreword")]
+    public void TheRemarkablePairingIsTrailed(string app)
+    {
+        var setup = Read(For(app).Folder, "SetupPage.xaml.cs");
+
+        Assert.Contains("PairingTrail.Start()", setup, StringComparison.Ordinal);
+        Assert.Contains("PairingTrail.Paired(", setup, StringComparison.Ordinal);
+        Assert.Contains("PairingTrail.Failed(", setup, StringComparison.Ordinal);
+    }
+
     private static Dictionary<string, string> Constants(Head head) =>
         Constant().Matches(File.ReadAllText(Path.Combine(RepoRoot(), head.KeyActionsFile)))
             .ToDictionary(m => m.Groups["name"].Value, m => m.Groups["id"].Value, StringComparer.Ordinal);

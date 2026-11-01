@@ -154,7 +154,10 @@ public sealed partial class SignInTrail
     public SignInTrail RecoverableAuth(DateTimeOffset at, string detail) => With(at, SignInStepKind.RecoverableAuth, detail);
 
     /// <summary>A flow with its own clock (a device code's window) ran out with nothing back.</summary>
-    public SignInTrail TimedOut(DateTimeOffset at, string detail) => With(at, SignInStepKind.NoReturn, detail, "timeout");
+    public SignInTrail TimedOut(DateTimeOffset at, string detail) => With(at, SignInStepKind.NoReturn, detail, ExpiredOutcome);
+
+    /// <summary>The outcome word of a flow whose own clock ran out, as distinct from the ten-minute no-return.</summary>
+    public const string ExpiredOutcome = "expired";
 
     /// <summary>
     /// Marks the trail NoReturn when the app came back (Back, a task switch) with nothing having returned,
