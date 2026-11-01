@@ -4,7 +4,8 @@ using Storyworthtelling.Voice.Secrets;
 namespace Storyworthtelling.Voice.Logs;
 
 /// <summary>How one upload run went, for the worker's own log line and the Diagnostics status sentence.</summary>
-public sealed record LogUploadResult(int Planned, int Confirmed, LogUploadRefusal? Refusal, string? Error)
+public sealed record LogUploadResult(
+    int Planned, int Confirmed, LogUploadRefusal? Refusal, string? Error, int Trashed = 0, string? TrashError = null)
 {
     /// <summary>Every planned batch reached Drive and read back, and the run was not refused.</summary>
     public bool Succeeded => Refusal is null && Error is null && Confirmed == Planned;
@@ -31,11 +32,13 @@ public sealed class LogUploader(IDriveLogFolder folder, LogOutbox outbox, LogIns
             return new LogUploadResult(0, 0, LogUploadRefusal.WaitingForPassphrase, null);
         }
 
+        var (trashed, trashError) = await TrashProcessedAsync(cancellationToken);
+
         outbox.SealAll(liveLogPaths);
         var run = LogUploadPlan.Decide(outbox.Segments(), LogKeyState.Ready, install.App, install.InstallId);
         if (run.Batches.Count == 0)
         {
-            return new LogUploadResult(0, 0, run.Refusal, null);
+            return new LogUploadResult(0, 0, run.Refusal, null, trashed, trashError);
         }
 
         var key = LogKey.Derive(passphrase, LogKey.Epoch);
@@ -63,7 +66,29 @@ public sealed class LogUploader(IDriveLogFolder folder, LogOutbox outbox, LogIns
         {
             error = $"{run.Batches.Count - confirmed} of {run.Batches.Count} batches did not read back the same.";
         }
-        return new LogUploadResult(run.Batches.Count, confirmed, null, error);
+        return new LogUploadResult(run.Batches.Count, confirmed, null, error, trashed, trashError);
+    }
+
+    // Her phone's files are hers, so the reader cannot trash them; it lists what it processed and this phone
+    // trashes its own (§5.6). Only this install's files, only those listed. A failure here is reported and
+    // never stops the upload: the files simply wait for next week's list.
+    private async Task<(int Trashed, string? Error)> TrashProcessedAsync(CancellationToken cancellationToken)
+    {
+        var mine = $"{LogUploadPlan.NamePrefix}{install.App}.{install.InstallId}.";
+        var trashed = 0;
+        try
+        {
+            foreach (var name in (await folder.ProcessedNamesAsync(cancellationToken)).Where(n => n.StartsWith(mine, StringComparison.Ordinal)))
+            {
+                await folder.TrashOwnAsync(name, cancellationToken);
+                trashed++;
+            }
+            return (trashed, null);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            return (trashed, $"{e.GetType().Name}: {e.Message}");
+        }
     }
 
     private async Task<bool> UploadAsync(PlannedBatch planned, string key, CancellationToken cancellationToken)

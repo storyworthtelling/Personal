@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -67,6 +68,7 @@ public class HomeActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         GoImmersive();
         RestoreUpdateTokenFromVault();
@@ -244,6 +246,17 @@ public class HomeActivity : Activity
             var succeeded = status == (int)PackageInstallStatus.Success;
             var reason = intent?.GetStringExtra(PackageInstaller.ExtraStatusMessage) ?? $"status {status}";
             var package = intent?.GetStringExtra(PackageInstaller.ExtraPackageName) ?? "an app";
+            if (PendingUninstalls.TryRemove(package, out var action))
+            {
+                if (succeeded)
+                {
+                    action.Succeeded();
+                }
+                else
+                {
+                    action.Failed($"refused by the platform ({reason})");
+                }
+            }
             if (!succeeded)
             {
                 // A refused uninstall used to clear the notice and reload an unchanged shelf — exactly
@@ -306,11 +319,15 @@ public class HomeActivity : Activity
 
     private void OpenCurrentCall()
     {
+        var answering = TapWatch.Action(FlyleafKeyActions.AnswerCall, KeyActs.Local);
         if (CallScreen.Current.Target is not { } target || !CallScreen.Open(target))
         {
             // The call ended between the bar being drawn and the tap.
+            answering.Failed("the call screen did not open");
             callBar!.Visibility = ViewStates.Gone;
+            return;
         }
+        answering.Succeeded();
     }
 
     // ---- Interactions ----
@@ -369,8 +386,12 @@ public class HomeActivity : Activity
     // receiver: the silent path is asynchronous with nothing else on screen changing meanwhile, so without
     // it a tap reads as "nothing happened" for however long the broadcast takes to arrive — or forever, if
     // it never does.
+    // The uninstall's key action, until the platform's result broadcast answers it (by package).
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Codex.Domain.Diagnostics.KeyAction> PendingUninstalls = new();
+
     private void UninstallApp(string package, string label)
     {
+        PendingUninstalls[package] = TapWatch.Action(FlyleafKeyActions.Uninstall, TimeSpan.FromMinutes(2));
         DogEar.SetNotice(this, root!, UninstallNoticeKey,
             new DogEar.Notice("Uninstalling…", label, PaperTheme.ProgressMark));
 
@@ -432,9 +453,11 @@ public class HomeActivity : Activity
         var catalog = new CategoryStore(this).Load();
         var store = new AppFolderStore(this);
         var actions = catalog.Categories
-            .Select(category => (category.Name, (Action)(() => { store.SetFolder(package, category.Id); ReloadScene(); })))
+            .Select(category => (category.Name, (Action)(() => KeyActs.Run(
+                TapWatch.Action(FlyleafKeyActions.MoveToShelf, KeyActs.Local), () => { store.SetFolder(package, category.Id); ReloadScene(); }))))
             .ToList();
-        actions.Add(("None (loose)", () => { store.ClearFolder(package); ReloadScene(); }));
+        actions.Add(("None (loose)", () => KeyActs.Run(
+            TapWatch.Action(FlyleafKeyActions.MoveToShelf, KeyActs.Local), () => { store.ClearFolder(package); ReloadScene(); })));
         ShowPaperMenu($"Move {label} to…", actions);
     }
 
@@ -444,18 +467,19 @@ public class HomeActivity : Activity
         var home = store.Load();
         var hidden = new HiddenAppsStore(this).Load();
         var actions = home.Packages
-            .Select(featured => (art!.Label(featured), (Action)(() =>
+            .Select(featured => (art!.Label(featured), (Action)(() => KeyActs.Run(
+                TapWatch.Action(FlyleafKeyActions.Feature, KeyActs.Local), () =>
             {
                 store.Save(home.Replace(featured, package, hidden));
                 ReloadScene();
-            })))
+            }))))
             .ToList();
         ShowPaperMenu($"Feature {label} — replace which book?", actions);
     }
 
     private void BlockWithUndo(string package, string label)
     {
-        SetBlocked(package, blocked: true);
+        KeyActs.Run(TapWatch.Action(FlyleafKeyActions.Block, KeyActs.Local), () => SetBlocked(package, blocked: true));
         // A folded page-corner (book metaphor), not a toast/bar: tap the dog-ear to turn back the block.
         DogEar.Show(this, root!, $"Undo blocking {label}", onUndo: () => SetBlocked(package, blocked: false));
     }

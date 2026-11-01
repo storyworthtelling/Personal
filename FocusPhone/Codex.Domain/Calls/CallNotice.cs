@@ -57,6 +57,15 @@ public static class CallNotice
         kinds.DefaultIfEmpty(CallNoticeKind.None).Max();
 
     /// <summary>The home screen's way back into the call, or null when there is no call.</summary>
+    /// <summary>
+    /// The call-surfacing decision for the log loop (LOG-LOOP-PLAN.md §4.5): what kind of call, and whether
+    /// Flyleaf brought the call screen forward — the record a call that rang unseen would leave.
+    /// </summary>
+    public static string Line(CallNoticeKind kind, bool surfaced, bool opened = true) =>
+        !surfaced ? $"CALL {kind}: already surfaced for this ring"
+        : opened ? $"CALL {kind}: surfaced the call screen"
+        : $"CALL {kind}: the call screen did not open";
+
     public static string? ActionLabel(CallNoticeKind kind) => kind switch
     {
         CallNoticeKind.Incoming => "Answer the call",

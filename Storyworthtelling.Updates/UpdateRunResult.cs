@@ -57,6 +57,25 @@ public record UpdateRunResult(UpdateRunState State, IReadOnlyList<AppInstallResu
 
     public bool AnyInstalled => Apps.Any(a => a.Outcome == InstallOutcome.Installed);
 
+    /// <summary>
+    /// One line per app for the log loop (LOG-LOOP-PLAN.md §4.5), not just the summary sentence, so an app held
+    /// back by a signature mismatch is visible by name; a run that never reached the apps says why.
+    /// </summary>
+    public IReadOnlyList<string> Lines()
+    {
+        if (State != UpdateRunState.Ran)
+        {
+            return [Error is null ? $"UPDATE run {State}" : $"UPDATE run {State} — {Error}"];
+        }
+        if (Apps.Count == 0)
+        {
+            return ["UPDATE run Ran: nothing new"];
+        }
+        return Apps.Select(a => a.Error is null
+            ? $"UPDATE {a.Package} {a.VersionCode}: {a.Outcome}"
+            : $"UPDATE {a.Package} {a.VersionCode}: {a.Outcome} — {a.Error}").ToList();
+    }
+
     public bool AnyFailed => Apps.Any(a => a.Outcome == InstallOutcome.Failed);
 
     /// <summary>

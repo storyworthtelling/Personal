@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.Content;
 using Android.Views;
 using Android.Widget;
@@ -154,10 +155,11 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         //
         // The Photos fix has not been abandoned, only moved — the DCIM/Camera insert now
         // happens at send time, in DarkroomArea.
+        var shooting = TapWatch.Action(PlateKeyActions.Shutter, TimeSpan.FromSeconds(10));
         var file = shell.DarkroomFiles.NewFile("jpg");
         var options = new ImageCapture.OutputFileOptions.Builder(file).Build();
         capture.TakePicture(options, ContextCompat.GetMainExecutor(Host),
-            new CaptureCallback(this, file));
+            new CaptureCallback(this, file, shooting));
     }
 
     private void StartVideo()
@@ -246,13 +248,14 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         }
     }
 
-    private sealed class CaptureCallback(CameraArea area, Java.IO.File file)
+    private sealed class CaptureCallback(CameraArea area, Java.IO.File file, KeyAction shooting)
         : Java.Lang.Object, ImageCapture.IOnImageSavedCallback
     {
         public void OnImageSaved(ImageCapture.OutputFileResults? results) =>
             area.Host.RunOnUiThread(() =>
             {
                 area.shell.Kept(DarkroomItem.Photo(file.Name!, DateTime.Now));
+                shooting.Succeeded();
                 // §7 bans a success toast, so the shutter's only answer is this line. It
                 // says where the picture went, and it did NOT go to the camera roll.
                 area.ShowStatus($"In the Darkroom · {TimeFormats.Clock12(DateTime.Now)}");
@@ -260,8 +263,11 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
 
         // §7: a failure surfaces inline, in the same line the success uses. It used to be a
         // toast, which is the one place the owner cannot go back and read.
-        public void OnError(ImageCaptureException? exception) =>
+        public void OnError(ImageCaptureException? exception)
+        {
+            shooting.Failed($"capture error {exception?.ImageCaptureError}: {exception?.Message}");
             area.Host.RunOnUiThread(() => area.ShowStatus(
                 $"That one did not save: {exception?.Message}"));
+        }
     }
 }

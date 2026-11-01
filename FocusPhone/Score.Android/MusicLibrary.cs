@@ -1,3 +1,5 @@
+using Codex.Ui;
+using Codex.Domain.Diagnostics;
 using AndroidX.Lifecycle;
 using AndroidX.Work;
 using Codex.Domain.Audio;
@@ -479,6 +481,9 @@ public sealed class MusicLibrary(
             return;
         }
 
+        // The controller may still be connecting; the play is answered when it actually starts.
+        var playing = TapWatch.Action(ScoreKeyActions.Play, TimeSpan.FromSeconds(20));
+
         // playback.WhenReady, not an early return on Controller is null: a tap landing in the
         // brief cold-start window before the controller connects used to be dropped with no
         // feedback at all (the bottom bar reads persisted state directly, so it looked queued
@@ -494,6 +499,7 @@ public sealed class MusicLibrary(
             // Speed 1.0 and skip-silence off: both are podcast settings, and a track must
             // not inherit them from whatever episode played last.
             playback.Start(MediaKind.Music, [.. tracks.Select(BuildItem)], index, 0L, 1.0f, skipSilence: false);
+            playing.Succeeded();
 
             // Start a listening sitting for Genius; replay is judged against the saved progress book.
             var book = new PlaybackProgressBook(progress.Load());

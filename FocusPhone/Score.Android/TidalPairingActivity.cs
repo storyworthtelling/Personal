@@ -1,3 +1,5 @@
+using Storyworthtelling.Diagnostics;
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -66,9 +68,14 @@ public class TidalPairingActivity : Activity
     private PkceCodes? codes;
     private string? expectedState;
 
+    // The sign-in's trail and key action (LOG-LOOP-PLAN.md §4.1, §4.2): every way it ends, with a reason.
+    private SignInTrail? trail;
+    private KeyAction? signingIn;
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         signedIn = new TidalAccountStore(this).Load() is not null;
         SetContentView(BuildLayout());
@@ -84,6 +91,22 @@ public class TidalPairingActivity : Activity
         if (intent?.Data is { } data)
         {
             _ = FinishSignInAsync(data.ToString());
+        }
+    }
+
+    // Back from the browser with nothing returned is the Error 1002 shape: TIDAL's page refused before any
+    // redirect. The trail turns that silence into NoReturn with its diagnosis. OnNewIntent runs first, so a
+    // redirect that did come back has already been recorded.
+    protected override void OnResume()
+    {
+        base.OnResume();
+        if (trail is { } pending)
+        {
+            trail = pending.CheckNoReturn(DateTimeOffset.Now, resumed: true);
+            if (trail.IsFinished)
+            {
+                EndTrail(succeeded: false, "no redirect came back from TIDAL");
+            }
         }
     }
 
@@ -158,6 +181,7 @@ public class TidalPairingActivity : Activity
 
     private async Task StartSignInAsync()
     {
+        signingIn = TapWatch.Action(ScoreKeyActions.TidalSignIn, TimeSpan.FromMinutes(15));
         status = "Reading TIDAL app credentials…"; // §6: loading is a sentence
         Render();
 
@@ -165,6 +189,7 @@ public class TidalPairingActivity : Activity
         if (credentials is not ({ Length: > 0 } clientId, var clientSecret))
         {
             health.MarkFailing(CredentialIds.Tidal, "Vault has no TIDAL client id/secret.");
+            signingIn?.Failed("the vault has no TIDAL client id/secret");
             status = "TIDAL app credentials aren't set up yet.";
             Render();
             return;
@@ -177,10 +202,12 @@ public class TidalPairingActivity : Activity
         expectedState = TidalSignIn.NewState();
 
         var url = TidalSignIn.AuthorizeUrl(clientId, TidalSignIn.RedirectUri, codes.Challenge, expectedState);
+        trail = TidalSignInTrails.StartPkce(expectedState, clientId, DateTimeOffset.Now);
 
         try
         {
             OpenInBrowser(url);
+            trail = trail.LeftApp(DateTimeOffset.Now);
 
             // A refusal on TIDAL's page never comes back here, so this is the only record of
             // what was asked for — the three things the portal must agree with. Nothing
@@ -196,6 +223,8 @@ public class TidalPairingActivity : Activity
             // gone entirely there is nothing to fall back to, and saying so beats a
             // screen that looks like it is still waiting.
             AudioDiagnostics.LogWarning("TidalPairingActivity", "No browser to sign in with.", e);
+            trail = trail.NoBrowser(DateTimeOffset.Now, $"{e.GetType().Name}: {e.Message}");
+            EndTrail(succeeded: false, "no browser to sign in with");
             Forget();
             status = "There's no browser on this phone to sign in with.";
         }
@@ -209,16 +238,21 @@ public class TidalPairingActivity : Activity
 
     private async Task FinishSignInAsync(string redirect)
     {
-        if (codes is not { } pkce || expectedState is not { } state)
+        if (codes is not { } pkce || expectedState is not { } state || trail is null)
         {
             // A redirect with no sign-in waiting for it — a stale link, or a second
-            // one after the first was spent. Nothing to do, and nothing to alarm about.
+            // one after the first was spent. Nothing to do, and nothing to alarm about,
+            // but the trail says it happened.
+            HeadDiagnostics.Current?.SignIn(TidalSignInTrails.Stale(redirect, DateTimeOffset.Now));
             return;
         }
 
         var result = OAuthRedirect.Read(redirect, state);
+        trail = TidalSignInTrails.Redirect(trail, redirect, result, DateTimeOffset.Now);
         if (result.Status != OAuthRedirectStatus.Authorized || result.Code is not { } code)
         {
+            // A cancel is the owner's decision, not a failure of the tap.
+            EndTrail(result.Status == OAuthRedirectStatus.Declined, $"the redirect was {result.Status}");
             if (result.Status != OAuthRedirectStatus.Declined)
             {
                 AudioDiagnostics.LogWarning(
@@ -243,6 +277,8 @@ public class TidalPairingActivity : Activity
         if (credentials is not ({ Length: > 0 } clientId, var clientSecret))
         {
             health.MarkFailing(CredentialIds.Tidal, "Vault has no TIDAL client id/secret.");
+            trail = trail?.ExchangeFailed(DateTimeOffset.Now, 0, "the vault has no TIDAL client id/secret");
+            EndTrail(succeeded: false, "the vault has no TIDAL client id/secret");
             Forget();
             status = "TIDAL app credentials aren't set up yet.";
             Render();
@@ -259,6 +295,8 @@ public class TidalPairingActivity : Activity
         catch (Exception e)
         {
             AudioDiagnostics.LogWarning("TidalPairingActivity", "Exchanging the TIDAL code failed.", e);
+            trail = trail is null ? null : TidalSignInTrails.ExchangeThrew(trail, e, DateTimeOffset.Now);
+            EndTrail(succeeded: false, $"the code exchange threw {e.GetType().Name}");
             Forget();
             status = TidalSignInFailure.Describe(e.Message);
             if (TidalSignInFailure.IsCredentialRejection(e.Message))
@@ -273,6 +311,9 @@ public class TidalPairingActivity : Activity
         // Spent either way: a code is single-use, and a verifier that outlives its
         // exchange is a secret kept for no reason.
         Forget();
+        trail = trail is null ? null : TidalSignInTrails.Exchange(trail, exchanged, DateTimeOffset.Now);
+        EndTrail(exchanged.Status == TidalTokenPollStatus.Success && !string.IsNullOrEmpty(exchanged.RefreshToken),
+            $"TIDAL refused the code exchange: {exchanged.Status}");
 
         if (exchanged.Status == TidalTokenPollStatus.Success && !string.IsNullOrEmpty(exchanged.RefreshToken))
         {
@@ -330,6 +371,25 @@ public class TidalPairingActivity : Activity
         intent.PutExtra("android.support.customtabs.extra.TOOLBAR_COLOR", PaperTheme.Paper.ToArgb());
         intent.AddFlags(ActivityFlags.NoHistory);
         StartActivity(intent);
+    }
+
+    // Writes the finished trail and answers the sign-in's key action. Called once per sign-in.
+    private void EndTrail(bool succeeded, string reason)
+    {
+        if (trail is { } finished)
+        {
+            HeadDiagnostics.Current?.SignIn(finished);
+        }
+        trail = null;
+        if (succeeded)
+        {
+            signingIn?.Succeeded();
+        }
+        else
+        {
+            signingIn?.Failed(reason);
+        }
+        signingIn = null;
     }
 
     // Drops the flow's secrets. Called when a sign-in is spent, abandoned, or replaced.

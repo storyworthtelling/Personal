@@ -44,7 +44,6 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
     private CancellationTokenSource? loading;
     private Snapshot? snapshot;
     private bool unreadable;
-    private string? diagnosticsStatus;
 
     private sealed record Snapshot(HouseholdView Household, IReadOnlyList<bool> KeysNeedingEntry);
 
@@ -243,40 +242,10 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
     private View DiagnosticsGroup(PulpServices services) =>
         Group(SettingsGroups.Diagnostics, SettingsGroups.DiagnosticsMeta, body =>
         {
-            body.AddView(PaperUi.Secondary(Host, diagnosticsStatus ?? "What went wrong quietly on this phone — never what anyone watched."));
-            body.AddView(PaperUi.SecondaryButton(Host, SettingsGroups.DiagnosticsMeta, () => ExportLog(services)),
+            body.AddView(PaperUi.Secondary(Host, "What went wrong quietly on this phone — never what anyone watched."));
+            body.AddView(PaperUi.SecondaryButton(Host, SettingsGroups.DiagnosticsMeta, () => LoopDiagnosticsActivity.Open(Host)),
                 SettingsViews.Spaced(Host, DesignTokens.Space.X2));
         });
-
-    private void ExportLog(PulpServices services)
-    {
-        var directory = Host.FilesDir?.AbsolutePath;
-        string text;
-        try
-        {
-            text = directory is null ? string.Empty : new DiagnosticLog(directory).ReadAll().TrimEnd();
-        }
-        catch (IOException exception)
-        {
-            services.Diagnostics.Warn("settings", "The diagnostics log could not be read for export.", exception);
-            diagnosticsStatus = "The log couldn't be read just now.";
-            Invalidate();
-            return;
-        }
-
-        if (text.Length == 0)
-        {
-            diagnosticsStatus = "Nothing has been logged on this phone.";
-            Invalidate();
-            return;
-        }
-
-        var send = new Intent(Intent.ActionSend);
-        send.SetType("text/plain");
-        send.PutExtra(Intent.ExtraSubject, "Pulp diagnostics");
-        send.PutExtra(Intent.ExtraText, text);
-        Host.StartActivity(Intent.CreateChooser(send, SettingsGroups.DiagnosticsMeta));
-    }
 
     // ---- reading ----
 

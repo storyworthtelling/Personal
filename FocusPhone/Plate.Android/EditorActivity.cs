@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.Graphics;
@@ -62,6 +63,7 @@ public class EditorActivity : AppCompatActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         files = new DarkroomStore(this);
@@ -185,7 +187,17 @@ public class EditorActivity : AppCompatActivity
             return;
         }
 
-        var found = await recogniser.FindAsync(original);
+        var recognising = TapWatch.Action(PlateKeyActions.Recognise, TimeSpan.FromSeconds(30));
+        IReadOnlyList<FoundFace> found;
+        try
+        {
+            found = await recogniser.FindAsync(original);
+        }
+        catch (Exception e)
+        {
+            recognising.Failed($"{e.GetType().Name}: {e.Message}");
+            throw;
+        }
         var face = found.FirstOrDefault(entry => entry.CanBeMatched);
         if (face is null)
         {
@@ -193,11 +205,15 @@ public class EditorActivity : AppCompatActivity
             {
                 entry.Crop.Recycle();
             }
+            HeadLog.Info("Plate", PlateLogLines.Recognised(0, FaceMatch.Unknown));
+            recognising.Succeeded();
             return;
         }
 
         var book = faces.Load();
         var match = book.Nearest(face.Descriptor);
+        HeadLog.Info("Plate", PlateLogLines.Recognised(found.Count(entry => entry.CanBeMatched), match));
+        recognising.Succeeded();
         if (!match.IsSomeone || overlay is null)
         {
             return;
@@ -337,7 +353,7 @@ public class EditorActivity : AppCompatActivity
         {
             // The original is untouched, so nothing is lost — which is what makes it safe to
             // say so and stay put rather than leave with a half-written file.
-            Android.Util.Log.Warn("Plate", $"Could not write the edit: {e}");
+            HeadLog.Warn("Plate", $"Could not write the edit: {e}");
             return;
         }
 

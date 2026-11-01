@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Codex.Domain.Credentials;
 using Android.App;
 using Android.Content;
@@ -43,6 +44,7 @@ public class UnlockActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         store = new UnlockStore(this);
         var clock = new SystemClockAdapter();
@@ -142,7 +144,8 @@ public class UnlockActivity : Activity
             case UnlockState.Locked:
                 AddHeader("Locked");
                 AddBody($"Admin access requires a {UnlockDelayText.Format(machine.UnlockDelay)} delay. The countdown is visible and can be cancelled at any time.");
-                PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => Transition(machine.RequestUnlock)));
+                PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => KeyActs.Run(
+                    TapWatch.Action(FlyleafKeyActions.AdminUnlock, KeyActs.Local), () => Transition(machine.RequestUnlock))));
                 break;
 
             case UnlockState.Pending:
@@ -354,8 +357,12 @@ public class UnlockActivity : Activity
     // open system installer. A Storage Access Framework picker hands back a
     // readable content URI, so no storage permission is needed under scoped
     // storage.
+    // The pick-and-install's key action, answered when the install settles (or the picker is backed out of).
+    private Codex.Domain.Diagnostics.KeyAction? pendingApkInstall;
+
     private void PickApkToInstall()
     {
+        pendingApkInstall = TapWatch.Action(FlyleafKeyActions.InstallApk, TimeSpan.FromMinutes(15));
         var intent = new Intent(Intent.ActionOpenDocument);
         intent.AddCategory(Intent.CategoryOpenable!);
         intent.SetType("application/vnd.android.package-archive");
@@ -372,6 +379,7 @@ public class UnlockActivity : Activity
         }
         catch (Android.Content.ActivityNotFoundException)
         {
+            pendingApkInstall?.Failed("no file picker is available");
             inlineStatus = "No file picker is available to choose an APK.";
             Render();
         }
@@ -383,6 +391,11 @@ public class UnlockActivity : Activity
         if (requestCode == InstallApkRequestCode && resultCode == Result.Ok && data?.Data is { } uri)
         {
             InstallApkFromUri(uri);
+        }
+        else if (requestCode == InstallApkRequestCode)
+        {
+            // Backed out of the picker: the owner chose not to, which is not a failure of the tap.
+            pendingApkInstall?.Succeeded();
         }
     }
 
@@ -397,14 +410,18 @@ public class UnlockActivity : Activity
             using var input = ContentResolver!.OpenInputStream(uri);
             if (input is null)
             {
+                pendingApkInstall?.Failed("the selected file could not be read");
                 inlineStatus = "Could not read the selected file.";
                 Render();
                 return;
             }
             await ApkInstaller.InstallAsync(this, input);
+            pendingApkInstall?.Succeeded();
         }
         catch (Exception e)
         {
+            pendingApkInstall?.Failed($"{e.GetType().Name}: {e.Message}");
+            HeadLog.Warn("Install", "Installing an APK from Downloads failed", e);
             inlineStatus = $"Install failed: {e.Message}";
             Render();
         }

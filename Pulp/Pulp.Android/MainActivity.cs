@@ -82,6 +82,7 @@ public class MainActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         // Strip order is PulpAreas' order; the home (Watching) is first and is where Pulp opens.

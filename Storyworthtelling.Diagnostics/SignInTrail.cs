@@ -16,6 +16,9 @@ public static class SignInFlowKinds
     public const string PlaidHostedLink = "plaid-hosted-link";
     public const string RemarkablePairing = "remarkable-pairing";
     public const string SleepNumber = "sleep-number";
+
+    /// <summary>Flyleaf's restricted browser passing a sign-in redirect on (or blocking it); joined to the app's own trail by state.</summary>
+    public const string RedirectHop = "flyleaf-redirect-hop";
 }
 
 /// <summary>Which way the sign-in left the app.</summary>
@@ -149,6 +152,9 @@ public sealed partial class SignInTrail
     public SignInTrail ConsentDenied(DateTimeOffset at, string reason) => With(at, SignInStepKind.ConsentDenied, reason);
 
     public SignInTrail RecoverableAuth(DateTimeOffset at, string detail) => With(at, SignInStepKind.RecoverableAuth, detail);
+
+    /// <summary>A flow with its own clock (a device code's window) ran out with nothing back.</summary>
+    public SignInTrail TimedOut(DateTimeOffset at, string detail) => With(at, SignInStepKind.NoReturn, detail, "timeout");
 
     /// <summary>
     /// Marks the trail NoReturn when the app came back (Back, a task switch) with nothing having returned,

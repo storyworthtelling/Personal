@@ -55,6 +55,26 @@ public sealed record PolicyAuditLog(IReadOnlyList<PolicyEvent> Events)
 
     public PolicyAuditLog Record(PolicyEvent single) => Record([single]);
 
+    /// <summary>
+    /// The events <see cref="Record"/> would actually add — consecutive repeats collapsed against the log and
+    /// within the batch — so the log loop writes a failure that recurs every pass once, as the audit does.
+    /// </summary>
+    public IReadOnlyList<PolicyEvent> NewlyRecorded(IEnumerable<PolicyEvent> events)
+    {
+        var fresh = new List<PolicyEvent>();
+        PolicyEvent? last = Events.Count > 0 ? Events[^1] : null;
+        foreach (var next in events)
+        {
+            if (last is { } previous && previous.Kind == next.Kind && previous.Summary == next.Summary)
+            {
+                continue;
+            }
+            fresh.Add(next);
+            last = next;
+        }
+        return fresh;
+    }
+
     /// <summary>A plain-text export, newest first, one line per event.</summary>
     public string Format() =>
         Events.Count == 0
@@ -62,4 +82,14 @@ public sealed record PolicyAuditLog(IReadOnlyList<PolicyEvent> Events)
             : string.Join("\n", Events
                 .OrderByDescending(e => e.TimestampUtc)
                 .Select(e => $"{e.TimestampUtc:yyyy-MM-dd HH:mm:ss}Z  [{e.Kind}]  {e.Summary}"));
+}
+
+/// <summary>Flyleaf's policy lines for the log loop (LOG-LOOP-PLAN.md §4.5).</summary>
+public static class PolicyLogLines
+{
+    public static string Line(PolicyEvent policyEvent) => $"POLICY {policyEvent.Kind}: {policyEvent.Summary}";
+
+    /// <summary>Whether something the policy asked for did not take — those are warnings, the rest information.</summary>
+    public static bool IsProblem(PolicyEventKind kind) => kind is PolicyEventKind.SuspendFailed or PolicyEventKind.ReleaseFailed
+        or PolicyEventKind.GrantFailed or PolicyEventKind.ConfigFailed or PolicyEventKind.NotDeviceOwner or PolicyEventKind.UninstallFailed;
 }

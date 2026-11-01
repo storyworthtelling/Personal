@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Android.Content.PM;
 using Android.Util;
@@ -44,7 +45,7 @@ public class PackageWatcher
         }
         catch (Java.Lang.Exception e)
         {
-            Log.Warn(Tag, $"Could not re-apply policy after an install change: {e.Message}");
+            HeadLog.Warn(Tag, $"Could not re-apply policy after an install change: {e.Message}");
         }
     }
 

@@ -84,6 +84,7 @@ public abstract class ConstitutionActivity : Activity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
         NoticePoster.Attach(this);
 

@@ -1,3 +1,4 @@
+using Codex.Ui;
 using global::Android.Content;
 using AndroidX.Work;
 using Score.Google;
@@ -22,7 +23,11 @@ public class FridayPicksWorker : Worker
     {
     }
 
-    public override Result DoWork()
+    public override Result DoWork() => HeadDiagnostics.Worker(nameof(FridayPicksWorker), Work);
+
+
+    private Result Work()
+
     {
         var context = ApplicationContext!;
 
