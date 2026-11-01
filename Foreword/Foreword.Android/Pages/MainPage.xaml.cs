@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using Foreword.Domain.Calendar;
 using Microsoft.Extensions.DependencyInjection;
 using Foreword.Infrastructure.Delivery;
@@ -129,7 +130,7 @@ public partial class MainPage : BinderPage
             return;
         }
 
-        DeliveryFileLogger.Clear();
+        MauiLog.Current?.Clear();
         deliverNow.IsEnabled = false;
         // Loading is words (DESIGN.md §5).
         StatusLabel.Text = "Delivering — fetching today's brief…";

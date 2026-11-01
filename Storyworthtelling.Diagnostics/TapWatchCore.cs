@@ -1,6 +1,5 @@
-using Storyworthtelling.Diagnostics;
 
-namespace Codex.Domain.Diagnostics;
+namespace Storyworthtelling.Diagnostics;
 
 /// <summary>
 /// A declared key action in flight (LOG-LOOP-PLAN.md §4.1, O10): the code that started background work
