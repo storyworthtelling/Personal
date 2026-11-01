@@ -150,6 +150,7 @@ jobs:
             android.permission.WAKE_LOCK \
             android.permission.RECEIVE_BOOT_COMPLETED \
             android.permission.FOREGROUND_SERVICE \
+            android.permission.POST_NOTIFICATIONS \
             com.storyworthtelling.constitution.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION \
             com.storyworthtelling.focusphone.camera.READ_RECIPE | sort -u)
           echo "$USES" | grep -qx "android.permission.INTERNET" || {
