@@ -169,4 +169,25 @@ public class SignInDiagnosisTests
             "The Google account was chosen, but the consent step never answered.",
             SignInDiagnosis.Explain(trail));
     }
+
+    // A flow with its own clock (Plaid's polling, a device code's window) says what ran out, not a generic no-return.
+    [Fact]
+    public void AnOwnClockThatRanOutAfterComingBackSaysWhat()
+    {
+        var at = new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
+        var trail = SignInTrail.Start(SignInFlowKinds.PlaidHostedLink, "f1", at, null, null, [], SignInBrowserPaths.ChromeByPackage)
+            .LeftApp(at).Returned(at.AddSeconds(30), "(came back)").TimedOut(at.AddSeconds(45), "no public_token after 6 polls");
+
+        Assert.Equal("The redirect came back, but no token followed: no public_token after 6 polls.", SignInDiagnosis.Explain(trail));
+    }
+
+    [Fact]
+    public void AnOwnClockThatRanOutWithoutComingBackSaysWhat()
+    {
+        var at = new DateTimeOffset(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
+        var trail = SignInTrail.Start(SignInFlowKinds.TidalDevice, "f2", at, null, null, [], SignInBrowserPaths.None)
+            .TimedOut(at.AddMinutes(5), "the device code's window closed before it was approved");
+
+        Assert.Equal("No token came back: the device code's window closed before it was approved.", SignInDiagnosis.Explain(trail));
+    }
 }

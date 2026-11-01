@@ -429,21 +429,25 @@ public partial class SetupPage : FolioBinderPage
         if (string.IsNullOrWhiteSpace(code))
             return;
 
+        var pairing = PairingTrail.Start();
         try
         {
             var registration = IPlatformApplication.Current!.Services
                 .GetRequiredService<Storyworthtelling.Remarkable.IRemarkableRegistration>();
             SettingsStore.RemarkableDeviceToken = await registration.Register(code);
+            PairingTrail.Paired(pairing);
             UpdateRemarkableStatus();
             await PublishToVaultAsync();
         }
         catch (HttpRequestException ex)
         {
+            PairingTrail.Failed(pairing, ex);
             await DisplayAlert("Registration failed",
                 $"The reMarkable cloud returned {(int?)ex.StatusCode}. Check the code and try again.", "OK");
         }
         catch (Exception ex)
         {
+            PairingTrail.Failed(pairing, ex);
             await DisplayAlert("Registration failed", ex.Message, "OK");
         }
     }
