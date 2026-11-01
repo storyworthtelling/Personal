@@ -1,3 +1,5 @@
+using Codex.Domain.Diagnostics;
+using Constitution.Domain.Diagnostics;
 using System.Text.Json;
 using Android.App;
 using Android.Content;
@@ -139,6 +141,9 @@ public sealed class SettingsArea(Activity host)
         {
             column.AddView(PaperUi.Secondary(Host, exportStatus), Spaced(DesignTokens.Space.X1));
         }
+
+        // The log loop's screen: the logs as they stand, and Send logs now (LOG-LOOP-PLAN.md §3).
+        column.AddView(PaperUi.QuietButton(Host, "Logs", () => LoopDiagnosticsActivity.Open(Host)), Spaced(DesignTokens.Space.X1));
 
         column.AddView(PaperUi.BuildNumber(Host, "Constitution"));
 
@@ -533,13 +538,18 @@ public sealed class SettingsArea(Activity host)
         entryOpenFor = null;
         SetNote(credentialId, "Saved on this phone. Saving to the vault.");
         _ = SaveToVaultAsync(
-            credentialId, VaultNoteSubject.SleepNumber, [VaultField.SleepNumberLogin, VaultField.SleepNumberPassword]);
+            credentialId, VaultNoteSubject.SleepNumber, [VaultField.SleepNumberLogin, VaultField.SleepNumberPassword],
+            TapWatch.Action(ConstitutionKeyActions.SleepNumberLogin, TimeSpan.FromMinutes(1)));
     }
 
     // The note says what the vault actually did. The runner never throws: every ending is a result.
-    private async Task SaveToVaultAsync(string credentialId, VaultNoteSubject subject, IReadOnlyCollection<VaultField> changed)
+    private async Task SaveToVaultAsync(
+        string credentialId, VaultNoteSubject subject, IReadOnlyCollection<VaultField> changed, KeyAction? watched = null)
     {
         var result = await ConstitutionVaults.Create(Host).PublishAsync(changed, CancellationToken.None);
+        // The runner never throws, so the vault's answer is the action's: its outcome word, never a value.
+        watched?.Succeeded();
+        HeadLog.Info("Settings", $"vault publish after a login save: {result.Status}");
         var note = VaultNote.For(result, subject);
         Host.RunOnUiThread(() => SetNote(credentialId, note));
     }
@@ -648,6 +658,7 @@ public sealed class SettingsArea(Activity host)
 
     private async Task SignInAsync()
     {
+        var signing = TapWatch.Action(ConstitutionKeyActions.GoogleSignIn, TimeSpan.FromMinutes(5));
         var settled = false;
         try
         {
@@ -656,6 +667,7 @@ public sealed class SettingsArea(Activity host)
             try
             {
                 var email = await googleAccount.SignIn(Host);
+                signing.Succeeded();
                 signInStatus = $"Signed in as {email}.";
                 settled = true;
             }
@@ -663,6 +675,7 @@ public sealed class SettingsArea(Activity host)
                 e is InvalidOperationException or OperationCanceledException or TimeoutException or IOException
                     or Java.Lang.Exception))
             {
+                signing.Failed(e.GetType().Name);
                 signInStatus = ConnectionFailure.Sentence(ConnectionAct.SignIn, e, callerCancelled: false);
                 settled = true;
                 return;

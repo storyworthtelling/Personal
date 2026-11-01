@@ -494,6 +494,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
         var current = cooks.TryGetValue(picked, out var state) ? state : CookSoon.StateOf(picked, PlannedNow(ready.Snapshot));
         var current2 = source;
+        var cooking = TapWatch.Action(ConstitutionKeyActions.CookSoon, KeyActs.Local);
         _ = Task.Run(() =>
         {
             CookSoonState settled;
@@ -501,11 +502,13 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             try
             {
                 settled = CookSoon.Press(current2, picked, current);
+                cooking.Succeeded();
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 settled = current;
                 sentence = CookSoon.NotKeptWords + " (" + e.GetType().Name + ")";
+                cooking.Failed(e.GetType().Name);
             }
 
             Host.RunOnUiThread(() => CookDone(picked, settled, sentence));
@@ -824,13 +827,16 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             return;
         }
 
+        var opening = TapWatch.Action(ConstitutionKeyActions.ScanRecipe, TimeSpan.FromSeconds(15));
         if (scanLauncher.Start() is { } sentence)
         {
+            opening.Failed(sentence);
             notice = sentence;
             RaiseChanged();
             return;
         }
 
+        opening.Succeeded();
         notice = null;
         scanBusy = true;
     }
@@ -850,7 +856,10 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
 
         scanBusy = false;
-        switch (ScanRecipeLauncher.Read(resultCode, data))
+        var answer = ScanRecipeLauncher.Read(resultCode, data);
+        // §4.5: what Plate's read came to, by kind only; the card's words never reach the log.
+        HeadLog.Info("Meals", "recipe scan: " + answer.GetType().Name.ToLowerInvariant());
+        switch (answer)
         {
             case ScanReturn.Read read:
                 BeginDraft(read.Payload);

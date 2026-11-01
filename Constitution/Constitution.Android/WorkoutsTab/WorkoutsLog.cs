@@ -1,3 +1,5 @@
+using Storyworthtelling.Diagnostics;
+using Codex.Ui;
 using Android.Content;
 using Codex.Domain.Diagnostics;
 
@@ -12,7 +14,8 @@ public sealed class WorkoutsLog
 {
     public const string FileName = "workouts.log";
 
-    private const long MaxBytes = 32 * 1024;
+    /// <summary>The trail's cap; past it the older half is sealed into the log loop's outbox, not discarded.</summary>
+    public const long MaxBytes = 32 * 1024;
     private const string Source = "Workouts";
 
     private readonly DiagnosticLog? log;
@@ -20,7 +23,10 @@ public sealed class WorkoutsLog
     public WorkoutsLog(Context context)
     {
         var directory = context.NoBackupFilesDir?.AbsolutePath;
-        log = directory is null ? null : new DiagnosticLog(directory, MaxBytes, FileName);
+        // The head's own instance when the Application has installed it, so one outbox counts every seal;
+        // a process that never ran it (a test host) gets its own, still sealing rather than discarding.
+        log = HeadDiagnostics.Current?.Trail(FileName)
+            ?? (directory is null ? null : new DiagnosticLog(directory, MaxBytes, FileName, new LogOutbox(directory)));
     }
 
     public void Outcome(string phrase)

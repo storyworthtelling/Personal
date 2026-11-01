@@ -10,8 +10,9 @@ public static class ConstitutionKeyActions
     /// <summary>Sign in with Google.</summary>
     public const string GoogleSignIn = "constitution.google-sign-in";
 
-    /// <summary>Signing in to the bed.</summary>
-    public const string SleepNumberSignIn = "constitution.sleep-number-sign-in";
+    /// <summary>Settings: saving the bed's login, on the phone and to the vault. The bed itself is signed in to by the
+    /// body sync, whose answers are on the Sleep Number trail.</summary>
+    public const string SleepNumberLogin = "constitution.sleep-number-login";
 
     /// <summary>Asking Health Connect for its permissions.</summary>
     public const string HealthConnectPermission = "constitution.health-connect-permission";
@@ -19,12 +20,12 @@ public static class ConstitutionKeyActions
     /// <summary>Reading a recipe card through Plate.</summary>
     public const string ScanRecipe = "constitution.scan-recipe";
 
-    /// <summary>Planning the week now.</summary>
-    public const string Plan = "constitution.plan";
+    /// <summary>Meals: Cook this soon, which plans a recipe into next week.</summary>
+    public const string CookSoon = "constitution.cook-soon";
 
     /// <summary>Diagnostics: Send logs now.</summary>
     public const string SendLogsNow = "constitution.send-logs-now";
 
     public static IReadOnlyList<string> All { get; } =
-        [GoogleSignIn, SleepNumberSignIn, HealthConnectPermission, ScanRecipe, Plan, SendLogsNow];
+        [GoogleSignIn, SleepNumberLogin, HealthConnectPermission, ScanRecipe, CookSoon, SendLogsNow];
 }

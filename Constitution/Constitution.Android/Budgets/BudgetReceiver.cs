@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -50,6 +51,7 @@ public class BudgetReceiver : BroadcastReceiver
             // trail keeps the type, so the owner's diagnostics can say a budget was lost without saying what it held.
             trail.Outcome($"budget broadcast not kept: {e.GetType().Name}");
             Android.Util.Log.Error("Budget", e.GetType().Name);
+            HeadDiagnostics.Current?.Warn("Budget", "The budget broadcast could not be read: " + e.GetType().Name);
         }
     }
 }
