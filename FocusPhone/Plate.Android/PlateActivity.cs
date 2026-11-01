@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -88,6 +89,7 @@ public class PlateActivity : AppCompatActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+        TapWatch.Attach(this);
         PaperTransitions.Apply(this);
 
         Camera = new PlateCamera(this);
@@ -152,9 +154,13 @@ public class PlateActivity : AppCompatActivity
     /// MediaStore with RELATIVE_PATH = DCIM/Camera, which is the one folder Google Photos
     /// backs up without being asked. Until this moment it existed only inside Plate.
     /// </summary>
-    public void Send(IReadOnlyList<DarkroomItem> items)
+    public void Send(IReadOnlyList<DarkroomItem> items) =>
+        KeyActs.Run(TapWatch.Action(PlateKeyActions.Send, KeyActs.Local), () => SendNow(items));
+
+    private void SendNow(IReadOnlyList<DarkroomItem> items)
     {
         var sent = 0;
+        var putBack = 0;
         foreach (var item in items)
         {
             if (item.Kind == DarkroomKind.Scan)
@@ -176,6 +182,7 @@ public class PlateActivity : AppCompatActivity
                 {
                     // Put it back rather than lose it: the room is the only copy.
                     Room = Room.Restore([item]);
+                    putBack++;
                     continue;
                 }
 
@@ -192,10 +199,12 @@ public class PlateActivity : AppCompatActivity
             {
                 // Anything that goes wrong puts the picture back in the room. Losing it
                 // would be the exact failure the reversed spine was warned about.
-                Android.Util.Log.Warn("Plate", $"Could not send {item.Id}: {e}");
+                HeadLog.Warn("Plate", $"Could not send {item.Id}", e);
                 Room = Room.Restore([item]);
+                putBack++;
             }
         }
+        HeadLog.Info("Plate", PlateLogLines.Sent(sent, putBack));
     }
 
     /// <summary>Throws the bytes away. Only ever called once an undo can no longer reach them.</summary>

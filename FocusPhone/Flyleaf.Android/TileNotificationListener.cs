@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Service.Notification;
 using Android.App;
 using Android.Content;
@@ -82,9 +83,18 @@ public class TileNotificationListener : NotificationListenerService
             return;
         }
         var kind = CallScreen.Classify(notification);
-        if (calls.ShouldSurface(key, kind) && CallScreen.Target(notification, kind) is { } target)
+        if (kind == CallNoticeKind.None)
         {
-            CallScreen.Open(target);
+            return;
+        }
+        if (!calls.ShouldSurface(key, kind))
+        {
+            return;
+        }
+        if (CallScreen.Target(notification, kind) is { } target)
+        {
+            // The record a call that rang unseen would leave (LOG-LOOP-PLAN.md §4.5).
+            HeadDiagnostics.Current?.Info("Call", CallNotice.Line(kind, surfaced: true, opened: CallScreen.Open(target)));
         }
     }
 

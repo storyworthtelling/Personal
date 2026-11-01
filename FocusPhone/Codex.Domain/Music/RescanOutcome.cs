@@ -55,4 +55,10 @@ public readonly record struct RescanOutcome(int Added, int Changed, int Removed)
 /// <see cref="RescanOutcome.Combine"/> and only publishes the total once
 /// <see cref="FullyDrained"/> is true, so a still-in-flight scan never reads as the day's
 /// finding.</summary>
-public readonly record struct MusicScanRunResult(bool FullyDrained, RescanOutcome Outcome);
+public readonly record struct MusicScanRunResult(bool FullyDrained, RescanOutcome Outcome)
+{
+    /// <summary>The run's line for the log loop (LOG-LOOP-PLAN.md §4.5).</summary>
+    public string Line() =>
+        $"SCAN added {Outcome.Added} · changed {Outcome.Changed} · removed {Outcome.Removed} · "
+        + (FullyDrained ? "finished" : "stopped for its time budget; resuming");
+}

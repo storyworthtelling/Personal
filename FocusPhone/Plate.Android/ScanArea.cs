@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.Net.Wifi;
@@ -274,10 +275,11 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             .SetResultFormats(GmsDocumentScannerOptions.ResultFormatJpeg)
             .SetScannerMode(GmsDocumentScannerOptions.ScannerModeFull)
             .Build();
+        var opening = TapWatch.Action(PlateKeyActions.Scan, TimeSpan.FromSeconds(15));
         var scanner = GmsDocumentScanning.GetClient(options);
         scanner.GetStartScanIntent(Host)
-            .AddOnSuccessListener(new IntentSenderListener(this))
-            .AddOnFailureListener(new FailureListener(this, "The scanner is not available"));
+            .AddOnSuccessListener(new IntentSenderListener(this, opening))
+            .AddOnFailureListener(new FailureListener(this, "The scanner is not available", opening));
     }
 
     public override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
@@ -368,9 +370,10 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     // (ScanDelivery) rather than here.
     private void Hand(ScanDestination destination, Android.Net.Uri document, string title, byte[] pdf)
     {
+        var delivering = TapWatch.Action(PlateKeyActions.Deliver, TimeSpan.FromMinutes(2));
         if (ScanDelivery.RouteFor(destination) != DeliveryRoute.ShareIntent)
         {
-            SendToRemarkable(title, pdf);
+            SendToRemarkable(title, pdf, delivering);
             return;
         }
 
@@ -386,6 +389,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         try
         {
             Host.StartActivity(share);
+            Delivered(delivering, destination, true, null);
             ShowStatus($"Handed over · {TimeFormats.Clock12(DateTime.Now)}");
             tray = null;
             face = Face.Doors;
@@ -393,18 +397,33 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         }
         catch (ActivityNotFoundException)
         {
+            Delivered(delivering, destination, false, "that app is not installed");
             ShowStatus($"Saved to Documents · {TimeFormats.Clock12(DateTime.Now)}. "
                 + "That app is not installed.");
+        }
+    }
+
+    private static void Delivered(KeyAction delivering, ScanDestination destination, bool delivered, string? reason)
+    {
+        HeadLog.Info("Plate", PlateLogLines.Delivered(destination, delivered, reason));
+        if (delivered)
+        {
+            delivering.Succeeded();
+        }
+        else
+        {
+            delivering.Failed(reason ?? "not delivered");
         }
     }
 
     // The one destination that is not another app on the phone. It is also the only one
     // that can say whether it arrived: a share intent is fire-and-forget, so Drive and Post
     // get "handed over" while this gets a real answer either way.
-    private async void SendToRemarkable(string title, byte[] pdf)
+    private async void SendToRemarkable(string title, byte[] pdf, KeyAction delivering)
     {
         if (!PlateRemarkable.IsPaired)
         {
+            Delivered(delivering, ScanDestination.Remarkable, false, "the reMarkable is not paired");
             ShowStatus($"Saved to Documents · {TimeFormats.Clock12(DateTime.Now)}. "
                 + "Pair the reMarkable in Settings to send it there.");
             return;
@@ -415,6 +434,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         try
         {
             await shell.Remarkable.DeliverToRoot(title, pdf);
+            Delivered(delivering, ScanDestination.Remarkable, true, null);
             ShowStatus($"On the reMarkable · {TimeFormats.Clock12(DateTime.Now)}");
             tray = null;
             face = Face.Doors;
@@ -422,6 +442,8 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         }
         catch (Exception e)
         {
+            HeadLog.Warn("Plate", "The reMarkable refused a scan", e);
+            Delivered(delivering, ScanDestination.Remarkable, false, $"{e.GetType().Name}: {e.Message}");
             // The PDF is already filed under Documents, so nothing is lost — which is what
             // makes it safe to say plainly what went wrong instead of retrying blind.
             ShowStatus($"Saved to Documents, but the reMarkable refused it: {e.Message}");
@@ -543,7 +565,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         }
     }
 
-    private sealed class IntentSenderListener(ScanArea area)
+    private sealed class IntentSenderListener(ScanArea area, KeyAction? opening = null)
         : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
     {
         public void OnSuccess(Java.Lang.Object? result)
@@ -551,6 +573,11 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             if (result is Android.Content.IntentSender sender)
             {
                 area.Host.StartIntentSenderForResult(sender, DocumentScanRequest, null, 0, 0, 0);
+                opening?.Succeeded();
+            }
+            else
+            {
+                opening?.Failed("the scanner returned no intent");
             }
         }
     }
@@ -608,10 +635,14 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     }
 
     // §7 again: a failure is a sentence on the page, not a toast the owner cannot re-read.
-    private sealed class FailureListener(ScanArea area, string message)
+    private sealed class FailureListener(ScanArea area, string message, KeyAction? opening = null)
         : Java.Lang.Object, Android.Gms.Tasks.IOnFailureListener
     {
-        public void OnFailure(Java.Lang.Exception e) =>
+        public void OnFailure(Java.Lang.Exception e)
+        {
+            opening?.Failed($"{e.GetType().Name}: {e.Message}");
+            HeadLog.Warn("Plate", message, e);
             area.Host.RunOnUiThread(() => area.ShowStatus($"{message}: {e.Message}"));
+        }
     }
 }

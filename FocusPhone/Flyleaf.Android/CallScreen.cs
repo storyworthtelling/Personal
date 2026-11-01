@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.App;
 using Android.OS;
 using Android.Service.Notification;
@@ -105,7 +106,7 @@ public static class CallScreen
         {
             // The dialer withdrew it between the post and the send — the call ended or was
             // answered elsewhere. Nothing to open.
-            Log.Info(Tag, $"Call screen intent was cancelled before it could open: {e.Message}");
+            HeadLog.Info(Tag, $"Call screen intent was cancelled before it could open: {e.Message}");
             return false;
         }
     }

@@ -5,21 +5,36 @@ namespace Codex.Tests.Guard;
 
 /// <summary>
 /// Plan §4.3 (G7): a background worker that silently never runs, or runs and fails, leaves nothing unless
-/// it says so. Every Worker in a head on the loop runs its body through the head's worker trail, which
-/// logs start, end, result and duration. Post only for Phase 1.
+/// it says so. Every Worker in a head on the loop, and the shared upload worker, runs its body through the
+/// worker trail (start, end, result and duration).
 /// </summary>
 public partial class WorkerTrailCoverageTests
 {
-    [Fact]
-    public void EveryPostWorkerRunsThroughTheTrail()
+    public static TheoryData<string> Folders()
     {
-        var workers = LogLoopSource.Sources("FocusPhone/Post.Android")
+        var folders = LogLoopHeads.Folders();
+        folders.Add(LogLoopHeads.SharedKit);
+        return folders;
+    }
+
+    [Theory]
+    [MemberData(nameof(Folders))]
+    public void EveryWorkerRunsThroughTheTrail(string folder)
+    {
+        var workers = LogLoopSource.Sources(folder)
             .SelectMany(s => WorkerDeclaration().Matches(s.Text).Select(m => (s.Path, Name: m.Groups["name"].Value, Body: ClassBody(s.Text, m.Index))))
             .ToList();
 
-        Assert.True(workers.Count >= 2, "Expected at least EmailSyncWorker and LogUploadWorker.");
-        var untrailed = workers.Where(w => !w.Body.Contains("PostDiagnostics.Worker(", StringComparison.Ordinal)).Select(w => w.Name).ToList();
+        var untrailed = workers.Where(w => !Trailed().IsMatch(w.Body)).Select(w => $"{w.Name} ({w.Path})").ToList();
         Assert.True(untrailed.Count == 0, "Not on the worker trail: " + string.Join(", ", untrailed));
+    }
+
+    [Fact]
+    public void ThereAreWorkersToCheck()
+    {
+        var count = LogLoopHeads.All.Sum(h => LogLoopSource.Sources(h.Folder).Sum(s => WorkerDeclaration().Matches(s.Text).Count));
+
+        Assert.True(count >= 6, $"Expected the suite's workers (Post 2, Flyleaf 1, Score 3), found {count}.");
     }
 
     private static string ClassBody(string text, int start)
@@ -39,4 +54,7 @@ public partial class WorkerTrailCoverageTests
 
     [GeneratedRegex(@"class\s+(?<name>\w+)\s*(?:\([^)]*\))?\s*:\s*(?:AndroidX\.Work\.)?Worker\b")]
     private static partial Regex WorkerDeclaration();
+
+    [GeneratedRegex(@"\b\w*Diagnostics\.Worker\(")]
+    private static partial Regex Trailed();
 }

@@ -1,3 +1,4 @@
+using Codex.Domain.Diagnostics;
 using Android.Content;
 using Android.Views;
 using AndroidX.Media3.Common;
@@ -853,14 +854,17 @@ public sealed class PodcastsArea : ScoreArea
 
     private void MarkDoneWithUndo(Episode episode)
     {
-        SetListened(episode.Id, listened: true);
+        KeyActs.Run(TapWatch.Action(ScoreKeyActions.MarkPlayed, KeyActs.Local), () => SetListened(episode.Id, listened: true));
         DogEar.Show(Host, Overlay, "Marked played.", onUndo: () => SetListened(episode.Id, listened: false));
     }
 
     // Marks a batch played, remembering only the ids this action newly added so undo
     // restores exactly them and leaves already-played episodes alone. A no-op batch
     // (nothing left to mark) skips the undo bar rather than showing an empty promise.
-    private void MarkManyWithUndo(IReadOnlyList<string> episodeIds, string message)
+    private void MarkManyWithUndo(IReadOnlyList<string> episodeIds, string message) =>
+        KeyActs.Run(TapWatch.Action(ScoreKeyActions.MarkPlayed, KeyActs.Local), () => MarkManyNow(episodeIds, message));
+
+    private void MarkManyNow(IReadOnlyList<string> episodeIds, string message)
     {
         var listened = store.ListenedIds.ToHashSet();
         var added = episodeIds.Where(id => listened.Add(id)).ToList();

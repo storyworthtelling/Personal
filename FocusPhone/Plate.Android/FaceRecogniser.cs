@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Graphics;
 using Codex.Domain.Plate;
 using Xamarin.Google.MLKit.Vision.Common;
@@ -123,7 +124,7 @@ public sealed class FaceRecogniser(IFaceEmbedder embedder)
         catch (Exception e)
         {
             // No faces. Never a crash on a picture the owner was only looking at.
-            Android.Util.Log.Warn("Plate", $"Face detection did not run: {e.Message}");
+            HeadLog.Warn("Plate", $"Face detection did not run: {e.Message}");
             return [];
         }
     }

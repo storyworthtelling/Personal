@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Android.Provider;
 using Codex.Domain.Plate;
@@ -59,7 +60,7 @@ public sealed class Rolodex(Context context)
         }
         catch (Exception e)
         {
-            Android.Util.Log.Warn("Plate", $"Could not read contacts: {e.Message}");
+            HeadLog.Warn("Plate", $"Could not read contacts: {e.Message}");
         }
         return people;
     }
@@ -85,7 +86,7 @@ public sealed class Rolodex(Context context)
         }
         catch (Exception e)
         {
-            Android.Util.Log.Warn("Plate", $"Could not read a contact photo: {e.Message}");
+            HeadLog.Warn("Plate", $"Could not read a contact photo: {e.Message}");
             return null;
         }
     }

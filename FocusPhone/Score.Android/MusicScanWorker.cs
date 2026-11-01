@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Android.Util;
 using AndroidX.Work;
@@ -120,7 +121,11 @@ public class MusicScanWorker : Worker
         base.OnStopped();
     }
 
-    public override Result DoWork()
+    public override Result DoWork() => HeadDiagnostics.Worker(nameof(MusicScanWorker), Work);
+
+
+    private Result Work()
+
     {
         var folderId = MusicSettingsStore.MusicFolderId;
         if (string.IsNullOrEmpty(folderId))
@@ -137,6 +142,7 @@ public class MusicScanWorker : Worker
             // every partial run's contribution folded into the running total to get
             // there (see RescanOutcomeStore).
             new RescanOutcomeStore(ApplicationContext!).RecordRun(result);
+            AudioDiagnostics.LogInfo("Scan", result.Line());
 
             // A run that ran out of its time budget has already committed everything it
             // read so far; retrying resumes from exactly where the incremental plan left
@@ -153,7 +159,7 @@ public class MusicScanWorker : Worker
         }
         catch (Exception e)
         {
-            Log.Warn(Tag, $"Library scan failed: {e.Message}");
+            HeadLog.Warn(Tag, "Library scan failed", e);
             return Result.InvokeFailure();
         }
     }
