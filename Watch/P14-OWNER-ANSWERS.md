@@ -151,3 +151,9 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   is not one of the places named.
 - **A49** — Glyph studies come next, in two families: drawn from each name, and drawn from the
   face's polygons.
+- **A50 — Glyph family A:** each glyph is its name, drawn once (a glass point, a short dash, one sine
+  wave, one heartbeat trace).
+- **A51 — Each app's colour drifts over the day, not with the minute,** back and forth across its own
+  range: **Point** violet ↔ seafoam, **Dash** maroon ↔ navy, **Wave** slate ↔ amber, **Beat** bright red
+  ↔ velvet. Which end falls at noon is proposed in the design book and confirmed there.
+- **A52** — Next: the watch design language book (before screen mockups and the technical finding).
