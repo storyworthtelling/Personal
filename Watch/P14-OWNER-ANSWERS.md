@@ -139,3 +139,15 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
 
 - **A44** — Pulp's main-build failure on the vault-ownership change is fixed first, in its own small PR.
 - **A45** — D152 stays: the Sunday deadline waits up to 12 hours for the lease claim.
+
+## 11. After the face studies (round 2)
+
+- **A46 — The face is study 1b:** the 12-hour polygon, sides for the hour and hue for the minute,
+  with the afternoon drawn as a second ring of the same shape. The watch theming skews **abstract**.
+- **A47 — The watch apps are named from bare marks:** **Point** (the face and lockdown, Flyleaf's
+  analogue), **Dash** (Post's), **Wave** (Score's), **Beat** (Constitution's). Phone names stay bookish.
+- **A48** — On the watch each app is a **glyph only**, each with its own fixed hue. The names appear in
+  the watch's system settings and in the repository and docs; Flyleaf's allowlist screen on the phone
+  is not one of the places named.
+- **A49** — Glyph studies come next, in two families: drawn from each name, and drawn from the
+  face's polygons.
