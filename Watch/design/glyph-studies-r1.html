@@ -1,0 +1,169 @@
+<title>Watch Glyph Studies</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: the face-study notebook again. Two families, side by side: each shows the four
+   glyphs large, at app-list size, and as the watch's glyph-only app list. Single dark theme on purpose. */
+:root {
+  --ground: #101418;
+  --slab: #171d23;
+  --rule: #26303a;
+  --ink: #dfe6ec;
+  --muted: #8a98a6;
+  --glass: #9fd3e6;
+  --font-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-label: "Spline Sans Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--ground); color: var(--ink); font-family: var(--font-body); }
+body { padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 24px; }
+h1 { font-weight: 600; font-size: 30px; margin: 0 0 6px; text-wrap: balance; }
+header p, .note { margin: 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+.family { padding: 22px; background: var(--slab); border: 1px solid var(--rule); border-radius: 10px; display: grid; gap: 16px; }
+.family h2 { margin: 0; font-size: 21px; font-weight: 600; }
+.family .tag { font-family: var(--font-label); font-size: 12px; color: var(--glass); letter-spacing: 0.04em; }
+.family p { margin: 0; line-height: 1.5; max-width: 80ch; }
+.glyphs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.glyph { display: grid; justify-items: center; gap: 8px; min-width: 0; }
+.glyph canvas.big { width: 100%; max-width: 150px; aspect-ratio: 1; }
+.glyph .small { display: flex; gap: 10px; align-items: center; }
+.glyph canvas.s { width: 40px; height: 40px; }
+.glyph canvas.xs { width: 24px; height: 24px; }
+.glyph .name { font-weight: 600; font-size: 16px; }
+.glyph .what { font-family: var(--font-label); font-size: 11px; color: var(--muted); text-align: center; line-height: 1.4; }
+.listrow { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; }
+.listrow canvas { width: 220px; height: 220px; max-width: 100%; }
+.listrow p { max-width: 52ch; color: var(--muted); font-size: 14px; }
+.label { font-family: var(--font-label); font-size: 12px; color: var(--muted); }
+@media (max-width: 640px) { .glyphs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Watch glyph studies</h1>
+    <p>Each watch app is a glyph with no word beside it, in one fixed colour of its own. Point is the face
+    and the lockdown, Dash stands in for Post, Wave for Score and Beat for Constitution. Two families follow:
+    glyphs drawn from each app's name, and glyphs drawn from the face's own polygons. Each is shown large,
+    at app-list size and smaller, and as the watch's app list.</p>
+  </header>
+  <main id="families" class="wrap"></main>
+  <p class="note">The colours are a first proposal: a glass blue for Point, amber for Dash, violet for Wave and
+  rose for Beat. They sit well apart on the colour wheel and differ in lightness, and no two are a red-green
+  pair, so colour-blind eyes can still separate them. The shapes differ in every case anyway, so colour is
+  never the only cue. The face's minute
+  colour still sweeps the whole wheel and will pass through each of them once an hour. That is expected,
+  since a glyph is never drawn on the face.</p>
+</div>
+
+<script>
+"use strict";
+const TAU = Math.PI * 2;
+const APPS = [
+  { name: "Point", hue: 195, role: "Face and lockdown" },
+  { name: "Dash", hue: 35, role: "Calls, texts, mail" },
+  { name: "Wave", hue: 275, role: "Music and podcasts" },
+  { name: "Beat", hue: 350, role: "Workouts and recording" },
+];
+
+function glow(c, hue, S, draw, light = 1) {
+  c.save(); c.shadowColor = `hsla(${hue} 90% 60% / ${0.55 * light})`; c.shadowBlur = S * 0.08; draw(); c.restore(); draw();
+}
+function strokeStyle(c, hue, S, w) { c.strokeStyle = `hsl(${hue} 85% 74%)`; c.lineWidth = S * w; c.lineCap = "round"; c.lineJoin = "round"; }
+function glassFill(c, hue, cx, cy, r) {
+  const g = c.createRadialGradient(cx - r * 0.35, cy - r * 0.45, r * 0.05, cx, cy, r * 1.1);
+  g.addColorStop(0, `hsl(${hue} 90% 84%)`); g.addColorStop(0.55, `hsl(${hue} 72% 54%)`); g.addColorStop(1, `hsl(${hue} 68% 30%)`);
+  return g;
+}
+
+// Family A: from the name. S is the canvas size; the glyph sits on a black disc like a Wear OS icon.
+const byName = {
+  Point(c, S, hue) { glow(c, hue, S, () => { c.fillStyle = glassFill(c, hue, S / 2, S / 2, S * 0.14); c.beginPath(); c.arc(S / 2, S / 2, S * 0.14, 0, TAU); c.fill(); }); },
+  Dash(c, S, hue) { glow(c, hue, S, () => { strokeStyle(c, hue, S, 0.14); c.beginPath(); c.moveTo(S * 0.3, S / 2); c.lineTo(S * 0.7, S / 2); c.stroke(); }); },
+  Wave(c, S, hue) { glow(c, hue, S, () => { strokeStyle(c, hue, S, 0.08); c.beginPath();
+    for (let i = 0; i <= 60; i++) { const x = S * 0.24 + (i / 60) * S * 0.52, y = S / 2 - Math.sin((i / 60) * TAU) * S * 0.14; i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }); },
+  Beat(c, S, hue) { glow(c, hue, S, () => { strokeStyle(c, hue, S, 0.075); c.beginPath();
+    const p = [[0.22, 0.52], [0.4, 0.52], [0.47, 0.32], [0.55, 0.7], [0.61, 0.52], [0.78, 0.52]];
+    p.forEach(([x, y], i) => i ? c.lineTo(S * x, S * y) : c.moveTo(S * x, S * y)); c.stroke(); }); },
+};
+
+// Family B: from the face. One o'clock's dot, two o'clock's line, then the triangle and the square.
+function polygon(c, S, n, r) { c.beginPath(); for (let i = 0; i < n; i++) { const a = (i / n) * TAU - Math.PI / 2;
+  const x = S / 2 + Math.cos(a) * r, y = S / 2 + Math.sin(a) * r * (n === 3 ? 1 : 1) + (n === 3 ? r * 0.14 : 0); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.closePath(); }
+const byPolygon = {
+  Point(c, S, hue) { byName.Point(c, S, hue); },
+  Dash(c, S, hue) { glow(c, hue, S, () => { strokeStyle(c, hue, S, 0.1); c.beginPath(); c.moveTo(S / 2, S * 0.3); c.lineTo(S / 2, S * 0.7); c.stroke(); }); },
+  Wave(c, S, hue) { glow(c, hue, S, () => { polygon(c, S, 3, S * 0.24); c.fillStyle = glassFill(c, hue, S / 2, S / 2, S * 0.24); c.fill();
+    c.strokeStyle = `hsl(${hue} 90% 86%)`; c.lineWidth = S * 0.02; c.lineJoin = "round"; c.stroke(); }); },
+  Beat(c, S, hue) { glow(c, hue, S, () => { polygon(c, S, 4, S * 0.24); c.fillStyle = glassFill(c, hue, S / 2, S / 2, S * 0.24); c.fill();
+    c.strokeStyle = `hsl(${hue} 90% 86%)`; c.lineWidth = S * 0.02; c.lineJoin = "round"; c.stroke(); }); },
+};
+
+const FAMILIES = [
+  { tag: "Family A", title: "Drawn from the name", draw: byName,
+    about: "Each glyph is its name, drawn once: a single glass point, a short dash, one full wave, one heartbeat trace. You can say each name aloud from its glyph, so none has to be learned.",
+    what: { Point: "a single point of glass light", Dash: "one short dash", Wave: "one full sine wave", Beat: "one beat of a heart trace" } },
+  { tag: "Family B", title: "Drawn from the face's polygons", draw: byPolygon,
+    about: "Each glyph is one of the face's hour shapes, filled with the same glass as the face, in order: Point is one o'clock's dot, Dash is two o'clock's line, Wave is the triangle and Beat the square. The apps read as one set with the face, but Wave and Beat have to be learned, since nothing in a triangle says music.",
+    what: { Point: "one o'clock: a dot", Dash: "two o'clock: a line", Wave: "three o'clock: a triangle", Beat: "four o'clock: a square on its point, as on the face" } },
+];
+
+function paintIcon(canvas, family, app) {
+  const dpr = window.devicePixelRatio || 1, S = Math.round(canvas.clientWidth * dpr);
+  if (canvas.width !== S) { canvas.width = S; canvas.height = S; }
+  const c = canvas.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, S, S);
+  c.fillStyle = "#000"; c.beginPath(); c.arc(S / 2, S / 2, S / 2, 0, TAU); c.fill();
+  c.strokeStyle = "hsl(210 10% 20%)"; c.lineWidth = Math.max(1, S * 0.01); c.stroke();
+  family.draw[app.name](c, S, app.hue);
+}
+
+// The watch's app list: a curved column of round icons, glyph only, with the selected one centred.
+function paintList(canvas, family) {
+  const dpr = window.devicePixelRatio || 1, W = Math.round(canvas.clientWidth * dpr);
+  if (canvas.width !== W) { canvas.width = W; canvas.height = W; }
+  const c = canvas.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, W);
+  c.fillStyle = "#000"; c.beginPath(); c.arc(W / 2, W / 2, W / 2, 0, TAU); c.fill();
+  c.save(); c.beginPath(); c.arc(W / 2, W / 2, W / 2, 0, TAU); c.clip();
+  const rows = [...APPS, { name: "Clock", hue: 0, system: true }, { name: "Wallet", hue: 0, system: true }];
+  const gap = W * 0.2, centre = W / 2 - gap * 1.0;
+  rows.forEach((app, i) => {
+    const y = centre + (i - 1.5) * gap + gap * 0.5, off = Math.abs(y - W / 2) / (W / 2);
+    const size = W * 0.2 * (1 - off * 0.35), x = W / 2 - size / 2 + (off * off) * W * 0.12;
+    if (y < -size || y > W + size) return;
+    c.save(); c.translate(x, y - size / 2); c.globalAlpha = 1 - off * 0.5;
+    c.fillStyle = "hsl(210 8% 12%)"; c.beginPath(); c.arc(size / 2, size / 2, size / 2, 0, TAU); c.fill();
+    if (app.system) { c.fillStyle = "hsl(210 8% 55%)"; c.font = `500 ${size * 0.26}px "Spline Sans Mono", monospace`; c.textAlign = "center"; c.textBaseline = "middle";
+      c.fillText(app.name === "Clock" ? "◷" : "▭", size / 2, size / 2); }
+    else family.draw[app.name](c, size, app.hue);
+    c.restore();
+  });
+  c.restore();
+}
+
+const root = document.getElementById("families"); const views = [];
+FAMILIES.forEach(f => {
+  const sec = document.createElement("section"); sec.className = "family";
+  sec.innerHTML = `<div><div class="tag">${f.tag}</div><h2>${f.title}</h2></div><p>${f.about}</p>
+    <div class="glyphs"></div><div class="label">On the watch, in the app list (Clock and Wallet are the system's own)</div>
+    <div class="listrow"><canvas class="list" role="img" aria-label="${f.title}: the watch app list"></canvas>
+    <p>Glyph only, as you asked. The names appear in the watch's settings and in the repository. Allowlisted system apps keep their own icons, so the suite's four stand out from them.</p></div>`;
+  root.appendChild(sec);
+  const g = sec.querySelector(".glyphs");
+  APPS.forEach(app => {
+    const el = document.createElement("div"); el.className = "glyph";
+    el.innerHTML = `<canvas class="big" role="img" aria-label="${app.name}, ${f.what[app.name]}"></canvas>
+      <div class="small"><canvas class="s" aria-hidden="true"></canvas><canvas class="xs" aria-hidden="true"></canvas></div>
+      <div class="name">${app.name}</div><div class="what">${app.role}<br>${f.what[app.name]}</div>`;
+    g.appendChild(el);
+    el.querySelectorAll("canvas").forEach(cv => views.push(() => paintIcon(cv, f, app)));
+  });
+  const list = sec.querySelector("canvas.list"); views.push(() => paintList(list, f));
+});
+const paintAll = () => views.forEach(v => v());
+window.addEventListener("resize", paintAll);
+paintAll();
+if (document.fonts) document.fonts.ready.then(paintAll);
+</script>
