@@ -168,3 +168,5 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
 - **A56 — O3:** show typeface alternatives.
 - **A57 — O3:** the watch typeface is **IBM Plex Mono**, chosen from six distinct directions (the first
   five candidates were too alike).
+- **A58 — The watch design book (`WATCH-DESIGN.md`) is approved.** Next: the technical finding, then
+  screen mockups.
