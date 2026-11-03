@@ -1,6 +1,6 @@
 # WATCH-DESIGN.md — the watch design language (draft for approval)
 
-**Status:** draft, round 2 (O1, O2, O4, O5 and O6 answered; O3 open). Nothing here is approved until the owner says so. Items marked **O#** are
+**Status:** draft, round 3. All six open questions are answered; the whole book awaits the owner's approval. Nothing here is approved until the owner says so. Items marked **O#** are
 open questions for the owner, and every one of them is listed in §14.
 
 This is the single source of truth for how the four watch apps look, move, buzz and speak: **Point**
@@ -100,9 +100,12 @@ same moment, because the colour depends only on the time of day.
 
 ## 5. Type
 
-- One family for words and numerals, with tabular figures. **Proposed (O3): Atkinson Hyperlegible
-  Next** (OFL, drawn for low-vision legibility, which suits a 30 mm screen). It is not one of the
-  Paper & Ink faces, by decision (A33).
+- One family for words and numerals: **IBM Plex Mono** (O3, owner's choice; SIL Open Font Licence,
+  so it ships inside the apps). It reads like an instrument, and its numerals line up without
+  needing tabular figures. It is not one of the Paper & Ink faces (A33): Paper & Ink's monospace is
+  Cascadia Code, used there only for machine text.
+- A monospace face fits fewer letters on a line, which suits the one-short-sentence rule (§6). A line
+  that does not fit wraps once and is never shrunk.
 - **Three sizes only:** *Glance* (a name or a time: the largest), *Line* (the one short sentence) and
   *Small* (relative times, the date). Values are set in the token file, never in code.
 - Sentence case, no letter-spacing on words, and no all-caps except the weekday on the face's date.
@@ -203,7 +206,7 @@ starting point (O4) and are settled on the wrist:
 |---|---|---|
 | O1 | Which end of each range falls at noon | **Approved:** night end at midnight, day end at noon; Beat's night end is forest green |
 | O2 | The dark colours on black | **Decided:** kept dark, no lightness floor (cost accepted, §4.2) |
-| O3 | The typeface | **Open:** alternatives shown in the book |
+| O3 | The typeface | **Decided:** IBM Plex Mono |
 | O4 | The four buzz shapes | **Approved** as the starting point, settled on the wrist |
 | O5 | Undo on the watch | **Approved:** a six-second Undo line with an emptying ring |
 | O6 | Album art in Wave | **Approved:** a small square |

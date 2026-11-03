@@ -166,3 +166,5 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
 - **A55 — O4–O6:** the four buzz shapes as drawn (settled on the wrist), the six-second Undo ring, and
   a small square of album art in Wave.
 - **A56 — O3:** show typeface alternatives.
+- **A57 — O3:** the watch typeface is **IBM Plex Mono**, chosen from six distinct directions (the first
+  five candidates were too alike).
