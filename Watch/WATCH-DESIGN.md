@@ -1,6 +1,6 @@
 # WATCH-DESIGN.md — the watch design language (draft for approval)
 
-**Status:** draft, round 1. Nothing here is approved until the owner says so. Items marked **O#** are
+**Status:** draft, round 2 (O1, O2, O4, O5 and O6 answered; O3 open). Nothing here is approved until the owner says so. Items marked **O#** are
 open questions for the owner, and every one of them is listed in §14.
 
 This is the single source of truth for how the four watch apps look, move, buzz and speak: **Point**
@@ -74,20 +74,21 @@ Each app has its own colour range and drifts across it **once a day and back**, 
 easing between them, never jumping. Every Dash glyph, tile and accent shows the same colour at the
 same moment, because the colour depends only on the time of day.
 
-| App | Midnight | Noon | Proposed mapping (O1) |
+| App | Midnight | Noon | Mapping (O1, approved; Beat's night end changed to forest green) |
 |---|---|---|---|
 | Point | violet | seafoam | night violet, day seafoam |
 | Dash | navy | maroon | night navy, day maroon |
 | Wave | slate | amber | night slate, day amber |
-| Beat | velvet | bright red | night velvet, day bright red |
+| Beat | forest green | bright red | night forest green, day bright red |
 
 - The colour between the two ends is mixed in a perceptual colour space (OKLCH), along the shorter
   way round the hue wheel, so Dash passes through plum rather than through green.
-- **Legibility on black (O2):** maroon, navy and velvet are dark colours, and a dark glyph on black
-  fades away. The proposal keeps each colour's hue and character but holds its lightness at or above
-  a floor where it is drawn as a glyph, giving at least 3:1 contrast against black, and lets the glow
-  carry the depth. The tokens record both the named colour and its on-black form.
-- Colour is never the only cue: every app is also its own shape.
+- **Dark colours stay dark (O2, owner decision).** Maroon, navy and forest green are drawn as named,
+  with no lightness floor, so Dash at night and Beat at night are deliberately quiet on black. The
+  cost is accepted: those glyphs fall below 3:1 against black for part of the day, and their glow
+  and their shape carry them.
+- Colour is never the only cue: every app is also its own shape. This matters most for Beat, whose
+  red-to-green range is the pair that red-green colour blindness cannot separate.
 
 ### 4.3 Neutrals and states
 
@@ -117,9 +118,10 @@ same moment, because the colour depends only on the time of day.
 
 ## 7. Touch (haptics)
 
-Four patterns, each with one meaning and no other use (A35):
+Four patterns, each with one meaning and no other use (A35). The shapes below are approved as the
+starting point (O4) and are settled on the wrist:
 
-| Pattern | Meaning | Proposed shape (O4) |
+| Pattern | Meaning | Shape (O4) |
 |---|---|---|
 | **Call** | a call is ringing | long, gap, long, repeating while it rings |
 | **Text** | a text arrived | two short taps |
@@ -145,7 +147,7 @@ Four patterns, each with one meaning and no other use (A35):
   (A35). If Wear OS refuses gestures on the face, tiles and the crown take their place.
 - **Big targets:** a workout set is marked done by tapping anywhere (A23).
 - **The crown** is volume in Wave and scroll everywhere else.
-- **Undo (O5):** a filed or deleted message leaves at once, and an **Undo** line stays for six
+- **Undo (O5, approved):** a filed or deleted message leaves at once, and an **Undo** line stays for six
   seconds, drawn as the app's glyph with a thin ring that empties as the time runs out. Then the act
   is final. There are no confirmation dialogs.
 - **Choosing where Wave plays:** whoever started playback owns it. A single **Play on phone / Play
@@ -166,7 +168,7 @@ Four patterns, each with one meaning and no other use (A35):
 - **Dash:** opens on *People waiting*, newest first. A person is their name and one line, nothing
   else; no counts. Accent: Dash's day colour.
 - **Wave:** opens on *Now playing*: the track, the artist and the controls, with the crown for volume.
-  No lyrics, no album art beyond a small square (O6). Accent: Wave's day colour.
+  No lyrics. A small square of album art beside the track (O6, approved). Accent: Wave's day colour.
 - **Beat:** during a workout shows what A23 lists (cadence, live HR, distance when running; the set
   counter and rest timer for strength). Live heart rate is the only Body value the watch ever shows
   (A29). Accent: Beat's day colour.
@@ -176,7 +178,8 @@ Four patterns, each with one meaning and no other use (A35):
 ## 12. Accessibility
 
 - Colour is never the only cue: shape always differs.
-- Text keeps 4.5:1 contrast against black, glyphs at least 3:1 (§4.2).
+- Text keeps 4.5:1 contrast against black. Glyphs may fall below 3:1 at the dark end of their range,
+  by decision (§4.2); shape is what tells them apart.
 - Every touch target is at least 48 dp.
 - The four haptic patterns differ in rhythm, not only in strength.
 
@@ -196,11 +199,11 @@ Four patterns, each with one meaning and no other use (A35):
 
 ## 14. Open questions for the owner
 
-| # | Question | Proposal |
+| # | Question | State |
 |---|---|---|
-| O1 | Which end of each range falls at noon | the table in §4.2 |
-| O2 | The dark colours on black | keep the hue, hold lightness to a 3:1 floor, and let the glow carry depth |
-| O3 | The typeface | Atkinson Hyperlegible Next |
-| O4 | The four buzz shapes | the table in §7, then checked on the wrist |
-| O5 | Undo on the watch | a six-second Undo line with an emptying ring |
-| O6 | Album art in Wave | a small square, or none |
+| O1 | Which end of each range falls at noon | **Approved:** night end at midnight, day end at noon; Beat's night end is forest green |
+| O2 | The dark colours on black | **Decided:** kept dark, no lightness floor (cost accepted, §4.2) |
+| O3 | The typeface | **Open:** alternatives shown in the book |
+| O4 | The four buzz shapes | **Approved** as the starting point, settled on the wrist |
+| O5 | Undo on the watch | **Approved:** a six-second Undo line with an emptying ring |
+| O6 | Album art in Wave | **Approved:** a small square |

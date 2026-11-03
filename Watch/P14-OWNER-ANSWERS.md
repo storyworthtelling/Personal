@@ -157,3 +157,12 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   range: **Point** violet ↔ seafoam, **Dash** maroon ↔ navy, **Wave** slate ↔ amber, **Beat** bright red
   ↔ velvet. Which end falls at noon is proposed in the design book and confirmed there.
 - **A52** — Next: the watch design language book (before screen mockups and the technical finding).
+
+## 12. The design book, round 1
+
+- **A53 — O1:** night end at midnight, day end at noon. **Beat runs forest green (night) ↔ bright red
+  (noon)**, replacing velvet.
+- **A54 — O2:** the dark colours stay dark, with no lightness floor; low contrast on black accepted.
+- **A55 — O4–O6:** the four buzz shapes as drawn (settled on the wrist), the six-second Undo ring, and
+  a small square of album art in Wave.
+- **A56 — O3:** show typeface alternatives.

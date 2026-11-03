@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600&family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600&family=Jost:wght@400;600&family=Lexend:wght@400;600&family=Sora:wght@400;600&family=Red+Hat+Text:wght@400;600&family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* Layout idea: the companion to Watch/WATCH-DESIGN.md. One section per chapter that needs to be seen
    (colour, face, touch, type, undo), each answering its open question. Single dark theme on purpose. */
@@ -51,11 +51,13 @@ button:focus-visible { outline: 2px solid var(--glass); outline-offset: 2px; }
 .hrow b { font-weight: 600; }
 .hrow canvas { width: 100%; height: 34px; display: block; }
 .hrow small { grid-column: 2; font-family: var(--font-label); font-size: 11px; color: var(--muted); }
-.type { display: grid; gap: 12px; background: #000; border-radius: 10px; padding: 20px; }
-.type .glance { font-family: var(--font-watch); font-weight: 600; font-size: 30px; color: #eef3f7; }
-.type .line { font-family: var(--font-watch); font-size: 19px; color: #eef3f7; }
-.type .small { font-family: var(--font-watch); font-size: 14px; color: #93a1ad; font-variant-numeric: tabular-nums; }
-.type .label { margin-top: -6px; }
+.typeset { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.type { display: grid; gap: 10px; background: #000; border-radius: 10px; padding: 18px; min-width: 0; }
+.type h3 { margin: 0; font-family: var(--font-label); font-size: 12px; font-weight: 500; color: var(--glass); }
+.type p { margin: 0; font-size: 13px; color: var(--muted); }
+.type .glance { font-weight: 600; font-size: 30px; color: #eef3f7; }
+.type .line { font-size: 19px; color: #eef3f7; }
+.type .small { font-size: 14px; color: #93a1ad; font-variant-numeric: tabular-nums; }
 @media (max-width: 700px) { .faces, .undo { grid-template-columns: repeat(2, minmax(0, 180px)); } .hrow { grid-template-columns: 1fr; } .hrow small { grid-column: 1; } }
 </style>
 
@@ -69,19 +71,15 @@ button:focus-visible { outline: 2px solid var(--glass); outline-offset: 2px; }
 
   <section aria-labelledby="c1">
     <div><div class="tag">Colour · O1, O2</div><h2 id="c1">Each app's day colour</h2></div>
-    <p>Each app drifts across its own range once a day and back: at the night end at midnight, at the day end
-    at noon, easing in between and never jumping. Each glyph below is drawn every three hours. Switch between the
-    named colours and the on-black colours to see O2: maroon, navy and velvet nearly vanish on a black screen,
-    so the proposal holds their lightness up and keeps their hue.</p>
-    <div class="controls" role="group" aria-label="Colour form">
-      <button id="onblack" type="button" aria-pressed="true">On-black colours (proposed)</button>
-      <button id="named" type="button" aria-pressed="false">Named colours, as you described them</button>
-    </div>
+    <p>Approved: each app drifts across its own range once a day and back, at the night end at midnight and
+    the day end at noon, easing in between. Beat now runs forest green at night to bright red at noon. The dark
+    colours stay dark, as you decided, so Dash and Beat are deliberately quiet on black at night. Each glyph below
+    is drawn every three hours.</p>
     <div class="scroller"><div class="sweep" id="sweep"></div></div>
     <p class="note">The mixing runs through a perceptual colour space along the shorter way round the colour wheel. Dash
-    passes through plum on its way between navy and maroon. Wave's slate is so grey that its middle hours pass
-    through a muted teal and olive on the way to amber. If you would rather it went the long way, through dusty rose,
-    say so.</p>
+    passes through plum on its way between navy and maroon. Wave's middle hours pass through a muted teal and olive
+    on the way to amber. Beat passes through orange and olive between green and red. Its two ends are the pair that
+    red-green colour blindness cannot separate, so its heartbeat shape is what identifies it.</p>
   </section>
 
   <section aria-labelledby="c2">
@@ -94,20 +92,17 @@ button:focus-visible { outline: 2px solid var(--glass); outline-offset: 2px; }
   <section aria-labelledby="c3">
     <div><div class="tag">Touch · O4</div><h2 id="c3">Four buzzes, one meaning each</h2></div>
     <p>Each bar is one pattern over two seconds: the height is the strength and the width is the length. They
-    differ in rhythm as well as in strength, so they can be told apart without looking. These shapes are a first
-    guess, to be settled on the wrist.</p>
+    differ in rhythm as well as in strength, so they can be told apart without looking. Approved as the starting
+    point, to be settled on the wrist.</p>
     <div class="haptics" id="haptics"></div>
   </section>
 
   <section aria-labelledby="c4">
-    <div><div class="tag">Type · O3</div><h2 id="c4">One typeface, three sizes</h2></div>
-    <p>The proposal is Atkinson Hyperlegible Next, drawn for low-vision legibility, which suits a 30 mm screen.
-    It is shown here at the three sizes the watch would use, on black.</p>
-    <div class="type">
-      <div class="glance">Lee</div><div class="label">Glance: a name or a time</div>
-      <div class="line">Running late. I'll be at the field by four.</div><div class="label">Line: the one short sentence</div>
-      <div class="small">5 min ago · SAT 31 · 2:22 pm</div><div class="label">Small: relative times and the date</div>
-    </div>
+    <div><div class="tag">Type · O3</div><h2 id="c4">One typeface: five candidates</h2></div>
+    <p>Each candidate is shown on black at the watch's three sizes. All five are free, open-licence fonts that can
+    ship inside the app. They differ in character: one is drawn for legibility, two are geometric and suit the
+    polygon face, and two sit in between.</p>
+    <div class="typeset" id="typeset"></div>
   </section>
 
   <section aria-labelledby="c5">
@@ -133,17 +128,14 @@ const APPS = [
   { name: "Point", night: [0.62, 0.19, 300], day: [0.82, 0.10, 170], nightName: "violet", dayName: "seafoam" },
   { name: "Dash", night: [0.30, 0.10, 262], day: [0.32, 0.12, 15], nightName: "navy", dayName: "maroon" },
   { name: "Wave", night: [0.62, 0.03, 250], day: [0.80, 0.16, 75], nightName: "slate", dayName: "amber" },
-  { name: "Beat", night: [0.36, 0.13, 355], day: [0.63, 0.24, 27], nightName: "velvet", dayName: "bright red" },
+  { name: "Beat", night: [0.38, 0.09, 150], day: [0.63, 0.24, 27], nightName: "forest green", dayName: "bright red" },
 ];
-const FLOOR = 0.56; // on-black lightness floor proposed for O2
-let onBlack = true;
 
 function dayColour(app, hours, alpha = 1) {
   const p = (1 - Math.cos((hours / 24) * TAU)) / 2; // 0 at midnight, 1 at noon
   const [l0, c0, h0] = app.night, [l1, c1, h1] = app.day;
   let dh = h1 - h0; if (dh > 180) dh -= 360; if (dh < -180) dh += 360;
-  let l = l0 + (l1 - l0) * p; const c = c0 + (c1 - c0) * p, h = (h0 + dh * p + 360) % 360;
-  if (onBlack) l = Math.max(l, FLOOR);
+  const l = l0 + (l1 - l0) * p; const c = c0 + (c1 - c0) * p, h = (h0 + dh * p + 360) % 360;
   return `oklch(${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(1)} / ${alpha})`;
 }
 
@@ -219,6 +211,19 @@ HAPTICS.forEach(hp => { const row = document.createElement("div"); row.className
     c.fillStyle = "hsl(210 15% 20%)"; c.fillRect(0, H - 1 * dpr, W, 1 * dpr);
     hp.parts.forEach(([a, b, s]) => { c.fillStyle = "hsl(195 60% 72%)"; const x = (a / 2) * W, w = ((b - a) / 2) * W, h = s * (H - 4 * dpr); c.fillRect(x, H - h, Math.max(w, 2 * dpr), h); }); }); });
 
+// ---- typeface candidates ----
+const FACES_TYPE = [
+  ["Atkinson Hyperlegible Next", "Drawn for low-vision legibility: every letter is distinct, so 1, l and I never blur. The plainest choice."],
+  ["Jost", "Geometric, after Futura: circles and straight lines, the closest in spirit to the polygon face."],
+  ["Sora", "Geometric and wide, a little technical. Clear at small sizes, and the most modern feel."],
+  ["Lexend", "Drawn to make reading easier, with wide spacing. Calm, rounder than Atkinson."],
+  ["Red Hat Text", "A humanist sans, warm and compact. Fits more words on a line, which matters on 30 mm."],
+];
+FACES_TYPE.forEach(([family, about]) => { const el = document.createElement("div"); el.className = "type"; el.style.fontFamily = `"${family}", Verdana, sans-serif`;
+  el.innerHTML = `<h3>${family}</h3><div class="glance">Lee</div><div class="line">Running late. I'll be at the field by four.</div>
+    <div class="small">5 min ago \u00b7 SAT 31 \u00b7 2:22 pm \u00b7 Il1 0O</div><p style="font-family: var(--font-body)">${about}</p>`;
+  document.getElementById("typeset").appendChild(el); });
+
 // ---- undo ----
 const UNDO = [["before", "Lee · 2 min ago"], ["filed", 1], ["filed", 0.45], ["after", "Filing stands"]];
 const undoViews = [];
@@ -257,9 +262,6 @@ ART.forEach(([kind, cap]) => { const cell = document.createElement("div"); cell.
     [-1, 1].forEach(s => { c.fillStyle = "#93a1ad"; const x = R + s * R * 0.42; c.beginPath(); c.moveTo(x - s * R * 0.05, R * 1.38); c.lineTo(x - s * R * 0.05, R * 1.54); c.lineTo(x + s * R * 0.06, R * 1.46); c.closePath(); c.fill(); }); }); });
 
 const paintAll = () => { paintSweep(); faceViews.forEach(f => f()); hapViews.forEach(f => f()); undoViews.forEach(f => f()); artViews.forEach(f => f()); };
-const setMode = mode => { onBlack = mode; document.getElementById("onblack").setAttribute("aria-pressed", String(mode)); document.getElementById("named").setAttribute("aria-pressed", String(!mode)); paintAll(); };
-document.getElementById("onblack").addEventListener("click", () => setMode(true));
-document.getElementById("named").addEventListener("click", () => setMode(false));
 window.addEventListener("resize", paintAll);
 paintAll();
 if (document.fonts) document.fonts.ready.then(paintAll);
