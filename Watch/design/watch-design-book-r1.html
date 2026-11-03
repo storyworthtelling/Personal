@@ -2,7 +2,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600&family=Jost:wght@400;600&family=Lexend:wght@400;600&family=Sora:wght@400;600&family=Red+Hat+Text:wght@400;600&family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600&family=Doto:wght@500;800&family=Unbounded:wght@400;600&family=Big+Shoulders+Text:wght@500;800&family=IBM+Plex+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Comfortaa:wght@400;700&family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* Layout idea: the companion to Watch/WATCH-DESIGN.md. One section per chapter that needs to be seen
    (colour, face, touch, type, undo), each answering its open question. Single dark theme on purpose. */
@@ -98,10 +98,10 @@ button:focus-visible { outline: 2px solid var(--glass); outline-offset: 2px; }
   </section>
 
   <section aria-labelledby="c4">
-    <div><div class="tag">Type · O3</div><h2 id="c4">One typeface: five candidates</h2></div>
-    <p>Each candidate is shown on black at the watch's three sizes. All five are free, open-licence fonts that can
-    ship inside the app. They differ in character: one is drawn for legibility, two are geometric and suit the
-    polygon face, and two sit in between.</p>
+    <div><div class="tag">Type · O3</div><h2 id="c4">One typeface: six different directions</h2></div>
+    <p>The first five looked too alike, so these six are far apart: dot matrix, wide and rounded, condensed signage,
+    monospace, a soft serif, and a thin rounded geometric. Each is shown on black at the watch's three sizes. All
+    are free, open-licence fonts that can ship inside the app.</p>
     <div class="typeset" id="typeset"></div>
   </section>
 
@@ -213,11 +213,12 @@ HAPTICS.forEach(hp => { const row = document.createElement("div"); row.className
 
 // ---- typeface candidates ----
 const FACES_TYPE = [
-  ["Atkinson Hyperlegible Next", "Drawn for low-vision legibility: every letter is distinct, so 1, l and I never blur. The plainest choice."],
-  ["Jost", "Geometric, after Futura: circles and straight lines, the closest in spirit to the polygon face."],
-  ["Sora", "Geometric and wide, a little technical. Clear at small sizes, and the most modern feel."],
-  ["Lexend", "Drawn to make reading easier, with wide spacing. Calm, rounder than Atkinson."],
-  ["Red Hat Text", "A humanist sans, warm and compact. Fits more words on a line, which matters on 30 mm."],
+  ["Doto", "A dot-matrix face: every letter is made of points, like the watch's own name, Point. The most abstract. Its small line is the hardest to read."],
+  ["Unbounded", "Wide, rounded and heavy. Very legible at a glance and bold in character, though it fits the fewest words on a line."],
+  ["Big Shoulders Text", "Condensed signage, like a trail marker or a field sign. Fits the most words on a line, with a strong outdoor feel."],
+  ["IBM Plex Mono", "Monospace, like an instrument readout. Even and technical, and the numerals line up naturally."],
+  ["Fraunces", "A soft serif with a little wobble. The warmest of the six. Paper & Ink is serif too, but in a different face."],
+  ["Comfortaa", "Rounded and thin, built from circles. Gentle and quiet, and the lightest on the screen."],
 ];
 FACES_TYPE.forEach(([family, about]) => { const el = document.createElement("div"); el.className = "type"; el.style.fontFamily = `"${family}", Verdana, sans-serif`;
   el.innerHTML = `<h3>${family}</h3><div class="glance">Lee</div><div class="line">Running late. I'll be at the field by four.</div>
