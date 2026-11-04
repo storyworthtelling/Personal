@@ -34,9 +34,17 @@ public class DeliveryWorker : Worker
     public const int DeliveryHour = 6;
     public const int DeliveryMinute = 30;
 
+    private bool retrying;
+
     public override Result DoWork() => MauiLogLoop.Worker(nameof(DeliveryWorker), () =>
     {
+        retrying = false;
         var result = Work();
+        // Queue tomorrow from the wall clock now, unless this run is going round again. Doing it
+        // here rather than relying on a periodic request is the fix for mornings drifting to the
+        // afternoon: a periodic request re-anchors to when each run finished.
+        if (!retrying)
+            Enqueue(ApplicationContext, ExistingWorkPolicy.AppendOrReplace);
         UploadLogs();
         return result;
     });
@@ -103,13 +111,17 @@ public class DeliveryWorker : Worker
         {
             CredentialStore.LastDeliveryOutcome = $"Failed: {ex.Message}";
             CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
+            // Bounded: tomorrow is queued behind this run, so it cannot retry forever.
+            if (!DeliverySchedule.ShouldRetry(RunAttemptCount))
+                return Result.InvokeSuccess();
+            retrying = true;
             return Result.InvokeRetry();
         }
     }
 
     public static void Schedule(Context context)
     {
-        // Keep (not Update) so app re-launches don't reset the initial delay on a
+        // Keep so app re-launches don't reset the initial delay on a
         // pending-but-never-run job — that would starve a fresh install whose owner opens the app
         // after the morning window, pushing the first delivery to tomorrow again and again.
         //
@@ -122,24 +134,30 @@ public class DeliveryWorker : Worker
         var replacing = DeliverySchedule.Decide(DeliveryHour, DeliveryMinute,
             CredentialStore.ScheduledDeliveryTime) == SchedulePolicy.Replace;
 
-        var request = (PeriodicWorkRequest) new PeriodicWorkRequest.Builder(
-                Java.Lang.Class.FromType(typeof(DeliveryWorker)),
-                24,
-                Java.Util.Concurrent.TimeUnit.Hours!)
-            .SetInitialDelay(DelayUntilNext(DeliveryHour, DeliveryMinute), Java.Util.Concurrent.TimeUnit.Milliseconds!)
-            .AddTag(WorkName)
-            .Build();
+        if (replacing)
+        {
+            // The old periodic request lives under the same unique name; cancel it so it cannot
+            // go on firing at its drifted hour beside the chain.
+            WorkManager.GetInstance(context).CancelUniqueWork(WorkName);
+        }
 
-        WorkManager.GetInstance(context)
-            .EnqueueUniquePeriodicWork(WorkName,
-                replacing
-                    ? ExistingPeriodicWorkPolicy.CancelAndReenqueue
-                    : ExistingPeriodicWorkPolicy.Keep,
-                request);
+        Enqueue(context, replacing ? ExistingWorkPolicy.Replace : ExistingWorkPolicy.Keep);
 
         // Written after the enqueue, so a throw above leaves the stamp disagreeing and the next
         // launch tries again rather than recording a schedule that was never made.
         CredentialStore.ScheduledDeliveryTime = wanted;
+    }
+
+    // One-time work aimed at the next 6:30 on the phone's clock. Each run queues the next, so the
+    // hour is recomputed every day instead of inherited from whenever the last run finished.
+    private static void Enqueue(Context context, ExistingWorkPolicy policy)
+    {
+        var request = new OneTimeWorkRequest.Builder(Java.Lang.Class.FromType(typeof(DeliveryWorker)))
+            .SetInitialDelay(DelayUntilNext(DeliveryHour, DeliveryMinute), Java.Util.Concurrent.TimeUnit.Milliseconds!)
+            .AddTag(WorkName)
+            .Build();
+
+        WorkManager.GetInstance(context).EnqueueUniqueWork(WorkName, policy, request);
     }
 
     // The phone's own clock, so the hour means the hour the owner reads on the Settings screen.
