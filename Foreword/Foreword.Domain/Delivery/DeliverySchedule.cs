@@ -28,11 +28,23 @@ public enum SchedulePolicy
 public static class DeliverySchedule
 {
     /// <summary>
-    /// The stored shape of a scheduled time. Zero-padded 24-hour, because this value is compared
+    /// The stored shape of a scheduled time. The "chained" suffix marks the self-rescheduling
+    /// schedule: a phone whose stamp is a bare "06:30" was scheduled by the older periodic request,
+    /// which drifted to wherever its last run finished (a late run moved every later morning), and
+    /// must be replaced once even though the time matches. Zero-padded 24-hour, because this value is compared
     /// against what an older launch wrote: 06:30 and 6:30 as two spellings of one time would look
     /// like a changed schedule on every launch and re-enqueue the work every time.
     /// </summary>
-    public static string Stamp(int hour, int minute) => $"{hour:D2}:{minute:D2}";
+    public static string Stamp(int hour, int minute) => $"{hour:D2}:{minute:D2} chained";
+
+    /// <summary>How many times a failed morning is retried before it is given up on.</summary>
+    public const int MaxRetries = 3;
+
+    /// <summary>
+    /// Whether a failed run should be retried. Bounded because each morning is queued behind the
+    /// one before it: a run that retried forever would hold every later morning back.
+    /// </summary>
+    public static bool ShouldRetry(int runAttemptCount) => runAttemptCount < MaxRetries;
 
     /// <summary>
     /// <paramref name="scheduled"/> is the stamp the last successful schedule wrote, or null on a
