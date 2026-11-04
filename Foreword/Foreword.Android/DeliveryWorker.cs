@@ -152,7 +152,7 @@ public class DeliveryWorker : Worker
     // hour is recomputed every day instead of inherited from whenever the last run finished.
     private static void Enqueue(Context context, ExistingWorkPolicy policy)
     {
-        var request = new OneTimeWorkRequest.Builder(Java.Lang.Class.FromType(typeof(DeliveryWorker)))
+        var request = (OneTimeWorkRequest) new OneTimeWorkRequest.Builder(Java.Lang.Class.FromType(typeof(DeliveryWorker)))
             .SetInitialDelay(DelayUntilNext(DeliveryHour, DeliveryMinute), Java.Util.Concurrent.TimeUnit.Milliseconds!)
             .AddTag(WorkName)
             .Build();
