@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- P14 device spike, throwaway: answers A60 (texts on Fi with the phone off; can a third-party app
+       be the watch's SMS app?) and A63 (does a Pixel Watch accept a device owner?). Not a product
+       head: deleted once the spikes report, and never published to apps-latest. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>WatchSpike</RootNamespace>
+    <ApplicationId>com.storyworthtelling.watchspike</ApplicationId>
+    <ApplicationTitle>Watch spike</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>
