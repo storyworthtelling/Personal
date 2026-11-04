@@ -170,3 +170,12 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   five candidates were too alike).
 - **A58 — The watch design book (`WATCH-DESIGN.md`) is approved.** Next: the technical finding, then
   screen mockups.
+
+## 13. The technical finding, round 1
+
+- **A59 — Q1:** calls already work on Fi on the owner's LTE Pixel Watch without the phone; the Fi help
+  page saying otherwise is out of date. The system Phone app rings.
+- **A60 — Q2:** test the carrier first: a device spike on whether Fi delivers texts to the watch with the
+  phone off and whether Dash can be the watch's default SMS app. The Post relay is the fallback.
+- **A61 — Q3:** the phone hands its Google tokens to the watch over the Data Layer.
+- **A62 — Q4:** Wave remote-controls TIDAL in Score on the phone when the phone is nearby.

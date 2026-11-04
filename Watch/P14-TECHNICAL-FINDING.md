@@ -1,6 +1,6 @@
 # P14 · Watch — technical finding (gate 1)
 
-**Status:** draft for the owner. It answers what the owner's 57 answers (A1–A57, in
+**Status:** draft for the owner, round 2 (Q1–Q4 answered; headline 1 corrected). It answers what the owner's 57 answers (A1–A57, in
 [`P14-OWNER-ANSWERS.md`](P14-OWNER-ANSWERS.md)) need from the platform, and says plainly which of
 them the platform does not allow. Design is in [`WATCH-DESIGN.md`](WATCH-DESIGN.md) (approved, A58).
 Owner decisions are **Q1–Q9** in §9. Nothing here has been tried on a watch: every claim is from
@@ -12,19 +12,22 @@ People in examples are invented (Sam, Lee, Robin, Juniper).
 
 ## 0. The headline findings
 
-1. **On Google Fi, the watch cannot make or take a call away from the phone.** Fi's own help page
-   for wearables says: "When your watch is outside the Bluetooth range of your paired phone, it can't
-   make or receive calls", and "Voice calling over LTE is not supported." Google's Pixel Watch page
-   says LTE watches can call without the phone, but that is with carriers that offer voice number
-   sharing (Verizon's Number Share, for example), and Fi is not one of them. So **A13 and A15
-   (calls with the phone at home, or off) cannot be met on Fi** (documented). This is the one
-   finding that decides the phase: **Q1**.
-2. **On Fi, texts on the watch come through the phone, not the network.** Fi: "Texting syncs your
+1. **Calls away from the phone work on Fi (corrected).** The first draft said they could not, on the
+   strength of Fi's wearables help page ("Voice calling over LTE is not supported"). The owner's
+   own LTE Pixel Watch already makes and takes calls on Fi without the phone, which matches Google's
+   Pixel Watch page ("Make calls without your phone", LTE only). The Fi page is out of date or
+   describes another case, and the owner's use is the evidence (A59). Calls ring through the
+   watch's own Phone app, so **Q1 is settled: the system Phone app rings, and Dash logs the call
+   and asks for the dictated note afterwards (A13).**
+2. **How texts reach the watch on Fi is the open question.** Fi's same help page says: "Texting syncs your
    watch and phone together using the Google Messages app over the Internet", and the phone must be on
    and online, though it need not be nearby (documented). Post holds the SMS role on the phone, and
    whether Fi's watch texting works at all when Google Messages is *not* the default SMS app is
-   unverified. It is likely not to.
-3. **That points to a route where Post does own texting (A9):** Dash on the watch talks to **Post on
+   unverified. Since that page was wrong about calls, it may be wrong about texts too. **The owner
+   chose to test the carrier first (A60):** a device spike finds out whether Fi delivers texts to
+   the watch with the phone off, and whether a third-party app (Dash) can be the watch's default SMS
+   app.
+3. **If the spike says no, the fallback is a route where Post owns texting (A9):** Dash on the watch talks to **Post on
    the phone**, over the Wear Data Layer, which falls back to Google's cloud relay when Bluetooth is
    out of range. Google documents both routes as end-to-end encrypted. Post stays the one place
    texts are sent and recorded. The cost: **the phone must be on and online at home** (A15's "phone
@@ -73,9 +76,9 @@ plans beyond the session in hand (A25, A26).
 
 | Need | Route | Verdict |
 |---|---|---|
-| Texts while out, Post owning them (A9, A10) | Dash ↔ Post over the Data Layer; Post sends and records on the phone | **Feasible**, phone on and online; unverified on a device |
-| Texts with the phone **off** (A15) | none on Fi. On a number-sharing carrier the watch receives SMS itself, and Dash would need to be the watch's default SMS app (one third-party app claims this works; unverified) | **Not on Fi** |
-| Calls while out (A13) | Fi: none beyond Bluetooth range. Number-sharing carrier: the watch's own Phone app rings | **Not on Fi** (Q1) |
+| Texts while out, Post owning them (A9, A10) | either Dash as the watch's own SMS app (spike), or, as the fallback, Dash ↔ Post over the Data Layer with Post sending and recording on the phone | One of the two; the spike decides |
+| Texts with the phone **off** (A15) | if Fi delivers SMS to the watch itself, Dash would need to be the watch's default SMS app (one third-party app claims this works; unverified) | **Device spike first** (A60) |
+| Calls while out (A13) | the watch's own Phone app rings over LTE with the shared number; Dash logs the call and takes the dictated note | **Works today** on the owner's watch (A59) |
 | Group texts and photos (A10) | Post already composes group MMS; Dash sends the request and Post sends it | Feasible |
 | Email subject and sender, people only (A11) | Gmail API from the watch over LTE, or Post relays the lines over the Data Layer | Feasible; Q3 decides which |
 | Voicemail, both ways (A13) | Fi's voicemail-by-text is a text, so it follows the text route; audio is a link | Feasible for the transcript; audio unverified |
@@ -93,7 +96,7 @@ texts, with the watch's Phone app used only for calls.
 |---|---|---|
 | Drive music, streamed (A17) | Drive API from the watch over LTE; prefetch the next track | Feasible; needs a Drive token on the watch (§4) |
 | Podcasts, curated on either device (A18) | feeds fetched on the watch; queue and positions shared with Score over the Data Layer | Feasible |
-| TIDAL (A17, A22) | no official Wear OS player | **Blocked** (Q4) |
+| TIDAL (A17, A22) | no official Wear OS player, so Wave remote-controls TIDAL in Score on the phone when the phone is with the owner (A62) | Remote only; no TIDAL with the phone at home |
 | One queue across both (A18, A20) | the Data Layer carries the queue; whoever started playback owns it | Feasible; the playback switch is new code |
 | Tempo from cadence, crossfading (A21) | Health Services gives steps per minute during an exercise; ExoPlayer/Media3 crossfade | Feasible with the alpha binding (Q6) |
 | Listening counted in the taste log (A18) | signals sent to Score on the phone over the Data Layer | Feasible |
@@ -184,10 +187,10 @@ Services cadence accuracy; battery over a real day; Drive streaming over LTE; th
 
 | # | Decision | Options the finding sees |
 |---|---|---|
-| Q1 | **Calls away from the phone.** Fi cannot do it. | Move the number to a carrier with voice number sharing (Verizon, AT&T, T-Mobile); or keep Fi and accept calls only near the phone; or keep Fi and drop phone-free calls from P14 |
-| Q2 | **Texts:** the Post relay (phone at home, on and online; texts cross Google's encrypted relay) | Accept the relay; or wait for Q1's carrier and test the watch as its own SMS app |
-| Q3 | **Google sign-in on the watch** (the vault gives no Google token) | Phone hands its tokens over the Data Layer (Google's first choice); or a Google sign-in on the watch once |
-| Q4 | **TIDAL** has no official Wear OS player | Drive and podcasts only on the watch until TIDAL supports Wear; or Wave remote-controls the phone's TIDAL when nearby |
+| Q1 | Calls away from the phone | **Settled (A59):** they work on Fi today; the system Phone app rings |
+| Q2 | How texts reach the watch | **Settled (A60):** test the carrier first (device spike); the Post relay is the fallback |
+| Q3 | Google sign-in on the watch | **Settled (A61):** the phone hands its tokens over the Data Layer |
+| Q4 | TIDAL on the watch | **Settled (A62):** Wave remote-controls the phone's TIDAL when the phone is nearby |
 | Q5 | **Device owner on the watch** is unknown | A device spike first (reset the watch, try, record what happens to LTE); or accept curation without enforcement |
 | Q6 | **The alpha Health Services binding** | Accept it, pinned, with a guard; or write a thin Java/Kotlin shim (breaks ".NET only", A40) |
 | Q7 | **Sleep without Fitbit:** Health Services gives asleep/awake, not stages | Keep Fitbit hidden as the sleep pipe; or the bed alone carries sleep |
