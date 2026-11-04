@@ -20,6 +20,32 @@ public class DayPdfComposerTests
         return PdfReader.Open(stream, PdfDocumentOpenMode.InformationOnly).PageCount;
     }
 
+    /// <summary>
+    /// The Day is a landscape document, and the bytes say so: every page's media box is wider than
+    /// it is tall. The sheets were drawn landscape all along; this pins that the uploaded file is too,
+    /// since the tablet shows whatever orientation the file itself declares.
+    /// </summary>
+    [Fact]
+    public void EveryPageOfTheDayIsWiderThanItIsTall()
+    {
+        var pdf = composer.Compose(new DayDocument
+        {
+            Date = Today,
+            Agenda = new DayAgenda { Date = Today, Events = [] },
+            Columns = Household.Layout.Printed,
+        });
+
+        using var stream = new MemoryStream(pdf);
+        using var document = PdfReader.Open(stream, PdfDocumentOpenMode.InformationOnly);
+        Assert.Equal(4, document.PageCount);
+        for (var i = 0; i < document.PageCount; i++)
+        {
+            var page = document.Pages[i];
+            Assert.True(page.Width.Point > page.Height.Point,
+                $"Page {i + 1} is {page.Width.Point} by {page.Height.Point} points: portrait.");
+        }
+    }
+
     private static CalendarEvent TimedEvent(PersonColumn column, int startHour, int endHour,
         string title, string? location = null) =>
         new()
