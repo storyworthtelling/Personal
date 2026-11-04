@@ -184,3 +184,11 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
 - **A65 — Q7:** Fitbit stays as a hidden sleep pipe, never visible.
 - **A66 — Q8:** Beat's data lands in Constitution's store and is also written to Health Connect,
   reversing P13's non-goal (writing to Health Connect).
+
+## 14. Spike S1a, answered by the owner's own use
+
+- **A67 — On Fi, texts and calls reach the watch anywhere, but only while the phone is on.** With the
+  phone at home and switched on, the watch receives texts and calls far away; with the phone off,
+  nothing arrives until it is back on. So A15's "phone off" case cannot be met on Fi by any app design,
+  S1b (the watch as its own SMS app) is dropped, and **the Post relay is Dash's route for texts**.
+  Only S2 (device owner) remains to spike.

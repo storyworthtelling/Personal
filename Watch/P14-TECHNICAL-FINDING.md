@@ -19,7 +19,10 @@ People in examples are invented (Sam, Lee, Robin, Juniper).
    describes another case, and the owner's use is the evidence (A59). Calls ring through the
    watch's own Phone app, so **Q1 is settled: the system Phone app rings, and Dash logs the call
    and asks for the dictated note afterwards (A13).**
-2. **How texts reach the watch on Fi is the open question.** Fi's same help page says: "Texting syncs your
+2. **Texts on Fi go through the phone (settled by the owner's use, A67).** With the phone on, texts
+   and calls reach the watch anywhere; with the phone off, nothing arrives until it is back on. So the
+   phone being on is a condition of the carrier, not of any design, and the Post relay below is Dash's
+   route. The rest of this headline is the first draft's reasoning, kept for the record: Fi's same help page says: "Texting syncs your
    watch and phone together using the Google Messages app over the Internet", and the phone must be on
    and online, though it need not be nearby (documented). Post holds the SMS role on the phone, and
    whether Fi's watch texting works at all when Google Messages is *not* the default SMS app is
@@ -27,7 +30,7 @@ People in examples are invented (Sam, Lee, Robin, Juniper).
    chose to test the carrier first (A60):** a device spike finds out whether Fi delivers texts to
    the watch with the phone off, and whether a third-party app (Dash) can be the watch's default SMS
    app.
-3. **If the spike says no, the fallback is a route where Post owns texting (A9):** Dash on the watch talks to **Post on
+3. **Dash's route: Post owns texting (A9, A67):** Dash on the watch talks to **Post on
    the phone**, over the Wear Data Layer, which falls back to Google's cloud relay when Bluetooth is
    out of range. Google documents both routes as end-to-end encrypted. Post stays the one place
    texts are sent and recorded. The cost: **the phone must be on and online at home** (A15's "phone
@@ -76,8 +79,8 @@ plans beyond the session in hand (A25, A26).
 
 | Need | Route | Verdict |
 |---|---|---|
-| Texts while out, Post owning them (A9, A10) | either Dash as the watch's own SMS app (spike), or, as the fallback, Dash ↔ Post over the Data Layer with Post sending and recording on the phone | One of the two; the spike decides |
-| Texts with the phone **off** (A15) | if Fi delivers SMS to the watch itself, Dash would need to be the watch's default SMS app (one third-party app claims this works; unverified) | **Device spike first** (A60) |
+| Texts while out, Post owning them (A9, A10) | Dash ↔ Post over the Data Layer; Post sends and records on the phone (A67) | **Feasible**; the relay itself is unverified on a device |
+| Texts with the phone **off** (A15) | Fi delivers nothing to the watch while the phone is off (A67) | **Not possible on Fi**, by any design |
 | Calls while out (A13) | the watch's own Phone app rings over LTE with the shared number; Dash logs the call and takes the dictated note | **Works today** on the owner's watch (A59) |
 | Group texts and photos (A10) | Post already composes group MMS; Dash sends the request and Post sends it | Feasible |
 | Email subject and sender, people only (A11) | Gmail API from the watch over LTE, or Post relays the lines over the Data Layer | Feasible; Q3 decides which |
@@ -188,7 +191,7 @@ Services cadence accuracy; battery over a real day; Drive streaming over LTE; th
 | # | Decision | Options the finding sees |
 |---|---|---|
 | Q1 | Calls away from the phone | **Settled (A59):** they work on Fi today; the system Phone app rings |
-| Q2 | How texts reach the watch | **Settled (A60):** test the carrier first (device spike); the Post relay is the fallback |
+| Q2 | How texts reach the watch | **Settled (A60, A67):** through the phone on Fi; Dash uses the Post relay |
 | Q3 | Google sign-in on the watch | **Settled (A61):** the phone hands its tokens over the Data Layer |
 | Q4 | TIDAL on the watch | **Settled (A62):** Wave remote-controls the phone's TIDAL when the phone is nearby |
 | Q5 | Device owner on the watch | **Settled (A63):** a device spike first (reset the watch, try it, record what happens to LTE and the number) |

@@ -23,7 +23,14 @@ a watch.
 
 ## S0 · Getting the spike onto the watch
 
-You need a computer with Android's `adb` (the "SDK Platform-Tools" download from developer.android.com).
+The APK is attached to the **`watch-spike`** pre-release on GitHub (never `apps-latest`, so Flyleaf
+never installs it), built by `.github/workflows/watch-spike.yml`. It is signed with a throwaway debug
+key, not the suite's keystore.
+
+With no computer, use an ADB app on an **unrestricted** Android phone (the partner's), such as
+Bugjaeger: it pairs with the watch's wireless debugging and can install an APK and run `adb shell`
+commands. The locked FocusPhone cannot run it. With a computer, use Android's `adb` (the "SDK
+Platform-Tools" download from developer.android.com).
 
 1. On the watch: **Settings → System → About → Versions**, tap **Build number** seven times to turn on
    Developer options.
@@ -33,7 +40,11 @@ You need a computer with Android's `adb` (the "SDK Platform-Tools" download from
 4. `adb install com.storyworthtelling.watchspike-Signed.apk`.
 5. Open **Watch spike** from the watch's app list.
 
-## S1 · Texts on Fi (A60)
+## S1 · Texts on Fi (A60) — answered, A67
+
+The owner's own use answered S1a: with the phone on, texts and calls reach the watch anywhere; with
+the phone off, nothing arrives until it is back on. On Fi the phone carries everything, so **S1b is
+dropped** and Dash uses the Post relay. The steps are kept below for the record only.
 
 **S1a, no app needed.** Run each with someone (Lee, say) texting and calling your number.
 
