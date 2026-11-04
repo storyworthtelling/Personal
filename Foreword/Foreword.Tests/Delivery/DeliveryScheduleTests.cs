@@ -58,10 +58,10 @@ public class DeliveryScheduleTests
     [Fact]
     public void TheStampIsZeroPaddedTwentyFourHour()
     {
-        Assert.Equal("06:30", DeliverySchedule.Stamp(6, 30));
-        Assert.Equal("10:45", DeliverySchedule.Stamp(10, 45));
-        Assert.Equal("00:00", DeliverySchedule.Stamp(0, 0));
-        Assert.Equal("23:05", DeliverySchedule.Stamp(23, 5));
+        Assert.Equal("06:30 chained", DeliverySchedule.Stamp(6, 30));
+        Assert.Equal("10:45 chained", DeliverySchedule.Stamp(10, 45));
+        Assert.Equal("00:00 chained", DeliverySchedule.Stamp(0, 0));
+        Assert.Equal("23:05 chained", DeliverySchedule.Stamp(23, 5));
     }
 
     /// <summary>
@@ -73,7 +73,42 @@ public class DeliveryScheduleTests
     [Fact]
     public void SurroundingWhitespaceIsNotADifferentSchedule()
     {
-        Assert.Equal(SchedulePolicy.Keep, DeliverySchedule.Decide(6, 30, " 06:30 "));
+        Assert.Equal(SchedulePolicy.Keep, DeliverySchedule.Decide(6, 30, " 06:30 chained "));
+    }
+
+    /// <summary>
+    /// The bug: morning delivery landing in the late afternoon. The old stamp was a bare "06:30",
+    /// written by the build that scheduled a 24-hour PERIODIC request. WorkManager re-anchors a
+    /// periodic request to when each run finished, so one late run (Doze, a retry backoff, the first
+    /// launch) moved every later morning with it and nothing ever pulled it back. A phone carrying
+    /// that stamp must be replaced once, onto the self-rescheduling chain, or it stays late forever.
+    /// </summary>
+    [Fact]
+    public void APhoneOnTheOldPeriodicScheduleIsReplacedEvenAtTheSameTime()
+    {
+        Assert.Equal(SchedulePolicy.Replace, DeliverySchedule.Decide(6, 30, "06:30"));
+    }
+
+    [Fact]
+    public void ARunThatFailedIsRetriedASmallNumberOfTimesThenGivenUp()
+    {
+        // Giving up matters: the next morning is queued behind this run, so a run that retried
+        // forever would hold every later morning back.
+        Assert.True(DeliverySchedule.ShouldRetry(0));
+        Assert.True(DeliverySchedule.ShouldRetry(DeliverySchedule.MaxRetries - 1));
+        Assert.False(DeliverySchedule.ShouldRetry(DeliverySchedule.MaxRetries));
+    }
+
+    /// <summary>
+    /// The next morning is always computed from the wall clock when a run finishes, so a run that
+    /// happens at four in the afternoon queues tomorrow at 6:30, not tomorrow at four.
+    /// </summary>
+    [Fact]
+    public void ALateRunQueuesTomorrowsMorningNotTomorrowAtTheSameLateHour()
+    {
+        var late = new DateTimeOffset(2026, 9, 11, 16, 0, 0, TimeSpan.FromHours(-4));
+
+        Assert.Equal(TimeSpan.FromHours(14.5), DeliverySchedule.DelayUntilNext(late, 6, 30));
     }
 }
 
