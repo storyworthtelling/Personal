@@ -179,3 +179,8 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   phone off and whether Dash can be the watch's default SMS app. The Post relay is the fallback.
 - **A61 — Q3:** the phone hands its Google tokens to the watch over the Data Layer.
 - **A62 — Q4:** Wave remote-controls TIDAL in Score on the phone when the phone is nearby.
+- **A63 — Q5:** a device spike on device owner comes first.
+- **A64 — Q6:** the alpha Health Services binding is accepted, pinned and guarded.
+- **A65 — Q7:** Fitbit stays as a hidden sleep pipe, never visible.
+- **A66 — Q8:** Beat's data lands in Constitution's store and is also written to Health Connect,
+  reversing P13's non-goal (writing to Health Connect).

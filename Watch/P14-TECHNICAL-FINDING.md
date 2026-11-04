@@ -1,6 +1,6 @@
 # P14 · Watch — technical finding (gate 1)
 
-**Status:** draft for the owner, round 2 (Q1–Q4 answered; headline 1 corrected). It answers what the owner's 57 answers (A1–A57, in
+**Status:** draft for the owner, round 3 (Q1–Q8 answered; headline 1 corrected). It answers what the owner's 57 answers (A1–A57, in
 [`P14-OWNER-ANSWERS.md`](P14-OWNER-ANSWERS.md)) need from the platform, and says plainly which of
 them the platform does not allow. Design is in [`WATCH-DESIGN.md`](WATCH-DESIGN.md) (approved, A58).
 Owner decisions are **Q1–Q9** in §9. Nothing here has been tried on a watch: every claim is from
@@ -109,7 +109,7 @@ texts, with the watch's Phone app used only for calls.
 | "Ease off" buzz (A24) | zones from history and an age-based maximum, computed on the **phone** and sent as numbers; the watch never sees a birthdate | Feasible |
 | Session to the phone, deleted after (A29) | Data Layer, falling back to the cloud relay | Feasible |
 | All-day steps, resting HR and sleep, without Fitbit visible (A27) | Health Services passive monitoring covers steps and heart rate, but for sleep it reports only whether the wearer is asleep, **not sleep stages or a sleep score**. So either Fitbit stays, hidden, as the sleep pipe, or Beat records asleep/awake time and the bed carries the rest | **Partly** (Q7) |
-| Writing to Health Connect | Health Connect lives on the phone, not the watch, and P13 made writing to it a non-goal; Beat's data goes to Constitution's own store instead | Changes P13's rule only if the owner wants it there |
+| Writing to Health Connect | Health Connect lives on the phone, not the watch. Constitution on the phone writes Beat's sessions and all-day data there as well as to its own store (A66), which reverses P13's "never write to Health Connect" | Feasible; needs Health Connect **write** permissions and a guard that it writes only Beat's own records |
 
 ### 3.4 Point (the face and lockdown)
 
@@ -191,10 +191,10 @@ Services cadence accuracy; battery over a real day; Drive streaming over LTE; th
 | Q2 | How texts reach the watch | **Settled (A60):** test the carrier first (device spike); the Post relay is the fallback |
 | Q3 | Google sign-in on the watch | **Settled (A61):** the phone hands its tokens over the Data Layer |
 | Q4 | TIDAL on the watch | **Settled (A62):** Wave remote-controls the phone's TIDAL when the phone is nearby |
-| Q5 | **Device owner on the watch** is unknown | A device spike first (reset the watch, try, record what happens to LTE); or accept curation without enforcement |
-| Q6 | **The alpha Health Services binding** | Accept it, pinned, with a guard; or write a thin Java/Kotlin shim (breaks ".NET only", A40) |
-| Q7 | **Sleep without Fitbit:** Health Services gives asleep/awake, not stages | Keep Fitbit hidden as the sleep pipe; or the bed alone carries sleep |
-| Q8 | **Where Beat's watch data lands** | Constitution's own store on the phone (as now); or also write it to Health Connect (reverses a P13 non-goal) |
+| Q5 | Device owner on the watch | **Settled (A63):** a device spike first (reset the watch, try it, record what happens to LTE and the number) |
+| Q6 | The alpha Health Services binding | **Settled (A64):** accepted, pinned to its exact version, with a guard |
+| Q7 | Sleep without Fitbit | **Settled (A65):** Fitbit stays as a hidden sleep pipe, never visible |
+| Q8 | Where Beat's watch data lands | **Settled (A66):** Constitution's own store **and** Health Connect (reverses a P13 non-goal) |
 | Q9 | **Phase shape** | Releases A–F as in the plan, starting with Q5's spike, then Point, then Dash (A41) |
 
 ---
