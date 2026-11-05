@@ -4,47 +4,62 @@ using Xunit;
 namespace Codex.Tests.Post;
 
 /// <summary>
-/// A one-to-one text sent natively by Post (the role-holder path) must be able to carry a
-/// picture or video, the same way a group reply can. Before this, <c>ShowNativeCompose</c>
-/// offered only a message box, so the owner's only way to send a photo to one person was to
-/// leave Post for Google Messages — the failure this app is measured against.
-///
-/// <para>The MMS plumbing already exists and is shared: a one-recipient MMS goes through the
-/// same <c>MmsSender</c>/<c>MmsComposer</c> path a group reply does (the composer's single-
-/// recipient picture case is covered by <see cref="MmsComposerTests"/>). So the only thing to
-/// pin here is that the 1:1 compose dialog wires its Attach button into that path, with the
-/// one number as its recipient list.</para>
+/// Every text Post sends is composed in one dialog (<c>ComposeText</c>), for one person or a
+/// group, and every reply happens inside Post — the owner's ruling. The dialog must carry a
+/// picture or video as well as words, and when the bridge to Google Messages is down the words
+/// still go as a plain text through the phone rather than handing the owner to another app.
 ///
 /// <para>Read from source because the compose dialog lives in an Android head the test project
 /// cannot reference — the same convention as <c>AreaHueTests</c>.</para>
 /// </summary>
 public class NativeTextAttachTests
 {
-    private static readonly string MailboxSource = ReadMailboxSource();
+    private static readonly string MailboxSource = ReadSource("MailboxArea.cs");
 
     [Fact]
-    public void OneToOneNativeCompose_OffersAttachThroughTheSingleRecipientMms()
+    public void TheComposeOffersAttachForOnePersonOrAGroup()
     {
-        var body = MethodBody("ShowNativeCompose");
+        var body = MethodBody("ComposeText");
 
-        Assert.Contains("SetNeutralButton(\"Attach\", (_, _) => PickMediaForGroup([number]))", body);
+        Assert.Contains("SetNeutralButton(\"Attach\", (_, _) => PickMedia(recipients, conversationId))", body);
     }
 
     [Fact]
-    public void OneToOneNativeCompose_StillSendsPlainTextThroughSmsSender()
+    public void WithoutTheBridgeAOneToOneTextGoesThroughSmsSender()
     {
-        var body = MethodBody("ShowNativeCompose");
+        var body = MethodBody("SendWithoutBridge");
 
         // The fourth argument is the send's key action (LOG-LOOP-PLAN.md §4.1), which reports the radio's result.
-        Assert.Contains("SmsSender.Send(Host, number, text, sending)", body);
+        Assert.Contains("SmsSender.Send(Host, recipients[0], text, sending)", body);
     }
 
     [Fact]
-    public void GroupCompose_StillOffersAttach()
+    public void BothReplyEntriesUseTheOneCompose()
     {
-        var body = MethodBody("ShowGroupCompose");
+        Assert.Contains("private void SendText(string number) => ComposeText([number], openBridgeConversationId);", MailboxSource);
+        Assert.Contains(
+            "private void ShowGroupCompose(IReadOnlyList<string> recipients) => ComposeText(recipients, openBridgeConversationId);",
+            MailboxSource);
+    }
 
-        Assert.Contains("SetNeutralButton(\"Attach\", (_, _) => PickMediaForGroup(recipients))", body);
+    // Replying never leaves Post: nothing in the Mailbox or the Rolodex hands a text to whichever
+    // app answers "smsto:" (Google Messages, now that it holds the texting role). The Rolodex
+    // aims its Text action at Post's own router by class.
+    [Theory]
+    [InlineData("MailboxArea.cs")]
+    [InlineData("RolodexArea.cs")]
+    public void NoTextIsHandedToAnotherApp(string file)
+    {
+        var source = ReadSource(file);
+
+        Assert.DoesNotMatch(new Regex(@"new Intent\(Intent\.ActionSendto,"), source);
+        Assert.DoesNotContain("TextSendPath.DeepLink", source);
+    }
+
+    [Fact]
+    public void TheRolodexStartsATextInPost()
+    {
+        Assert.Contains("new Intent(Host, typeof(SmsSendToActivity))", ReadSource("RolodexArea.cs"));
     }
 
     private static string MethodBody(string methodName)
@@ -69,18 +84,18 @@ public class NativeTextAttachTests
         throw new InvalidOperationException($"Could not find the end of {methodName}.");
     }
 
-    private static string ReadMailboxSource()
+    private static string ReadSource(string file)
     {
         var directory = AppContext.BaseDirectory;
         while (directory is not null
-            && !File.Exists(Path.Combine(directory, "FocusPhone", "Post.Android", "MailboxArea.cs")))
+            && !File.Exists(Path.Combine(directory, "FocusPhone", "Post.Android", file)))
         {
             directory = Path.GetDirectoryName(directory);
         }
         if (directory is null)
         {
-            throw new InvalidOperationException("Could not locate FocusPhone/Post.Android/MailboxArea.cs from the test output directory.");
+            throw new InvalidOperationException($"Could not locate FocusPhone/Post.Android/{file} from the test output directory.");
         }
-        return File.ReadAllText(Path.Combine(directory, "FocusPhone", "Post.Android", "MailboxArea.cs"));
+        return File.ReadAllText(Path.Combine(directory, "FocusPhone", "Post.Android", file));
     }
 }

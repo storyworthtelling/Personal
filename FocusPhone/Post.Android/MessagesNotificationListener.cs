@@ -6,15 +6,14 @@ using Codex.Domain.Timeline;
 namespace Post;
 
 /// <summary>
-/// Tier-2 messaging bridge: captures incoming texts from Google Messages
-/// notifications (MessagingStyle) and voicemails (with transcription) from
-/// Google Phone notifications into the timeline cache. Listener access is
-/// granted during provisioning. For texts, the SMS provider is the
-/// authoritative history and near-duplicates are collapsed at merge time, so
-/// this listener's lasting job is RCS (which never reaches the provider) and
-/// voicemail transcriptions. Tier 1 (the embedded Messages-for-Web bridge)
-/// replaces the text capture as the primary source once gmbridge lands; tier
-/// 3 (deep link into Google Messages) always remains for replying.
+/// Google Messages' notifications, read for three jobs. It is the bridge's doorbell: a
+/// Messages notification reconnects the Messages-for-Web bridge if it was down (Android keeps
+/// Post's process alive while this listener is bound, which is what lets the bridge stay up
+/// without a notification of its own). It is the backup copy of a message caught while the
+/// bridge was down — the bridge's own copy outranks it at merge time
+/// (NearDuplicateCollapser). And while a pairing waits, it keeps Messages' confirmation
+/// notification for the pairing screen, since the lockdown hides the status bar it would
+/// otherwise appear in. Listener access is granted during provisioning.
 /// </summary>
 [Service(
     Name = "com.storyworthtelling.focusphone.communication.MessageBridgeListener",
@@ -38,7 +37,16 @@ public class MessagesNotificationListener : NotificationListenerService
         // put two rows in the timeline for one message.
         if (sbn.PackageName == GoogleMessagesPackage)
         {
-            CaptureMessages(sbn);
+            // A Messages notification is the doorbell for the bridge: if it was down, this
+            // brings it back, and it delivers the message with its real conversation.
+            var bridge = GmBridgeClient.Shared(this);
+            bridge.ConnectIfPaired();
+            if (!CaptureMessages(sbn) && bridge.IsPairing)
+            {
+                // Not a message: while a pairing waits, this is Messages asking to confirm it,
+                // which the hidden status bar would never show. The pairing screen opens it.
+                PairingPrompt.Offer(sbn.Notification.ContentIntent);
+            }
         }
     }
 
@@ -57,13 +65,14 @@ public class MessagesNotificationListener : NotificationListenerService
         PostDiagnostics.LogText("Notifications", "Notification capture disconnected");
     }
 
-    private void CaptureMessages(StatusBarNotification sbn)
+    // True when the notification was a conversation's (MessagingStyle), whether or not it held anything new.
+    private bool CaptureMessages(StatusBarNotification sbn)
     {
         var style = AndroidX.Core.App.NotificationCompat.MessagingStyle
             .ExtractMessagingStyleFromNotification(sbn.Notification!);
         if (style is null)
         {
-            return;
+            return false;
         }
 
         // The shortcut id is Messages' own id for the conversation; a group threads on it.
@@ -92,6 +101,7 @@ public class MessagesNotificationListener : NotificationListenerService
                 PostDiagnostics.LogWarning("Notifications", "Could not record a group's name", e);
             }
         }
+        return true;
     }
 
     private void Cache(List<TimelineItem> items)

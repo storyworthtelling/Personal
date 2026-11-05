@@ -41,19 +41,8 @@ public static class PostLogLines
         [12] = "MMS_DISABLED_BY_CARRIER",
     };
 
-    public static string SmsRole(SmsRoleStatus status, SmsRoleNotice notice)
-    {
-        var line = $"SMS ROLE {status}";
-        if (notice.WasLost)
-        {
-            line += " — lost since the last launch";
-        }
-        if (notice.Speaks)
-        {
-            line += (notice.WasLost ? "; " : " — ") + "told the owner: " + notice.Headline;
-        }
-        return line;
-    }
+    public static string SmsRole(TextingAppHolder holder, SmsRoleNotice notice) =>
+        $"TEXTING APP {holder}" + (notice.Speaks ? " — told the owner: " + notice.Headline : string.Empty);
 
     public static string SmsSent(int resultCode) =>
         resultCode == ResultOk ? "SMS SENT ok" : "SMS SEND FAILED: " + Named(SmsErrors, resultCode);
