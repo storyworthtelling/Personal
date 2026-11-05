@@ -9,15 +9,12 @@ namespace Codex.Tests.Post;
 public class PostLogLinesTests
 {
     [Fact]
-    public void TheRoleIsStatedOnEveryLaunchWithWhatTheOwnerWasTold()
+    public void TheTextingAppIsStatedOnEveryLaunchWithWhatTheOwnerWasTold()
     {
-        Assert.Equal("SMS ROLE Held", PostLogLines.SmsRole(SmsRoleStatus.Held, SmsRoleNotice.Silent));
+        Assert.Equal("TEXTING APP GoogleMessages", PostLogLines.SmsRole(TextingAppHolder.GoogleMessages, SmsRoleNotice.Silent));
         Assert.Equal(
-            "SMS ROLE Available — lost since the last launch; told the owner: Texts stopped",
-            PostLogLines.SmsRole(SmsRoleStatus.Available, new SmsRoleNotice(true, true, true, "Texts stopped", "detail")));
-        Assert.Equal(
-            "SMS ROLE Available — told the owner: Post is not the texting app",
-            PostLogLines.SmsRole(SmsRoleStatus.Available, new SmsRoleNotice(true, true, false, "Post is not the texting app", "d")));
+            "TEXTING APP Post — told the owner: Post still has texting",
+            PostLogLines.SmsRole(TextingAppHolder.Post, new SmsRoleNotice(true, true, "Post still has texting", "d")));
     }
 
     [Theory]

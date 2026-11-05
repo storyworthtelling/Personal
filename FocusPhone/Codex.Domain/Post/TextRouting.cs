@@ -22,11 +22,14 @@ public enum TextSendPath
     /// <summary>Through the bridge — the only route that carries RCS and full-quality pictures.</summary>
     Bridge,
 
-    /// <summary>Post sends the SMS itself, as role holder.</summary>
+    /// <summary>Post sends a plain SMS itself, through the phone.</summary>
     NativeSms,
 
-    /// <summary>Hand the owner to the messaging app. The last resort.</summary>
-    DeepLink,
+    /// <summary>
+    /// Nothing can carry it right now. The text stays in Post with the reason; the owner is
+    /// never handed to another app to reply.
+    /// </summary>
+    Unavailable,
 }
 
 /// <summary>
@@ -59,23 +62,35 @@ public static class TextDelete
 }
 
 /// <summary>
-/// Which route a send takes. The bridge leads because it is the only one that carries RCS
-/// and pictures at full quality, but it can only reply into a conversation it already
-/// knows — so a person the bridge has never seen falls through to Post sending the SMS
-/// itself, which is what holding the role buys.
+/// Which route a send takes. The bridge leads: it is Google Messages itself, so it carries
+/// RCS, pictures at full quality and groups, and it can start a conversation from a number
+/// as well as reply into one. With the bridge down, Post sends a plain SMS through the phone
+/// (SEND_SMS, no role needed — Android files it for the texting app, so Messages shows it).
 ///
-/// The deep link is last and is the thing the owner most wants gone: leaving Post to
-/// answer someone is the failure this app is measured against. It stays only because a
-/// text that cannot be sent at all is worse.
+/// There is no third route out to Google Messages: every reply happens inside Post (the
+/// owner's ruling). With neither route available the text stays in Post with the reason,
+/// rather than handing the owner to another app.
 /// </summary>
 public static class TextSend
 {
-    public static TextSendPath Choose(bool bridgeConnected, bool hasBridgeConversation, bool holdsSmsRole)
-    {
-        if (bridgeConnected && hasBridgeConversation)
-        {
-            return TextSendPath.Bridge;
-        }
-        return holdsSmsRole ? TextSendPath.NativeSms : TextSendPath.DeepLink;
-    }
+    public static TextSendPath Choose(bool bridgeConnected, bool canSendSms) =>
+        bridgeConnected ? TextSendPath.Bridge
+        : canSendSms ? TextSendPath.NativeSms
+        : TextSendPath.Unavailable;
+
+    /// <summary>What the owner is told when a text could not go by any route.</summary>
+    public const string UnavailableReason =
+        "Post could not reach Google Messages and has no permission to send a plain text. "
+        + "Your words are still in the box; try again once the phone is online.";
+}
+
+/// <summary>
+/// Where the Mailbox reads texts from. Once the bridge is paired, Google Messages is the record:
+/// every SMS, MMS and RCS message comes through the bridge with its real conversation, so the
+/// phone's own text store is not read as well — a plain SMS would otherwise arrive twice, once
+/// from each. Unpaired, the store is the only full history Post can read.
+/// </summary>
+public static class TextSources
+{
+    public static bool ReadsProvider(bool bridgePaired) => !bridgePaired;
 }

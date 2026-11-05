@@ -123,6 +123,17 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         layout.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));
         layout.AddView(voiceStatus, Spaced(DesignTokens.Space.X2, 0));
 
+        // Texts: Post works through Google Messages over the Messages-for-Web bridge, so the
+        // one setup step is pairing it. The line says where texting stands; the button pairs
+        // (or pairs again after Messages unpaired it).
+        var bridge = GmBridgeClient.Shared(Host);
+        layout.AddView(PaperUi.Secondary(Host, TextsSetting.Describe(bridge.IsPaired, bridge.IsConnected)),
+            Spaced(DesignTokens.Space.X6, 0));
+        layout.AddView(PaperUi.SecondaryButton(Host,
+            bridge.IsPaired ? "Pair with Google Messages again" : "Connect to Google Messages",
+            () => Host.StartActivity(new Intent(Host, typeof(MessagesPairingActivity)))),
+            Spaced(DesignTokens.Space.X2, 0));
+
         // The vault passphrase is the one secret NOT kept in the vault, so it is shown in
         // the clear rather than masked: it has to be read back and set identically in
         // every app, and Android blocks clipboard copy on a password-typed field.

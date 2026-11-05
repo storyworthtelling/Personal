@@ -34,20 +34,17 @@ public static class PostSync
 
     private static async Task RunAsync(Context context, bool reconcile)
     {
-        // A reconcile is the owner asking to be brought fully up to date, so make
-        // sure the bridge is online and draining current texts. The periodic
-        // incremental run leaves the bridge to the app's own startup connect.
-        if (reconcile)
+        // Every run makes sure the bridge is up and reads what it missed while it was down:
+        // texts no longer come from the phone's own store once the bridge is paired, so this
+        // and the notification doorbell are what bring a dropped connection back.
+        var bridge = GmBridgeClient.Shared(context);
+        if (bridge.IsConnected)
         {
-            try
-            {
-                GmBridgeClient.Shared(context).ConnectIfPaired();
-            }
-            catch (Exception e)
-            {
-                Android.Util.Log.Warn("FocusPhoneComm", $"Bridge refresh during sync failed: {e}");
-                PostDiagnostics.LogWarning("Bridge", "Bridge refresh during sync failed", e);
-            }
+            await bridge.SyncAsync();
+        }
+        else
+        {
+            bridge.ConnectIfPaired();
         }
 
         // Before the mail: a text with no mail account is still owed its retry.

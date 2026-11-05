@@ -17,7 +17,7 @@ internal static class LogLoopHeads
         new("post", "FocusPhone/Post.Android", "FocusPhone/Codex.Domain/Post/PostKeyActions.cs", "PostKeyActions",
         [
             "post.send-sms", "post.send-mms", "post.file", "post.delete", "post.request-sms-role",
-            "post.gmail-sign-in", "post.open-attachment", "post.send-logs-now",
+            "post.gmail-sign-in", "post.open-attachment", "post.send-logs-now", "post.pair-messages",
         ]),
         new("flyleaf", "FocusPhone/Flyleaf.Android", "FocusPhone/Codex.Domain/Diagnostics/FlyleafKeyActions.cs", "FlyleafKeyActions",
         [

@@ -10,9 +10,14 @@ using Codex.Domain.Post;
 namespace Post;
 
 /// <summary>
-/// Sends a text as the role holder, and — just as importantly — records it.
+/// Sends a plain text through the phone: the fallback when the Messages bridge is down
+/// (Google Messages normally holds the texting role and the bridge carries the send).
 ///
-/// Android hands the default SMS app both halves of the job. It transmits what
+/// Who records the sent message depends on who holds the role. For any app that is not the
+/// default, Android writes the sent text into the system store itself, so Google Messages shows
+/// it in the conversation. For the default app it does not — the case below.
+///
+/// When Post itself holds the role, Android hands it both halves of the job. It transmits what
 /// <see cref="SmsManager"/> is given, but it does <b>not</b> write the sent message into
 /// the system store; that is the role holder's duty, exactly as it is for incoming mail.
 /// Skip it and the text goes out and then vanishes: it is in the recipient's phone and in
@@ -52,7 +57,10 @@ internal static class SmsSender
             manager.SendMultipartTextMessage(number, null, parts!, intents, null);
         }
 
-        Record(context, number, text);
+        if (SmsRoleAccess.Status(context) == Codex.Domain.Post.SmsRoleStatus.Held)
+        {
+            Record(context, number, text);
+        }
     }
 
     /// <summary>One part's result arrived: a failure ends the send, the last success completes it.</summary>

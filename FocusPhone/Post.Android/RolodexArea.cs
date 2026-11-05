@@ -359,7 +359,12 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
             case Channel.Text:
                 if (RecipientInput.TryCreatePhone(address, out var textNumber))
                 {
-                    Host.StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{textNumber}")));
+                    // Aimed at Post's own router, never the phone's texting app: a text starts in
+                    // Post's Mailbox like every reply does, whoever holds the texting role.
+                    var compose = new Intent(Host, typeof(SmsSendToActivity));
+                    compose.SetAction(Intent.ActionSendto);
+                    compose.SetData(Android.Net.Uri.Parse($"smsto:{textNumber}"));
+                    Host.StartActivity(compose);
                 }
                 break;
             case Channel.Email:
