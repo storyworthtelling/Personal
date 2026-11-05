@@ -113,4 +113,51 @@ public class FilingStoreTests : IDisposable
         Assert.Empty(store.LoadArchive().All);
         Assert.Empty(store.LoadTombstones().Outstanding());
     }
+
+    // Filed is searched rather than listed, so the search reads a short summary of each
+    // ghost — never the body in full — and only what has settled past its undo window.
+    [Fact]
+    public void EntriesSummariseEachSettledGhost()
+    {
+        var sent = Now.AddDays(-3);
+        store.SaveGhost(new Ghost(Message("m1") with { TimestampUtc = sent }, Now.AddMinutes(-5)));
+        store.SaveGhost(new Ghost(Message("fresh"), Now));
+        store.SaveGhost(new Ghost(
+            new TimelineItem(TimelineItemKind.Message, "5550101", sent, null, Incoming: false, SourceId: "t1")
+            {
+                Body = new string('w', 5_000),
+            },
+            Now.AddMinutes(-5)));
+
+        var entries = store.LoadEntries(settledBy: Now.AddSeconds(-10)).OrderBy(e => e.SourceId).ToList();
+
+        Assert.Equal(["m1", "t1"], entries.Select(e => e.SourceId));
+        var mail = entries[0];
+        Assert.Equal(TimelineItemKind.Email, mail.Kind);
+        Assert.True(mail.Incoming);
+        Assert.Equal("her@example.com", mail.ContactKey);
+        Assert.Equal("her@example.com", mail.Who);
+        Assert.Equal("Dinner", mail.Subject);
+        Assert.Equal("Seven?", mail.Excerpt);
+        Assert.Equal(sent, mail.SentAtUtc);
+        Assert.Equal(Now.AddMinutes(-5), mail.FiledAtUtc);
+
+        var text = entries[1];
+        Assert.False(text.Incoming);
+        Assert.Null(text.Subject);
+        Assert.True(text.Excerpt!.Length <= FilingStore.ExcerptChars); // the body, cut short
+    }
+
+    [Fact]
+    public void GhostsLoadByIdInTheOrderAsked()
+    {
+        store.SaveGhost(new Ghost(Message("m1"), Now));
+        store.SaveGhost(new Ghost(Message("m2"), Now));
+        store.SaveGhost(new Ghost(Message("m3"), Now));
+
+        var ghosts = store.LoadGhosts(["m3", "gone", "m1"]);
+
+        Assert.Equal(["m3", "m1"], ghosts.Select(g => g.Item.SourceId));
+        Assert.Equal("Are we still on for seven?", ghosts[0].Item.Body);
+    }
 }

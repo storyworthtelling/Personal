@@ -16,7 +16,8 @@ public static class PostKeyActions
     public const string OpenAttachment = "post.open-attachment";
     public const string SendLogsNow = "post.send-logs-now";
     public const string PairMessages = "post.pair-messages";
+    public const string SearchFiled = "post.search-filed";
 
     public static IReadOnlyList<string> All { get; } =
-        [SendSms, SendMms, File, Delete, RequestSmsRole, GmailSignIn, OpenAttachment, SendLogsNow, PairMessages];
+        [SendSms, SendMms, File, Delete, RequestSmsRole, GmailSignIn, OpenAttachment, SendLogsNow, PairMessages, SearchFiled];
 }
