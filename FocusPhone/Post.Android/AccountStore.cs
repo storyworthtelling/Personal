@@ -15,7 +15,7 @@ public class AccountStore
     private const string AddressKey = "gmailAddress";
     private const string AppPasswordKey = "gmailAppPassword";
     private const string GmBridgeSessionKey = "gmBridgeSession";
-    private const string SmsRoleHeldKey = "smsRoleHeld";
+    private const string GmBridgeSyncedKey = "gmBridgeSyncedThrough";
 
     private readonly ISharedPreferences preferences;
 
@@ -48,16 +48,13 @@ public class AccountStore
     }
 
     /// <summary>
-    /// Whether Post has held the SMS role since it last had it back (<see cref="Codex.Domain.Post.SmsRole.Remember"/>).
-    /// Kept because the useful
-    /// question on launch is not "do we hold it" but "did we just lose it" — the same
-    /// missing role reads as first-run setup or as something silently breaking texting,
-    /// and those want different words.
+    /// How far the bridge's history sync has read, as the newest conversation time it finished
+    /// (libgm's microseconds). Zero reads everything recent, which is what a first pairing wants.
     /// </summary>
-    public bool SmsRoleHeldAtLastLaunch
+    public long GmBridgeSyncedThrough
     {
-        get => preferences.GetBoolean(SmsRoleHeldKey, false);
-        set => preferences.Edit()!.PutBoolean(SmsRoleHeldKey, value)!.Apply();
+        get => preferences.GetLong(GmBridgeSyncedKey, 0);
+        set => preferences.Edit()!.PutLong(GmBridgeSyncedKey, value)!.Apply();
     }
 
     public bool IsConfigured =>

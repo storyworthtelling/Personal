@@ -25,6 +25,33 @@ public class NearDuplicateCollapserTests
         Assert.Equal("sms:1", survivor.SourceId);
     }
 
+    // The bridge's copy is Google Messages' own record, so a notification copy caught while
+    // the bridge was down yields to it exactly as it would to the provider's.
+    [Fact]
+    public void Collapse_DropsNotificationTextMatchingBridgeText()
+    {
+        var bridge = Item(TimelineItemKind.Message, "5551234567", "gm:m1");
+        var notification = Item(TimelineItemKind.Message, "5551234567", "5551234567:1750000000000",
+            secondsAfterT0: 30);
+
+        var result = NearDuplicateCollapser.Collapse([bridge, notification]);
+
+        Assert.Equal("gm:m1", Assert.Single(result).SourceId);
+    }
+
+    // A group the bridge knows outranks the notification's partial copy of the same message.
+    [Fact]
+    public void Collapse_GroupNotificationYieldsToTheBridgesGroupCopy()
+    {
+        var bridge = Item(TimelineItemKind.Message, "5551234567", "gm:m1") with { GroupId = "gm:g1" };
+        var notification = Item(TimelineItemKind.Message, "5551234567", "rcs-notice", secondsAfterT0: 5)
+            with { GroupId = "rcs:shortcut" };
+
+        var result = NearDuplicateCollapser.Collapse([bridge, notification]);
+
+        Assert.Equal("gm:m1", Assert.Single(result).SourceId);
+    }
+
     [Fact]
     public void Collapse_KeepsNotificationTextWithNoProviderMatch()
     {

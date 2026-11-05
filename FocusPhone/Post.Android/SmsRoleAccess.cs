@@ -9,20 +9,22 @@ using Codex.Domain.Post;
 namespace Post;
 
 /// <summary>
-/// The device side of the SMS role: what the platform says, and the one intent that asks
-/// for it. What any of it MEANS to the owner is decided by <see cref="SmsRole"/>, which
-/// is pure and tested; this file only reports and requests.
+/// The device side of the texting role: who holds it, and the one way Post can help it move.
+/// What any of it MEANS to the owner is decided by <see cref="SmsRole"/>, which is pure and
+/// tested; this file only reports and opens.
 ///
-/// The role cannot be granted silently. The device owner has no API for it — there is no
-/// <c>SetDefaultSmsApplication</c> in the bindings — so it costs exactly one consent
-/// dialog, and on a locked-down phone that dialog may not appear at all. That is the
-/// phase's largest open risk and it is settled on a device, not here.
+/// <para>Google Messages is meant to hold the role (it keeps RCS on only as the default SMS app),
+/// and Post works through it over the Messages-for-Web bridge. Post cannot give the role away —
+/// only the app that wants it can ask — so the notice opens Messages, which asks to become the
+/// default as soon as it is opened while it is not. A per-app block in Flyleaf only keeps
+/// Messages off the shelf; it still runs and can be opened from here.</para>
+///
+/// <para>Post's role components stay declared (<see cref="SmsRoleComponents"/>), so the role can
+/// still come back to Post if that is ever wanted again.</para>
 /// </summary>
 public static class SmsRoleAccess
 {
-    /// <summary>Arbitrary, distinct from the voice sign-in's code so results do not cross.</summary>
-    public const int RequestCode = 4801;
-
+    /// <summary>Whether Post itself holds the role (the provider accepts writes only from the holder).</summary>
     public static SmsRoleStatus Status(Context host)
     {
         var roles = (RoleManager?)host.GetSystemService(Context.RoleService);
@@ -33,61 +35,56 @@ public static class SmsRoleAccess
         return roles.IsRoleHeld(RoleManager.RoleSms!) ? SmsRoleStatus.Held : SmsRoleStatus.Available;
     }
 
-    /// <summary>
-    /// Reads the role, records it for the next look, and returns what to tell the owner.
-    /// Recording happens here rather than at the call site so the "did we just lose it"
-    /// comparison cannot drift out of step with the reading it is compared against.
-    /// </summary>
-    public static SmsRoleNotice CheckOnLaunch(Activity host, AccountStore account)
-    {
-        var status = Status(host);
-        var notice = SmsRole.Decide(status, account.SmsRoleHeldAtLastLaunch);
-        account.SmsRoleHeldAtLastLaunch = SmsRole.Remember(status, account.SmsRoleHeldAtLastLaunch);
+    public static TextingAppHolder Holder(Context host) =>
+        SmsRole.HolderOf(Android.Provider.Telephony.Sms.GetDefaultSmsPackage(host), host.PackageName ?? string.Empty);
 
-        // The role on the record (LOG-LOOP-PLAN.md §4.5): once per process, and again whenever it
+    public static bool MessagesInstalled(Context host) =>
+        host.PackageManager?.GetLaunchIntentForPackage(SmsRole.GoogleMessagesPackage) is not null;
+
+    /// <summary>Reads who holds the role and returns what to tell the owner.</summary>
+    public static SmsRoleNotice CheckOnLaunch(Activity host)
+    {
+        var holder = Holder(host);
+        var notice = SmsRole.Decide(holder, MessagesInstalled(host));
+
+        // The holder on the record (LOG-LOOP-PLAN.md §4.5): once per process, and again whenever it
         // changes — the check runs on every resume, and a line each time would bury the log.
-        if (loggedStatus != status)
+        if (loggedHolder != holder)
         {
-            loggedStatus = status;
-            PostDiagnostics.LogInfo("SmsRole", PostLogLines.SmsRole(status, notice));
+            loggedHolder = holder;
+            PostDiagnostics.LogInfo("SmsRole", PostLogLines.SmsRole(holder, notice));
         }
 
-        // A request the owner made is answered by what the platform says now.
-        if (Interlocked.Exchange(ref pendingRequest, null) is { } request)
+        // An "open Messages" the owner tapped is answered by who holds the role now.
+        if (holder == TextingAppHolder.GoogleMessages && Interlocked.Exchange(ref pendingRequest, null) is { } request)
         {
-            if (status == SmsRoleStatus.Held)
-            {
-                request.Succeeded();
-            }
-            else
-            {
-                request.Failed($"the role is still {status} after the request");
-            }
+            request.Succeeded();
         }
         return notice;
     }
 
-    private static SmsRoleStatus? loggedStatus;
+    private static TextingAppHolder? loggedHolder;
     private static KeyAction? pendingRequest;
 
-    public static void Request(Activity host)
+    /// <summary>Opens Google Messages, which asks for the role itself.</summary>
+    public static void OpenMessages(Activity host)
     {
         var action = TapWatch.Action(PostKeyActions.RequestSmsRole, TimeSpan.FromMinutes(5));
-        var roles = (RoleManager?)host.GetSystemService(Context.RoleService);
-        if (roles is null || !roles.IsRoleAvailable(RoleManager.RoleSms!))
+        var intent = host.PackageManager?.GetLaunchIntentForPackage(SmsRole.GoogleMessagesPackage);
+        if (intent is null)
         {
-            action.Failed("this device does not offer the SMS role");
+            action.Failed("Google Messages is not installed");
             return;
         }
         try
         {
-            host.StartActivityForResult(roles.CreateRequestRoleIntent(RoleManager.RoleSms!), RequestCode);
+            host.StartActivity(intent);
             pendingRequest = action;
         }
         catch (Exception e)
         {
-            action.Failed($"the role request would not open: {e.GetType().Name}");
-            PostDiagnostics.LogWarning("SmsRole", "The SMS role request would not open", e);
+            action.Failed($"Google Messages would not open: {e.GetType().Name}");
+            PostDiagnostics.LogWarning("SmsRole", "Google Messages would not open", e);
         }
     }
 }

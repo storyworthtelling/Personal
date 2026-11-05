@@ -13,60 +13,71 @@ public enum SmsRoleStatus
     Unavailable,
 }
 
-/// <summary>
-/// What to tell the owner about the SMS role. Never a toast and never a banner on the
-/// page: this goes behind the dog-ear like every other notice (§13).
-/// </summary>
-public sealed record SmsRoleNotice(bool Speaks, bool CanRequest, bool WasLost, string Headline, string Detail)
+/// <summary>Which app holds the texting (default SMS) role.</summary>
+public enum TextingAppHolder
 {
-    public static SmsRoleNotice Silent { get; } = new(false, false, false, string.Empty, string.Empty);
+    GoogleMessages,
+    Post,
+    Other,
+    Nobody,
 }
 
 /// <summary>
-/// The launch check behind the SMS role. Post cannot send a text or delete one for real
-/// without it, and the role can be taken away with nothing to show for it — a policy
-/// pass, an OS update, the cutover's reset. So it is re-checked on every launch rather
-/// than assumed from the day it was granted.
+/// What to tell the owner about the texting role. Never a toast and never a banner on the
+/// page: this goes behind the dog-ear like every other notice (§13).
+/// <see cref="OffersMessages"/> is whether the notice carries a button that opens Google
+/// Messages, which asks for the role itself.
+/// </summary>
+public sealed record SmsRoleNotice(bool Speaks, bool OffersMessages, string Headline, string Detail)
+{
+    public static SmsRoleNotice Silent { get; } = new(false, false, string.Empty, string.Empty);
+}
+
+/// <summary>
+/// The launch check behind the texting role. Google Messages is meant to hold it: Messages
+/// keeps RCS ("chat features") on only while it is the default SMS app, and Post reads and
+/// sends through Messages over the Messages-for-Web bridge. Post held the role under the old
+/// design, so a phone upgraded from it still has Post as the texting app — and RCS off —
+/// until the role goes back.
 ///
-/// The wording is static and neutral. Post's only voiced surface is the empty Mailbox;
-/// a wry line about a lost role would be delivered as a <i>reward</i> for turning the
-/// corner, which is the failure mode the fold exists to avoid.
+/// <para>Post cannot hand the role over itself: only the app that wants it can ask. So the
+/// notice opens Messages, which asks to be the default as soon as it is opened while it is not.
+/// Re-checked on every launch, since a policy pass or an OS update can move it.</para>
+///
+/// <para>The wording is static and neutral. Post's only voiced surface is the empty Mailbox.</para>
 /// </summary>
 public static class SmsRole
 {
-    /// <summary>
-    /// What to remember between looks. The role is read on every resume, so a plain
-    /// "held this time" would turn "something took over" into first-run wording on the
-    /// second look; once Post has held the role, losing it stays lost until it is back.
-    /// </summary>
-    public static bool Remember(SmsRoleStatus status, bool heldBefore) =>
-        status == SmsRoleStatus.Held || heldBefore;
+    public const string GoogleMessagesPackage = "com.google.android.apps.messaging";
 
-    public static SmsRoleNotice Decide(SmsRoleStatus status, bool heldAtLastLaunch) => status switch
+    /// <summary>Who holds the role, from the platform's default SMS package.</summary>
+    public static TextingAppHolder HolderOf(string? defaultSmsPackage, string selfPackage) =>
+        string.IsNullOrEmpty(defaultSmsPackage) ? TextingAppHolder.Nobody
+        : defaultSmsPackage == GoogleMessagesPackage ? TextingAppHolder.GoogleMessages
+        : defaultSmsPackage == selfPackage ? TextingAppHolder.Post
+        : TextingAppHolder.Other;
+
+    public static SmsRoleNotice Decide(TextingAppHolder holder, bool messagesInstalled)
     {
-        // A working app announcing that it works is the definition of noise, and that
-        // holds whether or not it was working yesterday.
-        SmsRoleStatus.Held => SmsRoleNotice.Silent,
-
-        // Something took the role away and texting has been broken since. This must not
-        // read like first-run setup, because the owner already did that.
-        SmsRoleStatus.Available when heldAtLastLaunch => new(
-            Speaks: true, CanRequest: true, WasLost: true,
-            "Post is no longer your texting app.",
-            "Something else took over. Texts you send from here will not go out, and deleting one "
-            + "will not remove it from the phone, until Post has the role back."),
-
-        SmsRoleStatus.Available => new(
-            Speaks: true, CanRequest: true, WasLost: false,
-            "Post is not your texting app yet.",
-            "Until it is, Post can show your texts but cannot send one or delete one for real."),
-
-        // Asking is not an option here, so no button is offered: one that opens nothing
-        // is worse than plainly saying what has to happen first.
-        _ => new(
-            Speaks: true, CanRequest: false, WasLost: heldAtLastLaunch,
-            "This phone is not offering the texting role.",
-            "The device-owner lockdown suppresses the consent dialog. Relax the policy from Flyleaf's "
-            + "admin mode, take the role, then put the policy back."),
-    };
+        if (holder == TextingAppHolder.GoogleMessages)
+        {
+            return SmsRoleNotice.Silent;
+        }
+        if (!messagesInstalled)
+        {
+            return new(true, false,
+                "Google Messages is not installed.",
+                "Post sends and receives texts through Google Messages. Install it from the Play Store, "
+                + "then open Post again.");
+        }
+        return holder == TextingAppHolder.Post
+            ? new(true, true,
+                "Post still has texting.",
+                "Google Messages needs to be the texting app to keep RCS on, and Post now works through it. "
+                + "Open Messages and let it become the default.")
+            : new(true, true,
+                "Google Messages is not your texting app.",
+                "Post works through Google Messages, and Messages keeps RCS on only as the texting app. "
+                + "Open Messages and let it become the default.");
+    }
 }

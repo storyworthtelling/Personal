@@ -77,6 +77,7 @@ public static class PolicyPlanBuilder
             new(PolicyContext.CommunicationPackage, PolicyContext.WriteCallLogPermission),
             new(PolicyContext.CommunicationPackage, PolicyContext.WriteContactsPermission),
             new(PolicyContext.CommunicationPackage, PolicyContext.ReadPhoneNumbersPermission),
+            new(PolicyContext.CommunicationPackage, PolicyContext.SendSmsPermission),
         };
 
         // Disable the status bar so its swipe-down shade — notifications, quick

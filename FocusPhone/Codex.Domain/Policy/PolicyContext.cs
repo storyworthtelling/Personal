@@ -92,6 +92,11 @@ public record PolicyContext(
     // replies). Android refuses the read without it, default SMS app or not.
     public const string ReadPhoneNumbersPermission = "android.permission.READ_PHONE_NUMBERS";
 
+    // A plain text through the phone when the Messages bridge is down. Google Messages holds
+    // the texting role now, and the permissions that role carried no longer come with it, so
+    // the device owner grants this one outright (hard-restricted like READ_SMS).
+    public const string SendSmsPermission = "android.permission.SEND_SMS";
+
     public static readonly IReadOnlySet<string> FocusPhonePackages = new HashSet<string>
     {
         LauncherPackage,

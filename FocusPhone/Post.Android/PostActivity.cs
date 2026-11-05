@@ -171,14 +171,14 @@ public class PostActivity : Activity
     // The fold goes on the page overlay, never on `content`, which RenderContent empties.
     private void CheckSmsRole()
     {
-        var notice = SmsRoleAccess.CheckOnLaunch(this, new AccountStore(this));
+        var notice = SmsRoleAccess.CheckOnLaunch(this);
         DogEar.SetNotice(this, overlay, NoticeKeys.SmsRole, notice.Speaks
             ? new DogEar.Notice(
                 notice.Headline,
                 notice.Detail,
-                notice.WasLost ? PaperTheme.ProblemMark : PaperTheme.CautionMark,
-                notice.CanRequest ? "Make Post the texting app" : null,
-                notice.CanRequest ? () => SmsRoleAccess.Request(this) : null)
+                PaperTheme.CautionMark,
+                notice.OffersMessages ? "Open Google Messages" : null,
+                notice.OffersMessages ? () => SmsRoleAccess.OpenMessages(this) : null)
             : null);
     }
 
@@ -348,6 +348,8 @@ public class PostActivity : Activity
         ApplyPendingReaderAction();
         CheckSmsRole();
         CheckPendingCallNotes();
+        // In front is the one time Post takes the Messages session back from another browser.
+        GmBridgeClient.Shared(this).TakeOverIfInactive();
     }
 
     // Consumes a switch requested by a secondary screen's binder tap. Cleared unconditionally
@@ -422,14 +424,6 @@ public class PostActivity : Activity
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode == SmsRoleAccess.RequestCode)
-        {
-            // Re-read rather than trusting the result code: the owner can leave the dialog
-            // by any route, and the only answer that matters is what the platform says now.
-            CheckSmsRole();
-            return;
-        }
-
         foreach (var area in areas)
         {
             area.OnActivityResult(requestCode, resultCode, data);
@@ -450,6 +444,8 @@ public class PostActivity : Activity
             // unless the APK was installed whitelisted, but they take effect post-cutover.
             Manifest.Permission.ReadCallLog,
             Manifest.Permission.ReadSms,
+            // A plain text when the Messages bridge is down (Flyleaf's policy grants it too).
+            Manifest.Permission.SendSms,
             // Reading the day a message proposes, and writing the event once the owner
             // accepts it. Refused, a date is still detected and still offered — it simply
             // says the day was not checked.
