@@ -403,7 +403,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         try
         {
-            live.AddRange(SmsLogReader.ReadAll(Host));
+            if (TextSources.ReadsProvider(GmBridgeClient.Shared(Host).IsPaired))
+            {
+                live.AddRange(SmsLogReader.ReadAll(Host));
+            }
         }
         catch (Java.Lang.SecurityException)
         {
@@ -913,9 +916,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // was made.
     private readonly DeleteBuffer deleteBuffer = new();
     private readonly Handler deleteHandler = new(Looper.MainLooper!);
-    private const int PickBridgePhoto = 71;
     private string? pendingPhotoConversationId;
-    private string? pendingPhotoNumber;
     private const int PickGroupMedia = 72;
     private IReadOnlyList<string>? pendingGroupMediaRecipients;
 
@@ -1077,7 +1078,10 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             }
             try
             {
-                gathered.AddRange(SmsLogReader.ReadAll(Host));
+                if (TextSources.ReadsProvider(GmBridgeClient.Shared(Host).IsPaired))
+                {
+                    gathered.AddRange(SmsLogReader.ReadAll(Host));
+                }
             }
             catch (Java.Lang.SecurityException)
             {
@@ -1767,8 +1771,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     }
 
     // Deleting a text for real depends on where it came from, and the routing is decided
-    // by pure tested logic rather than here. Holding the SMS role is what unlocks the
-    // provider: only the default app may write to it, which is exactly why Post takes it.
+    // by pure tested logic rather than here. A bridge message is deleted in Google Messages;
+    // a provider row only while Post itself holds the texting role.
     private void DeleteText(TimelineItem item)
     {
         var holdsRole = SmsRoleAccess.Status(Host) == SmsRoleStatus.Held;
@@ -1781,14 +1785,18 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 DeleteProviderRow(Android.Provider.Telephony.Mms.ContentUri!, item, "mms:");
                 return;
             case TextDeletePath.Bridge:
+                // Off the UI thread (it is a network call); gone from Post either way at once.
                 var messageId = item.SourceId["gm:".Length..];
-                if (!messageId.Contains(':') && GmBridgeClient.Shared(Host).TryDelete(messageId))
+                HideLocally(item);
+                var bridge = GmBridgeClient.Shared(Host);
+                Task.Run(() =>
                 {
-                    using var database = TimelineDatabase.Open(Host);
-                    database.Cache.Delete(item.Kind, item.SourceId);
-                    return;
-                }
-                break;
+                    if (!messageId.Contains(':') && !bridge.TryDelete(messageId))
+                    {
+                        PostDiagnostics.LogWarning("Bridge", "A message was hidden here but could not be deleted in Google Messages");
+                    }
+                });
+                return;
         }
 
         HideLocally(item);
@@ -1828,145 +1836,104 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private void PlaceCall(string number) =>
         Host.StartActivity(new Intent(Intent.ActionCall, Android.Net.Uri.Parse($"tel:{number}")));
 
-    // The bridge first (the only route that carries RCS and full-quality pictures), then
-    // Post sending the SMS itself as role holder, then — only if neither is possible —
-    // handing the owner to Google Messages. Leaving Post to answer someone is the failure
-    // this app is measured against, so the deep link is genuinely last.
-    private void SendText(string number)
+    // Every text — a reply, a first message, a group — is composed and sent here, inside
+    // Post: through Google Messages over the bridge first (RCS, full-quality pictures, groups),
+    // a plain text through the phone when the bridge is down, and otherwise the reason, in
+    // place. The owner is never handed to another app to reply.
+    private void SendText(string number) => ComposeText([number], openBridgeConversationId);
+
+    private void ShowGroupCompose(IReadOnlyList<string> recipients) => ComposeText(recipients, openBridgeConversationId);
+
+    private bool CanSendSms =>
+        AndroidX.Core.Content.ContextCompat.CheckSelfPermission(Host, Android.Manifest.Permission.SendSms)
+            == Android.Content.PM.Permission.Granted;
+
+    private void ComposeText(IReadOnlyList<string> recipients, string? conversationId)
     {
-        var holdsRole = SmsRoleAccess.Status(Host) == SmsRoleStatus.Held;
-        switch (TextSend.Choose(
-            GmBridgeClient.Shared(Host).IsConnected, openBridgeConversationId is not null, holdsRole))
+        var input = new EditText(Host) { Hint = "Message" };
+        new AlertDialog.Builder(Host)
+            .SetTitle("Text")!
+            .SetView(input)!
+            .SetPositiveButton("Send", (_, _) =>
+            {
+                var text = input.Text ?? string.Empty;
+                if (text.Length > 0)
+                {
+                    DeliverText(recipients, conversationId, text);
+                }
+            })!
+            .SetNeutralButton("Attach", (_, _) => PickMedia(recipients, conversationId))!
+            .SetNegativeButton("Cancel", (_, _) => { })!
+            .Show();
+    }
+
+    private void DeliverText(IReadOnlyList<string> recipients, string? conversationId, string text)
+    {
+        var bridge = GmBridgeClient.Shared(Host);
+        var canSendSms = CanSendSms;
+        var sending = TapWatch.Action(PostKeyActions.SendSms, TimeSpan.FromSeconds(60));
+        Task.Run(() =>
         {
-            case TextSendPath.Bridge:
-                ShowBridgeCompose(openBridgeConversationId!, number);
-                return;
-            case TextSendPath.NativeSms:
-                ShowNativeCompose(number);
-                return;
-            default:
-                Host.StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{number}")));
-                return;
+            if (TextSend.Choose(bridge.IsConnected, canSendSms) == TextSendPath.Bridge)
+            {
+                var target = conversationId ?? bridge.FindOrStartConversation(recipients);
+                if (target is not null && bridge.TrySend(target, text))
+                {
+                    sending.Succeeded();
+                    Host.RunOnUiThread(AfterSend);
+                    return;
+                }
+            }
+            // The bridge is down or refused it: a plain text through the phone, if that can go.
+            Host.RunOnUiThread(() => SendWithoutBridge(recipients, text, canSendSms, sending));
+        });
+    }
+
+    private void SendWithoutBridge(IReadOnlyList<string> recipients, string text, bool canSendSms, Storyworthtelling.Diagnostics.KeyAction sending)
+    {
+        if (!canSendSms)
+        {
+            sending.Failed("no bridge and no SEND_SMS permission");
+            NotSent(TextSend.UnavailableReason);
+            return;
+        }
+        if (recipients.Count > 1)
+        {
+            // A group without the bridge is one MMS to everyone, never N separate texts.
+            sending.Succeeded();
+            SendGroupMms(recipients, text, media: []);
+            return;
+        }
+        try
+        {
+            SmsSender.Send(Host, recipients[0], text, sending);
+            AfterSend();
+        }
+        catch (Exception e)
+        {
+            sending.Failed($"{e.GetType().Name}: {e.Message}");
+            PostDiagnostics.LogWarning("Sms", "Sending a text failed", e);
+            NotSent("Google Messages could not be reached and the phone refused the plain text too.");
         }
     }
 
-    // Post sends the text itself. As role holder it is also responsible for the record, so
-    // the sent message is written into the provider — Android does not do it for us, and a
-    // sent text missing from the phone's own store is a text the owner cannot find later.
-    private void ShowNativeCompose(string number)
+    private void AfterSend()
     {
-        var input = new EditText(Host) { Hint = "Message" };
-        new AlertDialog.Builder(Host)
-            .SetTitle("Text")!
-            .SetView(input)!
-            .SetPositiveButton("Send", (_, _) =>
-            {
-                var text = input.Text ?? string.Empty;
-                if (text.Length == 0)
-                {
-                    return;
-                }
-                var sending = TapWatch.Action(PostKeyActions.SendSms, TimeSpan.FromSeconds(60));
-                try
-                {
-                    SmsSender.Send(Host, number, text, sending);
-                    LoadOpenThread();
-                    Syncs.After(Host, PostAction.Sent);
-                }
-                catch (Exception e)
-                {
-                    sending.Failed($"{e.GetType().Name}: {e.Message}");
-                    Android.Util.Log.Warn("Post", $"Native SMS send failed: {e}");
-                    PostDiagnostics.LogWarning("Sms", "Sending a text failed", e);
-                    DogEar.ShowNotices(Host, Overlay,
-                    [
-                        new DogEar.Notice("That text did not go out.",
-                            "Post holds the texting role but the send failed. It is still in the box below.",
-                            PaperTheme.ProblemMark),
-                    ]);
-                }
-            })!
-            // A picture or video to one person is a one-recipient MMS — the same send a group
-            // reply uses (see ShowGroupCompose), so it lands in the same thread. Like the group
-            // dialog, Attach closes this one: a typed message is not carried along with it.
-            .SetNeutralButton("Attach", (_, _) => PickMediaForGroup([number]))!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+        Syncs.After(Host, PostAction.Sent);
+        LoadOpenThread();
+        // The bridge reports the sent message back a moment later; show it when it lands.
+        deleteHandler.PostDelayed(LoadOpenThread, 2500);
     }
 
-    private void ShowBridgeCompose(string conversationId, string number)
-    {
-        var input = new EditText(Host) { Hint = "Message" };
-        new AlertDialog.Builder(Host)
-            .SetTitle("Text")!
-            .SetView(input)!
-            .SetPositiveButton("Send", (_, _) =>
-            {
-                var text = input.Text ?? "";
-                if (text.Length == 0)
-                {
-                    return;
-                }
-                if (GmBridgeClient.Shared(Host).TrySend(conversationId, text))
-                {
-                    EchoOutgoing(conversationId, number, text);
-                    LoadOpenThread();
-                    Syncs.After(Host, PostAction.Sent);
-                }
-                else
-                {
-                    Toast.MakeText(Host, "Couldn't send — opening Messages.", ToastLength.Short)!.Show();
-                    Host.StartActivity(new Intent(Intent.ActionSendto, Android.Net.Uri.Parse($"smsto:{number}")));
-                }
-            })!
-            .SetNeutralButton("Photo", (_, _) => PickPhotoForBridge(conversationId, number))!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
-    }
-
-    // Picture text: pick an image and send it through the bridge; the result
-    // arrives in OnActivityResult (the dialog is already gone by then).
-    private void PickPhotoForBridge(string conversationId, string number)
-    {
-        pendingPhotoConversationId = conversationId;
-        pendingPhotoNumber = number;
-        var intent = new Intent(Intent.ActionGetContent);
-        intent.SetType("image/*");
-        intent.AddCategory(Intent.CategoryOpenable);
-        Host.StartActivityForResult(Intent.CreateChooser(intent, "Photo"), PickBridgePhoto);
-    }
-
-    // A reply into a group thread: native MMS to every participant at once, since sending
-    // one at a time is not a group reply — it is N separate texts, each missing everyone
-    // else's side of the conversation. Text and a picture/video are separate sends here
-    // (matching the bridge's own "Photo" button above) rather than one message carrying
-    // both; a captioned attachment is a reasonable future step, not required to close the
-    // "nowhere to reply at all" gap this exists for.
-    private void ShowGroupCompose(IReadOnlyList<string> recipients)
-    {
-        var input = new EditText(Host) { Hint = "Message" };
-        new AlertDialog.Builder(Host)
-            .SetTitle("Text")!
-            .SetView(input)!
-            .SetPositiveButton("Send", (_, _) =>
-            {
-                var text = input.Text ?? string.Empty;
-                if (text.Length == 0)
-                {
-                    return;
-                }
-                SendGroupMms(recipients, text, media: []);
-            })!
-            .SetNeutralButton("Attach", (_, _) => PickMediaForGroup(recipients))!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
-    }
+    private void NotSent(string detail) =>
+        DogEar.ShowNotices(Host, Overlay, [new DogEar.Notice("That text did not go out.", detail, PaperTheme.ProblemMark)]);
 
     // One picker for both photos and videos rather than two buttons — AlertDialog has room
     // for exactly three, already spent on Send/Attach/Cancel.
-    private void PickMediaForGroup(IReadOnlyList<string> recipients)
+    private void PickMedia(IReadOnlyList<string> recipients, string? conversationId)
     {
         pendingGroupMediaRecipients = recipients;
+        pendingPhotoConversationId = conversationId;
         var intent = new Intent(Intent.ActionGetContent);
         intent.SetType("*/*");
         intent.PutExtra(Intent.ExtraMimeTypes, new[] { "image/*", "video/*" });
@@ -2006,7 +1973,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             DogEar.ShowNotices(Host, Overlay,
             [
                 new DogEar.Notice("That text did not go out.",
-                    "Post holds the texting role but the send failed before it could even start.",
+                    "The send failed before it could even start.",
                     PaperTheme.ProblemMark),
             ]);
         }
@@ -2014,56 +1981,39 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     public override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
-        if (requestCode == PickGroupMedia)
-        {
-            var recipients = pendingGroupMediaRecipients;
-            pendingGroupMediaRecipients = null;
-            if (resultCode != Result.Ok || data?.Data is null || recipients is null)
-            {
-                return;
-            }
-            var mediaMime = Host.ContentResolver!.GetType(data.Data) ?? "application/octet-stream";
-            var mediaBytes = ReadBytes(data.Data);
-            if (mediaBytes is null)
-            {
-                return;
-            }
-            var fileName = mediaMime.StartsWith("video/") ? "video" : "photo";
-            SendGroupMms(recipients, text: null, media: [new MmsOutboundPart(fileName, mediaMime, mediaBytes)]);
-            return;
-        }
-
-        if (requestCode != PickBridgePhoto || resultCode != Result.Ok || data?.Data is null
-            || pendingPhotoConversationId is null)
+        if (requestCode != PickGroupMedia)
         {
             return;
         }
-
+        var recipients = pendingGroupMediaRecipients;
         var conversationId = pendingPhotoConversationId;
-        var number = pendingPhotoNumber ?? "";
-        var mime = Host.ContentResolver!.GetType(data.Data) ?? "image/jpeg";
-        var bytes = ReadBytes(data.Data);
+        pendingGroupMediaRecipients = null;
         pendingPhotoConversationId = null;
-        pendingPhotoNumber = null;
+        if (resultCode != Result.Ok || data?.Data is null || recipients is null)
+        {
+            return;
+        }
+        var mime = Host.ContentResolver!.GetType(data.Data) ?? "application/octet-stream";
+        var bytes = ReadBytes(data.Data);
         if (bytes is null)
         {
             return;
         }
-
+        var fileName = mime.StartsWith("video/", StringComparison.Ordinal) ? "video" : "photo";
+        var bridge = GmBridgeClient.Shared(Host);
         Task.Run(() =>
         {
-            if (GmBridgeClient.Shared(Host).TrySendMedia(conversationId, bytes, "photo", mime))
+            if (bridge.IsConnected)
             {
-                Host.RunOnUiThread(() =>
+                var target = conversationId ?? bridge.FindOrStartConversation(recipients);
+                if (target is not null && bridge.TrySendMedia(target, bytes, fileName, mime))
                 {
-                    EchoOutgoing(conversationId, number, "📷 Photo");
-                    LoadOpenThread();
-                });
+                    Host.RunOnUiThread(AfterSend);
+                    return;
+                }
             }
-            else
-            {
-                Host.RunOnUiThread(() => Toast.MakeText(Host, "Couldn't send photo.", ToastLength.Short)!.Show());
-            }
+            // Without the bridge a picture is an MMS, to one person or to the whole group.
+            Host.RunOnUiThread(() => SendGroupMms(recipients, text: null, media: [new MmsOutboundPart(fileName, mime, bytes)]));
         });
     }
 
@@ -2085,29 +2035,6 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             Android.Util.Log.Warn("FocusPhoneComm", $"Reading photo failed: {e}");
             PostDiagnostics.LogWarning("Photo", "Reading photo attachment failed", e);
             return null;
-        }
-    }
-
-    // The bridge only reports incoming messages, so record the sent one locally
-    // (keyed to the person) to reflect it in the thread immediately.
-    private void EchoOutgoing(string conversationId, string number, string text)
-    {
-        try
-        {
-            using var database = TimelineDatabase.Open(Host);
-            database.Cache.Upsert([new TimelineItem(
-                TimelineItemKind.Message,
-                ContactKeyNormalizer.NormalizePhone(number),
-                DateTimeOffset.UtcNow, text, Incoming: false,
-                SourceId: $"gmout:{conversationId}:{DateTimeOffset.UtcNow.Ticks}")
-            {
-                ExternalConversationId = conversationId,
-            }]);
-        }
-        catch (Exception e)
-        {
-            Android.Util.Log.Warn("FocusPhoneComm", $"Outgoing echo failed: {e}");
-            PostDiagnostics.LogWarning("Bridge", "Recording sent message locally failed", e);
         }
     }
 

@@ -20,7 +20,7 @@ public static class NearDuplicateCollapser
 
     public static IReadOnlyList<TimelineItem> Collapse(IReadOnlyList<TimelineItem> items)
     {
-        var providerTexts = items.Where(item => IsProviderText(item) || IsFiVoicemail(item)).ToList();
+        var providerTexts = items.Where(item => IsProviderText(item) || IsBridgeText(item) || IsFiVoicemail(item)).ToList();
         var voicemailNotifications = items
             .Where(item => item.Kind == TimelineItemKind.Voicemail && HasPrefix(item, "vm:"))
             .ToList();
@@ -44,9 +44,14 @@ public static class NearDuplicateCollapser
     private static bool IsFiVoicemail(TimelineItem item) =>
         item.Kind == TimelineItemKind.Voicemail && HasPrefix(item, "fivm:");
 
+    // A message from the Messages-for-Web bridge: Google Messages' own record of it, so it
+    // shadows a notification copy the same way a provider row does.
+    private static bool IsBridgeText(TimelineItem item) =>
+        item.Kind == TimelineItemKind.Message && HasPrefix(item, "gm:");
+
     private static bool IsShadowedNotificationText(TimelineItem item, List<TimelineItem> providerTexts)
     {
-        if (item.Kind != TimelineItemKind.Message || IsProviderText(item))
+        if (item.Kind != TimelineItemKind.Message || IsProviderText(item) || IsBridgeText(item))
         {
             return false;
         }
@@ -61,7 +66,7 @@ public static class NearDuplicateCollapser
     }
 
     private static bool IsGroupNotificationText(TimelineItem item) =>
-        item.Kind == TimelineItemKind.Message && item.IsGroup && !IsProviderText(item);
+        item.Kind == TimelineItemKind.Message && item.IsGroup && !IsProviderText(item) && !IsBridgeText(item);
 
     /// <summary>
     /// An RCS group message another phone gave up on comes in a second time as a plain SMS

@@ -32,9 +32,12 @@ internal static class AttachmentCache
         {
             // An MMS attachment's bytes are already on the device, in the system MMS
             // provider — no network fetch, unlike a Gmail attachment.
-            var bytes = item.Kind == TimelineItemKind.Message
-                ? MmsAttachments.Fetch(context, attachment)
-                : MailAccess.Attachment(context, item, attachment);
+            // A Google Messages picture comes down through the bridge, which decrypts it.
+            var bytes = Codex.Domain.Post.BridgeMessageMapper.ReadAttachmentId(attachment.Id) is var (mediaId, key)
+                ? GmBridgeClient.Shared(context).DownloadMedia(mediaId, key)
+                : item.Kind == TimelineItemKind.Message
+                    ? MmsAttachments.Fetch(context, attachment)
+                    : MailAccess.Attachment(context, item, attachment);
             if (bytes is null)
             {
                 throw new InvalidOperationException("The message no longer carries that attachment.");

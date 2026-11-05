@@ -298,6 +298,18 @@ public class PolicyPlanBuilderTests
             plan.PermissionGrants);
     }
 
+    // Post's fallback when the Messages bridge is down is a plain text through the phone, and
+    // Post no longer holds the texting role that used to carry SEND_SMS with it.
+    [Fact]
+    public void Plan_GrantsSendSmsSoPostCanStillTextWithTheBridgeDown()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.SendSmsPermission),
+            plan.PermissionGrants);
+    }
+
     [Fact]
     public void Plan_GrantsAreScopedToTheCommunicationApp()
     {

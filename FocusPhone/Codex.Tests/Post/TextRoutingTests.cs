@@ -65,39 +65,40 @@ public class TextRoutingTests
 
     // ---- sending ----
 
-    // The bridge first, because it is the only route that carries RCS and full-quality
-    // pictures — which the owner cares about very much.
+    // The bridge is Google Messages itself, so it carries RCS, pictures at full quality and
+    // groups, and it can start a conversation from a number as well as reply into one.
     [Fact]
-    public void TheBridgeIsPreferredWhenItCanCarryTheMessage()
+    public void TheBridgeIsPreferredWhenConnected()
     {
-        Assert.Equal(TextSendPath.Bridge,
-            TextSend.Choose(bridgeConnected: true, hasBridgeConversation: true, holdsSmsRole: true));
+        Assert.Equal(TextSendPath.Bridge, TextSend.Choose(bridgeConnected: true, canSendSms: true));
     }
 
-    // A connected bridge with no conversation for this person cannot send: it replies
-    // into conversations rather than starting them from a number.
+    // With the bridge down, Post can still send a plain SMS through the phone; Android files
+    // it in the provider for the texting app, so Messages shows it too. No RCS, but it goes.
     [Fact]
-    public void AConnectedBridgeWithNoConversationFallsThrough()
+    public void WithNoBridgePostSendsAPlainText()
     {
-        Assert.Equal(TextSendPath.NativeSms,
-            TextSend.Choose(bridgeConnected: true, hasBridgeConversation: false, holdsSmsRole: true));
+        Assert.Equal(TextSendPath.NativeSms, TextSend.Choose(bridgeConnected: false, canSendSms: true));
     }
 
-    // Holding the role means Post can send the text itself rather than handing the owner
-    // to another app — which is the entire point of "never leave Post to answer anyone".
+    // Every reply happens inside Post: with no route, the text stays here with the reason and
+    // the owner is never handed to Google Messages to send it.
     [Fact]
-    public void WithTheRoleAndNoBridgePostSendsItself()
+    public void WithNeitherRouteTheTextStaysInPost()
     {
-        Assert.Equal(TextSendPath.NativeSms,
-            TextSend.Choose(bridgeConnected: false, hasBridgeConversation: false, holdsSmsRole: true));
+        Assert.Equal(TextSendPath.Unavailable, TextSend.Choose(bridgeConnected: false, canSendSms: false));
+        Assert.DoesNotContain("DeepLink", Enum.GetNames<TextSendPath>());
     }
 
-    // The last resort, and the one the owner most wants gone: handing off to Google
-    // Messages. It stays only because a text that cannot be sent at all is worse.
-    [Fact]
-    public void WithNeitherTheOwnerIsHandedToTheMessagingApp()
+    // ---- reading ----
+
+    // Paired, the bridge carries every text (SMS included) with its real conversation, so the
+    // phone's store is not read too — that would show each plain text twice.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void ThePhonesTextStoreIsReadOnlyWithoutTheBridge(bool bridgePaired, bool readsProvider)
     {
-        Assert.Equal(TextSendPath.DeepLink,
-            TextSend.Choose(bridgeConnected: false, hasBridgeConversation: false, holdsSmsRole: false));
+        Assert.Equal(readsProvider, TextSources.ReadsProvider(bridgePaired));
     }
 }
