@@ -2,6 +2,7 @@ using Android.Content;
 using Codex.Domain.Post;
 using Codex.Domain.Timeline;
 using Codex.Infrastructure.Email;
+using Codex.Infrastructure.Storage;
 
 namespace Post;
 
@@ -25,6 +26,10 @@ internal static class MailIntelligence
         Context context, TimelineDatabase database, MailReadingClient? reader, DateTimeOffset now)
     {
         var promotions = SenderPromotionStore.Load(context);
+        database.Judgements.ForgetBefore(now - MailJudgementStore.Keep);
+        var asked = 0;
+        var placed = 0;
+        var remembered = 0;
 
         foreach (var item in database.Cache.LoadRecent(limit: 300))
         {
@@ -35,7 +40,23 @@ internal static class MailIntelligence
 
             try
             {
-                var reading = await ReadAsync(item, promotions, reader);
+                // Judged before and re-fetched since (aged-out mail is still at the source, and
+                // every reconcile reads thirty days back): the old verdict, with the owner's
+                // corrections over it, and no second call, date offer or balance hand-off.
+                if (database.Judgements.Find(item.SourceId) is { } known)
+                {
+                    var signals = new MailSignals(item.FromAddress ?? item.ContactKey, item.Subject, HasListUnsubscribe: false);
+                    database.Cache.Upsert([item with { MailClass = promotions.Apply(signals, known) ?? known }]);
+                    remembered++;
+                    continue;
+                }
+
+                var (reading, byClaude) = await ReadAsync(item, promotions, reader);
+                if (byClaude)
+                {
+                    asked++;
+                    placed += reading.Kind is null ? 0 : 1;
+                }
                 OfferAnyDetectedDate(context, item, reading.Event, now);
 
                 if (reading.Kind is null)
@@ -43,6 +64,7 @@ internal static class MailIntelligence
                     continue; // genuinely no idea; it waits, like anything unjudged
                 }
 
+                database.Judgements.Remember(item.SourceId, reading.Kind.Value, now);
                 database.Cache.Upsert([item with { MailClass = reading.Kind }]);
                 HandOverAnyBalance(context, item, reading.Kind.Value);
             }
@@ -53,6 +75,14 @@ internal static class MailIntelligence
             }
         }
 
+        // One line a sync, and only when Claude was asked: how many it placed is the measure of
+        // whether the model half is working. Asked many and placed none is a key or reply problem,
+        // since the reader returns "no idea" for every failure rather than throwing.
+        if (asked > 0)
+        {
+            PostDiagnostics.LogInfo("Mail", $"MAIL SORTING asked Claude about {asked}, it placed {placed}; {remembered} re-fetched judged from memory");
+        }
+
         AgeOutTrivia(database, now);
         NoteWhatTheDeferredWorkNeeds(context, database);
     }
@@ -60,7 +90,7 @@ internal static class MailIntelligence
     // Returns the whole reading, not just the kind. The first version of this took the kind
     // and dropped the event on the floor — the detection ran, cost a token, and produced
     // nothing anywhere, so there was no way to tell whether it worked.
-    private static async Task<MailReading> ReadAsync(
+    private static async Task<(MailReading Reading, bool ByClaude)> ReadAsync(
         TimelineItem item, SenderPromotions promotions, MailReadingClient? reader)
     {
         var from = item.FromAddress ?? item.ContactKey;
@@ -69,19 +99,19 @@ internal static class MailIntelligence
         var verdict = MailRules.Classify(signals);
         if (verdict.Kind is { } byRule)
         {
-            return new MailReading(promotions.Apply(signals, byRule), Event: null);
+            return (new MailReading(promotions.Apply(signals, byRule), Event: null), false);
         }
 
         // The rules place most machine mail and every bill. What is left is either a real
         // message or a list of unknown kind, and only reading it can say which.
         if (reader is null)
         {
-            return new MailReading(
-                promotions.Apply(signals, verdict.KnownMachine ? MailClass.Marketing : null), Event: null);
+            return (new MailReading(
+                promotions.Apply(signals, verdict.KnownMachine ? MailClass.Marketing : null), Event: null), false);
         }
 
         var reading = await reader.ReadAsync(from, item.Subject, item.Body);
-        return reading with { Kind = promotions.Apply(signals, reading.Kind) };
+        return (reading with { Kind = promotions.Apply(signals, reading.Kind) }, true);
     }
 
     // A detected date goes two places: onto the correspondence as a proposal the owner can
