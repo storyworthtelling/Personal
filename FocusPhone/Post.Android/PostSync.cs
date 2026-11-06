@@ -91,7 +91,7 @@ public static class PostSync
 
         // Sorting rides on the sync: the messages are already in hand and the phone is
         // already awake, so a second worker would only be a second thing to go wrong.
-        await MailIntelligence.RunAsync(context, database, ReadingClient(context), now);
+        await MailIntelligence.RunAsync(context, database, await ReadingClientAsync(), now);
 
         // The archive is the one thing here that cannot be rebuilt from a source, so it is
         // the one thing worth carrying off the device. Written only when it has changed.
@@ -105,17 +105,27 @@ public static class PostSync
     // The model half of classification, or null when there is no key. Null is a working
     // state rather than an error: rules-only Post still sorts every bill and most machine
     // mail, and asks nothing of the network.
-    private static MailReadingClient? ReadingClient(Context context)
+    //
+    // The key is in the Drive vault, and the options stay empty until RefreshAsync reads it.
+    // This used to skip that call, so the sorter never had a key and the model half never ran
+    // (VoiceKeyLoadedTests is the guard). A failed read is logged, not thrown: a sync that dies
+    // on sorting stops mail arriving.
+    private static async Task<MailReadingClient?> ReadingClientAsync()
     {
         try
         {
             var options = Codex.Ui.Voice.VoiceOptionsAccess.ForHead(
                 MailAccess.Account().GetAccessToken, "Post");
+            await options.RefreshAsync(CancellationToken.None);
+            if (string.IsNullOrWhiteSpace(options.Value.ApiKey))
+            {
+                return null; // no key in the vault, or the vault is locked: rules only
+            }
             return new MailReadingClient(MailAccess.Shared, options);
         }
         catch (Exception e)
         {
-            Android.Util.Log.Info("Post", $"No reading client: {e.Message}");
+            PostDiagnostics.LogWarning("Mail", "Could not read the Claude key for sorting; sorting by rules only", e);
             return null;
         }
     }

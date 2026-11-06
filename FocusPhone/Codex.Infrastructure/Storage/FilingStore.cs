@@ -80,6 +80,65 @@ public class FilingStore
         return GhostArchive.From(ghosts);
     }
 
+    /// <summary>How much of a body stands in for a message with no snippet, in a search entry.</summary>
+    public const int ExcerptChars = 300;
+
+    /// <summary>
+    /// A short summary of every ghost filed at or before <paramref name="settledBy"/>, for the
+    /// Filed search. SQLite pulls the few fields out of each stored item itself, so the bodies
+    /// are never deserialized or held in memory — that was the cost of listing everything.
+    /// </summary>
+    public IReadOnlyList<FiledEntry> LoadEntries(DateTimeOffset settledBy)
+    {
+        var entries = new List<FiledEntry>();
+        using var select = connection.CreateCommand();
+        select.CommandText = """
+            SELECT sourceId, filedAtUtc,
+                   json_extract(item, '$.TimestampUtc'),
+                   json_extract(item, '$.Kind'),
+                   json_extract(item, '$.Incoming'),
+                   json_extract(item, '$.ContactKey'),
+                   substr(json_extract(item, '$.Subject'), 1, 200),
+                   substr(coalesce(json_extract(item, '$.Snippet'), json_extract(item, '$.Body')), 1, $excerpt)
+            FROM ghosts
+            WHERE filedAtUtc <= $settled
+            """;
+        select.Parameters.AddWithValue("$excerpt", ExcerptChars);
+        select.Parameters.AddWithValue("$settled", settledBy.ToUniversalTime().ToString("O"));
+        using var reader = select.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(new FiledEntry(
+                reader.GetString(0),
+                DateTimeOffset.Parse(reader.GetString(1)),
+                DateTimeOffset.Parse(reader.GetString(2)),
+                (TimelineItemKind)reader.GetInt32(3),
+                reader.GetInt64(4) != 0,
+                reader.IsDBNull(5) ? string.Empty : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7)));
+        }
+        return entries;
+    }
+
+    /// <summary>The whole ghosts for these ids, in the order asked; an id no longer filed is skipped.</summary>
+    public IReadOnlyList<Ghost> LoadGhosts(IReadOnlyList<string> sourceIds)
+    {
+        var found = new Dictionary<string, Ghost>();
+        foreach (var id in sourceIds.Distinct())
+        {
+            using var select = connection.CreateCommand();
+            select.CommandText = "SELECT filedAtUtc, item FROM ghosts WHERE sourceId = $id";
+            select.Parameters.AddWithValue("$id", id);
+            using var reader = select.ExecuteReader();
+            if (reader.Read() && JsonSerializer.Deserialize<TimelineItem>(reader.GetString(1)) is { } item)
+            {
+                found[id] = new Ghost(item, DateTimeOffset.Parse(reader.GetString(0)));
+            }
+        }
+        return sourceIds.Where(found.ContainsKey).Select(id => found[id]).ToList();
+    }
+
     /// <summary>
     /// Replaces the stored tombstones with what stands now. A replace rather than an
     /// append, because a confirmed delete DROPS its tombstone and the store has to forget

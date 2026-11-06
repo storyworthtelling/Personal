@@ -26,6 +26,9 @@ public sealed class TimelineDatabase : IDisposable
     /// </summary>
     public FilingStore Filing { get; }
 
+    /// <summary>What each email was judged to be, so a re-fetched one is not judged (and billed) again.</summary>
+    public MailJudgementStore Judgements { get; }
+
     private TimelineDatabase(SqliteConnection connection)
     {
         this.connection = connection;
@@ -34,6 +37,7 @@ public sealed class TimelineDatabase : IDisposable
         IdentityLinks = new IdentityLinkStore(connection);
         ReadState = new ReadStateStore(connection);
         Filing = new FilingStore(connection);
+        Judgements = new MailJudgementStore(connection);
     }
 
     public static TimelineDatabase Open(Context context)
