@@ -18,7 +18,11 @@ public record PolicyContext(
     // than kept always-runnable: an allowlisted app reaching Chrome for an ordinary in-app link
     // (Maps opening a business's website, say) is free general browsing, not a sign-in, and the
     // fix is to make Chrome unavailable outside the owner-initiated Admin window entirely.
-    bool AdminModeActive)
+    bool AdminModeActive,
+    // The package that runs the swipe-up gesture and recents (SystemRecents). It is usually also an
+    // "other home", but it must stay runnable or leaving an app opens the suspension dialog instead
+    // of Flyleaf. Null when the platform names none.
+    string? SystemRecentsPackage = null)
 {
     // Every first-party app the owner ships lives under this namespace. Anything
     // matching it is known-good: the categorizer clears it outright so a
