@@ -60,6 +60,15 @@ public static class PolicyPlanBuilder
         {
             runnable.UnionWith(PolicyContext.LoginBrowserPackages);
         }
+        // The recents provider (Pixel Launcher on a Pixel) runs the swipe-up gesture and the
+        // back-to-home animation even though Flyleaf is the pinned home. Suspended with the other
+        // homes, leaving any app showed "blocked by your admin" rather than the shelf. It is kept
+        // runnable — Flyleaf stays home through the persistent preferred activity — unless it is a
+        // never-visible app, which nothing releases.
+        if (context.SystemRecentsPackage is { } recents && !context.NeverVisiblePackages.Contains(recents))
+        {
+            runnable.Add(recents);
+        }
         suspended.ExceptWith(runnable);
 
         // READ_SMS and READ_CALL_LOG are hard-restricted: the installer only
