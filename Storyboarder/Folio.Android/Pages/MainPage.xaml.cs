@@ -119,12 +119,30 @@ public partial class MainPage : FolioBinderPage
 
             // An empty desk is the one place in the app with room to speak to the owner directly, and
             // it is not a failure — it is the ordinary first state of a new install.
+            //
+            // Written once a day and then kept (EmptyDeskLinePlan): the desk refreshes every few
+            // seconds, and composing on each refresh rewrote the line under the owner's eyes.
             if (list.Count == 0)
             {
-                var messenger = scope.ServiceProvider.GetRequiredService<VoicedMessenger>();
-                var line = await messenger.ComposeAsync(
-                    new MessageRequest(VoicedOccasions.EmptyDesk, "no manuscripts yet", HighVisibility: true),
-                    fallback: string.Empty, CancellationToken.None);
+                var line = SettingsStore.EmptyDeskLine;
+                var today = DateOnly.FromDateTime(DateTime.Now);
+                if (EmptyDeskLinePlan.NeedsComposing(line, SettingsStore.EmptyDeskLineDay, today))
+                {
+                    var messenger = scope.ServiceProvider.GetRequiredService<VoicedMessenger>();
+                    var composed = await messenger.ComposeAsync(
+                        new MessageRequest(VoicedOccasions.EmptyDesk, "no manuscripts yet", HighVisibility: true),
+                        fallback: string.Empty, CancellationToken.None);
+
+                    // No voice yet (no profile or key) stores nothing, so a later paint can still
+                    // compose today's line once the voice is available. Yesterday's line stands
+                    // meanwhile rather than the desk going blank.
+                    if (!string.IsNullOrWhiteSpace(composed))
+                    {
+                        SettingsStore.EmptyDeskLine = composed;
+                        SettingsStore.EmptyDeskLineDay = today;
+                        line = composed;
+                    }
+                }
 
                 if (!string.IsNullOrWhiteSpace(line) && line != emptyDeskLine)
                 {
