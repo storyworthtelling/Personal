@@ -58,7 +58,8 @@ public static class PolicyManager
             OtherHomePackages: QueryOtherHomePackages(context),
             DebuggingLockedDown: store.DebuggingLockedDown,
             NeverVisiblePackages: QueryNeverVisiblePackages(context),
-            AdminModeActive: adminModeActive);
+            AdminModeActive: adminModeActive,
+            SystemRecentsPackage: QuerySystemRecentsPackage(context));
     }
 
     /// <summary>
@@ -442,6 +443,25 @@ public static class PolicyManager
         var homes = QueryPackages(context, intent);
         homes.Remove(context.PackageName!);
         return homes;
+    }
+
+    // The platform's recents component (config_recentsComponentName, e.g. Pixel Launcher's Quickstep),
+    // which runs the swipe-up gesture. An internal resource, so it is looked up by name; a build that
+    // does not have it names no package and the plan suspends every other home as before.
+    private static string? QuerySystemRecentsPackage(Context context)
+    {
+        try
+        {
+            var system = Android.Content.Res.Resources.System!;
+            var id = system.GetIdentifier("config_recentsComponentName", "string", "android");
+            var package = id == 0 ? null : SystemRecents.PackageFrom(system.GetString(id));
+            return package is not null && IsInstalled(context, package) ? package : null;
+        }
+        catch (Android.Content.Res.Resources.NotFoundException e)
+        {
+            HeadLog.Warn(Tag, $"Could not read the recents component: {e.Message}");
+            return null;
+        }
     }
 
     private static HashSet<string> QueryPackages(Context context, Intent intent)
