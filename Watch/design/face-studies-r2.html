@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watch Face Studies, Round 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: the round-1 field notebook, one study per block: four times on top, then the face's
+   date and what happens when a text or a call arrives. Single theme: the faces live on black glass. */
+:root {
+  --ground: #101418;
+  --slab: #171d23;
+  --rule: #26303a;
+  --ink: #dfe6ec;
+  --muted: #8a98a6;
+  --glass: #9fd3e6;
+  --font-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-label: "Spline Sans Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-body); }
+body { padding: 24px 16px 64px; }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 26px; }
+header h1 { font-weight: 600; font-size: 30px; margin: 0 0 6px; text-wrap: balance; }
+header p, .note { margin: 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+.controls { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--ground) 92%, transparent);
+  backdrop-filter: blur(6px); border-bottom: 1px solid var(--rule); padding: 12px 0; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+button { font-family: var(--font-label); font-size: 12px; background: var(--slab); color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button[aria-pressed=true] { border-color: var(--glass); color: var(--glass); }
+button:focus-visible { outline: 2px solid var(--glass); outline-offset: 2px; }
+.study { padding: 22px; background: var(--slab); border: 1px solid var(--rule); border-radius: 10px; display: grid; gap: 14px; }
+.study .num { font-family: var(--font-label); font-size: 12px; color: var(--glass); }
+.study h2 { margin: 2px 0 4px; font-size: 21px; font-weight: 600; text-wrap: balance; }
+.study p { margin: 4px 0; line-height: 1.5; max-width: 80ch; }
+.rowlabel { font-family: var(--font-label); font-size: 12px; color: var(--muted); margin-top: 6px; }
+.row { display: grid; grid-template-columns: repeat(4, minmax(0, 190px)); gap: 18px; }
+.cell { display: grid; justify-items: center; gap: 6px; }
+.cell canvas { width: 100%; max-width: 190px; aspect-ratio: 1; display: block; }
+.cell span { font-family: var(--font-label); font-size: 11px; color: var(--muted); text-align: center; line-height: 1.4; }
+@media (max-width: 760px) { .row { grid-template-columns: repeat(2, minmax(0, 190px)); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Watch face studies, round 2</h1>
+    <p>Round 2 develops studies 1, 5, 6 and 7, and tries study 1 as a 24-hour clock in two ways. Each
+    study is shown at 2:22 am, 7:15 am, 1:41 pm and 7:50 pm, then with its date and with a text
+    and a call arriving. People and messages are invented.</p>
+  </header>
+
+  <div class="controls">
+    <button id="ambient" type="button" aria-pressed="false">Show always-on</button>
+  </div>
+
+  <main id="studies" class="wrap"></main>
+
+  <p class="note"><strong>About notifications.</strong> You decided the face shows nothing anxious: no counts and no
+  unread marks. So the face never changes when something arrives. On Wear OS the arriving text and the ringing
+  call are cards that the system draws over the face, and a face cannot restyle them. The cards here are drawn in
+  each study's own colours to show what P14's apps could look like, if the finding shows Post can draw them. If it
+  cannot, they look like the stock Pixel cards.</p>
+</div>
+
+<script>
+"use strict";
+const TAU = Math.PI * 2;
+const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const TIMES = [[2, 22], [7, 15], [13, 41], [19, 50]];
+const ang = f => f * TAU - Math.PI / 2;
+const pt = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+const hour12 = h => (h % 12) || 12;
+const label = (h, m) => ((h % 12) || 12) + ":" + String(m).padStart(2, "0") + (h < 12 ? " am" : " pm");
+const today = new Date();
+const DAY = DAYS[today.getDay()], DATE = String(today.getDate());
+
+function text(c, s, x, y, size, color, weight = 500, family = '"Spline Sans Mono", monospace', align = "center") {
+  c.font = `${weight} ${size}px ${family}`; c.fillStyle = color; c.textAlign = align; c.textBaseline = "middle"; c.fillText(s, x, y);
+}
+function textOnArc(c, s, cx, cy, r, centreAngle, size, color) {
+  c.font = `500 ${size}px "Spline Sans Mono", monospace`; c.fillStyle = color; c.textAlign = "center"; c.textBaseline = "middle";
+  const step = size * 0.72 / r, start = centreAngle + ((s.length - 1) / 2) * step;
+  [...s].forEach((ch, i) => { const a = start - i * step; c.save(); c.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    c.rotate(a - Math.PI / 2); c.fillText(ch, 0, 0); c.restore(); });
+}
+function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+
+// ---- the polygon, shared by the 12- and 24-hour versions ----
+function shapePath(c, R, n, r) {
+  c.beginPath();
+  if (n === 0) { c.arc(R, R, r, 0, TAU); return "ring"; }
+  if (n === 1) { c.arc(R, R, R * 0.1, 0, TAU); return "dot"; }
+  if (n === 2) { c.moveTo(R, R - r); c.lineTo(R, R + r); return "line"; }
+  for (let i = 0; i < n; i++) { const [x, y] = pt(R, R, r, ang(i / n)); i ? c.lineTo(x, y) : c.moveTo(x, y); }
+  c.closePath(); return "poly";
+}
+function glassFill(c, R, r, hue, amb, kind) {
+  c.lineJoin = "round"; c.lineCap = "round";
+  if (amb) { c.strokeStyle = `hsl(${hue} 35% 32%)`; c.lineWidth = kind === "line" ? R * 0.04 : R * 0.022; c.stroke(); return; }
+  if (kind === "poly" || kind === "dot") {
+    const g = c.createRadialGradient(R - r * 0.35, R - r * 0.45, r * 0.05, R, R, r * 1.1);
+    g.addColorStop(0, `hsl(${hue} 90% 82%)`); g.addColorStop(0.55, `hsl(${hue} 75% 52%)`); g.addColorStop(1, `hsl(${hue} 70% 30%)`);
+    c.fillStyle = g; c.fill();
+  }
+  c.strokeStyle = `hsl(${hue} 90% 85%)`; c.lineWidth = kind === "line" ? R * 0.07 : R * 0.018; c.stroke();
+}
+const minuteHue = t => ((t.m + t.s / 60) / 60) * 360;
+function polygonDate(c, R, t, amb, hue) {
+  if (amb) return;
+  text(c, DAY + " " + DATE, R, R * 1.76, R * 0.085, `hsl(${hue} 18% 62%)`);
+}
+
+const studies = [
+{
+  num: "1", title: "Hours in sides, minutes in colour",
+  about: "As in round 1, on a 12-hour dial. The date sits beneath the shape in the shape's own colour, faded, so it changes with the minute too.",
+  card: { ground: "hsl(220 10% 10%)", accent: t => `hsl(${minuteHue(t)} 80% 70%)` },
+  draw(c, R, t, amb) { const hue = minuteHue(t); const k = shapePath(c, R, hour12(t.h), R * 0.5); glassFill(c, R, R * 0.5, hue, amb, k); polygonDate(c, R, t, amb, hue); }
+},
+{
+  num: "1a", title: "24-hour polygon: one side per hour",
+  about: "The shape has as many sides as the hour on a 24-hour clock. Midnight is an empty ring, one o'clock is a dot and two is a line. Up to about twelve the sides can be counted. Past about sixteen they cannot be told apart, and the evening shapes look like circles. That is the honest weakness of this version, and you can see it at 7:50 pm.",
+  card: { ground: "hsl(220 10% 10%)", accent: t => `hsl(${minuteHue(t)} 80% 70%)` },
+  draw(c, R, t, amb) { const hue = minuteHue(t); const k = shapePath(c, R, t.h, R * 0.5);
+    if (k === "ring") { c.strokeStyle = amb ? `hsl(${hue} 30% 30%)` : `hsl(${hue} 80% 75%)`; c.lineWidth = R * 0.02; c.stroke(); }
+    else glassFill(c, R, R * 0.5, hue, amb, k);
+    polygonDate(c, R, t, amb, hue); }
+},
+{
+  num: "1b", title: "24-hour polygon: afternoon in a second ring",
+  about: "The morning keeps round 1's shapes. From one in the afternoon the same shape returns inside an outline of itself, so 1:41 pm is a dot in a ring and 7:50 pm is a heptagon in a heptagon. Every hour still counts to twelve or fewer, so it stays legible, and the second ring says 'after noon' without a number.",
+  card: { ground: "hsl(220 10% 10%)", accent: t => `hsl(${minuteHue(t)} 80% 70%)` },
+  draw(c, R, t, amb) { const hue = minuteHue(t), n = hour12(t.h), pm = t.h >= 12;
+    const k = shapePath(c, R, n, R * (pm ? 0.42 : 0.5)); glassFill(c, R, R * (pm ? 0.42 : 0.5), hue, amb, k);
+    if (pm) { c.beginPath(); if (n <= 2) c.arc(R, R, R * 0.62, 0, TAU);
+      else for (let i = 0; i <= n; i++) { const [x, y] = pt(R, R, R * 0.62, ang(i / n)); i ? c.lineTo(x, y) : c.moveTo(x, y); }
+      c.strokeStyle = amb ? `hsl(${hue} 30% 28%)` : `hsla(${hue} 85% 80% / 0.7)`; c.lineWidth = R * 0.012; c.stroke(); }
+    polygonDate(c, R, t, amb, hue); }
+},
+{
+  num: "5", title: "Field watch",
+  about: "Round 1's field dial with a proper date window cut in at three, where field watches keep it, and the weekday written small at nine. The three moves into the window's place.",
+  card: { ground: "hsl(200 12% 9%)", accent: () => "hsl(185 45% 82%)" },
+  draw(c, R, t, amb) {
+    const lume = amb ? "hsl(185 18% 40%)" : "hsl(185 45% 88%)";
+    for (let i = 0; i < 60; i++) { if (amb && i % 5) continue; if (i === 15) continue;
+      const major = i % 5 === 0, a = ang(i / 60); const [x1, y1] = pt(R, R, R * (major ? 0.8 : 0.86), a), [x2, y2] = pt(R, R, R * 0.9, a);
+      c.strokeStyle = major ? lume : "hsl(200 10% 34%)"; c.lineWidth = R * (major ? 0.022 : 0.008); c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }
+    [[12, 0], [6, 0.5]].forEach(([n, f]) => { const [x, y] = pt(R, R, R * 0.63, ang(f)); text(c, String(n), x, y, R * 0.17, lume, 600, '"Familjen Grotesk", sans-serif'); });
+    const [nx, ny] = pt(R, R, R * 0.63, ang(0.75)); text(c, "9", nx, ny, R * 0.17, lume, 600, '"Familjen Grotesk", sans-serif');
+    if (!amb) {
+      text(c, DAY, R - R * 0.38, R, R * 0.065, "hsl(200 10% 55%)");
+      for (let i = 1; i <= 12; i++) { if (i % 3 === 0) continue; const [x, y] = pt(R, R, R * 0.44, ang(i / 12)); text(c, String(i + 12), x, y, R * 0.06, "hsl(200 10% 46%)"); }
+    }
+    const wx = R + R * 0.6, w = R * 0.24, h = R * 0.17;
+    roundRect(c, wx - w / 2, R - h / 2, w, h, R * 0.025); c.fillStyle = amb ? "#000" : "hsl(200 10% 8%)"; c.fill();
+    c.strokeStyle = amb ? "hsl(185 15% 30%)" : "hsl(185 25% 60%)"; c.lineWidth = R * 0.01; c.stroke();
+    text(c, DATE, wx, R + R * 0.005, R * 0.12, lume, 600, '"Familjen Grotesk", sans-serif');
+    const hand = (f, len, wdt, col) => { const a = ang(f); const [x, y] = pt(R, R, R * len, a), [bx, by] = pt(R, R, R * 0.1, a + Math.PI);
+      c.strokeStyle = col; c.lineWidth = R * wdt; c.lineCap = "round"; c.beginPath(); c.moveTo(bx, by); c.lineTo(x, y); c.stroke(); };
+    hand((t.h % 12 + t.m / 60) / 12, 0.5, 0.05, lume); hand((t.m + t.s / 60) / 60, 0.78, 0.032, lume);
+    if (!amb) hand(t.s / 60, 0.82, 0.008, "hsl(25 80% 62%)");
+    c.fillStyle = amb ? "hsl(200 10% 30%)" : "hsl(200 15% 75%)"; c.beginPath(); c.arc(R, R, R * 0.035, 0, TAU); c.fill();
+  }
+},
+{
+  num: "6", title: "Stone sundial",
+  about: "A stone garden sundial seen from directly above. Roman numerals, set upright so they read at a glance, and hour lines are cut into the plate, and a bronze gnomon stands along the noon line. Its shadow falls across the plate and its tip lands on the hour's numeral, moving between numerals through the hour. A small bronze pin on the rim gives the minute, since a real sundial has none. The date is cut along the lower half of the plate.",
+  card: { ground: "hsl(30 6% 13%)", accent: () => "hsl(36 45% 72%)" },
+  draw(c, R, t, amb) {
+    const NUM = ["XII", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
+    const hf = (t.h % 12 + t.m / 60) / 12, ha = ang(hf);
+    if (!amb) {
+      // the stone plate and its raised, bevelled rim
+      const g = c.createRadialGradient(R * 0.75, R * 0.65, R * 0.1, R, R, R);
+      g.addColorStop(0, "hsl(34 8% 58%)"); g.addColorStop(0.7, "hsl(30 7% 44%)"); g.addColorStop(1, "hsl(28 7% 30%)");
+      c.fillStyle = g; c.beginPath(); c.arc(R, R, R, 0, TAU); c.fill();
+      let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let i = 0; i < 1400; i++) { const a = rnd() * TAU, d = Math.sqrt(rnd()) * R; const [x, y] = pt(R, R, d, a);
+        c.fillStyle = `hsla(30 8% ${rnd() > 0.5 ? 70 : 25}% / ${0.12 + rnd() * 0.18})`; c.fillRect(x, y, R * 0.01, R * 0.01); }
+      for (let i = 0; i < 6; i++) { const a = rnd() * TAU, d = R * (0.2 + rnd() * 0.7); const [x, y] = pt(R, R, d, a);
+        c.fillStyle = "hsla(75 18% 48% / 0.18)"; c.beginPath(); c.arc(x, y, R * (0.03 + rnd() * 0.05), 0, TAU); c.fill(); }
+      c.lineWidth = R * 0.05; c.strokeStyle = "hsla(30 10% 72% / 0.35)"; c.beginPath(); c.arc(R - R * 0.01, R - R * 0.01, R * 0.93, 0, TAU); c.stroke();
+      c.lineWidth = R * 0.012; c.strokeStyle = "hsla(30 10% 15% / 0.6)"; c.beginPath(); c.arc(R, R, R * 0.9, 0, TAU); c.stroke();
+      // hour lines and numerals, cut in: a dark groove with a light lip on its lower edge
+      const cut = (draw) => { c.save(); c.translate(R * 0.006, R * 0.006); draw("hsla(34 15% 80% / 0.55)"); c.restore(); draw("hsla(25 15% 14% / 0.92)"); };
+      for (let i = 0; i < 48; i++) { const a = ang(i / 48), major = i % 4 === 0; if (!major && i % 2) continue;
+        const [x1, y1] = pt(R, R, R * (major ? 0.3 : 0.6), a), [x2, y2] = pt(R, R, R * 0.68, a);
+        cut(col => { c.strokeStyle = col; c.lineWidth = R * (major ? 0.01 : 0.006); c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }); }
+      NUM.forEach((n, i) => { const a = ang(i / 12), [x, y] = pt(R, R, R * 0.79, a);
+        cut(col => { c.save(); c.translate(x, y);
+          c.font = `600 ${R * 0.105}px "Familjen Grotesk", sans-serif`; c.fillStyle = col; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(n, 0, 0); c.restore(); }); });
+      textOnArc(c, DAY + " " + DATE, R + R * 0.006, R + R * 0.006, R * 0.47, Math.PI / 2, R * 0.07, "hsla(34 15% 80% / 0.55)");
+      textOnArc(c, DAY + " " + DATE, R, R, R * 0.47, Math.PI / 2, R * 0.07, "hsla(25 15% 14% / 0.92)");
+    } else {
+      [0, 0.25, 0.5, 0.75].forEach(f => { const [x, y] = pt(R, R, R * 0.79, ang(f));
+        text(c, ["XII", "III", "VI", "IX"][f * 4], x, y, R * 0.09, "hsl(30 8% 30%)", 600, '"Familjen Grotesk", sans-serif'); });
+    }
+    // the shadow: from the gnomon's foot to the hour's numeral, soft at the edges and lighter toward the tip
+    const tipR = R * 0.74, [tx, ty] = pt(R, R, tipR, ha);
+    const [l0x, l0y] = pt(R, R, R * 0.05, ha - Math.PI / 2), [r0x, r0y] = pt(R, R, R * 0.05, ha + Math.PI / 2);
+    const [l1x, l1y] = pt(tx, ty, R * 0.012, ha - Math.PI / 2), [r1x, r1y] = pt(tx, ty, R * 0.012, ha + Math.PI / 2);
+    const sg = c.createLinearGradient(R, R, tx, ty);
+    sg.addColorStop(0, amb ? "hsla(30 10% 45% / 0.8)" : "hsla(25 25% 6% / 0.82)");
+    sg.addColorStop(1, amb ? "hsla(30 10% 45% / 0.25)" : "hsla(25 25% 6% / 0.5)");
+    c.save(); if (!amb) c.filter = `blur(${Math.max(1, R * 0.008)}px)`;
+    c.fillStyle = sg; c.beginPath(); c.moveTo(l0x, l0y); c.lineTo(l1x, l1y); c.lineTo(r1x, r1y); c.lineTo(r0x, r0y); c.closePath(); c.fill(); c.restore();
+    // the gnomon, seen from above: a bronze blade along the noon line
+    if (!amb) {
+      const gx = R, gTop = R - R * 0.6;
+      const bg = c.createLinearGradient(gx - R * 0.03, 0, gx + R * 0.03, 0);
+      bg.addColorStop(0, "hsl(32 40% 28%)"); bg.addColorStop(0.5, "hsl(38 55% 62%)"); bg.addColorStop(1, "hsl(30 40% 22%)");
+      c.fillStyle = bg; c.beginPath(); c.moveTo(gx - R * 0.03, R + R * 0.05); c.lineTo(gx - R * 0.008, gTop); c.lineTo(gx + R * 0.008, gTop); c.lineTo(gx + R * 0.03, R + R * 0.05); c.closePath(); c.fill();
+      c.fillStyle = "hsl(32 35% 30%)"; c.beginPath(); c.arc(R, R + R * 0.05, R * 0.045, 0, TAU); c.fill();
+    }
+    // the minute pin on the rim
+    const [nx, ny] = pt(R, R, R * 0.93, ang((t.m + t.s / 60) / 60));
+    c.fillStyle = amb ? "hsl(35 20% 40%)" : "hsl(38 55% 60%)"; c.beginPath(); c.arc(nx, ny, R * 0.025, 0, TAU); c.fill();
+    if (!amb) { c.fillStyle = "hsla(38 70% 85% / 0.8)"; c.beginPath(); c.arc(nx - R * 0.007, ny - R * 0.007, R * 0.009, 0, TAU); c.fill(); }
+  }
+},
+{
+  num: "7", title: "Contour and bearing",
+  about: "The date is a map label: weekday and day set in small capitals on a clear patch between two contour lines, the way a spot height is printed on a survey map.",
+  card: { ground: "hsl(200 14% 9%)", accent: () => "hsl(30 85% 68%)" },
+  draw(c, R, t, amb) {
+    const rings = amb ? [0.86] : [0.2, 0.36, 0.52, 0.68, 0.86];
+    rings.forEach((rr, k) => { c.beginPath();
+      for (let i = 0; i <= 120; i++) { const a = (i / 120) * TAU, wob = 1 + 0.06 * Math.sin(a * 3 + k) + 0.04 * Math.sin(a * 5 + k * 2);
+        const [x, y] = pt(R, R, R * rr * wob * (rr === 0.86 ? 0.98 : 1), a); i ? c.lineTo(x, y) : c.moveTo(x, y); }
+      c.strokeStyle = amb ? "hsl(195 15% 26%)" : `hsl(${188 + k * 4} 35% ${30 + k * 6}%)`; c.lineWidth = R * 0.008; c.stroke(); });
+    if (!amb) { const lx = R, ly = R * 1.6, w = R * 0.42, h = R * 0.13;
+      c.fillStyle = "#000"; c.fillRect(lx - w / 2, ly - h / 2, w, h);
+      text(c, DAY + " " + DATE, lx, ly, R * 0.075, "hsl(195 30% 70%)"); }
+    const ha = ang((t.h % 12 + t.m / 60) / 12), [bx, by] = pt(R, R, R * 0.7, ha);
+    c.setLineDash([R * 0.04, R * 0.025]); c.strokeStyle = amb ? "hsl(30 30% 42%)" : "hsl(30 85% 66%)"; c.lineWidth = R * 0.022;
+    c.beginPath(); c.moveTo(R, R); c.lineTo(bx, by); c.stroke(); c.setLineDash([]);
+    const mf = (t.m + t.s / 60) / 60, a = mf * TAU - Math.PI / 2, wob = 1 + 0.06 * Math.sin(a * 3 + 4) + 0.04 * Math.sin(a * 5 + 8);
+    const [mx, my] = pt(R, R, R * 0.86 * wob * 0.98, a);
+    c.fillStyle = amb ? "hsl(190 20% 45%)" : "hsl(190 70% 85%)"; c.beginPath(); c.arc(mx, my, R * 0.03, 0, TAU); c.fill();
+    c.fillStyle = amb ? "hsl(200 10% 30%)" : "hsl(195 20% 70%)"; c.beginPath(); c.arc(R, R, R * 0.018, 0, TAU); c.fill();
+  }
+}
+];
+
+// ---- the arriving text and the ringing call, drawn in the study's colours ----
+function wrap(c, s, maxW) { const words = s.split(" "), lines = []; let line = "";
+  words.forEach(w => { const test = line ? line + " " + w : w; if (c.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test; });
+  if (line) lines.push(line); return lines; }
+function textCard(c, R, study, t) {
+  c.fillStyle = study.card.ground; c.fillRect(0, 0, R * 2, R * 2);
+  const acc = study.card.accent(t);
+  c.fillStyle = acc; c.beginPath(); c.arc(R, R * 0.36, R * 0.07, 0, TAU); c.fill();
+  text(c, "Lee · now", R, R * 0.56, R * 0.09, acc, 600, '"Familjen Grotesk", sans-serif');
+  c.font = `400 ${R * 0.105}px "Familjen Grotesk", sans-serif`;
+  wrap(c, "Running late. I'll be at the field by four.", R * 1.3).forEach((ln, i) => text(c, ln, R, R * 0.8 + i * R * 0.15, R * 0.105, "hsl(200 15% 90%)", 400, '"Familjen Grotesk", sans-serif'));
+  roundRect(c, R * 0.55, R * 1.45, R * 0.9, R * 0.2, R * 0.1); c.strokeStyle = acc; c.lineWidth = R * 0.012; c.stroke();
+  text(c, "Reply", R, R * 1.55, R * 0.085, acc, 500, '"Familjen Grotesk", sans-serif');
+}
+function callCard(c, R, study, t) {
+  c.fillStyle = study.card.ground; c.fillRect(0, 0, R * 2, R * 2);
+  const acc = study.card.accent(t);
+  text(c, "Calling", R, R * 0.5, R * 0.08, "hsl(200 10% 60%)");
+  text(c, "Robin", R, R * 0.72, R * 0.2, "hsl(200 15% 94%)", 600, '"Familjen Grotesk", sans-serif');
+  text(c, "Mobile · 555-0142", R, R * 0.93, R * 0.07, "hsl(200 10% 60%)");
+  const btn = (x, fill, word) => { c.fillStyle = fill; c.beginPath(); c.arc(x, R * 1.36, R * 0.2, 0, TAU); c.fill(); text(c, word, x, R * 1.37, R * 0.075, "hsl(0 0% 6%)", 600, '"Familjen Grotesk", sans-serif'); };
+  btn(R * 0.58, "hsl(355 55% 62%)", "Decline"); btn(R * 1.42, acc, "Answer");
+}
+
+const root = document.getElementById("studies"); const views = []; let ambient = false;
+studies.forEach(s => {
+  const sec = document.createElement("section"); sec.className = "study";
+  sec.innerHTML = `<div><div class="num">Study ${s.num}</div><h2>${s.title}</h2><p>${s.about}</p></div>
+    <div class="rowlabel">Four times</div><div class="row times"></div>
+    <div class="rowlabel">Date, and what arrives (at 1:41 pm)</div><div class="row states"></div>`;
+  root.appendChild(sec);
+  const add = (row, cap, kind, time) => { const cell = document.createElement("div"); cell.className = "cell";
+    cell.innerHTML = `<canvas role="img" aria-label="Study ${s.num}, ${cap}"></canvas><span>${cap}</span>`;
+    row.appendChild(cell); views.push({ canvas: cell.querySelector("canvas"), study: s, kind, time }); };
+  const times = sec.querySelector(".times"), states = sec.querySelector(".states");
+  TIMES.forEach(tm => add(times, label(tm[0], tm[1]), "face", tm));
+  add(states, "Date, enlarged", "date", [13, 41]);
+  add(states, "A text arrives:<br>the system shows a card", "text", [13, 41]);
+  add(states, "A call rings", "call", [13, 41]);
+  add(states, "After: the face is unchanged<br>(no unread mark, A34)", "face", [13, 41]);
+});
+
+function paint(v) {
+  const dpr = window.devicePixelRatio || 1, W = Math.round(v.canvas.clientWidth * dpr);
+  if (v.canvas.width !== W) { v.canvas.width = W; v.canvas.height = W; }
+  const c = v.canvas.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, W);
+  const R = W / 2, t = { h: v.time[0], m: v.time[1], s: 0 };
+  c.fillStyle = "#000"; c.beginPath(); c.arc(R, R, R, 0, TAU); c.fill();
+  c.save(); c.beginPath(); c.arc(R, R, R, 0, TAU); c.clip();
+  if (v.kind === "date") { c.translate(R, R); c.scale(1.9, 1.9); c.translate(-R, -R * 1.62); v.study.draw(c, R, t, false); }
+  else if (v.kind === "text") textCard(c, R, v.study, t);
+  else if (v.kind === "call") callCard(c, R, v.study, t);
+  else v.study.draw(c, R, t, ambient);
+  c.restore();
+}
+// The date close-up centres on where each study keeps its date.
+const DATE_FOCUS = { "5": [1.6, 1.0], "6": [1.0, 1.47], "7": [1.0, 1.6] };
+const basePaint = paint;
+function paintAll() { views.forEach(v => {
+  if (v.kind !== "date") { basePaint(v); return; }
+  const dpr = window.devicePixelRatio || 1, W = Math.round(v.canvas.clientWidth * dpr);
+  if (v.canvas.width !== W) { v.canvas.width = W; v.canvas.height = W; }
+  const c = v.canvas.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, W);
+  const R = W / 2, [fx, fy] = DATE_FOCUS[v.study.num] || [1.0, 1.76];
+  c.fillStyle = "#000"; c.beginPath(); c.arc(R, R, R, 0, TAU); c.fill();
+  c.save(); c.beginPath(); c.arc(R, R, R, 0, TAU); c.clip();
+  c.translate(R, R); c.scale(2.2, 2.2); c.translate(-R * fx, -R * fy);
+  c.beginPath(); c.arc(R, R, R, 0, TAU); c.clip(); c.fillStyle = "#000"; c.fill();
+  v.study.draw(c, R, { h: 13, m: 41, s: 0 }, false); c.restore();
+}); }
+
+document.getElementById("ambient").addEventListener("click", e => { ambient = !ambient; e.currentTarget.setAttribute("aria-pressed", String(ambient)); paintAll(); });
+window.addEventListener("resize", paintAll);
+paintAll();
+if (document.fonts) document.fonts.ready.then(paintAll);
+</script>
+</body>
+</html>

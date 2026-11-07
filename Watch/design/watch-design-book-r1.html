@@ -1,0 +1,269 @@
+<title>Watch Design Book</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600&family=Doto:wght@500;800&family=Unbounded:wght@400;600&family=Big+Shoulders+Text:wght@500;800&family=IBM+Plex+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Comfortaa:wght@400;700&family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: the companion to Watch/WATCH-DESIGN.md. One section per chapter that needs to be seen
+   (colour, face, touch, type, undo), each answering its open question. Single dark theme on purpose. */
+:root {
+  --ground: #101418;
+  --slab: #171d23;
+  --rule: #26303a;
+  --ink: #dfe6ec;
+  --muted: #8a98a6;
+  --glass: #9fd3e6;
+  --font-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-label: "Spline Sans Mono", ui-monospace, Menlo, monospace;
+  --font-watch: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", Verdana, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--ground); color: var(--ink); font-family: var(--font-body); }
+body { padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 24px; }
+h1 { font-weight: 600; font-size: 30px; margin: 0 0 6px; text-wrap: balance; }
+header p, .note { margin: 0; color: var(--muted); max-width: 72ch; line-height: 1.5; }
+section { padding: 22px; background: var(--slab); border: 1px solid var(--rule); border-radius: 10px; display: grid; gap: 14px; min-width: 0; }
+section h2 { margin: 0; font-size: 21px; font-weight: 600; text-wrap: balance; }
+.tag { font-family: var(--font-label); font-size: 12px; color: var(--glass); letter-spacing: 0.04em; }
+section p { margin: 0; line-height: 1.5; max-width: 80ch; }
+.q { font-family: var(--font-label); font-size: 12px; color: var(--glass); }
+.label { font-family: var(--font-label); font-size: 11px; color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; }
+button { font-family: var(--font-label); font-size: 12px; background: var(--ground); color: var(--ink); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button[aria-pressed=true] { border-color: var(--glass); color: var(--glass); }
+button:focus-visible { outline: 2px solid var(--glass); outline-offset: 2px; }
+.sweep { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px 14px; align-items: center; }
+.sweep .who { font-weight: 600; font-size: 15px; }
+.sweep .who small { display: block; font-family: var(--font-label); font-weight: 400; font-size: 10px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+.scroller { overflow-x: auto; min-width: 0; }
+.strip { display: grid; grid-template-columns: repeat(9, 56px); gap: 8px; }
+.strip canvas { width: 56px; height: 56px; display: block; }
+.bar { height: 10px; border-radius: 5px; grid-column: 1 / -1; }
+.ticks { display: grid; grid-template-columns: repeat(9, 56px); gap: 8px; font-family: var(--font-label); font-size: 10px; color: var(--muted); text-align: center; }
+.faces, .undo { display: grid; grid-template-columns: repeat(4, minmax(0, 180px)); gap: 16px; }
+.cell { display: grid; justify-items: center; gap: 6px; min-width: 0; }
+.cell canvas { width: 100%; max-width: 180px; aspect-ratio: 1; display: block; }
+.cell span { font-family: var(--font-label); font-size: 11px; color: var(--muted); text-align: center; line-height: 1.4; }
+.haptics { display: grid; gap: 12px; }
+.hrow { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 14px; align-items: center; }
+.hrow b { font-weight: 600; }
+.hrow canvas { width: 100%; height: 34px; display: block; }
+.hrow small { grid-column: 2; font-family: var(--font-label); font-size: 11px; color: var(--muted); }
+.typeset { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.type { display: grid; gap: 10px; background: #000; border-radius: 10px; padding: 18px; min-width: 0; }
+.type h3 { margin: 0; font-family: var(--font-label); font-size: 12px; font-weight: 500; color: var(--glass); }
+.type p { margin: 0; font-size: 13px; color: var(--muted); }
+.type .glance { font-weight: 600; font-size: 30px; color: #eef3f7; }
+.type .line { font-size: 19px; color: #eef3f7; }
+.type .small { font-size: 14px; color: #93a1ad; font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) { .faces, .undo { grid-template-columns: repeat(2, minmax(0, 180px)); } .hrow { grid-template-columns: 1fr; } .hrow small { grid-column: 1; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Watch design book</h1>
+    <p>The visual companion to <code>Watch/WATCH-DESIGN.md</code>, the draft watch design language for Point,
+    Dash, Wave and Beat. It shares nothing with Paper &amp; Ink. Each section shows one open question
+    (O1 to O6) with the proposed answer drawn, ready for your yes or your change. People and messages are invented.</p>
+  </header>
+
+  <section aria-labelledby="c1">
+    <div><div class="tag">Colour · O1, O2</div><h2 id="c1">Each app's day colour</h2></div>
+    <p>Approved: each app drifts across its own range once a day and back, at the night end at midnight and
+    the day end at noon, easing in between. Beat now runs forest green at night to bright red at noon. The dark
+    colours stay dark, as you decided, so Dash and Beat are deliberately quiet on black at night. Each glyph below
+    is drawn every three hours.</p>
+    <div class="scroller"><div class="sweep" id="sweep"></div></div>
+    <p class="note">The mixing runs through a perceptual colour space along the shorter way round the colour wheel. Dash
+    passes through plum on its way between navy and maroon. Wave's middle hours pass through a muted teal and olive
+    on the way to amber. Beat passes through orange and olive between green and red. Its two ends are the pair that
+    red-green colour blindness cannot separate, so its heartbeat shape is what identifies it.</p>
+  </section>
+
+  <section aria-labelledby="c2">
+    <div><div class="tag">Point</div><h2 id="c2">The face, as chosen</h2></div>
+    <p>Hours in sides, minutes in colour, with the afternoon as a second ring. The date sits under the shape in
+    the shape's own colour. Always-on shows the shape in outline, without the date.</p>
+    <div class="faces" id="faces"></div>
+  </section>
+
+  <section aria-labelledby="c3">
+    <div><div class="tag">Touch · O4</div><h2 id="c3">Four buzzes, one meaning each</h2></div>
+    <p>Each bar is one pattern over two seconds: the height is the strength and the width is the length. They
+    differ in rhythm as well as in strength, so they can be told apart without looking. Approved as the starting
+    point, to be settled on the wrist.</p>
+    <div class="haptics" id="haptics"></div>
+  </section>
+
+  <section aria-labelledby="c4">
+    <div><div class="tag">Type · O3</div><h2 id="c4">One typeface: six different directions</h2></div>
+    <p>The first five looked too alike, so these six are far apart: dot matrix, wide and rounded, condensed signage,
+    monospace, a soft serif, and a thin rounded geometric. Each is shown on black at the watch's three sizes. All
+    are free, open-licence fonts that can ship inside the app.</p>
+    <div class="typeset" id="typeset"></div>
+  </section>
+
+  <section aria-labelledby="c5">
+    <div><div class="tag">Undo · O5</div><h2 id="c5">Filing a message, and taking it back</h2></div>
+    <p>A filed message leaves at once. For six seconds an Undo line stays, drawn as Dash's glyph inside a thin
+    ring that empties. Tap it to bring the message back, or let it run out and the filing stands. There are no
+    confirmation dialogs.</p>
+    <div class="undo" id="undo"></div>
+  </section>
+
+  <section aria-labelledby="c6">
+    <div><div class="tag">Wave · O6</div><h2 id="c6">Album art, or none</h2></div>
+    <p>Now playing with a small square of album art beside the track, or with the glyph alone.</p>
+    <div class="faces" id="art"></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+const TAU = Math.PI * 2;
+// Night end (midnight) and day end (noon), in OKLCH: [lightness, chroma, hue].
+const APPS = [
+  { name: "Point", night: [0.62, 0.19, 300], day: [0.82, 0.10, 170], nightName: "violet", dayName: "seafoam" },
+  { name: "Dash", night: [0.30, 0.10, 262], day: [0.32, 0.12, 15], nightName: "navy", dayName: "maroon" },
+  { name: "Wave", night: [0.62, 0.03, 250], day: [0.80, 0.16, 75], nightName: "slate", dayName: "amber" },
+  { name: "Beat", night: [0.38, 0.09, 150], day: [0.63, 0.24, 27], nightName: "forest green", dayName: "bright red" },
+];
+
+function dayColour(app, hours, alpha = 1) {
+  const p = (1 - Math.cos((hours / 24) * TAU)) / 2; // 0 at midnight, 1 at noon
+  const [l0, c0, h0] = app.night, [l1, c1, h1] = app.day;
+  let dh = h1 - h0; if (dh > 180) dh -= 360; if (dh < -180) dh += 360;
+  const l = l0 + (l1 - l0) * p; const c = c0 + (c1 - c0) * p, h = (h0 + dh * p + 360) % 360;
+  return `oklch(${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(1)} / ${alpha})`;
+}
+
+function setup(canvas) { const dpr = window.devicePixelRatio || 1, S = Math.round(canvas.clientWidth * dpr);
+  if (canvas.width !== S) { canvas.width = S; canvas.height = S; } const c = canvas.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, S, S);
+  c.fillStyle = "#000"; c.beginPath(); c.arc(S / 2, S / 2, S / 2, 0, TAU); c.fill(); return [c, S]; }
+
+function glyph(c, S, name, colour, glowColour) {
+  const draw = () => {
+    c.strokeStyle = colour; c.fillStyle = colour; c.lineCap = "round"; c.lineJoin = "round";
+    if (name === "Point") { c.beginPath(); c.arc(S / 2, S / 2, S * 0.14, 0, TAU); c.fill(); }
+    if (name === "Dash") { c.lineWidth = S * 0.14; c.beginPath(); c.moveTo(S * 0.3, S / 2); c.lineTo(S * 0.7, S / 2); c.stroke(); }
+    if (name === "Wave") { c.lineWidth = S * 0.08; c.beginPath(); for (let i = 0; i <= 60; i++) { const x = S * 0.24 + (i / 60) * S * 0.52, y = S / 2 - Math.sin((i / 60) * TAU) * S * 0.14; i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }
+    if (name === "Beat") { c.lineWidth = S * 0.075; c.beginPath(); [[0.22, 0.52], [0.4, 0.52], [0.47, 0.32], [0.55, 0.7], [0.61, 0.52], [0.78, 0.52]].forEach(([x, y], i) => i ? c.lineTo(S * x, S * y) : c.moveTo(S * x, S * y)); c.stroke(); }
+  };
+  c.save(); c.shadowColor = glowColour; c.shadowBlur = S * 0.1; draw(); c.restore(); draw();
+}
+
+// ---- colour sweep ----
+const HOURS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+const sweep = document.getElementById("sweep"); const sweepViews = [];
+APPS.forEach(app => {
+  const who = document.createElement("div"); who.className = "who"; who.innerHTML = `${app.name}<small>${app.nightName} at night<br>${app.dayName} at noon</small>`;
+  const right = document.createElement("div"); right.style.display = "grid"; right.style.gap = "6px";
+  const strip = document.createElement("div"); strip.className = "strip";
+  HOURS.forEach(h => { const cv = document.createElement("canvas"); cv.setAttribute("role", "img"); cv.setAttribute("aria-label", `${app.name} at ${h % 24}:00`); strip.appendChild(cv); sweepViews.push({ cv, app, h }); });
+  const bar = document.createElement("div"); bar.className = "bar"; bar.dataset.app = app.name;
+  right.append(strip, bar); sweep.append(who, right);
+});
+const ticks = document.createElement("div"); ticks.className = "ticks";
+HOURS.forEach(h => { const s = document.createElement("span"); s.textContent = h === 0 || h === 24 ? "midnight" : h === 12 ? "noon" : ((h % 12) || 12) + (h < 12 ? " am" : " pm"); ticks.appendChild(s); });
+const blank = document.createElement("div"); sweep.append(blank, ticks);
+function paintSweep() {
+  sweepViews.forEach(v => { const [c, S] = setup(v.cv); glyph(c, S, v.app.name, dayColour(v.app, v.h), dayColour(v.app, v.h, 0.6)); });
+  document.querySelectorAll(".bar").forEach(b => { const app = APPS.find(a => a.name === b.dataset.app);
+    b.style.background = `linear-gradient(90deg, ${Array.from({ length: 25 }, (_, i) => dayColour(app, i)).join(", ")})`; });
+}
+
+// ---- the face (study 1b) ----
+const ang = f => f * TAU - Math.PI / 2, pt = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+function face(c, S, h, m, amb) {
+  const R = S / 2, n = (h % 12) || 12, pm = h >= 12, hue = (m / 60) * 360, r = R * (pm ? 0.42 : 0.5);
+  c.beginPath();
+  if (n === 1) c.arc(R, R, R * 0.1, 0, TAU); else if (n === 2) { c.moveTo(R, R - r); c.lineTo(R, R + r); }
+  else { for (let i = 0; i < n; i++) { const [x, y] = pt(R, R, r, ang(i / n)); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.closePath(); }
+  c.lineJoin = "round"; c.lineCap = "round";
+  if (amb) { c.strokeStyle = `hsl(${hue} 35% 32%)`; c.lineWidth = n === 2 ? R * 0.04 : R * 0.022; c.stroke(); }
+  else { if (n !== 2) { const g = c.createRadialGradient(R - r * 0.35, R - r * 0.45, r * 0.05, R, R, r * 1.1);
+      g.addColorStop(0, `hsl(${hue} 90% 82%)`); g.addColorStop(0.55, `hsl(${hue} 75% 52%)`); g.addColorStop(1, `hsl(${hue} 70% 30%)`); c.fillStyle = g; c.fill(); }
+    c.strokeStyle = `hsl(${hue} 90% 85%)`; c.lineWidth = n === 2 ? R * 0.07 : R * 0.018; c.stroke(); }
+  if (pm) { c.beginPath(); if (n <= 2) c.arc(R, R, R * 0.62, 0, TAU); else for (let i = 0; i <= n; i++) { const [x, y] = pt(R, R, R * 0.62, ang(i / n)); i ? c.lineTo(x, y) : c.moveTo(x, y); }
+    c.strokeStyle = amb ? `hsl(${hue} 30% 28%)` : `hsla(${hue} 85% 80% / 0.7)`; c.lineWidth = R * 0.012; c.stroke(); }
+  if (!amb) { c.font = `500 ${R * 0.085}px "Atkinson Hyperlegible Next", Verdana, sans-serif`; c.fillStyle = `hsl(${hue} 18% 62%)`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("SAT 31", R, R * 1.76); }
+}
+const FACES = [[9, 5, false, "9:05 am"], [12, 30, false, "12:30 pm"], [17, 48, false, "5:48 pm"], [17, 48, true, "5:48 pm, always-on"]];
+const faceViews = [];
+FACES.forEach(([h, m, amb, cap]) => { const cell = document.createElement("div"); cell.className = "cell";
+  cell.innerHTML = `<canvas role="img" aria-label="The face at ${cap}"></canvas><span>${cap}</span>`; document.getElementById("faces").appendChild(cell);
+  faceViews.push(() => { const [c, S] = setup(cell.querySelector("canvas")); face(c, S, h, m, amb); }); });
+
+// ---- haptics ----
+const HAPTICS = [
+  { name: "Call", when: "a call is ringing; repeats while it rings", parts: [[0, 0.5, 0.8], [0.75, 1.25, 0.8]] },
+  { name: "Text", when: "a text arrived", parts: [[0, 0.08, 0.6], [0.2, 0.28, 0.6]] },
+  { name: "Rest end", when: "a workout rest is over", parts: [[0, 0.9, 0.7]] },
+  { name: "Ease off", when: "worrying exertion, with the words “Ease off”", parts: [[0, 0.3, 1], [0.6, 0.9, 1], [1.2, 1.5, 1]] },
+];
+const hapViews = [];
+HAPTICS.forEach(hp => { const row = document.createElement("div"); row.className = "hrow";
+  row.innerHTML = `<b>${hp.name}</b><canvas role="img" aria-label="${hp.name} buzz pattern"></canvas><small>${hp.when}</small>`; document.getElementById("haptics").appendChild(row);
+  hapViews.push(() => { const cv = row.querySelector("canvas"), dpr = window.devicePixelRatio || 1, W = Math.round(cv.clientWidth * dpr), H = Math.round(cv.clientHeight * dpr);
+    if (cv.width !== W) { cv.width = W; cv.height = H; } const c = cv.getContext("2d"); c.clearRect(0, 0, W, H);
+    c.fillStyle = "hsl(210 15% 20%)"; c.fillRect(0, H - 1 * dpr, W, 1 * dpr);
+    hp.parts.forEach(([a, b, s]) => { c.fillStyle = "hsl(195 60% 72%)"; const x = (a / 2) * W, w = ((b - a) / 2) * W, h = s * (H - 4 * dpr); c.fillRect(x, H - h, Math.max(w, 2 * dpr), h); }); }); });
+
+// ---- typeface candidates ----
+const FACES_TYPE = [
+  ["Doto", "A dot-matrix face: every letter is made of points, like the watch's own name, Point. The most abstract. Its small line is the hardest to read."],
+  ["Unbounded", "Wide, rounded and heavy. Very legible at a glance and bold in character, though it fits the fewest words on a line."],
+  ["Big Shoulders Text", "Condensed signage, like a trail marker or a field sign. Fits the most words on a line, with a strong outdoor feel."],
+  ["IBM Plex Mono", "Monospace, like an instrument readout. Even and technical, and the numerals line up naturally."],
+  ["Fraunces", "A soft serif with a little wobble. The warmest of the six. Paper & Ink is serif too, but in a different face."],
+  ["Comfortaa", "Rounded and thin, built from circles. Gentle and quiet, and the lightest on the screen."],
+];
+FACES_TYPE.forEach(([family, about]) => { const el = document.createElement("div"); el.className = "type"; el.style.fontFamily = `"${family}", Verdana, sans-serif`;
+  el.innerHTML = `<h3>${family}</h3><div class="glance">Lee</div><div class="line">Running late. I'll be at the field by four.</div>
+    <div class="small">5 min ago \u00b7 SAT 31 \u00b7 2:22 pm \u00b7 Il1 0O</div><p style="font-family: var(--font-body)">${about}</p>`;
+  document.getElementById("typeset").appendChild(el); });
+
+// ---- undo ----
+const UNDO = [["before", "Lee · 2 min ago"], ["filed", 1], ["filed", 0.45], ["after", "Filing stands"]];
+const undoViews = [];
+const watchText = (c, s, x, y, size, col, w = 400) => { c.font = `${w} ${size}px "Atkinson Hyperlegible Next", Verdana, sans-serif`; c.fillStyle = col; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(s, x, y); };
+UNDO.forEach(([kind, v], i) => { const cell = document.createElement("div"); cell.className = "cell";
+  const cap = ["A message in People waiting", "Filed: Undo, six seconds", "Undo, three seconds left", "Time ran out: Lee is filed, the next person shows"][i];
+  cell.innerHTML = `<canvas role="img" aria-label="${cap}"></canvas><span>${cap}</span>`; document.getElementById("undo").appendChild(cell);
+  undoViews.push(() => { const [c, S] = setup(cell.querySelector("canvas")); const R = S / 2, dash = APPS[1];
+    if (kind === "before" || kind === "after") {
+      const before = kind === "before";
+      watchText(c, before ? "Lee" : "Robin", R, R * 0.72, R * 0.17, "#eef3f7", 600);
+      watchText(c, before ? "Running late. I'll be at" : "Sent the photos from", R, R * 0.98, R * 0.1, "#c9d3db");
+      watchText(c, before ? "the field by four." : "the game.", R, R * 1.15, R * 0.1, "#c9d3db");
+      watchText(c, before ? "2 min ago" : "1 h ago", R, R * 1.38, R * 0.08, "#93a1ad");
+    } else {
+      const g = S * 0.36, x0 = R - g / 2, y0 = R * 0.62 - g / 2;
+      c.save(); c.translate(x0, y0); glyph(c, g, "Dash", dayColour(dash, 14), dayColour(dash, 14, 0.6)); c.restore();
+      c.strokeStyle = "hsl(210 10% 22%)"; c.lineWidth = S * 0.012; c.beginPath(); c.arc(R, R * 0.62, g * 0.62, 0, TAU); c.stroke();
+      c.strokeStyle = dayColour(dash, 14); c.beginPath(); c.arc(R, R * 0.62, g * 0.62, -Math.PI / 2, -Math.PI / 2 + v * TAU); c.stroke();
+      watchText(c, "Lee filed", R, R * 1.18, R * 0.11, "#eef3f7", 600);
+      watchText(c, "Tap to undo", R, R * 1.4, R * 0.09, dayColour(dash, 14));
+    } }); });
+
+// ---- album art ----
+const ART = [["art", "With a small square"], ["none", "Glyph alone"]];
+const artViews = [];
+ART.forEach(([kind, cap]) => { const cell = document.createElement("div"); cell.className = "cell";
+  cell.innerHTML = `<canvas role="img" aria-label="Now playing: ${cap}"></canvas><span>${cap}</span>`; document.getElementById("art").appendChild(cell);
+  artViews.push(() => { const [c, S] = setup(cell.querySelector("canvas")); const R = S / 2, wave = APPS[2], col = dayColour(wave, 14);
+    if (kind === "art") { const a = S * 0.24; const g = c.createLinearGradient(R - a / 2, R * 0.48 - a / 2, R + a / 2, R * 0.48 + a / 2);
+      g.addColorStop(0, "hsl(200 30% 40%)"); g.addColorStop(1, "hsl(30 50% 45%)"); c.fillStyle = g; c.fillRect(R - a / 2, R * 0.5 - a / 2, a, a); }
+    else { c.save(); c.translate(R - S * 0.15, R * 0.5 - S * 0.15); glyph(c, S * 0.3, "Wave", col, dayColour(wave, 14, 0.6)); c.restore(); }
+    watchText(c, "Field Notes", R, R * 0.95, R * 0.14, "#eef3f7", 600);
+    watchText(c, "The Juniper Trio", R, R * 1.15, R * 0.09, "#93a1ad");
+    c.fillStyle = col; c.beginPath(); c.moveTo(R - R * 0.07, R * 1.36); c.lineTo(R - R * 0.07, R * 1.56); c.lineTo(R + R * 0.1, R * 1.46); c.closePath(); c.fill();
+    [-1, 1].forEach(s => { c.fillStyle = "#93a1ad"; const x = R + s * R * 0.42; c.beginPath(); c.moveTo(x - s * R * 0.05, R * 1.38); c.lineTo(x - s * R * 0.05, R * 1.54); c.lineTo(x + s * R * 0.06, R * 1.46); c.closePath(); c.fill(); }); }); });
+
+const paintAll = () => { paintSweep(); faceViews.forEach(f => f()); hapViews.forEach(f => f()); undoViews.forEach(f => f()); artViews.forEach(f => f()); };
+window.addEventListener("resize", paintAll);
+paintAll();
+if (document.fonts) document.fonts.ready.then(paintAll);
+</script>

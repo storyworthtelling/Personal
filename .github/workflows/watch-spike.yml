@@ -1,0 +1,59 @@
+name: Watch spike APK
+
+# P14's throwaway device spike (Watch/Spikes/P14-SPIKES.md). Builds the spike and attaches it to the
+# separate `watch-spike` pre-release so the owner can download it on a phone. Never apps-latest: the
+# update channel must not install a spike. Debug-key signed on purpose, not with the suite keystore.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['ccr-b5131ad9-ofy03o']
+    paths:
+      - 'Watch/Spikes/**'
+      - '.github/workflows/watch-spike.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Build the spike
+        run: dotnet build Watch/Spikes/WatchSpike.Android/WatchSpike.Android.csproj -c Release -p:AndroidPackageFormat=apk
+
+      - name: Attach to the watch-spike pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          APK=$(ls -1 Watch/Spikes/WatchSpike.Android/bin/Release/net10.0-android/*-Signed.apk | head -1)
+          cp "$APK" watch-spike.apk
+          if ! gh release view watch-spike > /dev/null 2>&1; then
+            gh release create watch-spike --prerelease --target "$GITHUB_SHA" \
+              --title "Watch spike (P14, throwaway)" \
+              --notes "Throwaway P14 device spike. Not an app; never installed by the update channel."
+          fi
+          gh release upload watch-spike watch-spike.apk --clobber
