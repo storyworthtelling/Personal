@@ -470,7 +470,7 @@ that. Tap lines now add button labels and screen content, and sign-in lines add 
    numbers, non-`example.com` addresses, non-`555-01xx` numbers, OAuth-code-shaped strings, `$`
    amounts in tests) on every `claude/**` push. Tested by `LogLoopLeakScanTests`.
 
-Residual risk: a paraphrase ("the owner's Chase card") passes the scan, and with every log-derived
+Residual risk: a paraphrase ("the owner's Redwood card") passes the scan, and with every log-derived
 fix auto-merging (O16) no person reads the PR before it lands. Layers 2 and 3 are the defence: the
 runbook makes the session reread its test fixtures, commit messages and PR body against the
 sanitizer's categories before pushing, and record that it did in the PR body. This is accepted with

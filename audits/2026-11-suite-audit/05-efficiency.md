@@ -84,7 +84,7 @@ I read the code for every finding below. All paths are relative to `/home/user/P
 - **Where:**
   - `Storyboarder/Folio.Android/PipelineWorker.cs:63-91,148-157`
   - `Pages/MainPage.xaml.cs:62-65,75-130`
-  - `Folio.Infrastructure/Services/ProjectService.cs:719-736,998-1050`
+  - `Folio.Infrastructure/Services/ProjectService.cs:719-736,998–1050`
 - **Now:**
   - `Work()` calls `GoToForeground` (foreground service plus a "reading" notification) **before** it checks whether any book is active. So 96 times a day an idle phone starts a foreground service, opens the DB and runs the pipeline loop.
   - With the desk open, `RefreshAsync` runs every 5 s. For each book, `BuildStatus` makes about 8–10 separate queries (novel, chunks, sheets, scenes, analyses, BookAnalyses twice, SourceTexts, PassReads). It then clears and rebuilds every row.

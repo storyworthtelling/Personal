@@ -12,7 +12,7 @@ namespace Index.Tests.Services;
 public class AccountServiceColorTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
-    private const string PncColour = "plaid-primary-colour"; // opaque: PostItTint, not this, parses it
+    private const string CedarColour = "plaid-primary-colour"; // opaque: PostItTint, not this, parses it
 
     private static AccountService Create(TestDatabase db) => new(db, new FakeClock(Now));
 
@@ -22,7 +22,7 @@ public class AccountServiceColorTests
         using var db = new TestDatabase();
         var service = Create(db);
 
-        await service.AddInstitutionAsync("item-1", "access-1", "PNC", default, plaidInstitutionId: "ins_13");
+        await service.AddInstitutionAsync("item-1", "access-1", "Cedar Hollow", default, plaidInstitutionId: "ins_13");
 
         Assert.Equal("ins_13", Assert.Single(await service.GetInstitutionsAsync(default)).PlaidInstitutionId);
     }
@@ -32,15 +32,15 @@ public class AccountServiceColorTests
     {
         using var db = new TestDatabase();
         var service = Create(db);
-        var added = await service.AddInstitutionAsync("item-1", "access-1", "PNC", default, "ins_13");
+        var added = await service.AddInstitutionAsync("item-1", "access-1", "Cedar Hollow", default, "ins_13");
         var plaid = new Mock<IPlaidClient>();
         plaid.Setup(p => p.GetInstitutionAsync("ins_13", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PlaidInstitution("ins_13", "PNC Bank", PncColour));
+            .ReturnsAsync(new PlaidInstitution("ins_13", "Cedar Hollow Bank", CedarColour));
 
         await service.LookUpInstitutionColorAsync(added.Id, plaid.Object, NullLogger.Instance, default);
 
         var stored = Assert.Single(await service.GetInstitutionsAsync(default));
-        Assert.Equal(PncColour, stored.PrimaryColorHex);
+        Assert.Equal(CedarColour, stored.PrimaryColorHex);
         Assert.Equal(Now, stored.ColorLookedUpAtUtc);
     }
 
@@ -49,7 +49,7 @@ public class AccountServiceColorTests
     {
         using var db = new TestDatabase();
         var service = Create(db);
-        var added = await service.AddInstitutionAsync("item-1", "access-1", "PNC", default, "ins_13");
+        var added = await service.AddInstitutionAsync("item-1", "access-1", "Cedar Hollow", default, "ins_13");
         var plaid = new Mock<IPlaidClient>();
         plaid.Setup(p => p.GetInstitutionAsync("ins_13", It.IsAny<CancellationToken>()))
             .ThrowsAsync(new RateLimitException("Plaid rate limited: 429"));

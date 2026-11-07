@@ -29,11 +29,11 @@ public class ReadRequestTests
     public void ACardComesBackAsThreePlainStrings()
     {
         var extras = ReadRequest.CardExtras(
-            new CardReading("Ada Speight", "(503) 555-0142", "ada@harbourline.com"));
+            new CardReading("Ada Speight", "(503) 555-0142", "ada@harbourline.example"));
 
         Assert.Equal("Ada Speight", extras[ReadRequest.NameExtra]);
         Assert.Equal("(503) 555-0142", extras[ReadRequest.PhoneExtra]);
-        Assert.Equal("ada@harbourline.com", extras[ReadRequest.EmailExtra]);
+        Assert.Equal("ada@harbourline.example", extras[ReadRequest.EmailExtra]);
     }
 
     [Fact]

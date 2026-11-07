@@ -3,10 +3,10 @@ using SkiaSharp;
 namespace IconStudio;
 
 /// <summary>
-/// The owner's medallion (DESIGN.md §13). The source image lives at
-/// /Branding/owner.png — a placeholder serif monogram until the owner drops
-/// in their real photo — and every consumer copy is that source circle-masked
-/// with a hairline ring.
+/// The owner's medallion (DESIGN.md §13). The source image is the drawn mark
+/// at /Branding/owners-mark.png (a placeholder serif monogram if it is ever
+/// missing), and every consumer copy is that source circle-masked with a
+/// hairline ring. Never a photograph: the repository and the APKs are public.
 /// </summary>
 public static class BrandingMedallion
 {

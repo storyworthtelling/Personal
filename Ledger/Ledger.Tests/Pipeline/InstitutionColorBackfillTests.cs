@@ -23,7 +23,7 @@ public class InstitutionColorBackfillTests
 
     // The lookup passes Plaid's colour through untouched (PostItTint is what parses it), so these tests
     // use an opaque marker rather than a hex literal the colour-leak guard would rightly object to.
-    private const string PncColour = "plaid-primary-colour";
+    private const string CedarColour = "plaid-primary-colour";
 
     private sealed class CapturingLogger : ILogger<BalanceRefreshProcessor>
     {
@@ -60,7 +60,7 @@ public class InstitutionColorBackfillTests
         {
             ItemId = "item-1",
             AccessToken = "access-1",
-            Name = "PNC",
+            Name = "Cedar Hollow",
             CreatedAtUtc = Now,
             PlaidInstitutionId = plaidInstitutionId,
             PrimaryColorHex = colour,
@@ -108,13 +108,13 @@ public class InstitutionColorBackfillTests
         var clock = new FakeClock(Now);
         var plaid = PlaidWithBalances();
         plaid.Setup(p => p.GetInstitutionAsync(InstitutionId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PlaidInstitution(InstitutionId, "PNC Bank", PncColour));
+            .ReturnsAsync(new PlaidInstitution(InstitutionId, "Cedar Hollow Bank", CedarColour));
 
         await RefreshRepeatedlyAsync(Create(db, plaid.Object, clock, new CapturingLogger()), clock, 3);
 
         plaid.Verify(p => p.GetInstitutionAsync(InstitutionId, It.IsAny<CancellationToken>()), Times.Once);
         var institution = Load(db, id);
-        Assert.Equal(PncColour, institution.PrimaryColorHex);
+        Assert.Equal(CedarColour, institution.PrimaryColorHex);
         Assert.NotNull(institution.ColorLookedUpAtUtc);
     }
 
@@ -140,7 +140,7 @@ public class InstitutionColorBackfillTests
     public async Task StoredColour_IsNeverFetchedAgain()
     {
         using var db = new TestDatabase();
-        var id = Seed(db, colour: PncColour);
+        var id = Seed(db, colour: CedarColour);
         var clock = new FakeClock(Now);
         var plaid = PlaidWithBalances();
 
@@ -148,7 +148,7 @@ public class InstitutionColorBackfillTests
 
         plaid.Verify(p => p.GetInstitutionAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         plaid.Verify(p => p.GetItemInstitutionIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        Assert.Equal(PncColour, Load(db, id).PrimaryColorHex);
+        Assert.Equal(CedarColour, Load(db, id).PrimaryColorHex);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class InstitutionColorBackfillTests
                     throw failure == "rate-limit"
                         ? new RateLimitException("Plaid rate limited: 429")
                         : new HttpRequestException("The network is unreachable.");
-                return Task.FromResult(new PlaidInstitution(InstitutionId, "PNC Bank", PncColour));
+                return Task.FromResult(new PlaidInstitution(InstitutionId, "Cedar Hollow Bank", CedarColour));
             });
         var processor = Create(db, plaid.Object, clock, logger);
 
@@ -198,7 +198,7 @@ public class InstitutionColorBackfillTests
         // ...and nothing says "looked up", so the next refresh asks again.
         Assert.Null(afterFailure.ColorLookedUpAtUtc);
         // ...and the failure went to the logger, not into thin air.
-        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("PNC"));
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("Cedar Hollow"));
 
         clock.Advance(TimeSpan.FromHours(25));
         await processor.ProcessNextAsync(CancellationToken.None);
@@ -207,7 +207,7 @@ public class InstitutionColorBackfillTests
 
         plaid.Verify(p => p.GetInstitutionAsync(InstitutionId, It.IsAny<CancellationToken>()), Times.Exactly(2));
         var final = Load(db, id);
-        Assert.Equal(PncColour, final.PrimaryColorHex);
+        Assert.Equal(CedarColour, final.PrimaryColorHex);
         Assert.NotNull(final.ColorLookedUpAtUtc);
     }
 
@@ -221,7 +221,7 @@ public class InstitutionColorBackfillTests
         plaid.Setup(p => p.GetItemInstitutionIdAsync("access-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(InstitutionId);
         plaid.Setup(p => p.GetInstitutionAsync(InstitutionId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new PlaidInstitution(InstitutionId, "PNC Bank", PncColour));
+            .ReturnsAsync(new PlaidInstitution(InstitutionId, "Cedar Hollow Bank", CedarColour));
 
         await RefreshRepeatedlyAsync(Create(db, plaid.Object, clock, new CapturingLogger()), clock, 3);
 
@@ -229,7 +229,7 @@ public class InstitutionColorBackfillTests
         plaid.Verify(p => p.GetInstitutionAsync(InstitutionId, It.IsAny<CancellationToken>()), Times.Once);
         var institution = Load(db, id);
         Assert.Equal(InstitutionId, institution.PlaidInstitutionId);
-        Assert.Equal(PncColour, institution.PrimaryColorHex);
+        Assert.Equal(CedarColour, institution.PrimaryColorHex);
     }
 
     [Fact]

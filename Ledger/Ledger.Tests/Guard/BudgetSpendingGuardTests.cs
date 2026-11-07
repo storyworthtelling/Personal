@@ -215,7 +215,7 @@ public class BudgetSpendingGuardTests
         var plaid = PlaidReturning(
             Tx("pay", -2400, "Employer", "INCOME", "INCOME_WAGES"),
             Tx("card", 300, "Bluebird Visa", "LOAN_PAYMENTS", "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT"),
-            Tx("car", 410, "Toyota Financial", "LOAN_PAYMENTS", "LOAN_PAYMENTS_CAR_PAYMENT"),
+            Tx("car", 410, "Foxglove Auto Finance", "LOAN_PAYMENTS", "LOAN_PAYMENTS_CAR_PAYMENT"),
             Tx("sweep", 500, "Savings", "TRANSFER_OUT", "TRANSFER_OUT_SAVINGS"),
             Tx("back", -500, "From savings", "TRANSFER_IN", "TRANSFER_IN_SAVINGS"),
             Tx("food", 40, "Whole Foods", "FOOD_AND_DRINK", "FOOD_AND_DRINK_GROCERIES"),

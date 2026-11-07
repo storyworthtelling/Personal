@@ -180,13 +180,38 @@ public static class TapWatch
                 // A generated id has no entry name; the label is enough.
             }
         }
-        var text = view is TextView own ? own.Text : FirstText(view);
-        if (string.IsNullOrWhiteSpace(text))
+        var inList = InList(view);
+        var text = inList ? null : view is TextView own ? own.Text : FirstText(view);
+        if (!inList && string.IsNullOrWhiteSpace(text))
         {
             text = view.ContentDescription;
         }
-        return TapWatchCore.ControlName(text, id, view.GetType().Name);
+        return TapWatchCore.ControlName(text, id, view.GetType().Name, inList: inList);
     }
+
+    /// <summary>
+    /// Whether <paramref name="view"/> is a row of a list (or the list itself). A row's text is a
+    /// person, a message or an amount, so it is never read for a tap line (logging audit 08).
+    /// RecyclerView is matched by name so the shared kit needs no AndroidX reference for it.
+    /// </summary>
+    private static bool InList(View view)
+    {
+        if (IsList(view))
+        {
+            return true;
+        }
+        for (var at = view.Parent; at is not null; at = at.Parent)
+        {
+            if (IsList(at))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool IsList(object view) =>
+        view is AdapterView || view.GetType().Name.EndsWith("RecyclerView", StringComparison.Ordinal);
 
     private static string? FirstText(View view)
     {

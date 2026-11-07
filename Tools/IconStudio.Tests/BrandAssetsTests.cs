@@ -65,7 +65,7 @@ public class BrandAssetsTests : IDisposable
     {
         var written = BrandAssets.Write(root);
 
-        Assert.True(File.Exists(Path.Combine(root, "Branding", "owner.png")));
+        Assert.True(File.Exists(Path.Combine(root, "Branding", "owners-mark.png")));
         Assert.True(File.Exists(Path.Combine(root, "Storyboarder", "Folio.Infrastructure", "Resources", "owner.png")));
         Assert.True(File.Exists(Path.Combine(root, "FocusPhone", "Codex.Ui.Android", "Resources", "drawable-nodpi", "paper_grain.png")));
         Assert.True(written.Count >= 7);
@@ -78,27 +78,57 @@ public class BrandAssetsTests : IDisposable
     }
 
     [Fact]
-    public void Write_NeverClobbersAnExistingOwnerImage()
+    public void Write_NeverClobbersAnExistingOwnersMark()
     {
-        var ownerPath = Path.Combine(root, "Branding", "owner.png");
-        Directory.CreateDirectory(Path.GetDirectoryName(ownerPath)!);
-        // A recognizable stand-in for the owner's real photo: a solid accent square.
-        using (var surface = SKSurface.Create(new SKImageInfo(64, 64)))
-        {
-            surface.Canvas.Clear(Tokens.Accent);
-            using var image = surface.Snapshot();
-            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-            File.WriteAllBytes(ownerPath, data.ToArray());
-        }
-        var original = File.ReadAllBytes(ownerPath);
+        var markPath = Path.Combine(root, "Branding", "owners-mark.png");
+        WriteSolid(markPath, Tokens.Accent);
+        var original = File.ReadAllBytes(markPath);
 
         BrandAssets.Write(root);
 
-        Assert.Equal(original, File.ReadAllBytes(ownerPath));
-        // And the consumer medallion derives from the photo (accent center).
+        Assert.Equal(original, File.ReadAllBytes(markPath));
+        // And the consumer medallion derives from the mark (accent center).
         using var medallion = SKBitmap.Decode(Path.Combine(
             root, "Storyboarder", "Folio.Infrastructure", "Resources", "owner.png"));
         Assert.Equal(Tokens.Accent, medallion.GetPixel(medallion.Width / 2, medallion.Height / 2));
+    }
+
+    // The old instructions said to drop a photo at Branding/owner.png. The repository is public and
+    // every medallion copy ships in an APK, so a photo there must be ignored, not fanned out.
+    [Fact]
+    public void Write_IgnoresAPhotoAtTheRetiredOwnerPath()
+    {
+        WriteSolid(Path.Combine(root, "Branding", "owner.png"), Tokens.Accent);
+
+        BrandAssets.Write(root);
+
+        using var medallion = SKBitmap.Decode(Path.Combine(
+            root, "Storyboarder", "Folio.Infrastructure", "Resources", "owner.png"));
+        Assert.NotEqual(Tokens.Accent, medallion.GetPixel(medallion.Width / 2, medallion.Height / 2));
+    }
+
+    [Fact]
+    public void TheRetiredOwnerPhotoPathIsGitignored()
+    {
+        var ignore = File.ReadAllLines(Path.Combine(RepoRoot(), ".gitignore"));
+        Assert.Contains("/Branding/owner.png", ignore);
+    }
+
+    [Fact]
+    public void TheCommittedOwnersMarkIsTheSource()
+    {
+        Assert.True(File.Exists(Path.Combine(RepoRoot(), "Branding", "owners-mark.png")));
+        Assert.False(File.Exists(Path.Combine(RepoRoot(), "Branding", "owner.png")), "Branding/owner.png is the retired photo path; nothing reads it.");
+    }
+
+    private static void WriteSolid(string path, SKColor colour)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var surface = SKSurface.Create(new SKImageInfo(64, 64));
+        surface.Canvas.Clear(colour);
+        using var image = surface.Snapshot();
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        File.WriteAllBytes(path, data.ToArray());
     }
 
     // The approved Constitution painting (POS.6), IconStudio's source for that icon and cover.

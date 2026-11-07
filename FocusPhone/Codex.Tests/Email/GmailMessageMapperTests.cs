@@ -7,7 +7,7 @@ namespace Codex.Tests.Email;
 
 public class GmailMessageMapperTests
 {
-    private const string AccountAddress = "me@gmail.com";
+    private const string AccountAddress = "me@example.com";
 
     private static readonly GmailMessageMapper Mapper = new(AccountAddress);
 

@@ -66,7 +66,7 @@ public class ColumnSetTests
     public void AGuestWhoIsNotOneOfTheFourIsIgnored()
     {
         var columns = ColumnSet.Resolve(
-            Event("Swimming", "riley@example.com", "someone@else.com"), Shared());
+            Event("Swimming", "riley@example.com", "someone@example.org"), Shared());
 
         Assert.Equal([Household.Riley], columns);
     }

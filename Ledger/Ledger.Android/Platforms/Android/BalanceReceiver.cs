@@ -89,7 +89,8 @@ public class BalanceReceiver : BroadcastReceiver
             // sender that cannot supply one) — see this class's own remarks: applying an unnamed
             // balance to a GUESSED account would be exactly the "fabricated balance...believed"
             // failure MoneyMail's own remarks warn against, so this still does not guess.
-            LogUnroutable(context, $"received balance {balance:0.00} (asOf={asOf?.ToString("yyyy-MM-dd") ?? "none"}) with no sender name to match it against");
+            // Never the balance or a lender's name: this log is uploaded (privacy report §4, 09 M5).
+            LogUnroutable(context, $"received a balance (asOf={asOf?.ToString("yyyy-MM-dd") ?? "none"}) with no sender name to match it against");
             return;
         }
 
@@ -114,13 +115,13 @@ public class BalanceReceiver : BroadcastReceiver
             var applied = await service.ApplyBalanceReceiptAsync(sender, balance, asOf, default);
             if (!applied)
             {
-                LogUnroutable(context, $"received balance {balance:0.00} from '{sender}' but no manual or stale-Plaid account matched it");
+                LogUnroutable(context, "received a balance but no manual or stale-Plaid account matched its sender");
             }
         }
         catch (Exception e)
         {
             var logger = IPlatformApplication.Current?.Services.GetService<ILogger<BalanceReceiver>>();
-            logger?.LogWarning(e, "BalanceReceiver: failed to route balance from '{Sender}'", sender);
+            logger?.LogWarning(e, "BalanceReceiver: failed to route a received balance");
         }
     }
 

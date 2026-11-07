@@ -59,8 +59,21 @@ public sealed class TapWatchCore
     /// How a control is named in a tap line, by the click wrapper (label only) and the touch hook (label,
     /// view id, type) alike: its visible label, then <c>#id</c> when it has one, else its view type.
     /// </summary>
-    public static string ControlName(string? text, string? idEntryName, string typeName)
+    public static string ControlName(string? text, string? idEntryName, string typeName) =>
+        ControlName(text, idEntryName, typeName, inList: false);
+
+    /// <summary>
+    /// As above, except that a row in a list is never named by its text: on a mailbox, an address book
+    /// or a ledger that text is a person's name, a message preview or an amount, and the tap log is
+    /// uploaded. A row is its id, or a row of its type.
+    /// </summary>
+    public static string ControlName(string? text, string? idEntryName, string typeName, bool inList)
     {
+        if (inList)
+        {
+            return string.IsNullOrWhiteSpace(idEntryName) ? $"list row ({typeName})" : "list row #" + idEntryName;
+        }
+
         var label = (text ?? string.Empty).Trim();
         if (label.Length > MaxLabelLength)
         {

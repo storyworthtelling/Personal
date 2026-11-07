@@ -4,9 +4,11 @@ namespace IconStudio;
 
 /// <summary>
 /// Writes the grain tiles and branding medallions into every consumer
-/// (DESIGN.md §6, §13). The owner source at Branding/owner.png is
-/// write-if-absent: a real photo dropped there is never clobbered, and every
-/// consumer medallion re-derives from it on the next run.
+/// (DESIGN.md §6, §13). The source is the owner's drawn mark at
+/// Branding/owners-mark.png, write-if-absent, and every consumer medallion
+/// re-derives from it. It is never a photograph: the repository is public and
+/// each medallion copy ships in an APK. The old photo path, Branding/owner.png,
+/// is gitignored and read by nothing.
 /// </summary>
 public static class BrandAssets
 {
@@ -35,11 +37,14 @@ public static class BrandAssets
         "FocusPhone/Plate.Android/Resources/drawable-nodpi/owner_medallion.png",
     ];
 
+    /// <summary>The drawn mark every medallion is made from, relative to the repo root.</summary>
+    public const string OwnerSource = "Branding/owners-mark.png";
+
     public static IReadOnlyList<string> Write(string repoRoot)
     {
         var written = new List<string>();
 
-        var ownerSource = Path.Combine(repoRoot, "Branding", "owner.png");
+        var ownerSource = Path.Combine(repoRoot, OwnerSource.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(ownerSource))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(ownerSource)!);

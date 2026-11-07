@@ -150,20 +150,20 @@ public class TimelineMergerTests
         {
             GroupId = "conv-77",
             Participants = ["5551110000", "7911123456"],
-            ParticipantAddresses = ["5551110000", "+447911123456"],
+            ParticipantAddresses = ["5551110000", "+447700900123"],
         };
         var groupItemB = groupItemA with
         {
             ContactKey = "7911123456",
             TimestampUtc = T0.AddMinutes(5),
             SourceId = "g2",
-            ParticipantAddresses = ["5551110000", "447911123456"],
+            ParticipantAddresses = ["5551110000", "447700900123"],
         };
 
         var thread = Assert.Single(new TimelineMerger().Merge([groupItemA, groupItemB]));
 
         Assert.Equal(2, thread.ParticipantAddresses.Count);
-        Assert.Contains(thread.ParticipantAddresses, address => address.EndsWith("447911123456", StringComparison.Ordinal));
+        Assert.Contains(thread.ParticipantAddresses, address => address.EndsWith("447700900123", StringComparison.Ordinal));
         Assert.DoesNotContain("7911123456", thread.ParticipantAddresses);
     }
 

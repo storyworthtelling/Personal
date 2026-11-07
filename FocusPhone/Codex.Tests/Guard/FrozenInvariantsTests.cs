@@ -414,6 +414,9 @@ public class FrozenInvariantsTests
             .Where(file => File.ReadAllText(file)
                 .Contains("<ApplicationId>com.storyworthtelling.", StringComparison.Ordinal))
             .Select(file => Path.GetDirectoryName(RepoRelative(file))!.Replace(Path.DirectorySeparatorChar, '/'))
+            // A spike is not a head: it ships to its own pre-release and is installed by hand, and it
+            // must stay off apps-latest, since Flyleaf installs everything the channel carries.
+            .Where(directory => !directory.Split('/').Contains("Spikes"))
             .Where(directory => !publishSteps.Any(text =>
                 text.Contains($"{directory}/bin/Release/net10.0-android/publish/", StringComparison.Ordinal)))
             .ToList();
@@ -422,6 +425,21 @@ public class FrozenInvariantsTests
             "These heads declare an owner-namespace ApplicationId but no workflow publishes their " +
             "signed APK to the apps-latest rolling release, so the phone will never install them: " +
             string.Join(", ", unpublished));
+    }
+
+    // The other side of the exemption above: Flyleaf installs every owner-namespace APK on
+    // apps-latest, so a spike that reached it would land on the locked phone unasked.
+    [Fact]
+    public void NoSpikeIsPublishedToTheRollingRelease()
+    {
+        var offenders = Directory
+            .EnumerateFiles(Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml")
+            .Where(file => File.ReadAllText(file).Contains("publish-rolling-release", StringComparison.Ordinal)
+                && File.ReadAllText(file).Contains("/Spikes/", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.True(offenders.Count == 0, "A workflow publishes a spike to apps-latest: " + string.Join(", ", offenders));
     }
 
     // Android will not even OFFER Post the SMS role unless all four of these components

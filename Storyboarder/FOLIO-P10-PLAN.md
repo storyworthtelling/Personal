@@ -58,7 +58,7 @@ The repository still ships a photographic medallion. Every site that prints the 
 
 | Site | What it does today |
 |---|---|
-| `/Branding/owner.png` | the source image — the black-oval render |
+| `/Branding/owners-mark.png` (was `owner.png`) | the source image — the black-oval render |
 | `Tools/IconStudio/BrandingMedallion.cs` | circle-masks it and adds the hairline ring |
 | `Tools/IconStudio/BrandAssets.cs` | fans it out to five targets: Folio Infrastructure plus `drawable-nodpi/owner_medallion.png` in Folio, **Foreword**, Post and Ledger |
 | `Storyworthtelling.Paper/EmbeddedBranding.cs`, `OwnerMark.cs` | the Skia side every printed page reads |
