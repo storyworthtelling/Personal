@@ -15,7 +15,7 @@ namespace Storyworthtelling.Voice;
 // app to its own copy) — Storyboarder's DeviceAccountTokenProvider requests it; the other apps must do the
 // same, and the owner registers the scope on each OAuth client. Not yet verified against live Drive; a
 // token without the scope (or any failure) just degrades the store to neutral copy.
-public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveFileRevision, IDriveFileTrash
+public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveFileRevision, IDriveFileTrash, IDriveFileMemory
 {
     private readonly Func<CancellationToken, Task<DriveService>> serviceFactory;
     private readonly string fileName;
@@ -38,6 +38,9 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
         this.fileIdStore = fileIdStore;
         this.logger = logger;
     }
+
+    // A remembered id is this install having found the file before. Emptied when the file is trashed from here.
+    public bool HasFoundBefore => !string.IsNullOrEmpty(fileIdStore?.Get(fileName));
 
     public async Task<string?> ReadAsync(CancellationToken cancellationToken)
     {
@@ -103,6 +106,9 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
             throw new InvalidOperationException($"{fileName} is shared with this account, not owned by it, so it is not trashed from here.");
 
         await service.Files.Update(new DriveData.File { Trashed = true }, id).ExecuteAsync(cancellationToken);
+
+        // Forgotten, so the file this install took back may be created again.
+        fileIdStore?.Set(fileName, string.Empty);
     }
 
     public async Task WriteAsync(string content, CancellationToken cancellationToken)
@@ -147,7 +153,7 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
     {
         // 1) Prefer a remembered id, so a file the owner moved is still found where it now lives.
         var remembered = fileIdStore?.Get(fileName);
-        if (remembered is not null && await StillExists(service, remembered, cancellationToken))
+        if (!string.IsNullOrEmpty(remembered) && await StillExists(service, remembered, cancellationToken))
             return remembered;
 
         // 2) Fall back to the well-known-name search, choosing deterministically among same-name copies.

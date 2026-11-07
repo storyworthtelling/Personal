@@ -141,7 +141,7 @@ public class VaultWireNamesTests
         // — restored from the first phone onto the second they would be Foreword Release I's bug.
         var fields = typeof(ConstitutionSecrets)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.Name != "EqualityContract")
+            .Where(p => p.Name is not ("EqualityContract" or "ExtensionData"))
             .Select(p => p.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();

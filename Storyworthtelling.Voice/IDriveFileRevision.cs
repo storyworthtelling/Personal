@@ -19,3 +19,14 @@ public interface IDriveFileTrash
 {
     Task TrashAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Whether this install has found the file in Drive before (it remembers the file's id). Optional on an
+/// <see cref="IDriveTextFile"/>: <see cref="Secrets.SealedDriveFile"/> refuses to create a file such an install
+/// suddenly cannot find, since a search miss or a narrowed scope would otherwise create a second copy beside the
+/// real one, which every other install then prefers or never sees (contracts M6).
+/// </summary>
+public interface IDriveFileMemory
+{
+    bool HasFoundBefore { get; }
+}

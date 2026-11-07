@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Storyworthtelling.Voice.Secrets;
@@ -84,6 +85,19 @@ public sealed record SecretsVault
     // is the one that publishes most, so it takes it back on the next save.
     public string OwnerAccount { get; init; } = string.Empty;
 
+    /// <summary>The vault layout this build writes. A file with a higher number is refused, never written over.</summary>
+    public const int CurrentSchema = 1;
+
+    /// <summary>The layout the file was written in; absent in files from before there was one, which read as 1.</summary>
+    public int Schema { get; init; } = CurrentSchema;
+
+    /// <summary>
+    /// Whatever a newer app wrote that this build does not know, kept and written back unchanged, so an older
+    /// app's save never erases another app's newer section or field (contracts H1).
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+
     public static SecretsVault Empty { get; } = new();
 }
 
@@ -146,19 +160,43 @@ public sealed record PersonalVault
     // property's name, with no naming policy, so it is frozen from the day it is first written.
     public string SleeperSide { get; init; } = string.Empty;
 
+    /// <summary>The layout this build writes; a personal vault with a higher number is refused.</summary>
+    public const int CurrentSchema = 1;
+
+    public int Schema { get; init; } = CurrentSchema;
+
+    /// <summary>
+    /// Whatever a newer app wrote that this build does not know, kept and written back unchanged, so an older
+    /// app's save never erases another app's newer section or field (contracts H1).
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+
     public static PersonalVault Empty { get; } = new();
 }
 
 // One person's TIDAL sign-in. UserId is kept beside the token because a token alone
 // cannot tell you who it belongs to, and an install that cannot name its own account
 // cannot say anything useful when the sign-in stops working.
-public sealed record TidalAccount(string UserId = "", string RefreshToken = "");
+public sealed record TidalAccount(string UserId = "", string RefreshToken = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // The shared Claude/Anthropic key that drives the owner's-voice messaging across every app. Canonical
 // source of truth once the vault is live (replaces the plaintext storyworthtelling-voice-config.json).
-public sealed record ClaudeSecrets(string ApiKey = "");
+public sealed record ClaudeSecrets(string ApiKey = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
-public sealed record GeminiSecrets(string ApiKey = "");
+public sealed record GeminiSecrets(string ApiKey = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // Plaid's app credentials plus the per-institution access tokens, which are generated on-device by the
 // Hosted-Link flow and otherwise lost on a reset (each bank would have to be re-linked by hand).
@@ -168,13 +206,24 @@ public sealed record PlaidSecrets(
     string Environment = "sandbox")
 {
     public IReadOnlyList<PlaidItem> Items { get; init; } = [];
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
 }
 
 // One connected Plaid Item (= one bank login): the long-lived access token, its item id, and the display
 // name, mirroring the fields Ledger keeps on Ledger.Domain.Model.Institution.
-public sealed record PlaidItem(string ItemId = "", string AccessToken = "", string Name = "");
+public sealed record PlaidItem(string ItemId = "", string AccessToken = "", string Name = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
-public sealed record NytSecrets(string SessionCookie = "", string ApiKey = "");
+public sealed record NytSecrets(string SessionCookie = "", string ApiKey = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // The Maps Platform key and the household's address. Coordinates rather than only the address
 // because the weather, pollen and air-quality APIs take a point and the Routes API takes text: the
@@ -183,20 +232,40 @@ public sealed record MapsSecrets(
     string ApiKey = "",
     string HomeAddress = "",
     double HomeLatitude = 0,
-    double HomeLongitude = 0);
+    double HomeLongitude = 0)
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
-public sealed record RemarkableSecrets(string DeviceToken = "");
+public sealed record RemarkableSecrets(string DeviceToken = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // Foreword's handwriting Anthropic key plus the owner-authored calendar mapping JSON (a magic string
 // that is tedious to reconstruct by hand). Written to Drive under the key "DailyLoader" — see above.
-public sealed record ForewordSecrets(string AnthropicApiKey = "", string CalendarMappingJson = "");
+public sealed record ForewordSecrets(string AnthropicApiKey = "", string CalendarMappingJson = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // The FocusPhone Communication head's Gmail credentials: address, the IMAP/SMTP app password, and the
 // Messages-for-Web (gmbridge) session blob, which is generated by pairing and otherwise lost on a reset.
-public sealed record GmailSecrets(string Address = "", string AppPassword = "", string BridgeSession = "");
+public sealed record GmailSecrets(string Address = "", string AppPassword = "", string BridgeSession = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // The FocusPhone Audio head's chosen music Drive-folder id.
-public sealed record MusicSecrets(string FolderId = "");
+public sealed record MusicSecrets(string FolderId = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // Score's TIDAL app credentials: the registered developer app's id and secret. These
 // identify the SOFTWARE, not a listener — TIDAL's own Credentials model draws the same
@@ -207,7 +276,11 @@ public sealed record MusicSecrets(string FolderId = "");
 // person's Family membership lives in their own PersonalVault.
 public sealed record TidalSecrets(
     string ClientId = "",
-    string ClientSecret = "");
+    string ClientSecret = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // Pulp's household API keys: the streaming-availability service, the rating service behind the
 // rating chip, and the video service for trailers and league highlights. Written to Drive under the
@@ -215,10 +288,18 @@ public sealed record TidalSecrets(
 public sealed record PulpSecrets(
     string StreamingAvailabilityKey = "",
     string OmdbKey = "",
-    string YouTubeKey = "");
+    string YouTubeKey = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
 
 // Constitution's household Sleep Number login: the account's sign-in name (an email address) and its
 // password. Written to Drive under the key "Constitution", with these two inner names exactly — see above.
 public sealed record ConstitutionSecrets(
     string SleepNumberLogin = "",
-    string SleepNumberPassword = "");
+    string SleepNumberPassword = "")
+{
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}

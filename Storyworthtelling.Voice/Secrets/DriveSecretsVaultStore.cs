@@ -17,7 +17,7 @@ public sealed class DriveSecretsVaultStore : ISecretsVaultStore
     public DriveSecretsVaultStore(IDriveTextFile file)
     {
         this.file = file;
-        sealedFile = new SealedDriveFile(file);
+        sealedFile = new SealedDriveFile(file, plaintext => VaultSchema.Of(plaintext) > SecretsVault.CurrentSchema);
     }
 
     public async Task<SecretsVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken)
@@ -33,7 +33,11 @@ public sealed class DriveSecretsVaultStore : ISecretsVaultStore
         read.ThrowIfUnreachable();
         if (read.Status != SealedReadStatus.Loaded)
         {
-            return new SecretsVaultLoadResult(Map(read.Status), SecretsVault.Empty, ownership) { Basis = read };
+            return new SecretsVaultLoadResult(Map(read.Status), SecretsVault.Empty, ownership)
+            {
+                Basis = read,
+                IsNewerFormat = read.Status == SealedReadStatus.NewerFormat,
+            };
         }
 
         try

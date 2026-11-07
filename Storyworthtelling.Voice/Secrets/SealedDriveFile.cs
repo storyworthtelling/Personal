@@ -140,6 +140,12 @@ public sealed class SealedDriveFile
         {
             return new SealedWriteResult(SealedWriteOutcome.Refused, RefusalFor(basis));
         }
+        if (basis.Status == SealedReadStatus.Absent && file is IDriveFileMemory { HasFoundBefore: true })
+        {
+            return new SealedWriteResult(SealedWriteOutcome.Refused,
+                "This install has found the file in Drive before and cannot find it now, so a second one is not created; "
+                + "check that it is still in Drive and shared with this account.");
+        }
         if (basis.Status == SealedReadStatus.Absent && !options.MayCreate)
         {
             return new SealedWriteResult(SealedWriteOutcome.Refused,

@@ -44,7 +44,8 @@ public sealed class DrivePersonalVaultStore
 
     private readonly SealedDriveFile sealedFile;
 
-    public DrivePersonalVaultStore(IDriveTextFile file) => sealedFile = new SealedDriveFile(file);
+    public DrivePersonalVaultStore(IDriveTextFile file) =>
+        sealedFile = new SealedDriveFile(file, plaintext => VaultSchema.Of(plaintext) > PersonalVault.CurrentSchema);
 
     public async Task<PersonalVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken)
     {

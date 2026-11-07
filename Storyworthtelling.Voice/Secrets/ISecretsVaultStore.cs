@@ -53,6 +53,9 @@ public sealed record SecretsVaultLoadResult(
     /// <summary>The read this result came from, which a save writes over. Null from a store without one.</summary>
     public SealedRead? Basis { get; init; }
 
+    /// <summary>The vault opened but a newer app wrote it (a higher schema). Status is Corrupt so nothing writes it.</summary>
+    public bool IsNewerFormat { get; init; }
+
     public static SecretsVaultLoadResult Empty { get; } = new(SecretsVaultStatus.Empty, SecretsVault.Empty);
     public static SecretsVaultLoadResult WrongPassphrase { get; } = new(SecretsVaultStatus.WrongPassphrase, SecretsVault.Empty);
     public static SecretsVaultLoadResult Corrupt { get; } = new(SecretsVaultStatus.Corrupt, SecretsVault.Empty);

@@ -57,6 +57,8 @@ public sealed class SecretsVaultService
                 return SecretsVaultPublishResult.WriteFailed($"Drive could not be read ({ex.GetType().Name}: {ex.Message}).");
             }
 
+            if (result.IsNewerFormat)
+                return SecretsVaultPublishResult.VaultUnreadable with { Error = SecretsVaultPublishResult.NewerAppError };
             if (result.Status is SecretsVaultStatus.WrongPassphrase or SecretsVaultStatus.Corrupt)
                 return SecretsVaultPublishResult.VaultUnreadable;
 
