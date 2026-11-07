@@ -15,7 +15,7 @@ namespace Storyworthtelling.Voice;
 // app to its own copy) — Storyboarder's DeviceAccountTokenProvider requests it; the other apps must do the
 // same, and the owner registers the scope on each OAuth client. Not yet verified against live Drive; a
 // token without the scope (or any failure) just degrades the store to neutral copy.
-public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership
+public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveFileRevision, IDriveFileTrash
 {
     private readonly Func<CancellationToken, Task<DriveService>> serviceFactory;
     private readonly string fileName;
@@ -71,6 +71,38 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership
         get.Fields = "id,ownedByMe";
         var file = await get.ExecuteAsync(cancellationToken);
         return file.OwnedByMe == true ? DriveFileOwnership.Owned : DriveFileOwnership.Shared;
+    }
+
+    // Drive's headRevisionId for the file this account resolves to, or null when there is none. Compared by
+    // SealedDriveFile before a write, so a file another phone wrote since it was read is not written over.
+    public async Task<string?> RevisionAsync(CancellationToken cancellationToken)
+    {
+        using var service = await serviceFactory(cancellationToken);
+        var id = await FindId(service, cancellationToken);
+        if (id is null)
+            return null;
+
+        var get = service.Files.Get(id);
+        get.Fields = "id,headRevisionId";
+        var file = await get.ExecuteAsync(cancellationToken);
+        return file.HeadRevisionId;
+    }
+
+    // Moves the file to Drive's trash. Only a file this account owns: a shared file is someone else's, and
+    // trashing it from here would hide it from every install.
+    public async Task TrashAsync(CancellationToken cancellationToken)
+    {
+        using var service = await serviceFactory(cancellationToken);
+        var id = await FindId(service, cancellationToken);
+        if (id is null)
+            return;
+
+        var get = service.Files.Get(id);
+        get.Fields = "id,ownedByMe";
+        if ((await get.ExecuteAsync(cancellationToken)).OwnedByMe != true)
+            throw new InvalidOperationException($"{fileName} is shared with this account, not owned by it, so it is not trashed from here.");
+
+        await service.Files.Update(new DriveData.File { Trashed = true }, id).ExecuteAsync(cancellationToken);
     }
 
     public async Task WriteAsync(string content, CancellationToken cancellationToken)

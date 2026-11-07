@@ -14,13 +14,37 @@ public sealed class DriveIndexUsageStoreTests
 
     private static readonly ServiceCatalogue Catalogue = ServiceCatalogue.Public;
 
-    private sealed class FakeDrive : IDriveTextFile
+    private sealed class FakeDrive : IDriveTextFile, IDriveFileRevision
     {
-        public string? Content { get; set; }
+        private string? content;
+        private int revision;
+        private int checks;
+
+        public string? Content
+        {
+            get => content;
+            set
+            {
+                content = value;
+                revision++;
+            }
+        }
 
         public int Writes { get; private set; }
 
+        /// <summary>Runs once, between this phone's read and its write: the other phone writing.</summary>
+        public Action? BetweenReadAndWrite { get; set; }
+
         public Task<string?> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(Content);
+
+        public Task<string?> RevisionAsync(CancellationToken cancellationToken)
+        {
+            if (++checks == 2)
+            {
+                BetweenReadAndWrite?.Invoke();
+            }
+            return Task.FromResult(content is null ? null : revision.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
 
         public Task WriteAsync(string content, CancellationToken cancellationToken)
         {
@@ -40,6 +64,26 @@ public sealed class DriveIndexUsageStoreTests
     {
         Assert.True(IndexUsageFile.TryRead(VaultEnvelope.Read(drive.Content, Passphrase).Plaintext!, out var entries));
         return entries!;
+    }
+
+    // Contracts M6: two phones publishing at once used to roll back one phone's month until the next hand-off.
+    [Fact]
+    public async Task TheOtherPhonesWriteBetweenReadAndWriteIsMergedNotRolledBack()
+    {
+        var seed = new FakeDrive();
+        await Store(seed).PublishAsync([Payload("netflix", 4)], CancellationToken.None);
+        var drive = new FakeDrive { Content = seed.Content };
+        drive.BetweenReadAndWrite = () =>
+        {
+            var other = new FakeDrive { Content = drive.Content };
+            Store(other).PublishAsync([Payload("hulu", 2)], CancellationToken.None).GetAwaiter().GetResult();
+            drive.Content = other.Content;
+        };
+
+        await Store(drive).PublishAsync([Payload("hbo-max", 3)], CancellationToken.None);
+
+        var services = Opened(drive).Select(entry => entry.Service.Value).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(["hbo-max", "hulu", "netflix"], services);
     }
 
     [Fact]

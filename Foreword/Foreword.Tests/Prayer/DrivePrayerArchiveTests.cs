@@ -25,9 +25,13 @@ public class DrivePrayerArchiveTests
         public Task<string?> ReadAsync(CancellationToken cancellationToken) =>
             Task.FromResult(Content);
 
+        /// <summary>When set, the next upload lands cut in half, the way a dropped connection can leave it.</summary>
+        public bool DamageNextWrite { get; set; }
+
         public Task WriteAsync(string content, CancellationToken cancellationToken)
         {
-            Content = content;
+            Content = DamageNextWrite ? content[..(content.Length / 2)] : content;
+            DamageNextWrite = false;
             Writes++;
             return Task.CompletedTask;
         }
@@ -78,6 +82,22 @@ public class DrivePrayerArchiveTests
     /// The whole point of the owner's choice. Anyone with the Drive — a shared laptop, a future
     /// connector, a support session — sees ciphertext and nothing else.
     /// </summary>
+    // The archive is the only copy once the page is trashed, so a save that did not land whole must stop the
+    // morning (the page stays on the tablet) and put the previous archive back.
+    [Fact]
+    public async Task ASaveThatDoesNotReadBackThrowsAndPutsThePreviousArchiveBack()
+    {
+        var drive = new InMemoryDrive();
+        var archive = new DrivePrayerArchive(drive);
+        await archive.SaveAsync(Sample(), Passphrase, CancellationToken.None);
+        var previous = drive.Content;
+        drive.DamageNextWrite = true;
+
+        await Assert.ThrowsAsync<IOException>(() => archive.SaveAsync(Sample(), Passphrase, CancellationToken.None));
+
+        Assert.Equal(previous, drive.Content);
+    }
+
     [Fact]
     public async Task WhatSitsOnDriveIsCiphertext()
     {

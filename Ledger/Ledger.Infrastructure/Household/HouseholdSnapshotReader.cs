@@ -31,7 +31,12 @@ public sealed class HouseholdSnapshotReader
     {
         var content = await file.ReadAsync(cancellationToken);
         var (status, plaintext) = VaultEnvelope.Read(content, passphrase);
+        return Interpret(status, plaintext);
+    }
 
+    /// <summary>What an opened (or unopened) envelope says, shared with the publisher's sealed read.</summary>
+    public static HouseholdSnapshotReadResult Interpret(SecretsVaultStatus status, string? plaintext)
+    {
         if (status != SecretsVaultStatus.Loaded)
         {
             return status switch

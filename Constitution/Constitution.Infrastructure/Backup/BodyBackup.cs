@@ -60,6 +60,7 @@ public sealed class BodyBackup
     public const string FileName = "storyworthtelling-constitution-body.json";
 
     private readonly IDriveTextFile file;
+    private readonly SealedDriveFile sealedFile;
     private readonly IConstitutionVaultLog log;
     private readonly SemaphoreSlim gate = new(1, 1);
 
@@ -70,6 +71,7 @@ public sealed class BodyBackup
         ArgumentNullException.ThrowIfNull(file);
         ArgumentNullException.ThrowIfNull(log);
         this.file = file;
+        sealedFile = new SealedDriveFile(file);
         this.log = log;
     }
 
@@ -195,55 +197,32 @@ public sealed class BodyBackup
             return new BodyBackupResult(BodyBackupOutcome.Unchanged);
         }
 
-        var sealedText = VaultEnvelope.Write(BodyBackupCodec.Write(merged), passphrase);
-        try
+        // The suite's sealed-file rule (duplication audit §5) does the write: checked against the revision the
+        // read saw, read back, and the previous file put back if it does not open. A first write that fails
+        // puts back a blank file, this backup's own "nothing here" (see Open).
+        var basis = new SealedRead(
+            remote.Kind == RemoteKind.Readable ? SealedReadStatus.Loaded : SealedReadStatus.Absent,
+            null,
+            remote.Raw ?? string.Empty,
+            remote.Revision);
+        var written = await sealedFile.WriteAsync(BodyBackupCodec.Write(merged), passphrase, basis, SealedWriteOptions.Default, cancellationToken);
+        switch (written.Outcome)
         {
-            await file.WriteAsync(sealedText, cancellationToken);
+            case SealedWriteOutcome.Written:
+                return new BodyBackupResult(BodyBackupOutcome.BackedUp);
+            case SealedWriteOutcome.Unverified:
+                // Neither trusted nor undone: the next backup reads it, finds nothing to add and stops.
+                return new BodyBackupResult(BodyBackupOutcome.Unreachable, Redact(written.Detail ?? string.Empty, passphrase));
+            case SealedWriteOutcome.Conflict:
+                // Another install wrote since the read; tried again after the next quiet window, merged then.
+                return new BodyBackupResult(BodyBackupOutcome.Unreachable, "The backup changed in Drive since it was read; it will be merged and tried again.");
+            case SealedWriteOutcome.Unconfirmed:
+                return new BodyBackupResult(BodyBackupOutcome.Failed, "The file written could not be read back; the previous file was put back.");
+            case SealedWriteOutcome.Refused:
+                return new BodyBackupResult(BodyBackupOutcome.RefusedUnreadable, written.Detail);
+            default:
+                return new BodyBackupResult(BodyBackupOutcome.Failed, Redact(written.Detail ?? string.Empty, passphrase));
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return new BodyBackupResult(BodyBackupOutcome.Failed, Describe(ex, passphrase));
-        }
-
-        return await ConfirmAsync(passphrase, remote.Raw, cancellationToken);
-    }
-
-    // Reads the file back: it must open. If Drive cannot be asked, the write is neither trusted nor
-    // undone (the next backup reads it, finds nothing to add and stops). If it does not open, the
-    // previous contents are put back, so a damaged upload costs one attempt and not the backup.
-    private async Task<BodyBackupResult> ConfirmAsync(string passphrase, string? previous, CancellationToken cancellationToken)
-    {
-        string? readBack;
-        try
-        {
-            readBack = await file.ReadAsync(cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return new BodyBackupResult(BodyBackupOutcome.Unreachable, Describe(ex, passphrase));
-        }
-
-        if (Open(readBack, passphrase).Kind == RemoteKind.Readable)
-        {
-            return new BodyBackupResult(BodyBackupOutcome.BackedUp);
-        }
-
-        try
-        {
-            // Not the caller's token: leaving mid-call must not leave a damaged file in place. A blank
-            // file reads as no file, which is as close to "nothing was here" as the seam can get.
-            await file.WriteAsync(previous ?? string.Empty, CancellationToken.None);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return new BodyBackupResult(
-                BodyBackupOutcome.Failed,
-                "The file written could not be read back, and the previous file could not be put back: " + Describe(ex, passphrase));
-        }
-
-        return new BodyBackupResult(
-            BodyBackupOutcome.Failed,
-            "The file written could not be read back; the previous file was put back.");
     }
 
     // ---- debounced ----
@@ -303,7 +282,11 @@ public sealed class BodyBackup
         Unreachable,
     }
 
-    private sealed record RemoteFile(RemoteKind Kind, string? Raw, DecodedBodyBackup? Backup, string? Detail);
+    private sealed record RemoteFile(RemoteKind Kind, string? Raw, DecodedBodyBackup? Backup, string? Detail)
+    {
+        /// <summary>The file's revision when it was read, which the write is checked against.</summary>
+        public string? Revision { get; init; }
+    }
 
     // The IDriveTextFile seam throws whatever the Google client and the HTTP stack throw (no network, no
     // Drive scope granted, a timeout), so there is no narrower type to catch. The failure is not dropped:
@@ -312,8 +295,10 @@ public sealed class BodyBackup
     private async Task<RemoteFile> ReadRemoteAsync(string passphrase, CancellationToken cancellationToken)
     {
         string? raw;
+        string? revision;
         try
         {
+            revision = file is IDriveFileRevision revisioned ? await revisioned.RevisionAsync(cancellationToken) : null;
             raw = await file.ReadAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -321,7 +306,7 @@ public sealed class BodyBackup
             return new RemoteFile(RemoteKind.Unreachable, null, null, Describe(ex, passphrase));
         }
 
-        return Open(raw, passphrase);
+        return Open(raw, passphrase) with { Revision = revision };
     }
 
     private static RemoteFile Open(string? raw, string passphrase)

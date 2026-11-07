@@ -13,12 +13,25 @@ public sealed class FakeDriveHandler : HttpMessageHandler
 {
     public sealed record FakeFile(string Id, string Name, string? Parent, string MimeType, bool OwnedByMe)
     {
-        public string Content { get; set; } = string.Empty;
+        private string content = string.Empty;
+
+        public string Content
+        {
+            get => content;
+            set
+            {
+                content = value;
+                Revision++;
+            }
+        }
+
         public bool Trashed { get; set; }
+        public int Revision { get; private set; }
     }
 
     private int nextId = 1;
     private readonly Dictionary<string, (string Name, string? Parent, string MimeType)> pendingUploads = [];
+    private readonly Dictionary<string, string> pendingUpdates = [];
 
     public List<FakeFile> Files { get; } = [];
     public List<string> Requests { get; } = [];
@@ -60,6 +73,22 @@ public sealed class FakeDriveHandler : HttpMessageHandler
             var started = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(string.Empty) };
             started.Headers.Location = new Uri($"https://www.googleapis.com/upload/drive/v3/files?upload_id={session}");
             return started;
+        }
+        if (path.StartsWith("/upload/drive/v3/files/", StringComparison.Ordinal) && request.Method == HttpMethod.Patch)
+        {
+            // A resumable update: the session names the file being replaced.
+            var session = $"update{pendingUpdates.Count + 1}";
+            pendingUpdates[session] = path["/upload/drive/v3/files/".Length..];
+            var started = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(string.Empty) };
+            started.Headers.Location = new Uri($"https://www.googleapis.com/upload/drive/v3/files?upload_id={session}");
+            return started;
+        }
+        if (path.StartsWith("/upload/drive/v3/files", StringComparison.Ordinal) && request.Method == HttpMethod.Put
+            && pendingUpdates.TryGetValue(query["upload_id"]!, out var updating))
+        {
+            var target = Files.First(f => f.Id == updating);
+            target.Content = body;
+            return Json($"{{\"id\":\"{target.Id}\"}}");
         }
         if (path.StartsWith("/upload/drive/v3/files", StringComparison.Ordinal) && request.Method == HttpMethod.Put)
         {
@@ -148,7 +177,7 @@ public sealed class FakeDriveHandler : HttpMessageHandler
     }
 
     private static string Describe(FakeFile file) =>
-        $"{{\"id\":\"{file.Id}\",\"name\":\"{file.Name}\",\"ownedByMe\":{(file.OwnedByMe ? "true" : "false")},\"trashed\":{(file.Trashed ? "true" : "false")},\"modifiedTime\":\"2026-10-31T12:00:00Z\"}}";
+        $"{{\"id\":\"{file.Id}\",\"name\":\"{file.Name}\",\"ownedByMe\":{(file.OwnedByMe ? "true" : "false")},\"trashed\":{(file.Trashed ? "true" : "false")},\"headRevisionId\":\"r{file.Revision}\",\"modifiedTime\":\"2026-10-31T12:00:00Z\"}}";
 
     private static HttpResponseMessage Json(string body) =>
         new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };

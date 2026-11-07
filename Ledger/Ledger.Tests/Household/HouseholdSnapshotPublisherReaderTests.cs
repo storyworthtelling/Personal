@@ -122,6 +122,23 @@ public class HouseholdSnapshotPublisherReaderTests
         Assert.Null(readResult.Snapshot);
     }
 
+    // Duplication audit §5: the snapshot publisher was the one sealed file that wrote over a damaged file,
+    // against G14 as Pulp and Constitution apply it. A damaged file is left exactly as it is.
+    [Fact]
+    public async Task Publish_OverADamagedFile_IsRefusedAndTheFileIsLeftAlone()
+    {
+        using var db = new TestDatabase();
+        await SeedHouseholdAsync(db);
+        var (publisher, _, file) = Create(db);
+        await file.WriteAsync("{ not an envelope", default);
+
+        var result = await publisher.PublishAsync(Passphrase, OwnerEmail, default);
+
+        Assert.True(result.Ok);
+        Assert.Contains("damaged", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("{ not an envelope", file.Content);
+    }
+
     [Fact]
     public async Task Read_BeforeAnythingHasEverBeenPublished_ReportsEmpty()
     {

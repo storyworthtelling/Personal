@@ -28,7 +28,7 @@ public sealed class DriveHouseholdStoreTests
     private static string Sealed(HouseholdDocument document, string passphrase = Passphrase) =>
         VaultEnvelope.Write(HouseholdDocumentCodec.Serialize(document), passphrase);
 
-    private static DriveHouseholdStore Store(FakeDrive drive, string passphrase = Passphrase, bool mayCreate = true) =>
+    private static DriveHouseholdStore Store(IDriveTextFile drive, string passphrase = Passphrase, bool mayCreate = true) =>
         new(drive, FileName, () => passphrase, () => mayCreate);
 
     private static HouseholdDocument Opened(FakeDrive drive) =>
@@ -225,6 +225,59 @@ public sealed class DriveHouseholdStoreTests
     }
 
     /// <summary>A Drive file in memory that can be made to lose a race or to be out of reach.</summary>
+    // Contracts M6: the other phone writes between this phone's read and its write. The write is checked
+    // against the revision it read at, so it reads again and merges instead of writing over that record.
+    [Fact]
+    public async Task AWriteFromTheOtherPhoneBetweenReadAndWriteIsMergedNotLost()
+    {
+        var drive = new RevisionedDrive { Content = Sealed(Of(Viewer("robin-example", 10, "install-b-example"))) };
+        drive.BeforeFirstRevisionCheck = () =>
+            drive.Content = Sealed(Of(Viewer("robin-example", 10, "install-b-example"), Viewer("jules-example", 30, "install-b-example")));
+
+        await Store(drive).SaveAsync(Of(Viewer("avery-example", 20, "install-a-example")), CancellationToken.None);
+
+        var held = HouseholdDocumentCodec.Deserialize(VaultEnvelope.Read(drive.Content, Passphrase).Plaintext!);
+        Assert.Equal(3, held.Records.Count);
+    }
+
+    /// <summary>A file whose revision moves on every write, with a hook that fires before the first check.</summary>
+    private sealed class RevisionedDrive : IDriveTextFile, IDriveFileRevision
+    {
+        private string? content;
+        private int revision;
+        private int checks;
+
+        public string? Content
+        {
+            get => content;
+            set
+            {
+                content = value;
+                revision++;
+            }
+        }
+
+        public Action? BeforeFirstRevisionCheck { get; set; }
+
+        public Task<string?> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(content);
+
+        public Task WriteAsync(string value, CancellationToken cancellationToken)
+        {
+            Content = value;
+            return Task.CompletedTask;
+        }
+
+        public Task<string?> RevisionAsync(CancellationToken cancellationToken)
+        {
+            // The first call is the read's; the second is the write's check.
+            if (++checks == 2)
+            {
+                BeforeFirstRevisionCheck?.Invoke();
+            }
+            return Task.FromResult(content is null ? null : revision.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+    }
+
     private sealed class FakeDrive : IDriveTextFile
     {
         public string? Content { get; set; }

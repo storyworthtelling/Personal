@@ -46,6 +46,6 @@ public sealed class VaultVoiceConfigStore : IVoiceConfigStore
             return;
 
         var merged = result.Vault with { Claude = new ClaudeSecrets(config.ApiKey) };
-        await vault.SaveAsync(merged, pass, cancellationToken);
+        await vault.SaveAsync(merged, pass, result, cancellationToken);
     }
 }

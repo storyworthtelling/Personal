@@ -42,28 +42,49 @@ public sealed class SecretsVaultService
         if (string.IsNullOrEmpty(pass))
             return SecretsVaultPublishResult.NoPassphrase;
 
-        var result = await store.LoadAsync(pass, cancellationToken);
-        if (result.Status is SecretsVaultStatus.WrongPassphrase or SecretsVaultStatus.Corrupt)
-            return SecretsVaultPublishResult.VaultUnreadable;
-
-        // Refused here rather than at each of the suite's publish call sites: one
-        // choke point is what makes "the partner's install never writes the household
-        // vault" true everywhere at once instead of nine places remembering. The answer is
-        // the vault file's own Drive ownership, not anything stored inside it.
-        if (!VaultOwnership.Decide(result.FileOwnership).CanWrite())
+        // A conflict means another app or phone wrote the vault since it was read: read it again and merge
+        // this section into what is there now, rather than writing over their change (contracts M6).
+        for (var attempt = 1; ; attempt++)
         {
-            return SecretsVaultPublishResult.ReadOnly;
-        }
+            SecretsVaultLoadResult result;
+            try
+            {
+                result = await store.LoadAsync(pass, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // A vault Drive could not be read is not an empty one; nothing is written.
+                return SecretsVaultPublishResult.WriteFailed($"Drive could not be read ({ex.GetType().Name}: {ex.Message}).");
+            }
 
-        try
-        {
-            await store.SaveAsync(merge(result.Vault), pass, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return SecretsVaultPublishResult.WriteFailed(ex.Message);
-        }
+            if (result.Status is SecretsVaultStatus.WrongPassphrase or SecretsVaultStatus.Corrupt)
+                return SecretsVaultPublishResult.VaultUnreadable;
 
-        return SecretsVaultPublishResult.Published;
+            // Refused here rather than at each of the suite's publish call sites: one
+            // choke point is what makes "the partner's install never writes the household
+            // vault" true everywhere at once instead of nine places remembering. The answer is
+            // the vault file's own Drive ownership, not anything stored inside it.
+            if (!VaultOwnership.Decide(result.FileOwnership).CanWrite())
+            {
+                return SecretsVaultPublishResult.ReadOnly;
+            }
+
+            try
+            {
+                await store.SaveAsync(merge(result.Vault), pass, result, cancellationToken);
+                return SecretsVaultPublishResult.Published;
+            }
+            catch (VaultWriteException ex) when (ex.IsConflict && attempt < MaxConflictRetries)
+            {
+                continue;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return SecretsVaultPublishResult.WriteFailed(ex.Message);
+            }
+        }
     }
+
+    /// <summary>How many times a publish reads again after finding the vault changed under it.</summary>
+    public const int MaxConflictRetries = 3;
 }
