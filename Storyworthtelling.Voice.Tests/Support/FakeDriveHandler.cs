@@ -23,6 +23,9 @@ public sealed class FakeDriveHandler : HttpMessageHandler
     public List<FakeFile> Files { get; } = [];
     public List<string> Requests { get; } = [];
 
+    /// <summary>When set, every content download answers with this status instead of the bytes.</summary>
+    public HttpStatusCode? MediaFailure { get; set; }
+
     public FakeFile Add(string name, string? parent, string content = "", bool ownedByMe = true,
         string mimeType = "application/json")
     {
@@ -93,6 +96,13 @@ public sealed class FakeDriveHandler : HttpMessageHandler
                     file.Trashed = true;
                 }
                 return Json($"{{\"id\":\"{file.Id}\"}}");
+            }
+            if (query["alt"] == "media" && MediaFailure is { } failure)
+            {
+                return new HttpResponseMessage(failure)
+                {
+                    Content = new StringContent($"{{\"error\":{{\"code\":{(int)failure},\"message\":\"injected\"}}}}", Encoding.UTF8, "application/json"),
+                };
             }
             if (query["alt"] == "media")
             {

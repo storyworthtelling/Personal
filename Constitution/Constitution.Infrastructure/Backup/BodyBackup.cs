@@ -326,6 +326,14 @@ public sealed class BodyBackup
 
     private static RemoteFile Open(string? raw, string passphrase)
     {
+        // This file's own rollback writes a blank file when a first upload could not be read back (the
+        // seam cannot delete), so for the Body backup alone a blank file means "nothing here". The shared
+        // envelope reads a blank file as damaged, which is right for every file that never does this.
+        if (raw is not null && string.IsNullOrWhiteSpace(raw))
+        {
+            return new RemoteFile(RemoteKind.Absent, raw, null, null);
+        }
+
         (SecretsVaultStatus Status, string? Plaintext) opened;
         try
         {

@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace Storyworthtelling.Voice.Tests;
 
-// DriveTextFile talks to a real DriveService, which these tests cannot fake, so this guard reads its source:
+// This guard reads DriveTextFile's source (DriveTextFileReadTests drives it against FakeDriveHandler):
 // every name search must go through DriveFileChooser (owned first, then most recent) rather than taking the
 // first of an unordered pageSize=1 listing — including the post-create lookup in WriteAsync.
 public class DriveTextFileLookupGuardTests

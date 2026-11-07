@@ -46,8 +46,15 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership
         if (id is null)
             return null;
 
+        // The downloader does not throw on a 401/403/429/5xx or a dropped connection; it reports the
+        // failure in the progress it returns. Ignoring it turned every failed read into "", which a vault
+        // reads as Empty and then overwrites (error-handling audit §1). A failed read fails.
         using var stream = new MemoryStream();
-        await service.Files.Get(id).DownloadAsync(stream, cancellationToken);
+        var progress = await service.Files.Get(id).DownloadAsync(stream, cancellationToken);
+        if (progress.Exception is not null)
+        {
+            throw new IOException($"Drive could not read {fileName}.", progress.Exception);
+        }
         return System.Text.Encoding.UTF8.GetString(stream.ToArray());
     }
 

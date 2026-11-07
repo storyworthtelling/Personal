@@ -33,9 +33,15 @@ public static class VaultEnvelope
     /// </summary>
     public static (SecretsVaultStatus Status, string? Plaintext) Read(string? content, string passphrase)
     {
-        if (string.IsNullOrWhiteSpace(content))
+        // Null is "there is no file", which permits creating one. A file that exists but reads back blank
+        // is damaged, and treating it as Empty is how one app's save would overwrite every other section.
+        if (content is null)
         {
             return (SecretsVaultStatus.Empty, null);
+        }
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return (SecretsVaultStatus.Corrupt, null);
         }
 
         SecretsEnvelope? envelope;

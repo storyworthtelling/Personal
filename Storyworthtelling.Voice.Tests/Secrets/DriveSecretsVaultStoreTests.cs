@@ -26,7 +26,8 @@ public class DriveSecretsVaultStoreTests
         Assert.Equal(SecretsVaultStatus.Empty, (await store.LoadAsync(Pass, default)).Status);
 
         var blank = new DriveSecretsVaultStore(new InMemoryTextFile { Content = "   " });
-        Assert.Equal(SecretsVaultStatus.Empty, (await blank.LoadAsync(Pass, default)).Status);
+        // A file that is there but blank is damaged, not "no vault yet" (error-handling audit §1).
+        Assert.Equal(SecretsVaultStatus.Corrupt, (await blank.LoadAsync(Pass, default)).Status);
     }
 
     [Fact]

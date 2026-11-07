@@ -68,12 +68,16 @@ public class SnowballHistorySealerTests
         Assert.Equal(SnowballHistoryStatus.NeedsPassphrase, SnowballHistorySealer.Open(sealedText, passphrase).Status);
     }
 
+    [Fact]
+    public void NoFileIsAbsent() =>
+        Assert.Equal(SnowballHistoryStatus.Absent, SnowballHistorySealer.Open(null, Passphrase).Status);
+
+    // A file that is there but blank is damaged, not missing (error-handling audit §1).
     [Theory]
-    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void NoContentIsAbsent(string? content) =>
-        Assert.Equal(SnowballHistoryStatus.Absent, SnowballHistorySealer.Open(content, Passphrase).Status);
+    public void ABlankFileIsUnreadableNotAbsent(string content) =>
+        Assert.Equal(SnowballHistoryStatus.Unreadable, SnowballHistorySealer.Open(content, Passphrase).Status);
 
     [Theory]
     [InlineData("this is not an envelope")]
