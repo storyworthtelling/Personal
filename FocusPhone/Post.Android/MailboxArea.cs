@@ -1577,8 +1577,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             // SMS role, so this should work — but if it does not, say so rather than leaving
             // the owner believing a number is blocked when it is not. Nothing is filed and
             // the correspondence stays open: a refused block should look like nothing happened.
-            Android.Util.Log.Warn("Post", $"Could not block {number}: {e}");
-            PostDiagnostics.LogWarning("Block", $"Could not block {number}", e);
+            Android.Util.Log.Warn("Post", $"Could not block {LogSafe.Number(number)}: {e.GetType().Name}");
+            PostDiagnostics.LogWarning("Block", $"Could not block {LogSafe.Number(number)}", e);
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Block, new DogEar.Notice(
                 "That number was not blocked.",
                 "The phone would not accept it. Blocking is the system's list, not Post's, and it "
@@ -1623,7 +1623,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         catch (Exception e)
         {
-            PostDiagnostics.LogWarning("Block", $"Could not unblock {number}", e);
+            PostDiagnostics.LogWarning("Block", $"Could not unblock {LogSafe.Number(number)}", e);
         }
     }
 

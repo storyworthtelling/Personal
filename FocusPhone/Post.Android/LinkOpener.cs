@@ -1,4 +1,5 @@
 using Android.Content;
+using Codex.Domain.Diagnostics;
 using Codex.Domain.Policy;
 
 namespace Post;
@@ -31,12 +32,12 @@ internal static class LinkOpener
             }
             catch (Exception e)
             {
-                PostDiagnostics.LogWarning("MailReader", $"Could not open a link from mail: {url}", e);
+                PostDiagnostics.LogWarning("MailReader", $"Could not open a link from mail: {LogSafe.Link(url)}", e);
             }
         }
         catch (Exception e)
         {
-            PostDiagnostics.LogWarning("MailReader", $"Could not open a link from mail: {url}", e);
+            PostDiagnostics.LogWarning("MailReader", $"Could not open a link from mail: {LogSafe.Link(url)}", e);
         }
     }
 }

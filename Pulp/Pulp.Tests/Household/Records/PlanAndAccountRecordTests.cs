@@ -102,7 +102,7 @@ public class PlanAndAccountRecordTests
     [Theory]
     [InlineData("avery@example.com", true)]
     [InlineData("  avery@example.com  ", true)]
-    [InlineData("avery.k+cal@mail.example.co", true)]
+    [InlineData("avery.k+cal@mail.example.org", true)]
     [InlineData("", false)]
     [InlineData("avery", false)]
     [InlineData("avery@", false)]

@@ -11,7 +11,7 @@ namespace Codex.Tests.Plate;
 public class QrScanTests
 {
     [Theory]
-    [InlineData("https://harbourline.com/warranty/8841-B")]
+    [InlineData("https://harbourline.example/warranty/8841-B")]
     [InlineData("http://example.org")]
     [InlineData("HTTPS://SHOUTING.EXAMPLE")]
     public void AWebAddressIsHandedToTheBrowser(string raw)

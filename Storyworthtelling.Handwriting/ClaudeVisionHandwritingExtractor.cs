@@ -135,7 +135,8 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
         var arrayJson = ExtractJsonArray(text);
         if (arrayJson is null)
         {
-            logger.LogWarning("Handwriting response contained no JSON array: {Text}", text);
+            // The reply is a transcription of the owner's handwriting, so only its size is logged.
+            logger.LogWarning("Handwriting response contained no JSON array ({Length} characters)", text.Length);
             return [];
         }
 

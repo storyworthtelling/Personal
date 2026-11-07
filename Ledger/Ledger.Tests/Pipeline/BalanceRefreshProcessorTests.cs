@@ -37,7 +37,7 @@ public class BalanceRefreshProcessorTests
         {
             ItemId = "item-1",
             AccessToken = "access-1",
-            Name = "PNC",
+            Name = "Cedar Hollow",
             RefreshStatus = status,
             NextAttemptAtUtc = nextAttempt,
             CreatedAtUtc = Now

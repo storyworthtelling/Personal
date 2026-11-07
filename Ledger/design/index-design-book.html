@@ -2234,7 +2234,7 @@ figcaption{font-size:13px;color:var(--ink-muted);margin-top:var(--s2)}
       <div class="row"><span class="id">D20</span>
         <div class="what"><strong>Connect flow redesigned.</strong> Extends the existing Admin-mode Chrome
           allowlist (<code>PolicyContext.LoginBrowserUrlAllowlist</code>) to Plaid's Hosted Link domain and
-          the OAuth bank hosts (Redwood Bank, Cedar Hollow Bank, Wells Fargo, &hellip;) it redirects to &mdash; the same
+          the OAuth bank hosts (Redwood Bank, Cedar Hollow Bank, Stonebridge Bank, &hellip;) it redirects to &mdash; the same
           mechanism already carrying Google/GitHub/reMarkable/TIDAL sign-in. Connecting a bank becomes: open
           Admin mode &rarr; Index's Connect flow opens real Chrome &rarr; complete login &rarr; return.
           <span class="why">Embedded-WebView fixes were ruled out: these banks deliberately fingerprint and
@@ -3061,7 +3061,7 @@ figcaption{font-size:13px;color:var(--ink-muted);margin-top:var(--s2)}
         D50), which Plaid account-type(s) qualify as "savings" by default vs. owner-designated, and the
         growth-chart treatment (does a goal overlay as a reference line, like a finish tape?).</p></div>
       <div class="thread"><h3>Admin-mode allowlist hosts</h3><p>The exact Plaid Hosted Link domain(s) and each
-        bank's real OAuth host(s) (Redwood Bank, Cedar Hollow, Wells Fargo, and whichever others the owner connects) need to
+        bank's real OAuth host(s) (Redwood Bank, Cedar Hollow, Stonebridge, and whichever others the owner connects) need to
         be enumerated for <code>LoginBrowserUrlAllowlist</code> &mdash; too narrow and a consent screen fails
         to load; this is on-device tuning territory per the existing comment in <code>PolicyContext.cs</code>.</p></div>
       <div class="thread"><h3>Settings, empty &amp; error states</h3><p>Settings screen layout under full kit

@@ -31,9 +31,9 @@ public class GmailCredentialsTests
     }
 
     [Theory]
-    [InlineData("  owner@gmail.com  ", "owner@gmail.com")]
-    [InlineData("Owner@Gmail.com", "owner@gmail.com")]
-    [InlineData("owner@gmail.com", "owner@gmail.com")]
+    [InlineData("  owner@example.com  ", "owner@example.com")]
+    [InlineData("Owner@Example.com", "owner@example.com")]
+    [InlineData("owner@example.com", "owner@example.com")]
     public void NormalizeAddress_TrimsAndLowercases(string input, string expected)
     {
         Assert.Equal(expected, GmailCredentials.NormalizeAddress(input));
@@ -52,8 +52,8 @@ public class GmailCredentialsTests
     {
         // The client is the transport seam the worker uses; it must not pass a
         // space-laden paste straight through to IMAP/SMTP.
-        var client = new GmailClient("  Owner@Gmail.com ", "abcd efgh ijkl mnop");
-        Assert.Equal("owner@gmail.com", client.AccountAddress);
+        var client = new GmailClient("  Owner@Example.com ", "abcd efgh ijkl mnop");
+        Assert.Equal("owner@example.com", client.AccountAddress);
         Assert.Equal("abcdefghijklmnop", client.AppPassword);
     }
 }

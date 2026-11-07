@@ -47,7 +47,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         var scroll = new ScrollView(Host);
         var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
-        address = PaperUi.Field(Host, "name@gmail.com");
+        address = PaperUi.Field(Host, string.Empty);
         address.Text = account.GmailAddress;
         AddFieldGroup(layout, "Gmail address", address, null);
 

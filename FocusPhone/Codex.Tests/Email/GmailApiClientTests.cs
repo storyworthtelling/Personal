@@ -23,7 +23,7 @@ public class GmailApiClientTests
         $"From: {from}\r\nTo: {to}\r\nSubject: {subject}\r\nMessage-Id: <m1@example.com>\r\n" +
         $"Date: Sat, 29 Aug 2026 10:00:00 +0000\r\n\r\n{body}";
 
-    private static GmailApiClient Client(FakeHttpMessageHandler handler, string address = "owner@gmail.com") =>
+    private static GmailApiClient Client(FakeHttpMessageHandler handler, string address = "owner@example.com") =>
         new(address, () => Task.FromResult("token-123"), new HttpClient(handler));
 
     [Fact]
@@ -33,7 +33,7 @@ public class GmailApiClientTests
         handler.Respond($"{Base}/messages?q=%28in%3Ainbox%20OR%20in%3Asent%29%20after%3A1756461600&maxResults=200",
             """{"messages":[{"id":"g1"}]}""");
         handler.Respond($"{Base}/messages/g1?format=raw",
-            $$"""{"id":"g1","raw":"{{Base64Url(RawMessage("her@example.com", "owner@gmail.com", "Dinner", "Seven?"))}}"}""");
+            $$"""{"id":"g1","raw":"{{Base64Url(RawMessage("her@example.com", "owner@example.com", "Dinner", "Seven?"))}}"}""");
 
         var items = await Client(handler).FetchRecentAsync(DateTimeOffset.FromUnixTimeSeconds(1756461600));
 
@@ -122,7 +122,7 @@ public class GmailApiClientTests
         var handler = new FakeHttpMessageHandler();
         handler.Respond($"{Base}/messages?q=plumber&maxResults=50", """{"messages":[{"id":"g4"}]}""");
         handler.Respond($"{Base}/messages/g4?format=raw",
-            $$"""{"id":"g4","raw":"{{Base64Url(RawMessage("plumber@example.com", "owner@gmail.com", "Quote", "Attached"))}}"}""");
+            $$"""{"id":"g4","raw":"{{Base64Url(RawMessage("plumber@example.com", "owner@example.com", "Quote", "Attached"))}}"}""");
 
         var results = await Client(handler).SearchAsync("plumber");
 
@@ -144,7 +144,7 @@ public class GmailApiClientTests
             "{}", status: status);
         var health = new RecordingHealthSink();
         var client = new GmailApiClient(
-            "owner@gmail.com", () => Task.FromResult("token-123"), new HttpClient(handler), health);
+            "owner@example.com", () => Task.FromResult("token-123"), new HttpClient(handler), health);
 
         await Assert.ThrowsAnyAsync<Exception>(() =>
             client.FetchRecentAsync(DateTimeOffset.FromUnixTimeSeconds(1756461600)));
@@ -159,7 +159,7 @@ public class GmailApiClientTests
     [Fact]
     public async Task AnHtmlOnlyMessageIsNotBlank()
     {
-        var html = "From: her@example.com\r\nTo: owner@gmail.com\r\nSubject: Dinner\r\n"
+        var html = "From: her@example.com\r\nTo: owner@example.com\r\nSubject: Dinner\r\n"
             + "Message-Id: <m9@example.com>\r\nDate: Sat, 29 Aug 2026 10:00:00 +0000\r\n"
             + "Content-Type: text/html; charset=utf-8\r\n\r\n"
             + "<html><body><p>Seven &amp; a half?</p></body></html>";

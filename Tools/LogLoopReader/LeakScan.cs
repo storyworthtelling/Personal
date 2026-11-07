@@ -127,14 +127,12 @@ public sealed record CiHit(string Path, int Line, string Rule)
 /// <summary>
 /// The content-free subset CI runs on every claude/** push (§6.1): it holds no plaintext, so it looks
 /// only for shapes — a Luhn-valid card-like number, an address outside example.com, a phone number that
-/// is not a 555 number, an OAuth-code- or token-shaped string, and (on a claude/logfix-* branch, where a
-/// figure in a test is most likely copied from a log) a dollar amount in a test.
+/// is not a 555 number, an OAuth-code- or token-shaped string, a key shape (<see cref="KeyShapes"/>, the
+/// list the repo-wide NoKeysTests reads), a house-precise coordinate pair, a real lender's name, and (on a
+/// claude/logfix-* branch, where a figure in a test is most likely copied from a log) a dollar amount in a test.
 /// </summary>
 public static partial class CiLeakScan
 {
-    private static readonly string[] AllowedEmailDomains =
-        ["example.com", "example.org", "example.net", "anthropic.com", "users.noreply.github.com"];
-
     public static IReadOnlyList<CiHit> Scan(string path, IEnumerable<(int Line, string Text)> addedLines, bool logfixBranch)
     {
         var hits = new List<CiHit>();
@@ -145,7 +143,8 @@ public static partial class CiLeakScan
             {
                 hits.Add(new CiHit(path, line, "card-number"));
             }
-            if (Email().Matches(text).Any(m => !AllowedEmail(m.Groups["domain"].Value)))
+            var shapes = InventedShapes.Find(path, text);
+            if (shapes.Any(finding => finding.Kind == InventedShapes.EmailKind))
             {
                 hits.Add(new CiHit(path, line, "email"));
             }
@@ -160,6 +159,18 @@ public static partial class CiLeakScan
             {
                 hits.Add(new CiHit(path, line, "oauth-code"));
             }
+            foreach (var kind in KeyShapes.Find(text).Select(finding => finding.Kind).Distinct())
+            {
+                hits.Add(new CiHit(path, line, "key: " + kind));
+            }
+            if (CoordinatePairs.Contains(text))
+            {
+                hits.Add(new CiHit(path, line, "coordinates"));
+            }
+            if (shapes.Any(finding => finding.Kind == InventedShapes.LenderKind))
+            {
+                hits.Add(new CiHit(path, line, "lender-name"));
+            }
             if (logfixBranch && isTest && DollarAmount().IsMatch(text))
             {
                 hits.Add(new CiHit(path, line, "amount-in-test"));
@@ -171,10 +182,6 @@ public static partial class CiLeakScan
     public static bool IsTestPath(string path) =>
         path.Replace('\\', '/').Split('/').Any(s => s.EndsWith(".Tests", StringComparison.Ordinal) || s == "Tests")
         || path.EndsWith("Tests.cs", StringComparison.Ordinal);
-
-    private static bool AllowedEmail(string domain) =>
-        AllowedEmailDomains.Any(a => domain.Equals(a, StringComparison.OrdinalIgnoreCase)
-            || domain.EndsWith("." + a, StringComparison.OrdinalIgnoreCase));
 
     private static bool Fictional(string phone) =>
         Regex.Matches(phone, @"\d{3,4}").Any(m => m.Value == "555");
@@ -205,9 +212,6 @@ public static partial class CiLeakScan
 
     [GeneratedRegex(@"\b(?:\d[ -]?){12,18}\d\b")]
     private static partial Regex Card();
-
-    [GeneratedRegex(@"[\w.+-]+@(?<domain>[\w-]+(\.[\w-]+)+)")]
-    private static partial Regex Email();
 
     [GeneratedRegex(@"\(?\b\d{3}\)?[-. ]\d{3}[-. ]\d{4}\b")]
     private static partial Regex Phone();

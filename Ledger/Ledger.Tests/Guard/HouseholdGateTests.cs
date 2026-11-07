@@ -239,7 +239,7 @@ public class HouseholdGateTests
         OwnerAccount = OwnerEmail,
         Plaid = new PlaidSecrets("client-id", "client-secret", "production")
         {
-            Items = [new PlaidItem("item-1", "access-token-1", "Redwood Bank"), new PlaidItem("item-2", "access-token-2", "Ally")],
+            Items = [new PlaidItem("item-1", "access-token-1", "Redwood Bank"), new PlaidItem("item-2", "access-token-2", "Harbor Savings")],
         },
     };
 
@@ -267,7 +267,7 @@ public class HouseholdGateTests
         var vault = OwnersVault();
 
         var rotatedSecret = PlaidVaultMerge.Apply(
-            vault, string.Empty, "new-secret", "production", [new PlaidItem("item-3", "access-token-3", "Wells")]);
+            vault, string.Empty, "new-secret", "production", [new PlaidItem("item-3", "access-token-3", "Stonebridge")]);
 
         Assert.Equal("client-id", rotatedSecret.Plaid.ClientId);
         Assert.Equal("new-secret", rotatedSecret.Plaid.Secret);

@@ -61,9 +61,9 @@ public class IncomeDetectionServiceTests
             });
             context.Institutions.Add(new Institution
             {
-                Name = "PNC",
-                AccessToken = "access-pnc",
-                Accounts = [new Account { AccountId = "pnc-checking", Name = "Checking" }],
+                Name = "Cedar Hollow",
+                AccessToken = "access-cedar",
+                Accounts = [new Account { AccountId = "cedar-checking", Name = "Checking" }],
             });
             await context.SaveChangesAsync();
         }
@@ -81,7 +81,7 @@ public class IncomeDetectionServiceTests
                 It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(redwoodDeposits);
         plaid.Setup(p => p.GetTransactionsAsync(
-                "access-pnc", It.IsAny<IReadOnlyList<string>>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(),
+                "access-cedar", It.IsAny<IReadOnlyList<string>>(), It.IsAny<DateOnly>(), It.IsAny<DateOnly>(),
                 It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((IReadOnlyList<PlaidTransaction>)[]);
 

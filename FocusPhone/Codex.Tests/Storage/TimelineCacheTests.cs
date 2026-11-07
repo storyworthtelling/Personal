@@ -82,7 +82,7 @@ public class TimelineCacheTests : IDisposable
         {
             Subject = "Subject line",
             Body = "Body text",
-            FromAddress = "me@gmail.com",
+            FromAddress = "me@example.com",
             Recipients = ["bob@example.com", "carol@example.com"],
             CarbonCopy = ["dave@example.com"],
             MessageId = "abc@mail",
@@ -95,7 +95,7 @@ public class TimelineCacheTests : IDisposable
 
         Assert.Equal("Subject line", loaded.Subject);
         Assert.Equal("Body text", loaded.Body);
-        Assert.Equal("me@gmail.com", loaded.FromAddress);
+        Assert.Equal("me@example.com", loaded.FromAddress);
         Assert.Equal(["bob@example.com", "carol@example.com"], loaded.Recipients);
         Assert.Equal(["dave@example.com"], loaded.CarbonCopy);
         Assert.Equal("abc@mail", loaded.MessageId);
@@ -114,7 +114,7 @@ public class TimelineCacheTests : IDisposable
         {
             GroupId = "conv-42",
             Participants = ["5551110000", "7911123456"],
-            ParticipantAddresses = ["5551110000", "+447911123456"],
+            ParticipantAddresses = ["5551110000", "+447700900123"],
             ExternalConversationId = "conv-42",
             Unread = true,
         };
@@ -125,7 +125,7 @@ public class TimelineCacheTests : IDisposable
         Assert.Equal("conv-42", loaded.GroupId);
         Assert.True(loaded.IsGroup);
         Assert.Equal(["5551110000", "7911123456"], loaded.Participants);
-        Assert.Equal(["5551110000", "+447911123456"], loaded.ParticipantAddresses);
+        Assert.Equal(["5551110000", "+447700900123"], loaded.ParticipantAddresses);
         Assert.Equal("conv-42", loaded.ExternalConversationId);
         Assert.True(loaded.Unread);
     }

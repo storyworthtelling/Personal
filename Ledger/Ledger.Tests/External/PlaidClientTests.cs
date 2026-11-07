@@ -288,7 +288,7 @@ public class PlaidClientTests
                 "item_add_results": [
                   {
                     "public_token": "public-sandbox-99",
-                    "institution": { "name": "PNC Bank", "institution_id": "ins_13" }
+                    "institution": { "name": "Cedar Hollow Bank", "institution_id": "ins_13" }
                   }
                 ]
               }
@@ -301,7 +301,7 @@ public class PlaidClientTests
 
         Assert.NotNull(result);
         Assert.Equal("public-sandbox-99", result!.PublicToken);
-        Assert.Equal("PNC Bank", result.InstitutionName);
+        Assert.Equal("Cedar Hollow Bank", result.InstitutionName);
     }
 
     [Fact]
@@ -393,7 +393,7 @@ public class PlaidClientTests
         {
           "institution": {
             "institution_id": "ins_13",
-            "name": "PNC Bank",
+            "name": "Cedar Hollow Bank",
             "primary_color": "#025a2f"
           },
           "request_id": "r"
@@ -403,7 +403,7 @@ public class PlaidClientTests
         var institution = await client.GetInstitutionAsync("ins_13", CancellationToken.None);
 
         Assert.Equal("ins_13", institution.InstitutionId);
-        Assert.Equal("PNC Bank", institution.Name);
+        Assert.Equal("Cedar Hollow Bank", institution.Name);
         Assert.Equal("#025a2f", institution.PrimaryColorHex);
 
         var body = handler.RequestBodies[0];

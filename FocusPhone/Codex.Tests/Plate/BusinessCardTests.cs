@@ -21,12 +21,12 @@ public class BusinessCardTests
             "Marguerite Okonjo",
             "Principal Surveyor",
             "(503) 555-0142",
-            "m.okonjo@harbourline.com",
+            "m.okonjo@harbourline.example",
         ]);
 
         Assert.Equal("Marguerite Okonjo", reading.Name);
         Assert.Equal("(503) 555-0142", reading.Phone);
-        Assert.Equal("m.okonjo@harbourline.com", reading.Email);
+        Assert.Equal("m.okonjo@harbourline.example", reading.Email);
     }
 
     [Fact]
@@ -50,9 +50,9 @@ public class BusinessCardTests
     }
 
     [Theory]
-    [InlineData("www.harbourline.com")]
-    [InlineData("https://harbourline.com")]
-    [InlineData("41 Quay Street, Portland OR 97204")]
+    [InlineData("www.harbourline.example")]
+    [InlineData("https://harbourline.example")]
+    [InlineData("41 Example Street, Springfield 00000")]
     [InlineData("Principal Surveyor")]
     public void AddressesUrlsAndTitlesAreNotNames(string noise)
     {
@@ -85,11 +85,11 @@ public class BusinessCardTests
     {
         var reading = BusinessCard.Read([
             "Ada Speight",
-            "ada@harbourline.com",
-            "accounts@harbourline.com",
+            "ada@harbourline.example",
+            "accounts@harbourline.example",
         ]);
 
-        Assert.Equal("ada@harbourline.com", reading.Email);
+        Assert.Equal("ada@harbourline.example", reading.Email);
     }
 
     [Fact]
@@ -105,9 +105,9 @@ public class BusinessCardTests
     [Fact]
     public void TheEmailLineIsNeverAlsoTheName()
     {
-        var reading = BusinessCard.Read(["ada@harbourline.com"]);
+        var reading = BusinessCard.Read(["ada@harbourline.example"]);
 
         Assert.Equal(string.Empty, reading.Name);
-        Assert.Equal("ada@harbourline.com", reading.Email);
+        Assert.Equal("ada@harbourline.example", reading.Email);
     }
 }

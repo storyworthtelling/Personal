@@ -194,17 +194,43 @@ public static class MauiTapWatch
                 // A generated id has no entry name; the label is enough.
             }
         }
-        var text = view is TextView own ? own.Text : FirstText(view);
-        if (string.IsNullOrWhiteSpace(text))
+        var inList = InList(view);
+        var text = inList ? null : view is TextView own ? own.Text : FirstText(view);
+        if (!inList && string.IsNullOrWhiteSpace(text))
         {
             text = view.ContentDescription;
         }
-        if (string.IsNullOrWhiteSpace(text) && Views.TryGetValue(view, out var mauiView))
+        if (!inList && string.IsNullOrWhiteSpace(text) && Views.TryGetValue(view, out var mauiView))
         {
             text = Microsoft.Maui.Controls.AutomationProperties.GetName(mauiView);
         }
-        return TapWatchCore.ControlName(text, id, Views.TryGetValue(view, out var named) ? named.GetType().Name : view.GetType().Name);
+        var type = Views.TryGetValue(view, out var named) ? named.GetType().Name : view.GetType().Name;
+        return TapWatchCore.ControlName(text, id, type, inList: inList);
     }
+
+    /// <summary>
+    /// Whether <paramref name="view"/> is a row of a list (or the list itself). A row's text is a
+    /// person, a message or an amount, so it is never read for a tap line (logging audit 08).
+    /// RecyclerView is matched by name so the shared kit needs no AndroidX reference for it.
+    /// </summary>
+    private static bool InList(AView view)
+    {
+        if (IsList(view))
+        {
+            return true;
+        }
+        for (var at = view.Parent; at is not null; at = at.Parent)
+        {
+            if (IsList(at))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool IsList(object view) =>
+        view is AdapterView || view.GetType().Name.EndsWith("RecyclerView", StringComparison.Ordinal);
 
     private static string? FirstText(AView view)
     {

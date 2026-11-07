@@ -23,3 +23,7 @@ graphify-out/
 log-loop/
 # …but the runbook folder is reviewed like code, so it is never ignored.
 !.claude/log-loop/
+
+# The retired owner-photo path. The medallion is made from the drawn mark at Branding/owners-mark.png;
+# a photograph dropped here would ship in every public APK, so nothing reads it and git ignores it.
+/Branding/owner.png

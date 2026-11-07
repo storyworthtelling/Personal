@@ -19,13 +19,13 @@ public class AccountServiceVaultTests
         using var db = new TestDatabase();
         var service = Create(db);
         await service.AddInstitutionAsync("item-1", "access-1", "Redwood Bank", default);
-        await service.AddInstitutionAsync("item-2", "access-2", "PNC", default);
+        await service.AddInstitutionAsync("item-2", "access-2", "Cedar Hollow", default);
 
         var credentials = await service.GetInstitutionCredentialsAsync(default);
 
         Assert.Collection(credentials,
             c => Assert.Equal(("item-1", "access-1", "Redwood Bank"), (c.ItemId, c.AccessToken, c.Name)),
-            c => Assert.Equal(("item-2", "access-2", "PNC"), (c.ItemId, c.AccessToken, c.Name)));
+            c => Assert.Equal(("item-2", "access-2", "Cedar Hollow"), (c.ItemId, c.AccessToken, c.Name)));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class AccountServiceVaultTests
         var added = await service.RestoreInstitutionsAsync(
             [
                 new InstitutionCredential("item-1", "stale-token", "Redwood Bank"), // already present — skipped
-                new InstitutionCredential("item-2", "access-2", "PNC")
+                new InstitutionCredential("item-2", "access-2", "Cedar Hollow")
             ], default);
 
         Assert.Equal(1, added);

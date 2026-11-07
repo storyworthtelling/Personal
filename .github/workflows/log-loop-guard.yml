@@ -3,7 +3,9 @@ name: Log loop guard
 # LOG-LOOP-PLAN.md §6.1, layer 4 — the content-free half of the leak scan, on every claude/** push and every
 # PR to main. It holds no log plaintext, so it looks only for shapes in the ADDED lines: a Luhn-valid
 # card-like number, an address outside example.com, a phone number that is not a 555 number, an OAuth-code-
-# or token-shaped string, and (on claude/logfix-* branches only) a dollar amount in a test. A hit is not a
+# or token-shaped string, a key shape, a house-precise coordinate pair, a real lender's name, and (on
+# claude/logfix-* branches only) a dollar amount in a test. It also runs the repo-wide NoKeys and
+# InventedData guards over the whole tree. A hit is not a
 # code risk the owner waived; it is the public-repository rule, and it always blocks. Branch protection
 # requires this job on main, and the auto-merge gate waits for it.
 #
@@ -37,6 +39,11 @@ jobs:
 
       - name: Test the reader (fetch, digest, sanitize, leakscan, gate)
         run: dotnet test Tools/LogLoopReader.Tests/LogLoopReader.Tests.csproj
+
+      # The whole tree, not just the added lines: no key shape and no real-looking contact,
+      # address or lender anywhere (RepoGuards.Tests reads the same detectors as leakscan).
+      - name: Scan the whole repository (NoKeys, InventedData)
+        run: dotnet test RepoGuards.Tests/RepoGuards.Tests.csproj
 
       - name: Scan the added lines
         env:

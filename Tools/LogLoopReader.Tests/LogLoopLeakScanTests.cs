@@ -79,6 +79,49 @@ public class LogLoopLeakScanTests
         Assert.Equal("phone", Assert.Single(CiLeakScan.Scan("a.cs", [(1, $"call {real}")], false)).Rule);
     }
 
+    public static IEnumerable<object[]> CiKeySamples()
+    {
+        yield return ["key: secret-key token", "var k = \"" + "sk-" + "ant-" + new string('q', 30) + "\";"];
+        yield return ["key: Google API key", "?key=" + "AIza" + new string('Q', 35)];
+        yield return ["key: GitHub token", "token " + "ghp_" + new string('Z', 36)];
+        yield return ["key: GitHub token", "token " + "github_pat_" + new string('Z', 30)];
+        yield return ["key: private key block", "-----" + "BEGIN " + "PRIVATE KEY-----"];
+    }
+
+    [Theory]
+    [MemberData(nameof(CiKeySamples))]
+    public void CiFlagsAKeyShape(string rule, string line)
+    {
+        var hits = CiLeakScan.Scan("a.cs", [(4, line)], false);
+
+        Assert.Contains(hits, hit => hit.Rule == rule && hit.Line == 4);
+        Assert.DoesNotContain(hits, hit => hit.ToString().Contains(new string('Q', 20), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CiLeavesStandInKeysAndTestNamesAlone()
+    {
+        Assert.Empty(CiLeakScan.Scan("a.cs", [(1, "ApiKey = \"test-key\"; RefreshToken = \"rt\";")], false));
+        Assert.Empty(CiLeakScan.Scan("a.cs", [(1, "public void Clock12IsLowercaseWithoutLeadingZero()")], false));
+    }
+
+    [Fact]
+    public void CiFlagsAHousePreciseCoordinatePairButNotACityCentre()
+    {
+        var precise = "41." + "8781" + ", -87." + "6298";
+        Assert.Equal("coordinates", Assert.Single(CiLeakScan.Scan("a.cs", [(1, $"new(\"x\", {precise})")], false)).Rule);
+        Assert.Empty(CiLeakScan.Scan("a.cs", [(1, "new(\"x\", 39.78, -89.65)")], false));
+        Assert.Empty(CiLeakScan.Scan("a.cs", [(1, "versions 1.2.3456 and 10.0.1140")], false));
+    }
+
+    [Fact]
+    public void CiFlagsARealLenderNameButNotAnInventedOneOrAPackageId()
+    {
+        var real = "Wells " + "Fargo";
+        Assert.Equal("lender-name", Assert.Single(CiLeakScan.Scan("a.cs", [(1, $"Name = \"{real}\"")], false)).Rule);
+        Assert.Empty(CiLeakScan.Scan("a.cs", [(1, "Name = \"Redwood Bank\"; [\"com.pnc.ecommerce.mobile\"] = Finance;")], false));
+    }
+
     [Fact]
     public void CiFlagsOauthShapedStrings()
     {
@@ -87,7 +130,7 @@ public class LogLoopLeakScanTests
         var refresh = "1//" + "0gAbCdEfGhIjKlMnOpQrStUvWx";
 
         Assert.All(new[] { google, plaid, refresh }, token =>
-            Assert.Equal("oauth-code", Assert.Single(CiLeakScan.Scan("a.cs", [(1, $"\"{token}\"")], false)).Rule));
+            Assert.Contains(CiLeakScan.Scan("a.cs", [(1, $"\"{token}\"")], false), hit => hit.Rule == "oauth-code"));
         Assert.Empty(CiLeakScan.Scan("a.cs", [(1, "code=<redacted> state=xyz")], false));
     }
 

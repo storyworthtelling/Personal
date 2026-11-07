@@ -12,7 +12,7 @@ public sealed class Institution
     public string ItemId { get; set; } = string.Empty;
     public string AccessToken { get; set; } = string.Empty;
 
-    // Display name shown in the list header (e.g. "PNC", "Redwood Bank").
+    // Display name shown in the list header (e.g. "Cedar Hollow", "Redwood Bank").
     public string Name { get; set; } = string.Empty;
 
     public WorkStatus RefreshStatus { get; set; } = WorkStatus.Pending;

@@ -11,9 +11,10 @@ namespace Storyworthtelling.Paper;
 /// renderer that cannot load a branding asset does not fail — it draws a blank where the mark should
 /// be, and the page is already printed by the time anyone notices.</para>
 ///
-/// <para>It is <b>optional</b>. A household that has not dropped a photo at <c>/Branding/owner.png</c>
+/// <para>It is <b>optional</b>. A build without the drawn mark at <c>/Branding/owners-mark.png</c>
 /// gets a page with no mark rather than an exception in the middle of a delivery, because the
-/// morning is worth more than the signature on it.</para>
+/// morning is worth more than the signature on it. It is never a photograph: the repository and
+/// the APKs are public.</para>
 /// </summary>
 public static class EmbeddedBranding
 {

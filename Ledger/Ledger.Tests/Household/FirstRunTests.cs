@@ -88,7 +88,7 @@ public class FirstRunTests
         {
             Bank("Redwood Bank", WorkStatus.Completed, Now, accounts: 2),
             Bank("Meridian Card", WorkStatus.Completed, Now, accounts: 1),
-            Bank("PNC"), Bank("Amex"), Bank("Citi"), Bank("Ally"),
+            Bank("Cedar Hollow"), Bank("Bluebird Card"), Bank("Meridian"), Bank("Harbor Savings"),
         };
 
         var progress = RestoreProgress.Of(banks);
@@ -100,7 +100,7 @@ public class FirstRunTests
     [Fact]
     public void AFailedFirstRefreshCountsAsAnsweredButKeepsItsPlaceWithAPlainLine()
     {
-        var failed = Bank("PNC", WorkStatus.Failed);
+        var failed = Bank("Cedar Hollow", WorkStatus.Failed);
         var banks = new List<Institution> { Bank("Redwood Bank", WorkStatus.Completed, Now, accounts: 1), failed };
 
         var progress = RestoreProgress.Of(banks);
@@ -109,13 +109,13 @@ public class FirstRunTests
         Assert.Null(progress.StatusLine);
         Assert.True(RestoreProgress.AwaitsFirstFigures(failed));
         Assert.Equal("No balances yet.", RestoreProgress.PendingLine(failed));
-        Assert.Equal("Waiting for its balances.", RestoreProgress.PendingLine(Bank("Amex")));
+        Assert.Equal("Waiting for its balances.", RestoreProgress.PendingLine(Bank("Bluebird Card")));
     }
 
     [Fact]
     public void AllBanksFailedIsNotRestoringSoAddIsOffered()
     {
-        var banks = new List<Institution> { Bank("PNC", WorkStatus.Failed), Bank("Amex", WorkStatus.Failed) };
+        var banks = new List<Institution> { Bank("Cedar Hollow", WorkStatus.Failed), Bank("Bluebird Card", WorkStatus.Failed) };
 
         Assert.False(RestoreProgress.Of(banks).Settling);
         Assert.True(RestoreProgress.OffersAdd(banks));
@@ -136,12 +136,12 @@ public class FirstRunTests
     public void OnlyAnOpenAccountCountsAsSomethingToShow()
     {
         var pendingOnly = new List<Institution> { Bank("Redwood Bank") };
-        var settledOnly = Bank("Amex", WorkStatus.Completed, Now);
+        var settledOnly = Bank("Bluebird Card", WorkStatus.Completed, Now);
         settledOnly.Accounts.Add(new Account { Name = "Card", Kind = AccountKind.Credit, CurrentBalance = 0m });
 
         Assert.False(RestoreProgress.HasCardsToShow(pendingOnly));
         Assert.False(RestoreProgress.HasCardsToShow([settledOnly]));
-        Assert.True(RestoreProgress.HasCardsToShow([Bank("PNC", WorkStatus.Completed, Now, accounts: 1)]));
+        Assert.True(RestoreProgress.HasCardsToShow([Bank("Cedar Hollow", WorkStatus.Completed, Now, accounts: 1)]));
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class FirstRunTests
     [Fact]
     public void TheSignatureChangesWhenABankAnswersAndNotOtherwise()
     {
-        var pending = new List<Institution> { Bank("Redwood Bank"), Bank("PNC") };
+        var pending = new List<Institution> { Bank("Redwood Bank"), Bank("Cedar Hollow") };
         var same = new List<Institution> { pending[0], pending[1] };
         Assert.Equal(RestoreProgress.Signature(pending, restoring: false), RestoreProgress.Signature(same, restoring: false));
 
