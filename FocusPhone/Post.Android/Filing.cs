@@ -62,7 +62,7 @@ internal static class Filing
             return null;
         }
 
-        database.Filing.RemoveGhost(sourceId);
+        database.Filing.RemoveGhost(sourceId, DateTimeOffset.UtcNow);
 
         var tombstones = database.Filing.LoadTombstones();
         tombstones.SourceConfirmed(sourceId);

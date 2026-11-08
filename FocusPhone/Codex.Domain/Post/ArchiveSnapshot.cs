@@ -2,10 +2,22 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 
+using Codex.Domain.Timeline;
+
 namespace Codex.Domain.Post;
 
 /// <summary>The filed archive as one backed-up whole.</summary>
-public sealed record ArchiveSnapshot(IReadOnlyList<Ghost> Ghosts, DateTimeOffset TakenUtc);
+public sealed record ArchiveSnapshot(IReadOnlyList<Ghost> Ghosts, DateTimeOffset TakenUtc)
+{
+    /// <summary>
+    /// Messages taken back out of Filed, and when. The backup is a union, so without this an unfiled message
+    /// would come back from Drive on the next sync. Absent in backups from before there was one.
+    /// </summary>
+    public IReadOnlyList<UnfiledGhost> Unfiled { get; init; } = [];
+}
+
+/// <summary>A message the owner took back out of Filed at <paramref name="UnfiledAtUtc"/>.</summary>
+public sealed record UnfiledGhost(string SourceId, DateTimeOffset UnfiledAtUtc);
 
 /// <summary>
 /// The on-Drive wrapper around a gzip-compressed snapshot. A small, versioned shell around
@@ -122,21 +134,59 @@ public static class ArchiveSnapshotCodec
 }
 
 /// <summary>
-/// When to write the archive up, and when to take it down.
-///
-/// The phone is the single writer, as it is for the audio library, so this is a one-writer
-/// mirror rather than a merge. The rule that matters is the refusal: <b>an empty local
-/// archive never overwrites a backup</b>. A fresh install has nothing filed yet, and
-/// writing that up would destroy the only copy of every message the owner ever filed —
-/// which is the exact thing the backup exists to prevent.
+/// How the phone's archive and the backup meet. It used to be a one-writer mirror, so whatever the phone held
+/// replaced the backup — and a phone whose restore had not run (mail entered by hand after a reset, or offline at
+/// first launch) replaced every filed message with the first one filed after (error-handling audit §2). It is a
+/// union now, keyed by <see cref="TimelineItem.SourceId"/>, taken in both directions on every sync: what the
+/// backup holds and the phone does not is restored, what the phone holds is added to the backup. A message the
+/// owner unfiled stays out, because the snapshot remembers when it was unfiled, and a ghost survives unless it
+/// was unfiled after it was filed.
 /// </summary>
 public static class ArchiveSync
 {
-    public static bool NeedsWriting(ArchiveSnapshot local, ArchiveSnapshot? backedUp)
+    public static ArchiveSnapshot Merge(ArchiveSnapshot local, ArchiveSnapshot? backedUp)
     {
-        // The refusal comes first, before any comparison. Nothing local is not a state
-        // worth propagating; it is the state a reset leaves behind.
-        if (local.Ghosts.Count == 0)
+        var unfiled = new Dictionary<string, UnfiledGhost>(StringComparer.Ordinal);
+        foreach (var entry in local.Unfiled.Concat(backedUp?.Unfiled ?? []))
+        {
+            if (!unfiled.TryGetValue(entry.SourceId, out var seen) || entry.UnfiledAtUtc > seen.UnfiledAtUtc)
+            {
+                unfiled[entry.SourceId] = entry;
+            }
+        }
+
+        // The phone's copy first, so it wins for a message both hold.
+        var ghosts = new Dictionary<string, Ghost>(StringComparer.Ordinal);
+        foreach (var ghost in local.Ghosts.Concat(backedUp?.Ghosts ?? []))
+        {
+            ghosts.TryAdd(ghost.Item.SourceId, ghost);
+        }
+
+        var kept = ghosts.Values
+            .Where(ghost => !unfiled.TryGetValue(ghost.Item.SourceId, out var taken) || ghost.FiledAtUtc > taken.UnfiledAtUtc)
+            .OrderByDescending(ghost => ghost.FiledAtUtc)
+            .ToList();
+
+        return new ArchiveSnapshot(kept, local.TakenUtc)
+        {
+            Unfiled = unfiled.Values.OrderBy(entry => entry.SourceId, StringComparer.Ordinal).ToList(),
+        };
+    }
+
+    /// <summary>The ghosts the merge holds that the phone does not: what a restore puts back.</summary>
+    public static IReadOnlyList<Ghost> ToRestore(ArchiveSnapshot merged, ArchiveSnapshot local)
+    {
+        var held = local.Ghosts.Select(ghost => ghost.Item.SourceId).ToHashSet(StringComparer.Ordinal);
+        return merged.Ghosts.Where(ghost => !held.Contains(ghost.Item.SourceId)).ToList();
+    }
+
+    /// <summary>
+    /// Whether the merge says something the backup does not. Compared by content, not by when it was taken: the
+    /// timestamp changes on every sync and would make every run a write. Nothing at all is never written.
+    /// </summary>
+    public static bool NeedsWriting(ArchiveSnapshot merged, ArchiveSnapshot? backedUp)
+    {
+        if (merged.Ghosts.Count == 0 && merged.Unfiled.Count == 0)
         {
             return false;
         }
@@ -145,23 +195,9 @@ public static class ArchiveSync
             return true;
         }
 
-        // Compared by content, not by when it was taken: the timestamp changes on every
-        // sync and would make every run a write.
-        return !SameContent(local, backedUp);
+        return !Ids(merged.Ghosts.Select(g => g.Item.SourceId)).SequenceEqual(Ids(backedUp.Ghosts.Select(g => g.Item.SourceId)), StringComparer.Ordinal)
+            || !Ids(merged.Unfiled.Select(u => u.SourceId)).SequenceEqual(Ids(backedUp.Unfiled.Select(u => u.SourceId)), StringComparer.Ordinal);
     }
 
-    /// <summary>A device with nothing filed takes what Drive has; one with ghosts is the authority.</summary>
-    public static bool ShouldRestore(IReadOnlyList<Ghost> local) => local.Count == 0;
-
-    private static bool SameContent(ArchiveSnapshot left, ArchiveSnapshot right)
-    {
-        if (left.Ghosts.Count != right.Ghosts.Count)
-        {
-            return false;
-        }
-
-        var leftIds = left.Ghosts.Select(ghost => ghost.Item.SourceId).OrderBy(id => id, StringComparer.Ordinal);
-        var rightIds = right.Ghosts.Select(ghost => ghost.Item.SourceId).OrderBy(id => id, StringComparer.Ordinal);
-        return leftIds.SequenceEqual(rightIds, StringComparer.Ordinal);
-    }
+    private static IEnumerable<string> Ids(IEnumerable<string> ids) => ids.Order(StringComparer.Ordinal);
 }

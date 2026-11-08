@@ -94,10 +94,11 @@ public static class PostSync
         await MailIntelligence.RunAsync(context, database, await ReadingClientAsync(), now);
 
         // The archive is the one thing here that cannot be rebuilt from a source, so it is
-        // the one thing worth carrying off the device. Written only when it has changed.
+        // the one thing worth carrying off the device. Merged both ways every sync, so a
+        // restore that has not happened yet happens here; written only when it has changed.
         if (VoiceGoogleAccount.IsSignedIn)
         {
-            await new ArchiveBackup(MailAccess.Account().GetAccessToken, "Post").BackUpAsync(context);
+            await new ArchiveBackup(MailAccess.Account().GetAccessToken, "Post").SyncAsync(context);
         }
         preferences.Edit()!.PutString(LastSyncKey, now.ToString("O"))!.Apply();
     }

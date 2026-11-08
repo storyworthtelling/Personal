@@ -67,9 +67,34 @@ public class FilingStoreTests : IDisposable
     {
         store.SaveGhost(new Ghost(Message("m1"), Now));
 
-        store.RemoveGhost("m1");
+        store.RemoveGhost("m1", Now);
 
         Assert.Empty(new FilingStore(connection).LoadArchive().All);
+    }
+
+    // The backup is a union now, so an unfiled message must be remembered as unfiled or the next sync
+    // brings it back from Drive (error-handling §2).
+    [Fact]
+    public void UnfilingIsRememberedAndFilingAgainForgetsIt()
+    {
+        store.SaveGhost(new Ghost(Message("m1"), Now));
+
+        store.RemoveGhost("m1", Now.AddMinutes(5));
+        var unfiled = Assert.Single(new FilingStore(connection).LoadUnfiled());
+
+        Assert.Equal("m1", unfiled.SourceId);
+        Assert.Equal(Now.AddMinutes(5), unfiled.UnfiledAtUtc);
+
+        store.SaveGhost(new Ghost(Message("m1"), Now.AddMinutes(10)));
+        Assert.Empty(store.LoadUnfiled());
+    }
+
+    [Fact]
+    public void AnUnfiledEntryFromTheBackupIsKeptHere()
+    {
+        store.RememberUnfiled([new UnfiledGhost("m7", Now), new UnfiledGhost("m8", Now)]);
+
+        Assert.Equal(["m7", "m8"], new FilingStore(connection).LoadUnfiled().Select(u => u.SourceId).Order());
     }
 
     // Tombstones outlive the process too. A filing whose source delete has not landed must
