@@ -104,3 +104,73 @@ public class TriageTests
         Assert.Null(TriageLedger.FromJson("{}").Get("a"));
     }
 }
+
+public class TriageSplitTests
+{
+    private static TriageItem Item(string fp, string app, TriageStatus status = TriageStatus.Pending, TriageOutcome? outcome = null) =>
+        new(fp, app, "message", 1, status, outcome, outcome is null ? null : "C5");
+
+    [Fact]
+    public void ItemsAreSplitByAppSoEachSubagentOwnsOneFile()
+    {
+        var split = Triage.ByApp([Item("a", "post"), Item("b", "score"), Item("c", "post")]);
+
+        Assert.Equal(["a", "c"], split["post"].Select(i => i.Fingerprint));
+        Assert.Equal(["b"], split["score"].Select(i => i.Fingerprint));
+    }
+
+    [Fact]
+    public void AnAppWithNothingToDecideGetsNoFile()
+    {
+        var split = Triage.ByApp([Item("a", "post", TriageStatus.Folded), Item("b", "score")]);
+
+        Assert.False(split.ContainsKey("post"));
+    }
+
+    [Fact]
+    public void ReportCountsNameHowManyAreStillOpen()
+    {
+        var counts = Triage.Counts([Item("a", "post", outcome: TriageOutcome.Fix), Item("b", "post", outcome: TriageOutcome.Report),
+            Item("c", "post", outcome: TriageOutcome.NoAction), Item("d", "post"), Item("e", "post", TriageStatus.Folded)]);
+
+        Assert.Equal((1, 1, 1, 1), (counts.Fix, counts.Report, counts.NoAction, counts.Untriaged));
+    }
+}
+
+public class BacklogTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 11, 8, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void OnlyFilesThatAreNotDoneAreListedWithTheirAgeInDays()
+    {
+        var lines = Backlog.Lines(
+        [
+            new Manifest.Entry("swt-log.post.a.000001-000001.json", "1", "done", "Decrypted"),
+            new Manifest.Entry("swt-log.post.a.000002-000002.json", "2", "triaged", "Decrypted"),
+        ],
+        name => name.EndsWith("000002-000002.json", StringComparison.Ordinal) ? Now.AddDays(-9) : null, Now);
+
+        var line = Assert.Single(lines);
+        Assert.Contains("9 days", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("OVERDUE", line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AFileOlderThanFourWeeksIsMarkedOverdue()
+    {
+        var lines = Backlog.Lines([new Manifest.Entry("f.json", "1", "decrypted", "Decrypted")], _ => Now.AddDays(-29), Now);
+
+        Assert.Contains("OVERDUE", Assert.Single(lines), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AFileWeCannotDateSaysSoAndNamesWhyItIsStillHere()
+    {
+        var lines = Backlog.Lines([new Manifest.Entry("f.json", "1", "fetched", "WrongKey")], _ => null, Now);
+
+        var line = Assert.Single(lines);
+        Assert.Contains("age unknown", line, StringComparison.Ordinal);
+        Assert.Contains("WrongKey", line, StringComparison.Ordinal);
+    }
+}
