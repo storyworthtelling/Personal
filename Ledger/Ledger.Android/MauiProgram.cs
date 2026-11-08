@@ -137,8 +137,9 @@ public static class MauiProgram
                 Microsoft.Maui.Storage.Preferences.Default.Set("driveFileIds", DriveFileIdMapCodec.Encode(map)));
         });
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
-            new DriveVoiceProfileStore(new DriveTextFile(
-                DriveFactory(sp), DriveVoiceProfileStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
+            DriveVoiceProfileStore.Sealed(
+                name => new DriveTextFile(DriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>()),
+                () => SettingsStore.VaultPassphrase));
 
         // Release I (D10, finding §3): the household snapshot the owner's install publishes and hers
         // reads — its own Drive file, over the same seam every other Drive file here uses. One shared

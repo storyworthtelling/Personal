@@ -38,8 +38,9 @@ public sealed class VoiceGreeting
         options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
         var client = new VoiceClient(http, options);
-        messenger = new VoicedMessenger(new DriveVoiceProfileStore(new DriveTextFile(
-            driveFactory, DriveVoiceProfileStore.FileName, SharedDriveFileIds.Store)), client);
+        messenger = new VoicedMessenger(
+            DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
+            client);
     }
 
     // Composes a greeting in the owner's voice for the occasion, or "" when it can't (no profile, no key,

@@ -64,7 +64,7 @@ internal static class BodySeats
         var options = new DriveVoiceOptions(new VaultVoiceConfigStore(vault, () => VaultPassphraseStore.Passphrase));
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
         var messenger = new VoicedMessenger(
-            new DriveVoiceProfileStore(new DriveTextFile(driveFactory, DriveVoiceProfileStore.FileName, SharedDriveFileIds.Store)),
+            DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
             new VoiceClient(http, options));
 
         return new SeatCache(new SeatComposer(messenger, options), new BodySeatLineStore(context));

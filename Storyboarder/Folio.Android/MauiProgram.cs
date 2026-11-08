@@ -183,8 +183,9 @@ public static class MauiProgram
                 Microsoft.Maui.Storage.Preferences.Default.Set("driveFileIds", DriveFileIdMapCodec.Encode(map)));
         });
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
-            new DriveVoiceProfileStore(new DriveTextFile(
-                DriveFactory(sp), DriveVoiceProfileStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
+            DriveVoiceProfileStore.Sealed(
+                name => new DriveTextFile(DriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>()),
+                () => SettingsStore.VaultPassphrase));
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
         // the owner's passphrase (SettingsStore.VaultPassphrase). Folio both publishes its own keys to
