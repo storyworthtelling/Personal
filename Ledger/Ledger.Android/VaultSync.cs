@@ -60,18 +60,10 @@ public sealed class VaultSync
                     ? v.Remarkable
                     : new RemarkableSecrets(SettingsStore.RemarkableDeviceToken),
                 // Fold this session's captured Drive file ids into the shared map (id wins per name).
-                DriveFileIds = MergeIds(v.DriveFileIds, fileIdStore.Snapshot())
+                DriveFileIds = VaultMerge.MergeDriveFileIds(v.DriveFileIds, fileIdStore.Snapshot())
             }, cancellationToken);
     }
 
-    private static IReadOnlyDictionary<string, string> MergeIds(
-        IReadOnlyDictionary<string, string> existing, IReadOnlyDictionary<string, string> captured)
-    {
-        var merged = new Dictionary<string, string>(existing);
-        foreach (var (name, id) in captured)
-            merged[name] = id;
-        return merged;
-    }
 
     // Fills in the Plaid credentials this install is missing and re-creates any bank the database doesn't
     // have. Existing local values win — restore never overwrites credentials or tokens already present here.

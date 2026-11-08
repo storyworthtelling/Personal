@@ -1,4 +1,5 @@
 using Storyworthtelling.Voice;
+using Folio.Infrastructure.Vault;
 using Storyworthtelling.Voice.Secrets;
 
 namespace Folio.Android;
@@ -19,28 +20,17 @@ public sealed class VaultSync
         this.fileIdStore = fileIdStore;
     }
 
-    // Writes the current Claude + Gemini keys and the reMarkable device token into the vault, leaving every
-    // other app's section untouched. The Remarkable section is shared with the other apps that deliver to the
-    // same tablet, so publishing the token here also lets them restore it.
-    public Task<SecretsVaultPublishResult> PublishAsync(CancellationToken cancellationToken) =>
-        vault.PublishAsync(v => v with
-        {
-            Claude = new ClaudeSecrets(SettingsStore.ClaudeApiKey),
-            Gemini = new GeminiSecrets(SettingsStore.GeminiApiKey),
-            Remarkable = new RemarkableSecrets(SettingsStore.RemarkableDeviceToken),
-            // Fold this session's captured Drive file ids into the shared map (id wins per name), so a
-            // reinstall restores where the well-known files live even after a rename/move.
-            DriveFileIds = MergeIds(v.DriveFileIds, fileIdStore.Snapshot())
-        }, cancellationToken);
-
-    private static IReadOnlyDictionary<string, string> MergeIds(
-        IReadOnlyDictionary<string, string> existing, IReadOnlyDictionary<string, string> captured)
-    {
-        var merged = new Dictionary<string, string>(existing);
-        foreach (var (name, id) in captured)
-            merged[name] = id;
-        return merged;
-    }
+    // Writes the Claude + Gemini keys and the reMarkable device token into the vault, leaving every other app's
+    // section untouched, under the suite's merge rule: a blank never overwrites (so a Folio that never paired
+    // cannot wipe the token Foreword published), and a value the vault already holds is replaced only by one
+    // the owner just changed here (`changed`, FolioVaultSection's field names). Captured Drive file ids are
+    // folded into the shared map, so a reinstall restores where the well-known files live.
+    public Task<SecretsVaultPublishResult> PublishAsync(IReadOnlyCollection<string> changed, CancellationToken cancellationToken) =>
+        vault.PublishAsync(v => FolioVaultSection.Merge(
+            v,
+            new FolioVaultSection.Local(SettingsStore.ClaudeApiKey, SettingsStore.GeminiApiKey, SettingsStore.RemarkableDeviceToken),
+            changed,
+            fileIdStore.Snapshot()), cancellationToken);
 
     // Fills in any key this install is missing from the vault. Existing local keys win — restore never
     // overwrites a value the owner has already entered here.

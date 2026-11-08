@@ -1,3 +1,4 @@
+using Folio.Infrastructure.Vault;
 using Folio.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -364,14 +365,24 @@ public partial class SetupPage : FolioBinderPage
 
     private async void OnSaveClicked(object sender, EventArgs e)
     {
-        SettingsStore.ClaudeApiKey = ClaudeKeyEntry.Text?.Trim() ?? string.Empty;
-        SettingsStore.GeminiApiKey = GeminiKeyEntry.Text?.Trim() ?? string.Empty;
+        var claude = ClaudeKeyEntry.Text?.Trim() ?? string.Empty;
+        var gemini = GeminiKeyEntry.Text?.Trim() ?? string.Empty;
+
+        // Only what the owner changed here may replace the vault's copy (VaultMerge.Pick).
+        var changed = new List<string>();
+        if (claude != SettingsStore.ClaudeApiKey)
+            changed.Add(FolioVaultSection.Claude);
+        if (gemini != SettingsStore.GeminiApiKey)
+            changed.Add(FolioVaultSection.Gemini);
+
+        SettingsStore.ClaudeApiKey = claude;
+        SettingsStore.GeminiApiKey = gemini;
         SettingsStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
         // Publish this app's keys (and, since the shared Claude key is entered here, the voice key) to the
         // encrypted Drive vault so every com.storyworthtelling app can back up and restore from one place.
         // The keys already work locally; a failed publish now surfaces (a silently-skipped backup is what
         // left the vault empty after the cutover) instead of vanishing.
-        await PublishToVaultAsync();
+        await PublishToVaultAsync(changed);
         // Success is the state change: saving returns to the library.
         await Navigation.PopAsync();
         await Navigation.PopAsync();
@@ -379,7 +390,7 @@ public partial class SetupPage : FolioBinderPage
 
     // Publishes and, only when a passphrase was set but the backup didn't land, tells the owner. A
     // no-passphrase skip stays quiet (the app just isn't in the vault yet).
-    private async Task PublishToVaultAsync()
+    private async Task PublishToVaultAsync(IReadOnlyCollection<string> changed)
     {
         SecretsVaultPublishResult result;
         try
@@ -387,7 +398,7 @@ public partial class SetupPage : FolioBinderPage
             var sync = IPlatformApplication.Current!.Services.GetService<VaultSync>();
             if (sync is null)
                 return;
-            result = await sync.PublishAsync(CancellationToken.None);
+            result = await sync.PublishAsync(changed, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -437,7 +448,7 @@ public partial class SetupPage : FolioBinderPage
             SettingsStore.RemarkableDeviceToken = await registration.Register(code);
             PairingTrail.Paired(pairing);
             UpdateRemarkableStatus();
-            await PublishToVaultAsync();
+            await PublishToVaultAsync([FolioVaultSection.Remarkable]);
         }
         catch (HttpRequestException ex)
         {

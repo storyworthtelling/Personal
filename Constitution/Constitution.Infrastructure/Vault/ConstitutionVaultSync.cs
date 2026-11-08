@@ -246,13 +246,9 @@ public sealed class ConstitutionVaultSync
         }
     }
 
-    // What the vault should hold for one slot. A value this install does not hold leaves the vault's
-    // alone; a slot the vault leaves empty takes what this install holds (adding, never overwriting);
-    // and a slot the vault already fills is replaced only by a value this install has just changed.
-    private static string Pick(string local, string inVault, bool changed) =>
-        string.IsNullOrEmpty(local) ? inVault
-        : changed || string.IsNullOrEmpty(inVault) ? local
-        : inVault;
+    // The suite's one rule for a slot (VaultMerge.Pick): a blank never overwrites, an empty slot takes what this
+    // install holds, and a filled slot yields only to a value this install has just changed.
+    private static string Pick(string local, string inVault, bool changed) => VaultMerge.Pick(local, inVault, changed);
 
     private static void Fill(VaultField field, string current, string fromVault, Action<string> set, List<VaultField> filled)
     {
