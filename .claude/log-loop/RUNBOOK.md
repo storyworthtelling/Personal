@@ -56,6 +56,10 @@ should agree. A disagreement goes in the report.
 dotnet run --project Tools/LogLoopReader -- digest          # → $TMPDIR/log-loop/digest.md + digest.json
 ```
 
+`digest` also writes `$TMPDIR/log-loop/triage.json`, the week's checklist, and prints how many fingerprints are
+**pending**, **carried** (decided as No action in an earlier week, from `.claude/log-loop/triage-ledger.json`) and
+**folded** (routine INFO messages, counted but not listed). Only pending ones need a decision.
+
 Read `digest.md` first. It groups every line by fingerprint (an exception's type and top three own
 frames; a tap verdict's screen, control and verdict; a sign-in's flow kind and diagnosis; otherwise a
 message template), with counts, phones and first/last seen. Open raw lines under `$TMPDIR/log-loop/plain/`
@@ -93,6 +97,19 @@ Every fingerprint gets exactly one outcome: **Fix**, **Report** or **No action**
 | C14 Repeated presses on a working control | `REPEATED TAP` where each press did act | Report as UX — not a bug, never a loop fix |
 | C15 Presses on non-controls | `TAPS ON NON-CONTROL` | Report as UX — not a bug, never a loop fix |
 | C16 Sign-in did not return a token | `NoReturn`, `ProviderError`, `StateMismatch`, `ExchangeFailed`, blocked `Hop` | Our bug → Fix; provider or portal configuration → Report with the exact owner checklist; user cancelled → No action |
+
+Write each decision into `triage.json` (`outcome`: `Fix`/`Report`/`NoAction`, and `class`: `C1`…`C16`). Then run:
+
+```bash
+dotnet run --project Tools/LogLoopReader -- triage-check
+```
+
+It exits 1 and lists what is open until every pending fingerprint has an outcome and class. **Do not post the
+report, mark any file `done` or trash anything while it fails.** If you cannot finish (time, volume), say so at the
+top of the report issue with the open count, leave every file untrashed, and stop. When it passes it updates
+`.claude/log-loop/triage-ledger.json` (fingerprints and decisions only, no log text); commit that on its own branch
+`claude/loop-ledger-<yyyy-MM-dd>` and open a PR, never on a logfix branch (a commit without a fingerprint trailer holds
+that PR). A fingerprint decided Fix or Report that appears again next week is asked about again; a No action one is not.
 
 Record each file's progress in `$TMPDIR/log-loop/manifest.json`: `fetched` → `decrypted` → `triaged` →
 `done`. A file is `done` when every fingerprint in it has an outcome.
@@ -192,7 +209,7 @@ Run the leak scan over the issue body (`--body`) before posting it.
 
 ## 7. Trash — the last step
 
-Only after the report issue is posted. Trash, through the connector's `trash_file`, every file the manifest
+Only after `triage-check` has passed and the report issue is posted. Trash, through the connector's `trash_file`, every file the manifest
 marks `done`. Never a `WrongKey` or `Corrupt` file. A crash before this step leaves the files in the folder
 for next week, which is the intended failure.
 

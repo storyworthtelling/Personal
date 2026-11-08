@@ -13,7 +13,7 @@ public static class Cli
     {
         if (args.Length == 0)
         {
-            errors.WriteLine("Usage: LogLoopReader fetch|digest|processed|sanitize|leakscan|gate [options]");
+            errors.WriteLine("Usage: LogLoopReader fetch|digest|triage-check|processed|sanitize|leakscan|gate [options]");
             return 2;
         }
         var options = Options(args.Skip(1).ToArray());
@@ -27,6 +27,7 @@ public static class Cli
                 "sanitize" => Sanitize(input, output),
                 "leakscan" => LeakScanCommand(options, input, output),
                 "gate" => Gate(options, input, output),
+                "triage-check" => TriageCheck(options, output),
                 _ => Unknown(args[0], errors),
             };
         }
@@ -83,11 +84,51 @@ public static class Cli
         var groups = LogLoopReader.Digest.Build(batches);
         Directory.CreateDirectory(outDir);
         var markdown = Path.Combine(outDir, "digest.md");
-        File.WriteAllText(markdown, LogLoopReader.Digest.Render(groups, new LogExcerptSanitizer(LogExcerptSanitizer.VocabularyFrom(RepoRoot()))));
+        var ledgerPath = options.GetValueOrDefault("ledger") ?? LedgerPath();
+        var ledger = File.Exists(ledgerPath) ? TriageLedger.FromJson(File.ReadAllText(ledgerPath)) : TriageLedger.Empty;
+        var plan = Triage.Plan(groups, ledger);
+        var folded = plan.Where(i => i.Status == TriageStatus.Folded).Select(i => i.Fingerprint).ToHashSet(StringComparer.Ordinal);
+        var shown = groups.Where(g => !folded.Contains(g.Fingerprint)).ToList();
+        File.WriteAllText(markdown, LogLoopReader.Digest.Render(shown, new LogExcerptSanitizer(LogExcerptSanitizer.VocabularyFrom(RepoRoot())))
+            + $"{folded.Count} routine INFO fingerprints folded ({groups.Where(g => folded.Contains(g.Fingerprint)).Sum(g => g.Count)} lines); not listed.{Environment.NewLine}");
+        File.WriteAllText(Path.Combine(outDir, TriageFile), JsonSerializer.Serialize(plan, TriageJson));
+        var pending = plan.Count(i => i.Status == TriageStatus.Pending);
+        output.WriteLine($"triage: {pending} to decide, {plan.Count(i => i.Status == TriageStatus.Carried)} carried from the ledger, {folded.Count} folded; checklist at {Path.Combine(outDir, TriageFile)}");
         File.WriteAllText(Path.Combine(outDir, "digest.json"), JsonSerializer.Serialize(groups, new JsonSerializerOptions { WriteIndented = true }));
         output.WriteLine($"{groups.Count} fingerprints from {batches.Count} batches; digest at {markdown}");
         return 0;
     }
+
+    // triage-check [--in DIR] [--ledger PATH]: exits 1 while any pending fingerprint lacks an outcome and class; once
+    // complete it writes the merged ledger to PATH (default: the committed one) for the session to commit.
+    private static int TriageCheck(IReadOnlyDictionary<string, string> options, TextWriter output)
+    {
+        var dir = options.GetValueOrDefault("in") ?? OutputGuard.DefaultOutput();
+        var items = JsonSerializer.Deserialize<List<TriageItem>>(File.ReadAllText(Path.Combine(dir, TriageFile)), TriageJson)
+            ?? throw new InvalidOperationException("triage.json is empty.");
+        var result = Triage.Check(items);
+        if (!result.Complete)
+        {
+            output.WriteLine($"triage-check: {result.Open.Count} of {items.Count(i => i.Status == TriageStatus.Pending)} fingerprints have no outcome and class. Do not report or trash.");
+            result.Open.Take(20).ToList().ForEach(f => output.WriteLine($"  open {f}"));
+            return 1;
+        }
+        var ledgerPath = options.GetValueOrDefault("ledger") ?? LedgerPath();
+        var ledger = File.Exists(ledgerPath) ? TriageLedger.FromJson(File.ReadAllText(ledgerPath)) : TriageLedger.Empty;
+        File.WriteAllText(ledgerPath, Triage.Merge(ledger, items, DateTime.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)).ToJson());
+        output.WriteLine($"triage-check: complete; ledger written to {ledgerPath}");
+        return 0;
+    }
+
+    private const string TriageFile = "triage.json";
+
+    private static readonly JsonSerializerOptions TriageJson = new()
+    {
+        WriteIndented = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+    };
+
+    private static string LedgerPath() => Path.Combine(RepoRoot(), ".claude", "log-loop", "triage-ledger.json");
 
     private static int Sanitize(TextReader input, TextWriter output)
     {
