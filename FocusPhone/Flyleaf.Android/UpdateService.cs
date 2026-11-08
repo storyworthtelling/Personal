@@ -1,3 +1,4 @@
+using Codex.Domain.Updates;
 using Codex.Domain.Credentials;
 using Android.App;
 using Android.Content;
@@ -30,6 +31,7 @@ public static class UpdateService
     private const string Tag = "FocusPhoneUpdate";
     private const string WorkName = "focusphone-update-check";
     public const string Repo = "storyworthtelling/Personal";
+    private static readonly UpdateRunGate RunGate = new();
 
     public static void Schedule(Context context)
     {
@@ -60,7 +62,9 @@ public static class UpdateService
     /// </returns>
     public static async Task<UpdateRunResult> CheckAndInstallAsync(Context context, bool force)
     {
-        var result = await RunAsync(context, force);
+        // The worker and the manual action can overlap; one run at a time keeps them off each
+        // other's cache files and install sessions.
+        var result = await RunGate.RunAsync(() => RunAsync(context, force));
         new UpdateStatusStore(context).Record(result.Summarize());
         // One line per app (LOG-LOOP-PLAN.md §4.5), not just the summary the settings panel shows.
         foreach (var line in result.Lines())
