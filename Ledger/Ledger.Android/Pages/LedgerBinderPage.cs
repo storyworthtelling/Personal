@@ -188,7 +188,10 @@ public abstract class LedgerBinderPage : ContentPage
         header.Text = title;
         header.Ink = LedgerAreas.RuleInk(area);
 
-        well.Content = Content;
+        // The page still holds what its XAML built as its own Content; take it off before the frame adopts it.
+        var inner = Content;
+        Content = null;
+        well.Content = inner;
 
         strip.SetAreas(LedgerAreas.All, (int)area);
         strip.AreaSelected += OnAreaSelected;
