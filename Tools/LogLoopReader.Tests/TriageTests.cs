@@ -85,23 +85,24 @@ public class TriageTests
     }
 
     [Fact]
-    public void TheLedgerIsUpdatedFromDecisionsAndRoundTripsAsFingerprintsOnly()
+    public void TheLedgerIsUpdatedFromDecisionsAndRoundTripsAsPlainLines()
     {
         var items = Triage.Plan([Group("a")], TriageLedger.Empty)
             .Select(i => i with { Outcome = TriageOutcome.Fix, Class = "C2" }).ToList();
 
-        var json = Triage.Merge(TriageLedger.Empty, items, "2026-11-08").ToJson();
+        var json = Triage.Merge(TriageLedger.Empty, items, "2026-11-08").ToText();
 
-        Assert.Equal(TriageOutcome.Fix, TriageLedger.FromJson(json).Get("a")!.Outcome);
+        Assert.Equal(TriageOutcome.Fix, TriageLedger.FromText(json).Get("a")!.Outcome);
         Assert.DoesNotContain("sample", json, StringComparison.Ordinal);
         Assert.DoesNotContain("k-a", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"", json, StringComparison.Ordinal);
     }
 
     [Fact]
     public void AnEmptyOrMissingLedgerReadsAsEmpty()
     {
-        Assert.Null(TriageLedger.FromJson("").Get("a"));
-        Assert.Null(TriageLedger.FromJson("{}").Get("a"));
+        Assert.Null(TriageLedger.FromText("").Get("a"));
+        Assert.Null(TriageLedger.FromText("\n").Get("a"));
     }
 }
 
