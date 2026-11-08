@@ -10,6 +10,9 @@ public class TriageRunbookTests
 
         Assert.Contains("triage-check", runbook, StringComparison.Ordinal);
         Assert.Contains("triage-ledger.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("untriaged: 0", runbook, StringComparison.Ordinal);
+        Assert.Contains("one subagent per file", runbook, StringComparison.Ordinal);
+        Assert.Contains("LogLoopReader -- backlog", runbook, StringComparison.Ordinal);
         Assert.Contains("never trash", runbook.ToLowerInvariant(), StringComparison.Ordinal);
     }
 }

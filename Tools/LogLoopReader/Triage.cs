@@ -114,6 +114,25 @@ public static class Triage
         return new TriageCheckResult(open.Count == 0, open);
     }
 
+    /// <summary>One list per app that has something to decide, so each subagent edits a file nobody else touches.</summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<TriageItem>> ByApp(IEnumerable<TriageItem> items) =>
+        items.Where(i => i.Status == TriageStatus.Pending)
+            .GroupBy(i => i.App, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<TriageItem>)g.ToList(), StringComparer.Ordinal);
+
+    public sealed record Tally(int Fix, int Report, int NoAction, int Untriaged);
+
+    /// <summary>The counts the report states; <c>Untriaged</c> is what the auto-merge gate reads.</summary>
+    public static Tally Counts(IEnumerable<TriageItem> items)
+    {
+        var pending = items.Where(i => i.Status == TriageStatus.Pending).ToList();
+        return new Tally(
+            pending.Count(i => i.Outcome == TriageOutcome.Fix),
+            pending.Count(i => i.Outcome == TriageOutcome.Report),
+            pending.Count(i => i.Outcome == TriageOutcome.NoAction),
+            pending.Count(i => i.Outcome is null || string.IsNullOrWhiteSpace(i.Class)));
+    }
+
     public static TriageLedger Merge(TriageLedger ledger, IEnumerable<TriageItem> items, string decided)
     {
         foreach (var item in items.Where(i => i.Status == TriageStatus.Pending && i.Outcome is not null && i.Class is not null))

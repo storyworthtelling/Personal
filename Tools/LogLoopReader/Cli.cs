@@ -13,7 +13,7 @@ public static class Cli
     {
         if (args.Length == 0)
         {
-            errors.WriteLine("Usage: LogLoopReader fetch|digest|triage-check|processed|sanitize|leakscan|gate [options]");
+            errors.WriteLine("Usage: LogLoopReader fetch|digest|triage-check|backlog|processed|sanitize|leakscan|gate [options]");
             return 2;
         }
         var options = Options(args.Skip(1).ToArray());
@@ -28,6 +28,7 @@ public static class Cli
                 "leakscan" => LeakScanCommand(options, input, output),
                 "gate" => Gate(options, input, output),
                 "triage-check" => TriageCheck(options, output),
+                "backlog" => BacklogCommand(options, output),
                 _ => Unknown(args[0], errors),
             };
         }
@@ -91,9 +92,18 @@ public static class Cli
         var shown = groups.Where(g => !folded.Contains(g.Fingerprint)).ToList();
         File.WriteAllText(markdown, LogLoopReader.Digest.Render(shown, new LogExcerptSanitizer(LogExcerptSanitizer.VocabularyFrom(RepoRoot())))
             + $"{folded.Count} routine INFO fingerprints folded ({groups.Where(g => folded.Contains(g.Fingerprint)).Sum(g => g.Count)} lines); not listed.{Environment.NewLine}");
-        File.WriteAllText(Path.Combine(outDir, TriageFile), JsonSerializer.Serialize(plan, TriageJson));
+        var triageDir = Path.Combine(outDir, TriageFolder);
+        if (Directory.Exists(triageDir))
+        {
+            Directory.Delete(triageDir, recursive: true);
+        }
+        Directory.CreateDirectory(triageDir);
+        foreach (var (app, items) in Triage.ByApp(plan))
+        {
+            File.WriteAllText(Path.Combine(triageDir, app + ".json"), JsonSerializer.Serialize(items, TriageJson));
+        }
         var pending = plan.Count(i => i.Status == TriageStatus.Pending);
-        output.WriteLine($"triage: {pending} to decide, {plan.Count(i => i.Status == TriageStatus.Carried)} carried from the ledger, {folded.Count} folded; checklist at {Path.Combine(outDir, TriageFile)}");
+        output.WriteLine($"triage: {pending} to decide, {plan.Count(i => i.Status == TriageStatus.Carried)} carried from the ledger, {folded.Count} folded; one checklist per app under {triageDir}");
         File.WriteAllText(Path.Combine(outDir, "digest.json"), JsonSerializer.Serialize(groups, new JsonSerializerOptions { WriteIndented = true }));
         output.WriteLine($"{groups.Count} fingerprints from {batches.Count} batches; digest at {markdown}");
         return 0;
@@ -104,9 +114,12 @@ public static class Cli
     private static int TriageCheck(IReadOnlyDictionary<string, string> options, TextWriter output)
     {
         var dir = options.GetValueOrDefault("in") ?? OutputGuard.DefaultOutput();
-        var items = JsonSerializer.Deserialize<List<TriageItem>>(File.ReadAllText(Path.Combine(dir, TriageFile)), TriageJson)
-            ?? throw new InvalidOperationException("triage.json is empty.");
+        var items = Directory.EnumerateFiles(Path.Combine(dir, TriageFolder), "*.json")
+            .SelectMany(f => JsonSerializer.Deserialize<List<TriageItem>>(File.ReadAllText(f), TriageJson) ?? [])
+            .ToList();
         var result = Triage.Check(items);
+        var tally = Triage.Counts(items);
+        output.WriteLine($"triage-check: fix {tally.Fix}, report {tally.Report}, no-action {tally.NoAction}, untriaged {tally.Untriaged}");
         if (!result.Complete)
         {
             output.WriteLine($"triage-check: {result.Open.Count} of {items.Count(i => i.Status == TriageStatus.Pending)} fingerprints have no outcome and class. Do not report or trash.");
@@ -120,7 +133,7 @@ public static class Cli
         return 0;
     }
 
-    private const string TriageFile = "triage.json";
+    private const string TriageFolder = "triage";
 
     private static readonly JsonSerializerOptions TriageJson = new()
     {
@@ -129,6 +142,22 @@ public static class Cli
     };
 
     private static string LedgerPath() => Path.Combine(RepoRoot(), ".claude", "log-loop", "triage-ledger.json");
+
+    // backlog [--in DIR]: the files this week did not finish and how long they have waited (names and days only).
+    private static int BacklogCommand(IReadOnlyDictionary<string, string> options, TextWriter output)
+    {
+        var dir = options.GetValueOrDefault("in") ?? OutputGuard.DefaultOutput();
+        var plain = Path.Combine(dir, FetchCommand.PlainFolder);
+        DateTimeOffset? LastWritten(string name)
+        {
+            var path = Path.Combine(plain, name);
+            return File.Exists(path) ? FetchCommand.ReadPlain(path).Header.LastUtc : null;
+        }
+        var lines = Backlog.Lines(Manifest.Read(dir), LastWritten, DateTimeOffset.UtcNow);
+        output.WriteLine($"backlog: {lines.Count} file(s) not finished");
+        lines.ToList().ForEach(output.WriteLine);
+        return 0;
+    }
 
     private static int Sanitize(TextReader input, TextWriter output)
     {

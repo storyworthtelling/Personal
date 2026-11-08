@@ -56,7 +56,7 @@ should agree. A disagreement goes in the report.
 dotnet run --project Tools/LogLoopReader -- digest          # → $TMPDIR/log-loop/digest.md + digest.json
 ```
 
-`digest` also writes `$TMPDIR/log-loop/triage.json`, the week's checklist, and prints how many fingerprints are
+`digest` also writes `$TMPDIR/log-loop/triage/<app>.json`, one checklist per app that has something to decide, and prints how many fingerprints are
 **pending**, **carried** (decided as No action in an earlier week, from `.claude/log-loop/triage-ledger.json`) and
 **folded** (routine INFO messages, counted but not listed). Only pending ones need a decision.
 
@@ -98,11 +98,18 @@ Every fingerprint gets exactly one outcome: **Fix**, **Report** or **No action**
 | C15 Presses on non-controls | `TAPS ON NON-CONTROL` | Report as UX — not a bug, never a loop fix |
 | C16 Sign-in did not return a token | `NoReturn`, `ProviderError`, `StateMismatch`, `ExchangeFailed`, blocked `Hop` | Our bug → Fix; provider or portal configuration → Report with the exact owner checklist; user cancelled → No action |
 
-Write each decision into `triage.json` (`outcome`: `Fix`/`Report`/`NoAction`, and `class`: `C1`…`C16`). Then run:
+**Triage per app, in parallel.** Start one subagent per file in `triage/` (several in one message). Brief each like
+a peer: its app, the path of its own `triage/<app>.json` (the only file it edits), the `## <app>` section of
+`digest.md`, the class table above, and rules 1–7. It opens raw lines under `plain/` only for its own app, writes an
+`outcome` and `class` for every pending fingerprint, and returns its Fix list with a sanitized one-line shape for each
+Report. Subagents do not open PRs, post issues or trash anything; the main session does the Fix work (below) and the
+report. Write each decision into the app's `triage/<app>.json` (`outcome`: `Fix`/`Report`/`NoAction`, and `class`: `C1`…`C16`). Then run:
 
 ```bash
 dotnet run --project Tools/LogLoopReader -- triage-check
 ```
+
+It also prints the counts (`fix`, `report`, `no-action`, `untriaged`) the report states.
 
 It exits 1 and lists what is open until every pending fingerprint has an outcome and class. **Do not post the
 report, mark any file `done` or trash anything while it fails.** If you cannot finish (time, volume), say so at the
@@ -184,14 +191,17 @@ Title: `Log loop — week of <yyyy-MM-dd>` (the same date as the branches). Body
 - sign-in diagnoses by flow kind;
 - PR links, and each fix's verification mark;
 - last week's merged fingerprints: Gone / Still present / New since merge;
-- untrashed files and why (`WrongKey`, `Corrupt`, still triaging);
+- untrashed files, why (`WrongKey`, `Corrupt`, still triaging) and how long each has waited — paste the output of
+  `dotnet run --project Tools/LogLoopReader -- backlog`, and name any file marked `OVERDUE` (four weeks) for the owner;
 - **no raw log line** — only sanitized shapes;
 
-and the machine-readable block the gate reads, listing every fingerprint whose outcome is **Fix**:
+and the machine-readable block the gate reads, listing every fingerprint whose outcome is **Fix**. `untriaged:` is the
+count `triage-check` printed and must be `0`; the `log-loop-automerge` gate ignores a report that does not say so:
 
 ```
 <!-- log-loop-report
 week: <yyyy-MM-dd>
+untriaged: 0
 fix: <sha256>
 fix: <sha256>
 -->

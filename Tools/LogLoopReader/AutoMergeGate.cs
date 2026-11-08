@@ -77,12 +77,19 @@ public static partial class AutoMergeGate
         var weekOfBranch = branch.Success
             ? DateOnly.ParseExact(branch.Groups["date"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture)
             : DateOnly.MaxValue;
-        var fixes = input.Reports
+        var reportBlocks = input.Reports
             .Where(r => trusted.Contains(r.Author) && r.Title.StartsWith(ReportTitlePrefix, StringComparison.Ordinal))
             .SelectMany(r => Blocks(r.Body, "log-loop-report"))
             .Where(b => Field(b, "week").Any(w => DateOnly.TryParseExact(w, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var week) && week >= weekOfBranch))
-            .SelectMany(b => Field(b, "fix"))
-            .ToHashSet(StringComparer.Ordinal);
+            .ToList();
+        // A report only counts once it says every fingerprint was triaged; one that is silent on it, or admits
+        // some are open, is a report written before the work was done.
+        var finished = reportBlocks.Where(b => Field(b, "untriaged").Any(v => v == "0")).ToList();
+        if (reportBlocks.Count > 0 && finished.Count == 0)
+        {
+            reasons.Add("the log loop report does not state untriaged: 0, so triage was not finished");
+        }
+        var fixes = finished.SelectMany(b => Field(b, "fix")).ToHashSet(StringComparer.Ordinal);
         foreach (var fingerprint in declared.Where(f => !fixes.Contains(f)).Order(StringComparer.Ordinal))
         {
             reasons.Add($"fingerprint {Short(fingerprint)} is not marked Fix in a log loop report for this week or later");
