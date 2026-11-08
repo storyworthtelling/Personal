@@ -59,7 +59,44 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     }
 
     private Face face = Face.Doors;
-    private ScanTray? tray;
+    // The tray is written down on every change and read back when the screen is rebuilt, so pages gathered over
+    // several trips through the scanner survive Android killing Plate while the scanner is in front
+    // (error-handling §8).
+    private const string TrayPrefs = "scan-tray";
+    private const string TrayKey = "tray";
+    private ScanTray? heldTray;
+    private bool trayRead;
+
+    private ScanTray? Tray
+    {
+        get
+        {
+            if (!trayRead)
+            {
+                heldTray = ScanTrayCodec.Read(TrayPreferences().GetString(TrayKey, null));
+                trayRead = true;
+            }
+            return heldTray;
+        }
+        set
+        {
+            heldTray = value;
+            trayRead = true;
+            var edit = TrayPreferences().Edit()!;
+            if (value is { HasPages: true })
+            {
+                edit.PutString(TrayKey, ScanTrayCodec.Write(value));
+            }
+            else
+            {
+                edit.Remove(TrayKey);
+            }
+            edit.Commit();
+        }
+    }
+
+    private static ISharedPreferences TrayPreferences() =>
+        Application.Context.GetSharedPreferences(TrayPrefs, FileCreationMode.Private)!;
     private TextView? statusLine;
     private PreviewView? codePreview;
     private QrReading reading;
@@ -68,6 +105,12 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     {
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         var gap = PaperTheme.Dp(Host, DesignTokens.Space.X3);
+
+        // A tray that survived the process being killed behind the scanner opens where it was left.
+        if (face == Face.Doors && Tray is { HasPages: true })
+        {
+            face = Face.Tray;
+        }
 
         switch (face)
         {
@@ -106,7 +149,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
 
     private void BuildTray(LinearLayout column)
     {
-        var held = tray!;
+        var held = Tray!;
         column.AddView(PaperUi.Secondary(Host,
             $"{DestinationSentence(held.Destination)} · {PagesSoFar(held.Count)}"));
 
@@ -134,20 +177,20 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     // drag — the same result with a target big enough to hit, and no gesture to discover.
     private void ShowPageActions(int index)
     {
-        var held = tray!;
+        var held = Tray!;
         var actions = new List<CardAction>();
         if (index > 0)
         {
             actions.Add(new CardAction("Move earlier",
-                () => { tray = held.Move(index, index - 1); Invalidate(); }));
+                () => { Tray = held.Move(index, index - 1); Invalidate(); }));
         }
         if (index < held.Pages.Count - 1)
         {
             actions.Add(new CardAction("Move later",
-                () => { tray = held.Move(index, index + 1); Invalidate(); }));
+                () => { Tray = held.Move(index, index + 1); Invalidate(); }));
         }
         actions.Add(new CardAction("Remove this page",
-            () => { tray = held.RemoveAt(index); Invalidate(); }, Destructive: true));
+            () => { Tray = held.RemoveAt(index); Invalidate(); }, Destructive: true));
 
         ActionCard.Show(Host, Overlay, $"Page {index + 1}",
             $"scanned {TimeFormats.Clock12(held.Pages[index].ScannedAt)}", [.. actions]);
@@ -184,8 +227,8 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     public override View? BuildBottomBar() => face switch
     {
         Face.Tray => PaperUi.BottomBar(Host,
-            tray!.HasPages
-                ? PaperUi.PrimaryButton(Host, PagesLabel(tray.Count), SaveScan)
+            Tray!.HasPages
+                ? PaperUi.PrimaryButton(Host, PagesLabel(Tray!.Count), SaveScan)
                 : PaperUi.PrimaryButton(Host, "Scan pages", StartDocumentScan),
             PaperUi.SecondaryButton(Host, "Add a page", StartDocumentScan),
             PaperUi.QuietButton(Host, "Discard", Discard)),
@@ -222,7 +265,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         {
             if (destination is { } door)
             {
-                tray = ScanTray.For(door);
+                Tray = ScanTray.For(door);
                 face = Face.Tray;
                 Invalidate();
                 StartDocumentScan();
@@ -256,7 +299,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
 
     private void Discard()
     {
-        tray = null;
+        Tray = null;
         reading = default;
         face = Face.Doors;
         shell.Camera.Release();
@@ -291,8 +334,9 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         }
 
         var result = GmsDocumentScanningResult.FromActivityResultIntent(data);
-        tray = (tray ?? ScanTray.For(ScanDestination.Drive)).Add(PageUris(result));
-        ShowStatus(tray.Count == 1 ? "1 page held." : $"{tray.Count} pages held.");
+        var gathered = (Tray ?? ScanTray.For(ScanDestination.Drive)).Add(PageUris(result));
+        Tray = gathered;
+        ShowStatus(gathered.Count == 1 ? "1 page held." : $"{gathered.Count} pages held.");
         Invalidate();
     }
 
@@ -317,23 +361,55 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         return uris;
     }
 
-    private void SaveScan()
+    private async void SaveScan()
     {
-        if (tray is not { HasPages: true } held)
+        if (Tray is not { HasPages: true } held)
         {
             StartDocumentScan();
             return;
         }
 
         // §8: loading is a status sentence, not a spinner. Composing a long document takes
-        // long enough to notice, and the sentence is what says so.
+        // long enough to notice, and the sentence is what says so. The work is off the UI
+        // thread: every page plus the PDF are in memory at once, and a long document on the
+        // main thread froze the screen or took the app down with it (error-handling §8).
         ShowStatus($"Composing {held.Count} pages…");
 
+        FiledScan? filed;
+        try
+        {
+            filed = await Task.Run(() => ComposeAndFile(held));
+        }
+        catch (Exception e)
+        {
+            // The pages are still held, so nothing is lost by saying so and stopping here.
+            HeadLog.Warn("Plate", "A scan could not be composed", e);
+            ShowStatus(e is OutOfMemoryException || e.GetType().Name.Contains("OutOfMemory", StringComparison.Ordinal)
+                ? "That scan is too large to put together at once. The pages are still here; remove some and try again."
+                : $"That scan could not be put together ({e.GetType().Name}). The pages are still here; try again.");
+            return;
+        }
+
+        if (filed is null)
+        {
+            ShowStatus("Could not file that scan.");
+            return;
+        }
+
+        Hand(held.Destination, filed.Document, filed.Title, filed.Pdf);
+    }
+
+    private sealed record FiledScan(Android.Net.Uri Document, string Title, byte[] Pdf);
+
+    // Off the UI thread. The MediaStore row is inserted pending, so a write that fails part way leaves no empty
+    // "Scan" document behind, and is deleted if the write does not finish.
+    private FiledScan? ComposeAndFile(ScanTray held)
+    {
         var pageImages = new List<byte[]>(held.Count);
         foreach (var page in held.Pages)
         {
-            using var input = Host.ContentResolver!.OpenInputStream(
-                Android.Net.Uri.Parse(page.Reference)!)!;
+            using var input = Host.ContentResolver!.OpenInputStream(Android.Net.Uri.Parse(page.Reference)!)
+                ?? throw new FileNotFoundException("A scanned page is no longer on the phone.");
             using var buffer = new MemoryStream();
             input.CopyTo(buffer);
             pageImages.Add(buffer.ToArray());
@@ -351,21 +427,36 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         values.Put(Android.Provider.MediaStore.IMediaColumns.DisplayName, entry.DisplayName);
         values.Put(Android.Provider.MediaStore.IMediaColumns.MimeType, entry.MimeType);
         values.Put(Android.Provider.MediaStore.IMediaColumns.RelativePath, entry.RelativePath);
-        var target = Host.ContentResolver!.Insert(
-            Android.Provider.MediaStore.Files.GetContentUri("external")!, values);
+        values.Put(IsPendingColumn, 1);
+        var target = Host.ContentResolver!.Insert(Android.Provider.MediaStore.Files.GetContentUri("external")!, values);
         if (target is null)
         {
-            ShowStatus("Could not file that scan.");
-            return;
+            return null;
         }
 
-        using (var output = Host.ContentResolver.OpenOutputStream(target)!)
+        try
         {
-            output.Write(pdf, 0, pdf.Length);
+            using (var output = Host.ContentResolver.OpenOutputStream(target)
+                ?? throw new IOException("The new document could not be opened for writing."))
+            {
+                output.Write(pdf, 0, pdf.Length);
+            }
+
+            var done = new ContentValues();
+            done.Put(IsPendingColumn, 0);
+            Host.ContentResolver.Update(target, done, null, null);
+        }
+        catch
+        {
+            Host.ContentResolver.Delete(target, null, null);
+            throw;
         }
 
-        Hand(held.Destination, target, entry.DisplayName, pdf);
+        return new FiledScan(target, entry.DisplayName, pdf);
     }
+
+    // MediaStore.MediaColumns.IS_PENDING, by its value: the row is hidden from other apps until it is complete.
+    private const string IsPendingColumn = "is_pending";
 
     // The delivery is hybrid, and which half applies is decided in Codex.Domain
     // (ScanDelivery) rather than here.
@@ -392,7 +483,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             Host.StartActivity(share);
             Delivered(delivering, destination, true, null);
             ShowStatus($"Handed over · {TimeFormats.Clock12(DateTime.Now)}");
-            tray = null;
+            Tray = null;
             face = Face.Doors;
             Invalidate();
         }
@@ -437,7 +528,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             await shell.Remarkable.DeliverToRoot(title, pdf);
             Delivered(delivering, ScanDestination.Remarkable, true, null);
             ShowStatus($"On the reMarkable · {TimeFormats.Clock12(DateTime.Now)}");
-            tray = null;
+            Tray = null;
             face = Face.Doors;
             Invalidate();
         }

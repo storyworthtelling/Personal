@@ -25,11 +25,19 @@ public sealed class ProjectBackupService
 
     private readonly string databasePath;
     private readonly string outputRoot;
+    private readonly Func<string, long> freeBytes;
 
     public ProjectBackupService(IOptions<StorageOptions> options)
+        : this(options, path => new DriveInfo(Path.GetPathRoot(Path.GetFullPath(path))!).AvailableFreeSpace)
+    {
+    }
+
+    /// <param name="freeBytes">The free space on the volume holding a path; a test passes a small number.</param>
+    public ProjectBackupService(IOptions<StorageOptions> options, Func<string, long> freeBytes)
     {
         databasePath = Path.GetFullPath(options.Value.DatabasePath);
         outputRoot = Path.GetFullPath(options.Value.OutputRoot);
+        this.freeBytes = freeBytes;
     }
 
     // Writes a backup zip to the destination stream. The database is snapshotted through SQLite's
@@ -64,12 +72,17 @@ public sealed class ProjectBackupService
         }
     }
 
-    // Restores a backup zip over the live project: extracts to a staging folder, validates it, then
-    // swaps in the database and output tree. A malformed archive is rejected before anything is
-    // touched, so a bad file can never corrupt an in-progress conversion.
+    // Restores a backup zip over the live project, without ever leaving it half replaced (error-handling §16).
+    // Extract and validate into staging; check there is room for the new project beside the old; snapshot the
+    // live database; copy the new output tree next to the live one; then swap the folders and the database, and
+    // put the snapshot and the old folder back if the swap fails. A malformed archive, too little space or a
+    // failed copy all stop before anything live is touched.
     public async Task ImportAsync(Stream source, CancellationToken cancellationToken)
     {
         var staging = Path.Combine(Path.GetTempPath(), $"storyboarder-restore-{Guid.NewGuid():N}");
+        var restoring = outputRoot.TrimEnd(Path.DirectorySeparatorChar) + ".restoring";
+        var retired = outputRoot.TrimEnd(Path.DirectorySeparatorChar) + ".before-restore";
+        var snapshot = databasePath + ".before-restore";
         Directory.CreateDirectory(staging);
         try
         {
@@ -82,29 +95,92 @@ public sealed class ProjectBackupService
                 throw new InvalidDataException("This file is not a Folio backup: it contains no database.");
             ValidateSqlite(stagedDatabase);
 
-            // Release any pooled handles the live process holds on the database before overwriting it.
-            SqliteConnection.ClearAllPools();
+            var stagedOutput = Path.Combine(staging, "output");
+            EnsureRoom(stagedDatabase, stagedOutput);
 
             Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
-            File.Copy(stagedDatabase, databasePath, overwrite: true);
-            // Drop stale journal sidecars so the restored database isn't read through an old journal.
-            foreach (var sidecar in new[] { databasePath + "-wal", databasePath + "-shm", databasePath + "-journal" })
-                if (File.Exists(sidecar))
-                    File.Delete(sidecar);
+            Directory.CreateDirectory(Path.GetDirectoryName(outputRoot)!);
 
-            var stagedOutput = Path.Combine(staging, "output");
-            if (Directory.Exists(outputRoot))
-                Directory.Delete(outputRoot, recursive: true);
+            // The new output, complete, beside the live one. Nothing live has been touched yet.
+            if (File.Exists(restoring))
+                throw new IOException($"Folio could not restore: '{restoring}' is in the way.");
+            if (Directory.Exists(restoring))
+                Directory.Delete(restoring, recursive: true);
             if (Directory.Exists(stagedOutput))
-                CopyDirectory(stagedOutput, outputRoot);
+                CopyDirectory(stagedOutput, restoring);
             else
-                Directory.CreateDirectory(outputRoot);
+                Directory.CreateDirectory(restoring);
+
+            // Release any pooled handles the live process holds on the database before replacing it.
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(databasePath))
+                SnapshotDatabase(snapshot);
+            // The snapshot's own connection is pooled too, and a pooled handle on the live file reads its old
+            // pages after the copy below.
+            SqliteConnection.ClearAllPools();
+
+            Swap(stagedDatabase, restoring, retired, snapshot);
         }
         finally
         {
             if (Directory.Exists(staging))
                 Directory.Delete(staging, recursive: true);
+            if (Directory.Exists(restoring))
+                Directory.Delete(restoring, recursive: true);
+            if (Directory.Exists(retired))
+                Directory.Delete(retired, recursive: true);
+            if (File.Exists(snapshot))
+                File.Delete(snapshot);
         }
+    }
+
+    // The two renames are on one volume, so they are quick and do not need the space twice; the database copy is
+    // the one step that can fail on a full disk, and the snapshot is what puts it back.
+    private void Swap(string stagedDatabase, string restoring, string retired, string snapshot)
+    {
+        var outputMoved = false;
+        try
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Move(outputRoot, retired);
+                outputMoved = true;
+            }
+            Directory.Move(restoring, outputRoot);
+
+            File.Copy(stagedDatabase, databasePath, overwrite: true);
+            // Drop stale journal sidecars so the restored database isn't read through an old journal.
+            foreach (var sidecar in new[] { databasePath + "-wal", databasePath + "-shm", databasePath + "-journal" })
+                if (File.Exists(sidecar))
+                    File.Delete(sidecar);
+        }
+        catch
+        {
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(snapshot))
+                File.Copy(snapshot, databasePath, overwrite: true);
+            if (outputMoved)
+            {
+                if (Directory.Exists(outputRoot))
+                    Directory.Delete(outputRoot, recursive: true);
+                Directory.Move(retired, outputRoot);
+            }
+            throw;
+        }
+    }
+
+    // Room for the new database and output beside the old, plus a database snapshot, with a margin.
+    private void EnsureRoom(string stagedDatabase, string stagedOutput)
+    {
+        var needed = new FileInfo(stagedDatabase).Length
+            + (Directory.Exists(stagedOutput) ? Directory.EnumerateFiles(stagedOutput, "*", SearchOption.AllDirectories).Sum(file => new FileInfo(file).Length) : 0)
+            + (File.Exists(databasePath) ? new FileInfo(databasePath).Length : 0);
+        needed += needed / 10;
+
+        var free = freeBytes(Path.GetDirectoryName(outputRoot)!);
+        if (free < needed)
+            throw new IOException(
+                $"There isn't enough free space to restore: it needs about {needed / (1024 * 1024) + 1} MB and the phone has {free / (1024 * 1024)} MB. Nothing was changed.");
     }
 
     private void SnapshotDatabase(string snapshotPath)

@@ -95,7 +95,7 @@ public class PlateActivity : AppCompatActivity
         Camera = new PlateCamera(this);
         Remarkable = new PlateRemarkable(Account);
         DarkroomFiles = new DarkroomStore(this);
-        room = DarkroomFiles.Load();
+        room = DarkroomFiles.LoadSwept();
         areas =
         [
             new CameraArea(this),

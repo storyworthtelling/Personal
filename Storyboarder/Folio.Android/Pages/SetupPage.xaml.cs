@@ -177,13 +177,20 @@ public partial class SetupPage : FolioBinderPage
 
             // The restored database may predate a schema change; bring it up to date, then resume.
             MainApplication.RunMigrations();
-            PipelineWorker.Schedule(activity);
             PipelineWorker.RunNow(activity);
             BackupStatusLabel.Text = "Restored. Your conversion will resume shortly.";
         }
         catch (Exception ex)
         {
-            BackupStatusLabel.Text = "Restore failed: " + ex.Message;
+            // A failed restore leaves the project as it was (ProjectBackupService swaps only once the new
+            // one is complete), so the message says so.
+            BackupStatusLabel.Text = "Restore failed, and your project is as it was: " + ex.Message;
+        }
+        finally
+        {
+            // The worker was stopped for the restore; it must come back whether or not the restore worked
+            // (error-handling §16), or a failed restore would also stop every book.
+            PipelineWorker.Schedule(activity);
         }
     }
 

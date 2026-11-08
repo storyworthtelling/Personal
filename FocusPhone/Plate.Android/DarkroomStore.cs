@@ -33,8 +33,30 @@ public sealed class DarkroomStore
 
     public Darkroom Load() => DarkroomCodec.Read(preferences.GetString(RoomKey, null));
 
+    // Commit, not Apply: the room is the only record of which pictures are here, and an asynchronous write a
+    // crash can cut short is how a photo ended up in the folder with nothing listing it (error-handling §18).
     public void Save(Darkroom room) =>
-        preferences.Edit()!.PutString(RoomKey, DarkroomCodec.Write(room))!.Apply();
+        preferences.Edit()!.PutString(RoomKey, DarkroomCodec.Write(room))!.Commit();
+
+    /// <summary>
+    /// The room, with any picture in the folder that it does not list put back (<see cref="DarkroomSweep"/>), and
+    /// saved again when the sweep found one. Called once at startup.
+    /// </summary>
+    public Darkroom LoadSwept()
+    {
+        var room = Load();
+        var files = Directory().ListFiles() ?? [];
+        var swept = DarkroomSweep.Recover(room, files
+            .Where(file => file.IsFile)
+            .Select(file => new SweptFile(file.Name!, DateTimeOffset.FromUnixTimeMilliseconds(file.LastModified()).LocalDateTime)));
+        if (!ReferenceEquals(swept, room))
+        {
+            Save(swept);
+            Android.Util.Log.Warn("Plate", $"The Darkroom sweep put back {swept.Items.Count - room.Items.Count} unlisted pictures.");
+        }
+
+        return swept;
+    }
 
     /// <summary>The folder the pictures sit in, made if it is not there yet.</summary>
     public Java.IO.File Directory()

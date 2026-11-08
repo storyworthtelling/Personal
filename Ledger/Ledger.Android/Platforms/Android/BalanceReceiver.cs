@@ -94,14 +94,16 @@ public class BalanceReceiver : BroadcastReceiver
             return;
         }
 
-        RouteAsync(context, sender, balance, asOf);
+        // GoAsync keeps the process alive until the balance is written. A bare async continuation does not
+        // outlive the broadcast on a cold start, and Post remembers its verdict and never sends the balance
+        // again, so a balance lost here was lost for good (error-handling §14).
+        RouteAsync(context, sender, balance, asOf, GoAsync());
     }
 
-    // Fire-and-forget from a BroadcastReceiver's synchronous OnReceive: PendingResult would let this
-    // await properly, but the existing LogUnroutable-only version already returned immediately, and
-    // AccountService's own EF work is quick. Any failure here is caught and logged, never thrown —
-    // per this class's standing rule, nothing may crash the process that owns other receivers.
-    private static async void RouteAsync(Context context, string sender, decimal balance, DateOnly? asOf)
+    // Runs under the broadcast's PendingResult, finished whatever happens. Any failure here is caught and
+    // logged, never thrown — per this class's standing rule, nothing may crash the process that owns other
+    // receivers.
+    private static async void RouteAsync(Context context, string sender, decimal balance, DateOnly? asOf, PendingResult? pending)
     {
         try
         {
@@ -122,6 +124,10 @@ public class BalanceReceiver : BroadcastReceiver
         {
             var logger = IPlatformApplication.Current?.Services.GetService<ILogger<BalanceReceiver>>();
             logger?.LogWarning(e, "BalanceReceiver: failed to route a received balance");
+        }
+        finally
+        {
+            pending?.Finish();
         }
     }
 

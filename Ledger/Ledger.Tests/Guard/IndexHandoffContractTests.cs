@@ -117,6 +117,18 @@ public class IndexHandoffContractTests
         return fullValue[IndexIdentity.ApplicationId.Length..];
     }
 
+    // Error-handling §14: the receiver did its work after OnReceive returned, with nothing holding the process
+    // alive, so a cold start could kill it first — and Post never sends the same balance twice.
+    [Fact]
+    public void TheReceiverHoldsTheBroadcastOpenUntilTheBalanceIsWritten()
+    {
+        var source = ReceiverSource();
+
+        Assert.Contains("GoAsync()", source, StringComparison.Ordinal);
+        Assert.Contains("pending?.Finish();", source, StringComparison.Ordinal);
+        Assert.Matches(@"finally\s*\{\s*pending\?\.Finish\(\);", source);
+    }
+
     private static string ReceiverSource()
     {
         var path = Path.Combine(
