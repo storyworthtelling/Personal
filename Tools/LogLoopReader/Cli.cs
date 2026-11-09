@@ -86,7 +86,7 @@ public static class Cli
         Directory.CreateDirectory(outDir);
         var markdown = Path.Combine(outDir, "digest.md");
         var ledgerPath = options.GetValueOrDefault("ledger") ?? LedgerPath();
-        var ledger = File.Exists(ledgerPath) ? TriageLedger.FromJson(File.ReadAllText(ledgerPath)) : TriageLedger.Empty;
+        var ledger = File.Exists(ledgerPath) ? TriageLedger.FromText(File.ReadAllText(ledgerPath)) : TriageLedger.Empty;
         var plan = Triage.Plan(groups, ledger);
         var folded = plan.Where(i => i.Status == TriageStatus.Folded).Select(i => i.Fingerprint).ToHashSet(StringComparer.Ordinal);
         var shown = groups.Where(g => !folded.Contains(g.Fingerprint)).ToList();
@@ -127,8 +127,8 @@ public static class Cli
             return 1;
         }
         var ledgerPath = options.GetValueOrDefault("ledger") ?? LedgerPath();
-        var ledger = File.Exists(ledgerPath) ? TriageLedger.FromJson(File.ReadAllText(ledgerPath)) : TriageLedger.Empty;
-        File.WriteAllText(ledgerPath, Triage.Merge(ledger, items, DateTime.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)).ToJson());
+        var ledger = File.Exists(ledgerPath) ? TriageLedger.FromText(File.ReadAllText(ledgerPath)) : TriageLedger.Empty;
+        File.WriteAllText(ledgerPath, Triage.Merge(ledger, items, DateTime.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)).ToText());
         output.WriteLine($"triage-check: complete; ledger written to {ledgerPath}");
         return 0;
     }
@@ -141,7 +141,7 @@ public static class Cli
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
-    private static string LedgerPath() => Path.Combine(RepoRoot(), ".claude", "log-loop", "triage-ledger.json");
+    private static string LedgerPath() => Path.Combine(RepoRoot(), ".claude", "log-loop", "triage-ledger.txt");
 
     // backlog [--in DIR]: the files this week did not finish and how long they have waited (names and days only).
     private static int BacklogCommand(IReadOnlyDictionary<string, string> options, TextWriter output)

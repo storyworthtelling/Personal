@@ -9,7 +9,7 @@ public class TriageRunbookTests
         var runbook = File.ReadAllText(Path.Combine(Support.RepoRoot(), ".claude", "log-loop", "RUNBOOK.md"));
 
         Assert.Contains("triage-check", runbook, StringComparison.Ordinal);
-        Assert.Contains("triage-ledger.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("triage-ledger.txt", runbook, StringComparison.Ordinal);
         Assert.Contains("untriaged: 0", runbook, StringComparison.Ordinal);
         Assert.Contains("one subagent per file", runbook, StringComparison.Ordinal);
         Assert.Contains("LogLoopReader -- backlog", runbook, StringComparison.Ordinal);

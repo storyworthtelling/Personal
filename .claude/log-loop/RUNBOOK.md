@@ -57,7 +57,7 @@ dotnet run --project Tools/LogLoopReader -- digest          # → $TMPDIR/log-lo
 ```
 
 `digest` also writes `$TMPDIR/log-loop/triage/<app>.json`, one checklist per app that has something to decide, and prints how many fingerprints are
-**pending**, **carried** (decided as No action in an earlier week, from `.claude/log-loop/triage-ledger.json`) and
+**pending**, **carried** (decided as No action in an earlier week, from `.claude/log-loop/triage-ledger.txt`) and
 **folded** (routine INFO messages, counted but not listed). Only pending ones need a decision.
 
 Read `digest.md` first. It groups every line by fingerprint (an exception's type and top three own
@@ -114,7 +114,7 @@ It also prints the counts (`fix`, `report`, `no-action`, `untriaged`) the report
 It exits 1 and lists what is open until every pending fingerprint has an outcome and class. **Do not post the
 report, mark any file `done` or trash anything while it fails.** If you cannot finish (time, volume), say so at the
 top of the report issue with the open count, leave every file untrashed, and stop. When it passes it updates
-`.claude/log-loop/triage-ledger.json` (fingerprints and decisions only, no log text); commit that on its own branch
+`.claude/log-loop/triage-ledger.txt` (fingerprints and decisions only, no log text); commit that on its own branch
 `claude/loop-ledger-<yyyy-MM-dd>` and open a PR, never on a logfix branch (a commit without a fingerprint trailer holds
 that PR). A fingerprint decided Fix or Report that appears again next week is asked about again; a No action one is not.
 

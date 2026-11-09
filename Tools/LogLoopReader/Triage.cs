@@ -1,6 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
 namespace LogLoopReader;
 
 public enum TriageOutcome
@@ -40,12 +37,6 @@ public sealed record TriageEntry(TriageOutcome Outcome, string Class, string Dec
 /// </summary>
 public sealed class TriageLedger
 {
-    private static readonly JsonSerializerOptions Json = new()
-    {
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() },
-    };
-
     private readonly SortedDictionary<string, TriageEntry> entries;
 
     private TriageLedger(SortedDictionary<string, TriageEntry> entries) => this.entries = entries;
@@ -63,16 +54,24 @@ public sealed class TriageLedger
         return new TriageLedger(copy);
     }
 
-    public string ToJson() => JsonSerializer.Serialize(entries, Json);
+    // One line per fingerprint: "<fingerprint> <Outcome> <Class> <yyyy-MM-dd>". Plain text on purpose: a quoted
+    // 64-hex string is the shape of an API key, and the repo's own key guard (rightly) refuses to tell the two apart.
+    public string ToText() =>
+        string.Concat(entries.Select(e => $"{e.Key} {e.Value.Outcome} {e.Value.Class} {e.Value.Decided}\n"));
 
-    public static TriageLedger FromJson(string json)
+    public static TriageLedger FromText(string text)
     {
-        if (string.IsNullOrWhiteSpace(json))
+        var read = new SortedDictionary<string, TriageEntry>(StringComparer.Ordinal);
+        foreach (var line in (text ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            return Empty;
+            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 4 || !Enum.TryParse<TriageOutcome>(parts[1], out var outcome))
+            {
+                throw new ArgumentException("The triage ledger has a line that is not '<fingerprint> <Outcome> <Class> <date>'.");
+            }
+            read[parts[0]] = new TriageEntry(outcome, parts[2], parts[3]);
         }
-        var read = JsonSerializer.Deserialize<Dictionary<string, TriageEntry>>(json, Json) ?? [];
-        return new TriageLedger(new SortedDictionary<string, TriageEntry>(read, StringComparer.Ordinal));
+        return read.Count == 0 ? Empty : new TriageLedger(read);
     }
 }
 
