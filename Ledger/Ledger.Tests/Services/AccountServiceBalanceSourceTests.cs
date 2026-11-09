@@ -166,4 +166,34 @@ public class AccountServiceBalanceSourceTests
         Assert.Equal(5_600m, stored.CurrentBalance);
         Assert.Equal(BalanceSource.Plaid, stored.BalanceSource);
     }
+
+    // Audit W2: the owner reads a statement with Plate from the account itself, so Index knows which account the
+    // balance is for and needs no sender name to match.
+    [Fact]
+    public async Task AStatementReadByPlateIsAppliedToTheAccountThatAsked_AndSaysFromPlate()
+    {
+        using var db = new TestDatabase();
+        var service = new AccountService(db, new FakeClock(Now));
+        var account = await service.AddManualAccountAsync(
+            "Car loan", "Evergreen Home Lending", AccountKind.Loan, 12_345.67m,
+            apr: null, payment: null, cadence: null, nextDueUtc: null, default);
+
+        var saved = await service.ApplyStatementReadAsync(account.Id, 10_500.25m, new DateOnly(2026, 9, 12), default);
+
+        Assert.NotNull(saved);
+        var stored = await LoadAsync(db, account.Id);
+        Assert.Equal(BalanceSource.Plate, stored.BalanceSource);
+        Assert.Equal(10_500.25m, stored.CurrentBalance);
+        Assert.Equal(new DateOnly(2026, 9, 12), CalendarDate.Of(stored.BalanceAsOfUtc!.Value));
+        Assert.Equal("From Plate, Sep 12", BalanceDisplay.UpdatedLine(stored, Now));
+    }
+
+    [Fact]
+    public async Task AStatementReadForAnAccountThatIsGoneChangesNothing()
+    {
+        using var db = new TestDatabase();
+        var service = new AccountService(db, new FakeClock(Now));
+
+        Assert.Null(await service.ApplyStatementReadAsync(Guid.NewGuid(), 10m, asOf: null, default));
+    }
 }

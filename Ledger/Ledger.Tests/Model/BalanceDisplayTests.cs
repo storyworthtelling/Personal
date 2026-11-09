@@ -178,4 +178,16 @@ public class BalanceDisplayTests
         Assert.Contains("Aug 12", notice.Detail, StringComparison.Ordinal);
         Assert.DoesNotContain("Aug 11", notice.Detail, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void APlateBalanceSaysFromPlateAndTheStatementsDay_UnshiftedOnAUsPhone()
+    {
+        var account = new Account
+        {
+            BalanceSource = BalanceSource.Plate,
+            BalanceAsOfUtc = StatementDay.ToOffset(TimeSpan.FromHours(-7)),
+        };
+
+        Assert.Equal("From Plate, Sep 12", BalanceDisplay.UpdatedLine(account, Now));
+    }
 }

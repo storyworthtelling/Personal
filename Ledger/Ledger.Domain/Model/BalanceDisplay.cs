@@ -21,7 +21,7 @@ public static class BalanceDisplay
 
     /// <summary>The calendar day an as-of value names, read the way its source stores it.</summary>
     public static DateOnly Day(DateTimeOffset asOf, BalanceSource source, TimeZoneInfo? zone = null) =>
-        source == BalanceSource.Post
+        source is BalanceSource.Post or BalanceSource.Plate
             ? CalendarDate.Of(asOf)
             : CalendarDate.PhoneDay(asOf, zone);
 
@@ -39,6 +39,11 @@ public static class BalanceDisplay
 
         var source = SourceOf(account);
         var day = ShortDay(Day(asOf, source, zone), now, zone);
-        return source == BalanceSource.Post ? $"From Post, {day}" : $"Updated {day}";
+        return source switch
+        {
+            BalanceSource.Post => $"From Post, {day}",
+            BalanceSource.Plate => $"From Plate, {day}",
+            _ => $"Updated {day}",
+        };
     }
 }

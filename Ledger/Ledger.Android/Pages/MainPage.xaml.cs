@@ -3,6 +3,7 @@ using Index.Android.Views;
 using Index.Domain.Connect;
 using Index.Domain.Design;
 using Index.Domain.External;
+using Index.Domain.Handoff;
 using Index.Domain.Household;
 using Index.Domain.Model;
 using Index.Domain.Time;
@@ -1218,6 +1219,7 @@ public partial class MainPage : LedgerBinderPage
         updatedLabel.IsVisible = UpdatedText() is not null;
 
         column.Children.Add(ManualFieldRow("Balance", updatedLabel, balance.Box));
+        column.Children.Add(StatementReadRow());
         if (shown.HasFlag(ManualField.CreditLimit))
         {
             column.Children.Add(ManualFieldRow("Credit limit", null, creditLimit.Box));
@@ -1247,6 +1249,60 @@ public partial class MainPage : LedgerBinderPage
         }
 
         RefreshRequired();
+
+        // Audit W2: the balance can be read off a paper statement by Plate instead of typed. The answer goes on
+        // this account (Index asked for it), and a read that changed nothing says why in a line under the link.
+        View StatementReadRow()
+        {
+            var note = new Label
+            {
+                Style = PaperResources.Token<Style>("SecondaryLabel"),
+                TextColor = softInk,
+                IsVisible = false,
+            };
+            var link = new Label
+            {
+                Text = "Read the statement with Plate",
+                Style = PaperResources.Token<Style>("FieldLabel"),
+                TextColor = PaperResources.Colour("ActionMark"),
+                MinimumHeightRequest = AccountsLayout.RemoveHitDp,
+                VerticalTextAlignment = TextAlignment.Center,
+            };
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += async (_, _) =>
+            {
+                if (Microsoft.Maui.ApplicationModel.Platform.CurrentActivity is not { } activity)
+                {
+                    return;
+                }
+
+                var (outcome, answer) = await PlateStatementReader.ReadAsync(activity);
+                if (answer is not null)
+                {
+                    try
+                    {
+                        var saved = await accounts.ApplyStatementReadAsync(account.Id, answer.Balance, answer.AsOf, CancellationToken.None);
+                        if (saved is not null)
+                        {
+                            current = saved;
+                            ShowStored(balance);
+                            saveFailed.IsVisible = false;
+                            RefreshInPlace();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Could not save the balance Plate read for {AccountId}.", account.Id);
+                        saveFailed.IsVisible = true;
+                    }
+                }
+
+                note.Text = PlateStatementRead.Describe(outcome) ?? string.Empty;
+                note.IsVisible = note.Text.Length > 0;
+            };
+            link.GestureRecognizers.Add(tap);
+            return new VerticalStackLayout { Children = { link, note } };
+        }
 
         // D112, D159: undo-first Remove, at the foot in the problem rose — matching how removing a
         // Plaid institution already works (DisconnectInstitution). Mockup 15 sets a rule above it, and it is

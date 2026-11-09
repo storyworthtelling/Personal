@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Android.App;
 using Android.Content;
 using Index.Domain.Identity;
@@ -21,7 +22,7 @@ namespace Index.Android.Platforms.Android;
     Name = IndexIdentity.ApplicationId + ".UsageReceiver",
     Exported = true,
     Enabled = true,
-    Permission = IndexIdentity.ApplicationId + ".RECEIVE_USAGE")]
+    Permission = IndexIdentity.UsagePermission)]
 [IntentFilter([UsageReceiver.HandoffAction])]
 public class UsageReceiver : BroadcastReceiver
 {
@@ -37,6 +38,13 @@ public class UsageReceiver : BroadcastReceiver
         if (context is null || intent?.Action != HandoffAction)
         {
             return;
+        }
+
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        Log(ContractBroadcast.ReceiptLine("usage", version));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            return; // a newer Pulp may count differently; a guessed count would be a number nobody can vouch for
         }
 
         try

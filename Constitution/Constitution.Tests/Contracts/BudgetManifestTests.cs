@@ -55,12 +55,12 @@ public class BudgetManifestTests
     }
 
     [Fact]
-    public void ItIsDeclaredNeverRequestedAsAUse()
+    public void ItIsDeclaredAndHeld()
     {
-        // The 'no unexpected permissions' rule is about uses-permission. The app defines this one; it asks for nothing new.
-        Assert.DoesNotContain(HeadSources(), text =>
-            text.Contains("UsesPermission", StringComparison.Ordinal)
-            && text.Contains("BudgetPermission", StringComparison.Ordinal));
+        // Index sends with SendBroadcast(intent, RECEIVE_BUDGET), which reaches only a receiver whose app holds it, and a
+        // declaring app is not granted its own permission. "Declared, not requested" was why no budget ever arrived (D174).
+        var contracts = File.ReadAllText(Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "ContractPermissions.cs"));
+        Assert.Contains("[assembly: UsesPermission(Name = ConstitutionIdentity.BudgetPermission)]", contracts, StringComparison.Ordinal);
         Assert.DoesNotContain(HeadSources(), text => text.Contains("RECEIVE_BUDGET", StringComparison.Ordinal));
     }
 
@@ -88,7 +88,7 @@ public class BudgetManifestTests
         Assert.True(permission is not null, "The merged Release manifest does not declare the budget permission.");
         Assert.Equal("signature", (string?)permission!.Attribute(Android + "protectionLevel"));
 
-        Assert.DoesNotContain(merged.Descendants("uses-permission"),
+        Assert.Contains(merged.Descendants("uses-permission"),
             element => (string?)element.Attribute(Android + "name") == ConstitutionIdentity.BudgetPermission);
     }
 }

@@ -1,3 +1,4 @@
+using Codex.Domain.Policy;
 using Android;
 using Android.App;
 using Android.Content;
@@ -23,6 +24,7 @@ namespace Flyleaf;
 /// download manager when it points at a file rather than a page.
 /// </summary>
 [Activity(
+    Name = RestrictedBrowserHandoff.Activity,
     Label = "Web",
     Exported = true,
     Theme = "@style/Theme.FocusPhone.Paper")]

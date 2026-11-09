@@ -13,5 +13,11 @@ namespace Codex.Domain.Policy;
 public static class RestrictedBrowserHandoff
 {
     public const string Package = PolicyContext.LauncherPackage;
-    public const string Activity = "Flyleaf.RestrictedBrowserActivity";
+
+    /// <summary>
+    /// The activity's registered Java name, which the activity declares as its <c>Name</c>. It was the C#
+    /// name, <c>Flyleaf.RestrictedBrowserActivity</c>, which nothing registered: with no declared name the
+    /// activity lives under a generated <c>crc64…</c> package, so every explicit hand-off missed it.
+    /// </summary>
+    public const string Activity = PolicyContext.LauncherPackage + ".RestrictedBrowserActivity";
 }

@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
+using Codex.Domain.Plate;
 using Codex.Domain.Policy;
 using Codex.Domain.Timeline;
 using Codex.Ui;
@@ -115,7 +116,74 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
     // The Rolodex is the one area with a pinned primary action, because reaching someone
     // who is not in the book is a thing you do to the screen rather than to a row.
     public override View? BuildBottomBar() =>
-        PaperUi.BottomBar(Host, PaperUi.PrimaryButton(Host, "Reach someone new", ShowManualEntry));
+        PaperUi.BottomBar(Host,
+            PaperUi.PrimaryButton(Host, "Reach someone new", ShowManualEntry),
+            PaperUi.SecondaryButton(Host, "Read a card", ReadCardInPlate));
+
+    // A business card is read by Plate, which is the suite's camera; Post only names its guarded
+    // reading screen and saves what comes back. Nothing is saved until the owner sends it back from Plate.
+    private void ReadCardInPlate()
+    {
+        var intent = new Intent(ReadRequest.ReadCard).SetClassName(PlatePackage, ReadRequest.PaperActivity);
+        try
+        {
+            Host.StartActivityForResult(intent, RequestCardCode);
+            PostDiagnostics.LogInfo("Rolodex", "Card read sent to Plate");
+        }
+        catch (ActivityNotFoundException)
+        {
+            PostDiagnostics.LogInfo("Rolodex", "Card read refused: Plate's reading screen is not installed");
+            DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
+                "Plate is not on this phone yet.",
+                "Reading a business card is Plate's job, and Post does not have a camera of its own.",
+                PaperTheme.CautionMark));
+        }
+        catch (Java.Lang.SecurityException)
+        {
+            PostDiagnostics.LogInfo("Rolodex", "Card read refused: Post does not hold Plate's reading permission");
+            DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
+                "Plate would not read a card for Post.",
+                "Post is missing Plate's reading permission. Updating both apps puts it back.",
+                PaperTheme.ProblemMark));
+        }
+    }
+
+    private void SaveCard(Result resultCode, Intent? data)
+    {
+        if (resultCode != Result.Ok || data is null)
+        {
+            return;
+        }
+
+        var contact = CardContact.From(
+            data.GetStringExtra(ReadRequest.NameExtra),
+            data.GetStringExtra(ReadRequest.PhoneExtra),
+            data.GetStringExtra(ReadRequest.EmailExtra));
+        if (contact is null)
+        {
+            DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
+                "The card had no number or email.",
+                "Plate read the card but found no way to reach anyone on it, so nothing was saved.",
+                PaperTheme.CautionMark));
+            return;
+        }
+
+        try
+        {
+            ContactPicker.CreateContact(Host, contact.Name, contact.Addresses);
+            PostDiagnostics.LogInfo("Rolodex", $"Card saved as a contact with {contact.Addresses.Count} addresses");
+            Resume();
+            Invalidate();
+        }
+        catch (Exception e)
+        {
+            PostDiagnostics.LogWarning("Rolodex", "Could not save the card Plate read as a contact", e);
+            DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
+                "Couldn't save that card.",
+                "Plate read it, but the phone would not add the contact.",
+                PaperTheme.ProblemMark));
+        }
+    }
 
     // Google first, then Plate, then something already on the phone. Google-first is what
     // turns a hundred missing faces from a photo shoot into a hundred taps: most of these
@@ -236,6 +304,7 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
     }
 
     private const int RequestContactPhotoCode = 4802;
+    private const int RequestCardCode = 4803;
     private long pendingContactPhotoId;
     private Android.Net.Uri? pendingContactPhotoUri;
 
@@ -274,6 +343,12 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
 
     public override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
+        if (requestCode == RequestCardCode)
+        {
+            SaveCard(resultCode, data);
+            return;
+        }
+
         if (requestCode != RequestContactPhotoCode)
         {
             return;

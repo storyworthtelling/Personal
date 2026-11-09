@@ -26,4 +26,10 @@ public static class IndexIdentity
 
     /// <summary>The name the owner sees — on the phone, and on the foot of the Settings page.</summary>
     public const string DisplayName = "Index";
+
+    /// <summary>Post's balance hand-off (<c>IndexHandoff.Permission</c>), guarding <c>BalanceReceiver</c>.</summary>
+    public const string BalancePermission = ApplicationId + ".RECEIVE_BALANCE";
+
+    /// <summary>Pulp's usage count (<c>IndexUsageContract.Permission</c>), guarding <c>UsageReceiver</c>.</summary>
+    public const string UsagePermission = ApplicationId + ".RECEIVE_USAGE";
 }

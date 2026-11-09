@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.App;
 using Android.Content;
@@ -5,11 +6,6 @@ using Android.Content.PM;
 using Constitution.Domain;
 using Constitution.Domain.Budgets;
 using Constitution.Infrastructure.Budgets;
-
-// The signature permission that protects BudgetReceiver, declared here and held by Index. A permission nobody declares is
-// granted to nobody, so without this line a correctly signed sender would be refused; and it is signature level, so only an
-// app signed with the suite's one keystore can send a budget at all. Declared, not requested: no uses-permission is added.
-[assembly: Permission(Name = ConstitutionIdentity.BudgetPermission, ProtectionLevel = Protection.Signature)]
 
 namespace Constitution.Budgets;
 
@@ -35,6 +31,13 @@ public class BudgetReceiver : BroadcastReceiver
         if (context is null || intent?.Action != ConstitutionIdentity.BudgetAction)
         {
             return;
+        }
+
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        HeadLog.Info("Constitution", ContractBroadcast.ReceiptLine("budget", version));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            return; // a newer Index may mean something else by the figures
         }
 
         var trail = new BudgetTrail(context);

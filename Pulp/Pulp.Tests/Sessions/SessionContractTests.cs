@@ -62,9 +62,9 @@ public class SessionContractTests
     [Fact]
     public void ThePermissionIsDeclaredAtSignatureLevel()
     {
-        Assert.Matches(
-            @"\[assembly: Permission\(Name = SessionHandOff\.Permission, ProtectionLevel = Protection\.Signature\)\]",
-            ReceiverSource());
+        var source = File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Android", "ContractPermissions.cs"));
+        Assert.Contains("[assembly: Permission(Name = SessionHandOff.Permission, ProtectionLevel = Protection.Signature)]", source, StringComparison.Ordinal);
+        Assert.Contains("[assembly: UsesPermission(Name = SessionHandOff.Permission)]", source, StringComparison.Ordinal);
     }
 
     [Fact]

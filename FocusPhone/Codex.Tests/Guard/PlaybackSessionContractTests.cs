@@ -65,7 +65,8 @@ public class PlaybackSessionContractTests
         Assert.Contains("SendBroadcast(intent, PlaybackSessionHandoff.Permission)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SendBroadcast(intent)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SetPackage(", source, StringComparison.Ordinal);
-        Assert.Matches(@"\[assembly: UsesPermission\(PlaybackSessionHandoff\.Permission\)\]", source);
+        Assert.Contains("[assembly: UsesPermission(Name = PlaybackSessionHandoff.Permission)]",
+            File.ReadAllText(Path.Combine(RepoRoot(), "FocusPhone", "Flyleaf.Android", "ContractPermissions.cs")), StringComparison.Ordinal);
     }
 
     /// <summary>Only packages Pulp named, from the stored hidden-apps set, ever leave the phone.</summary>

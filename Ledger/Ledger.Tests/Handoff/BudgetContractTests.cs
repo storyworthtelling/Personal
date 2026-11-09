@@ -24,13 +24,14 @@ public class BudgetContractTests
     }
 
     [Fact]
-    public void IndexUsesButNeverDeclaresThePermission()
+    public void IndexDeclaresAndHoldsThePermission()
     {
         var manifest = File.ReadAllText(Path.Combine(AndroidDir(), "Platforms", "Android", "AndroidManifest.xml"));
         Assert.DoesNotContain("RECEIVE_BUDGET", manifest, StringComparison.Ordinal);
 
-        var uses = File.ReadAllText(Path.Combine(AndroidDir(), "ConstitutionBudgetPermission.cs"));
-        Assert.Contains("[assembly: UsesPermission(Name = ConstitutionBudgetContract.Permission)]", uses, StringComparison.Ordinal);
+        var contracts = File.ReadAllText(Path.Combine(AndroidDir(), "ContractPermissions.cs"));
+        Assert.Contains("[assembly: Permission(Name = ConstitutionBudgetContract.Permission, ProtectionLevel = Protection.Signature)]", contracts, StringComparison.Ordinal);
+        Assert.Contains("[assembly: UsesPermission(Name = ConstitutionBudgetContract.Permission)]", contracts, StringComparison.Ordinal);
     }
 
     [Fact]

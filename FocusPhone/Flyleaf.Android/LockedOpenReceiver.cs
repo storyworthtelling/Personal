@@ -1,13 +1,9 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Codex.Domain.Apps;
-
-// Pulp's locked hand-off contract (LockedOpenHandoff). Pulp holds this permission to send; declaring
-// it here at signature level is what makes the receiver's Permission enforceable at all, since a
-// permission nobody declares is never granted to anyone.
-[assembly: Permission(Name = LockedOpenHandoff.Permission, ProtectionLevel = Protection.Signature)]
 
 namespace Flyleaf;
 
@@ -34,6 +30,14 @@ public class LockedOpenReceiver : BroadcastReceiver
     {
         if (context is null || intent?.Action != LockedOpenHandoff.Action)
         {
+            return;
+        }
+
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        HeadLog.Info("Flyleaf", ContractBroadcast.ReceiptLine("locked-open", version));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            Answer(LockedOpenHandoff.ResultRefused); // Pulp falls back to the plain hand-off
             return;
         }
 

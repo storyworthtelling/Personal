@@ -9,17 +9,6 @@
   <uses-permission android:name="android.permission.WAKE_LOCK" />
   <!-- Required for WorkManager on API 33+ -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-  <!-- Post's frozen IndexHandoff contract (FocusPhone/Codex.Domain/Post/MoneyMail.cs, read-only to
-       this app): Index itself must declare this permission (Post only requires the RECEIVING app hold
-       it) at protectionLevel="signature" — every com.storyworthtelling app shares one keystore for the
-       update channel, so this costs nothing and stops any other app on the phone from feeding Index a
-       fabricated balance. Guard G2 (IndexHandoffContractTests) checks this line's name against
-       IndexHandoff.Permission byte-for-byte. -->
-  <permission android:name="com.storyworthtelling.ledger.RECEIVE_BALANCE" android:protectionLevel="signature" />
-  <!-- Pulp's usage count (Pulp D90, D269-D271): the same shape as the balance hand-off above, signature
-       level so only the owner's own signed apps can send it. Guard G16 (PulpUsageContractTests) checks
-       this line's name against Pulp's IndexUsageContract.Permission byte-for-byte. -->
-  <permission android:name="com.storyworthtelling.ledger.RECEIVE_USAGE" android:protectionLevel="signature" />
   <!-- Package visibility (Android 11+). The connect page asks whether Chrome is suspended, which is
        how it tells that the FocusPhone's Admin mode is open (the default browser stays Flyleaf's
        restricted viewer either way, so it cannot). Without the <package> entry Android hides Chrome
@@ -28,6 +17,8 @@
     <package android:name="com.android.chrome" />
     <!-- Constitution (budget contract): the sender asks whether it is installed before it broadcasts. -->
     <package android:name="com.storyworthtelling.constitution" />
+    <!-- Plate (statement read): an account's post-it starts Plate's reading screen by name. -->
+    <package android:name="com.storyworthtelling.focusphone.camera" />
     <intent>
       <action android:name="android.intent.action.VIEW" />
       <category android:name="android.intent.category.BROWSABLE" />

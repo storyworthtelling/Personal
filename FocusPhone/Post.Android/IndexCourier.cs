@@ -1,3 +1,5 @@
+using Codex.Ui;
+using Storyworthtelling.Diagnostics;
 using Android.Content;
 using Codex.Domain.Post;
 
@@ -22,9 +24,18 @@ internal static class IndexCourier
 {
     public static void Send(Context context, IndexBalance payload)
     {
+        var before = ContractCourier.Before(context, IndexHandoff.Package, IndexHandoff.Permission);
+        if (before != ContractSendOutcome.Sent)
+        {
+            // Index not being installed is the ordinary case today, not a fault worth telling the owner about.
+            HeadLog.Info("Post", ContractBroadcast.SendLine(Contract, before));
+            return;
+        }
+
         try
         {
             var intent = new Intent(IndexHandoff.Action);
+            intent.PutExtra(ContractBroadcast.VersionExtra, ContractBroadcast.Version);
             intent.SetComponent(new ComponentName(IndexHandoff.Package, IndexHandoff.Receiver));
             foreach (var (key, value) in IndexHandoff.Extras(payload))
             {
@@ -32,12 +43,14 @@ internal static class IndexCourier
             }
 
             context.SendBroadcast(intent, IndexHandoff.Permission);
+            HeadLog.Info("Post", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
         }
         catch (Exception e)
         {
-            // Dropped on purpose, and quietly: Index not being installed is the ordinary
-            // case today, not a fault worth telling the owner about.
-            Android.Util.Log.Info("Post", $"Balance handoff to Index did not land: {e.Message}");
+            // Dropped on purpose; the type name only, since a message can carry the payload.
+            HeadLog.Info("Post", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
         }
     }
+
+    private const string Contract = "balance";
 }

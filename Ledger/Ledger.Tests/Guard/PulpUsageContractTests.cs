@@ -40,10 +40,12 @@ public class PulpUsageContractTests
     {
         var full = ContractConstant("Permission");
         var suffix = SuffixAfterApplicationId(full);
-        Assert.Contains($"Permission = IndexIdentity.ApplicationId + \"{suffix}\"", ReceiverSource(), StringComparison.Ordinal);
-        Assert.Contains(
-            $"<permission android:name=\"{full}\" android:protectionLevel=\"signature\" />",
-            File.ReadAllText(ManifestPath()), StringComparison.Ordinal);
+        Assert.Equal(full, IndexIdentity.UsagePermission);
+        Assert.Contains($"UsagePermission = ApplicationId + \"{suffix}\";", File.ReadAllText(Path.Combine(RepoRoot(), "Ledger", "Ledger.Domain", "Identity", "IndexIdentity.cs")), StringComparison.Ordinal);
+        Assert.Contains("Permission = IndexIdentity.UsagePermission)]", ReceiverSource(), StringComparison.Ordinal);
+        var contracts = File.ReadAllText(Path.Combine(RepoRoot(), "Ledger", "Ledger.Android", "ContractPermissions.cs"));
+        Assert.Contains("[assembly: Permission(Name = IndexIdentity.UsagePermission, ProtectionLevel = Protection.Signature)]", contracts, StringComparison.Ordinal);
+        Assert.Contains("[assembly: UsesPermission(Name = IndexIdentity.UsagePermission)]", contracts, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -89,8 +91,6 @@ public class PulpUsageContractTests
         return File.ReadAllText(path);
     }
 
-    private static string ManifestPath() =>
-        Path.Combine(RepoRoot(), "Ledger", "Ledger.Android", "Platforms", "Android", "AndroidManifest.xml");
 
     private static string DomainParserPath() =>
         Path.Combine(RepoRoot(), "Ledger", "Ledger.Domain", "Usage", "PulpUsageReceipt.cs");

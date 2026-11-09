@@ -1,13 +1,9 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Codex.Domain.Apps;
-
-// Pulp's hidden-apps contract (HiddenAppsHandoff). Pulp holds this permission to send; declaring it
-// here at signature level is what makes the receiver's Permission enforceable at all, since a
-// permission nobody declares is never granted to anyone.
-[assembly: Permission(Name = HiddenAppsHandoff.Permission, ProtectionLevel = Protection.Signature)]
 
 namespace Flyleaf;
 
@@ -29,6 +25,13 @@ public class HiddenAppsReceiver : BroadcastReceiver
         if (context is null || intent?.Action != HiddenAppsHandoff.Action)
         {
             return;
+        }
+
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        HeadLog.Info("Flyleaf", ContractBroadcast.ReceiptLine("hidden-apps", version));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            return; // a newer Pulp may mean something else by the list; the stored set is unchanged
         }
 
         var text = intent.GetStringExtra(HiddenAppsHandoff.PackagesExtra);

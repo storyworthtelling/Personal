@@ -8,7 +8,7 @@ using Android.App;
 // The two features are declared not required, because holding CAMERA otherwise makes the store treat a camera as a requirement and
 // refuse the install on a phone without one (or without autofocus). Typing a card in needs neither.
 //
-// Kept in its own file, like RecipeScanPermission.cs, so the manifest guards can read it by content. The permission is written as a
+// Kept in its own file, like ContractPermissions.cs, so the manifest guards can read it by content. The permission is written as a
 // platform constant (not a string) and the guards name exactly this line.
 [assembly: UsesPermission(Name = Android.Manifest.Permission.Camera)]
 [assembly: UsesFeature("android.hardware.camera", Required = false)]

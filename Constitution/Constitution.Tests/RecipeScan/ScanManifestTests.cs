@@ -52,11 +52,12 @@ public class ScanManifestTests
     }
 
     [Fact]
-    public void ConstitutionHoldsItAndNeverDeclaresOrAsksForIt()
+    public void ConstitutionHoldsAndDeclaresItButNeverAsksForIt()
     {
         var sources = HeadSources().ToList();
 
-        Assert.DoesNotContain(sources, text => text.Contains("[assembly: Permission(", StringComparison.Ordinal) && text.Contains("RecipeReadContract", StringComparison.Ordinal));
+        // Declared here as well as in Plate, so it exists whichever app is installed first (D174).
+        Assert.Contains(sources, text => text.Contains("[assembly: Permission(Name = RecipeReadContract.Permission, ProtectionLevel = Protection.Signature)]", StringComparison.Ordinal));
         Assert.DoesNotContain(sources, text => text.Contains("RequestPermissions", StringComparison.Ordinal) && text.Contains("RecipeReadContract", StringComparison.Ordinal));
     }
 
@@ -67,6 +68,8 @@ public class ScanManifestTests
             .Where(argument => argument != "Android.Manifest.Permission.Internet")
             .Where(argument => !argument.StartsWith("\"android.permission.health.", StringComparison.Ordinal))
             .Where(argument => argument != "Name = RecipeReadContract.Permission")
+            // Index's budget broadcast reaches only an app that holds it (D174).
+            .Where(argument => argument != "Name = ConstitutionIdentity.BudgetPermission")
             .Where(argument => argument != "Name = Android.Manifest.Permission.Camera")
             // C-9.1.3: the brief's short list posts as notifications, which Android 13 refuses without it (D155).
             .Where(argument => argument != "\"android.permission.POST_NOTIFICATIONS\"")
@@ -96,7 +99,7 @@ public class ScanManifestTests
             .ToList();
 
         Assert.Equal(
-            new[] { "android.permission.CAMERA", "android.permission.POST_NOTIFICATIONS", RecipeReadContract.Permission }.Order(StringComparer.Ordinal).ToList(),
+            new[] { "android.permission.CAMERA", "android.permission.POST_NOTIFICATIONS", RecipeReadContract.Permission, ConstitutionIdentity.BudgetPermission }.Order(StringComparer.Ordinal).ToList(),
             news.Order(StringComparer.Ordinal).ToList());
         Assert.Contains("android.permission.INTERNET", requested);
         Assert.Equal(1, requested.Count(name => name == RecipeReadContract.Permission));
