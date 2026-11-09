@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Pulp.Domain.Diagnostics;
 using Codex.Ui;
 using Android.App;
@@ -41,11 +42,20 @@ internal static class LockedOpenCourier
     public static bool Send(Context context, string package, Uri link, Action fallBack)
     {
         ArgumentNullException.ThrowIfNull(fallBack);
+        var before = ContractCourier.Before(context, LockedOpenHandOff.Package, LockedOpenHandOff.Permission);
+        if (before != ContractSendOutcome.Sent)
+        {
+            // Flyleaf is not here, or Pulp cannot reach it: the caller falls back to the plain hand-off.
+            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, before));
+            return false;
+        }
+
         var asking = TapWatch.Action(PulpKeyActions.LockedOpen, LockedOpenHandOff.AnswerTimeout + TimeSpan.FromSeconds(5));
         try
         {
             var intent = new Intent(LockedOpenHandOff.Action);
             intent.SetComponent(new ComponentName(LockedOpenHandOff.Package, LockedOpenHandOff.Receiver));
+            intent.PutExtra(ContractBroadcast.VersionExtra, ContractBroadcast.Version);
             foreach (var (key, value) in LockedOpenHandOff.Extras(package, link))
             {
                 intent.PutExtra(key, value);
@@ -77,15 +87,19 @@ internal static class LockedOpenCourier
                 LockedOpenHandOff.ResultRefused,
                 null,
                 null);
+            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
             return true;
         }
         catch (Exception e)
         {
+            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
             HeadLog.Warn("Pulp", PulpLogLines.LockedOpenNotSent(e.GetType().Name), e);
             asking.Failed(PulpLogLines.LockedOpenNotSent(e.GetType().Name));
             return false;
         }
     }
+
+    private const string Contract = "locked-open";
 
     // The ordered broadcast's final receiver: it runs once Flyleaf's receiver (or nobody) has finished.
     private sealed class AnswerReceiver(Action<int> answered) : BroadcastReceiver

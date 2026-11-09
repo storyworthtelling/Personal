@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.App;
 using Android.Content;
@@ -29,6 +30,14 @@ public class LockedOpenReceiver : BroadcastReceiver
     {
         if (context is null || intent?.Action != LockedOpenHandoff.Action)
         {
+            return;
+        }
+
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        HeadLog.Info("Flyleaf", ContractBroadcast.ReceiptLine("locked-open", version));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            Answer(LockedOpenHandoff.ResultRefused); // Pulp falls back to the plain hand-off
             return;
         }
 

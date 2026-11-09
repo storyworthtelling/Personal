@@ -142,6 +142,58 @@ public partial class ContractPermissionsTests
         Assert.True(unheld.Count == 0, $"{head} sends under or is guarded by a permission it does not hold: {string.Join(", ", unheld)}");
     }
 
+    /// <summary>
+    /// SendBroadcast reports nothing (09 L1), so every courier checks first and logs the outcome, and every broadcast
+    /// carries a version (09 L2). <see cref="Storyworthtelling.Diagnostics.ContractBroadcast"/> holds the rules.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Heads))]
+    public void EveryContractSendChecksFirstCarriesAVersionAndLogsItsOutcome(string head)
+    {
+        var senders = Sources(head).Where(file => SentUnder().IsMatch(File.ReadAllText(file))).ToList();
+        foreach (var file in senders)
+        {
+            var text = File.ReadAllText(file);
+            var name = Path.GetFileName(file);
+            Assert.True(text.Contains("ContractBroadcast.Before(", StringComparison.Ordinal) || text.Contains("ContractCourier.Before(", StringComparison.Ordinal),
+                $"{name} sends without checking the receiver first.");
+            Assert.True(text.Contains("ContractBroadcast.VersionExtra, ContractBroadcast.Version", StringComparison.Ordinal), $"{name} sends without a version.");
+            Assert.True(text.Contains("ContractBroadcast.SendLine(", StringComparison.Ordinal), $"{name} does not log how the send went.");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Heads))]
+    public void EveryContractReceiverReadsTheVersionAndLogsTheReceipt(string head)
+    {
+        var receivers = Sources(head)
+            .Where(file => GuardedBy().Matches(File.ReadAllText(file))
+                .Any(match => match.Value.StartsWith("[BroadcastReceiver(", StringComparison.Ordinal) && !IsPlatform(match.Groups["constant"].Value.Trim())))
+            .ToList();
+        foreach (var file in receivers)
+        {
+            var text = File.ReadAllText(file);
+            var name = Path.GetFileName(file);
+            Assert.True(text.Contains("ContractBroadcast.ReadVersion(", StringComparison.Ordinal), $"{name} does not read the version.");
+            Assert.True(text.Contains("ContractBroadcast.Accepts(", StringComparison.Ordinal), $"{name} would read a newer version as its own.");
+            Assert.True(text.Contains("ContractBroadcast.ReceiptLine(", StringComparison.Ordinal), $"{name} does not log what arrived.");
+        }
+    }
+
+    [Fact]
+    public void TheVersionGuardsReachEverySenderAndReceiver()
+    {
+        var senders = Contracts.Select(row => row.Head).Distinct()
+            .SelectMany(Sources).Count(file => SentUnder().IsMatch(File.ReadAllText(file)));
+        var receivers = Contracts.Select(row => row.Head).Distinct()
+            .SelectMany(Sources).Count(file => GuardedBy().Matches(File.ReadAllText(file))
+                .Any(match => match.Value.StartsWith("[BroadcastReceiver(", StringComparison.Ordinal) && !IsPlatform(match.Groups["constant"].Value.Trim())));
+
+        // Post, Pulp (three), Flyleaf and Index send; Flyleaf (two), Pulp, Index (two) and Constitution receive.
+        Assert.Equal(6, senders);
+        Assert.Equal(6, receivers);
+    }
+
     [Fact]
     public void EveryContractSendIsInTheTable()
     {

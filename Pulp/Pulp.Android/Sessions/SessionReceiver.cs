@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using System.Collections.Concurrent;
 using Android.App;
 using Android.Content;
@@ -39,6 +40,14 @@ public class SessionReceiver : BroadcastReceiver
     {
         if (context is null || intent?.Action != SessionHandOff.Action)
         {
+            return;
+        }
+
+        // Sessions arrive many times a minute while something plays, so only a refusal is logged.
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            Codex.Ui.HeadLog.Info("Pulp", ContractBroadcast.ReceiptLine("playback-sessions", version));
             return;
         }
 

@@ -58,7 +58,7 @@ W1 and W2 are first because they lose data or silently break features today. W3 
    - Tap-watch row text (08).
 5. **Your step:** trash any `storyworthtelling-voice-config.json` left in Drive, and rotate the Claude key if it is there.
 
-## W1 · Data safety — in review
+## W1 · Data safety — done (PR #296)
 
 Goal: no failure path can overwrite or lose data.
 
@@ -87,7 +87,7 @@ Goal: no failure path can overwrite or lose data.
    - Retention purge runs on approval (03 §32).
    - Offline doesn't spend attempts, and Failed banks come back after 24 h (11 §5).
 
-## W2 · Cross-app contracts
+## W2 · Cross-app contracts — in review
 
 1. **Receivers request their own permissions.** Index, Flyleaf, Pulp and Constitution each add a `uses-permission` for the permission they declare, and Post requests `RECEIVE_BALANCE` (09 C1, C2).
    - Fix `BudgetManifestTests` and the 17→18 permission count.

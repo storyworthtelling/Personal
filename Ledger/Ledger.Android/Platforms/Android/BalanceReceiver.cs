@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Android.App;
 using Android.Content;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,6 +57,13 @@ public class BalanceReceiver : BroadcastReceiver
         if (context is null || intent?.Action != HandoffAction)
         {
             return;
+        }
+
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        LogReceipt(ContractBroadcast.ReceiptLine("balance", version));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            return; // a newer Post may mean something else by the balance; reading it as v1 would be a guess
         }
 
         var balanceText = intent.GetStringExtra(BalanceExtra);
@@ -130,6 +138,9 @@ public class BalanceReceiver : BroadcastReceiver
             pending?.Finish();
         }
     }
+
+    private static void LogReceipt(string line) =>
+        IPlatformApplication.Current?.Services.GetService<ILogger<BalanceReceiver>>()?.LogInformation("{Line}", line);
 
     private static void LogUnroutable(Context context, string reason)
     {

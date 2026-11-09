@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.App;
 using Android.Content;
@@ -24,6 +25,13 @@ public class HiddenAppsReceiver : BroadcastReceiver
         if (context is null || intent?.Action != HiddenAppsHandoff.Action)
         {
             return;
+        }
+
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        HeadLog.Info("Flyleaf", ContractBroadcast.ReceiptLine("hidden-apps", version));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            return; // a newer Pulp may mean something else by the list; the stored set is unchanged
         }
 
         var text = intent.GetStringExtra(HiddenAppsHandoff.PackagesExtra);

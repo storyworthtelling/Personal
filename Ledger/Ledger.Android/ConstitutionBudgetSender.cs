@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using global::Android.Content;
 using global::Android.Content.PM;
 using Index.Domain.Handoff;
@@ -46,15 +47,13 @@ public static class ConstitutionBudgetSender
 
     private static BudgetSendOutcome Send(Context context, ConstitutionBudgetPayload payload, ILogger? logger)
     {
-        if (!IsInstalled(context))
+        var installed = IsInstalled(context);
+        var holds = context.CheckSelfPermission(ConstitutionBudgetContract.Permission) == Permission.Granted;
+        var before = ContractBroadcast.Before(installed, holds);
+        if (before != ContractSendOutcome.Sent)
         {
-            return BudgetSendPlan.Outcome(receiverInstalled: false, senderHoldsPermission: true, sendThrew: false);
-        }
-
-        if (context.CheckSelfPermission(ConstitutionBudgetContract.Permission) != Permission.Granted)
-        {
-            logger?.LogInformation("Budget not sent to Constitution: Index does not hold the budget permission yet.");
-            return BudgetSendPlan.Outcome(receiverInstalled: true, senderHoldsPermission: false, sendThrew: false);
+            logger?.LogInformation("{Line}", ContractBroadcast.SendLine(Contract, before));
+            return BudgetSendPlan.Outcome(receiverInstalled: installed, senderHoldsPermission: holds, sendThrew: false);
         }
 
         var threw = false;
@@ -62,19 +61,23 @@ public static class ConstitutionBudgetSender
         {
             var intent = new Intent(ConstitutionBudgetContract.Action);
             intent.SetComponent(new ComponentName(ConstitutionBudgetContract.Package, ConstitutionBudgetContract.Receiver));
+            intent.PutExtra(ContractBroadcast.VersionExtra, ContractBroadcast.Version);
             intent.PutExtra(ConstitutionBudgetContract.MonthExtra, payload.Month);
             intent.PutExtra(ConstitutionBudgetContract.BudgetExtra, payload.BudgetText);
             intent.PutExtra(ConstitutionBudgetContract.SpentExtra, payload.SpentText);
             context.SendBroadcast(intent, ConstitutionBudgetContract.Permission);
+            logger?.LogInformation("{Line}", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
         }
         catch (Exception ex)
         {
             threw = true;
-            logger?.LogInformation(ex, "Budget broadcast to Constitution failed; the next change sends again.");
+            logger?.LogInformation("{Line}", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, ex.GetType().Name));
         }
 
         return BudgetSendPlan.Outcome(receiverInstalled: true, senderHoldsPermission: true, sendThrew: threw);
     }
+
+    private const string Contract = "budget";
 
     private static bool IsInstalled(Context context)
     {

@@ -1,3 +1,5 @@
+using Codex.Ui;
+using Storyworthtelling.Diagnostics;
 using Android.Content;
 using Pulp.Domain.Core;
 using Pulp.Domain.Services;
@@ -30,21 +32,32 @@ internal static class IndexUsageCourier
 
     public static void Send(Context context, IndexUsagePayload payload, ServiceCatalogue catalogue)
     {
+        var before = ContractCourier.Before(context, IndexUsageContract.Package, IndexUsageContract.Permission);
+        if (before != ContractSendOutcome.Sent)
+        {
+            // Index not being installed is the ordinary case.
+            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, before));
+            return;
+        }
+
         try
         {
             var intent = new Intent(IndexUsageContract.Action);
             intent.SetComponent(new ComponentName(IndexUsageContract.Package, IndexUsageContract.Receiver));
+            intent.PutExtra(ContractBroadcast.VersionExtra, ContractBroadcast.Version);
             foreach (var (key, value) in IndexUsageContract.Extras(payload, catalogue))
             {
                 intent.PutExtra(key, value);
             }
 
             context.SendBroadcast(intent, IndexUsageContract.Permission);
+            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
         }
         catch (Exception e)
         {
-            // Dropped on purpose and quietly: Index not being installed is the ordinary case.
-            Android.Util.Log.Info("Pulp", $"Usage hand-off to Index did not land: {e.Message}");
+            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
         }
     }
+
+    private const string Contract = "usage";
 }

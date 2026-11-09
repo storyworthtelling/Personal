@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.App;
 using Android.Content;
@@ -174,19 +175,43 @@ internal sealed class PlaybackSessionWatcher
         return new PlaybackSessionReading(package, title, Math.Max(0L, position), Math.Max(0L, duration), mapped);
     }
 
+    // Sessions change many times a minute while something plays, so the outcome is logged when it changes,
+    // not on every send.
+    private string? lastLine;
+
     private void Send(PlaybackSessionReading reading)
     {
+        var before = ContractCourier.Before(context, PlaybackSessionHandoff.Package, PlaybackSessionHandoff.Permission);
+        if (before != ContractSendOutcome.Sent)
+        {
+            // Pulp not being on this phone is an ordinary case.
+            Note(ContractBroadcast.SendLine(Contract, before));
+            return;
+        }
+
         try
         {
             var intent = new Intent(PlaybackSessionHandoff.Action);
             intent.SetComponent(new ComponentName(PlaybackSessionHandoff.Package, PlaybackSessionHandoff.Receiver));
+            intent.PutExtra(ContractBroadcast.VersionExtra, ContractBroadcast.Version);
             intent.PutExtra(PlaybackSessionHandoff.SessionExtra, PlaybackSessionCodec.Encode(reading));
             context.SendBroadcast(intent, PlaybackSessionHandoff.Permission);
+            Note(ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
         }
         catch (Exception e)
         {
-            // Dropped on purpose: Pulp not being on this phone is an ordinary case.
-            Android.Util.Log.Info("Flyleaf", $"Playback-session relay to Pulp did not land: {e.Message}");
+            Note(ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
+        }
+    }
+
+    private const string Contract = "playback-sessions";
+
+    private void Note(string line)
+    {
+        if (line != lastLine)
+        {
+            lastLine = line;
+            HeadLog.Info("Flyleaf", line);
         }
     }
 

@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.App;
 using Android.Content;
@@ -30,6 +31,13 @@ public class BudgetReceiver : BroadcastReceiver
         if (context is null || intent?.Action != ConstitutionIdentity.BudgetAction)
         {
             return;
+        }
+
+        var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
+        HeadLog.Info("Constitution", ContractBroadcast.ReceiptLine("budget", version));
+        if (!ContractBroadcast.Accepts(version))
+        {
+            return; // a newer Index may mean something else by the figures
         }
 
         var trail = new BudgetTrail(context);
