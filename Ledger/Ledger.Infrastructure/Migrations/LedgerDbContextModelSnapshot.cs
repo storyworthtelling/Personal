@@ -256,6 +256,41 @@ namespace Index.Infrastructure.Migrations
                     b.ToTable("MerchantCategoryRules");
                 });
 
+            modelBuilder.Entity("Index.Domain.Model.PendingPlaidRelease", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AccessToken")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InstitutionName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ItemId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("NextAttemptAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("QueuedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PendingPlaidReleases");
+                });
+
             modelBuilder.Entity("Index.Domain.Model.SavingsGoal", b =>
                 {
                     b.Property<Guid>("Id")

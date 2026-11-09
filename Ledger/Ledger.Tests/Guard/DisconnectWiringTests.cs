@@ -34,9 +34,12 @@ public class DisconnectWiringTests
     }
 
     [Fact]
-    public void SettingsReleasesThroughTheSharedHelper()
+    public void SettingsReleasesThroughTheOutbox()
     {
-        Assert.Contains("PlaidItemRelease.ReleaseAsync(", Source("Ledger.Android/Pages/SetupPage.xaml.cs"), StringComparison.Ordinal);
+        // Through AccountService, which asks the shared helper and keeps the token in the outbox when Plaid
+        // cannot say yes (error-handling §9).
+        Assert.Contains("accounts.ReleaseOrQueueAsync(", Source("Ledger.Android/Pages/SetupPage.xaml.cs"), StringComparison.Ordinal);
+        Assert.Contains("PlaidItemRelease.ReleaseAsync(", Source("Ledger.Infrastructure/Services/AccountService.cs"), StringComparison.Ordinal);
     }
 
     private static string Source(string ledgerRelativePath)

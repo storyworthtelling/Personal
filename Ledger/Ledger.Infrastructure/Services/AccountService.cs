@@ -510,11 +510,42 @@ public sealed class AccountService
         var released = false;
         await disconnected.TrySettleAsync(DisconnectedInstitution.Outcome.Released, async () =>
         {
-            released = await PlaidItemRelease.ReleaseAsync(
-                plaid, disconnected.Snapshot.AccessToken, disconnected.Name, logger, cancellationToken);
+            released = await ReleaseOrQueueAsync(
+                plaid, disconnected.Snapshot.ItemId, disconnected.Snapshot.AccessToken, disconnected.Name, logger, cancellationToken);
             return true;
         });
         return released;
+    }
+
+    /// <summary>How long a release Plaid refused waits before the refresh worker asks again.</summary>
+    public static readonly TimeSpan ReleaseRetryDelay = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// Asks Plaid to release the Item, and when it cannot say yes, keeps the token in the outbox
+    /// (<see cref="PendingPlaidRelease"/>) for the refresh worker to ask again. True only when Plaid accepted
+    /// now; a hand-entered bank (blank token) has nothing to release.
+    /// </summary>
+    public async Task<bool> ReleaseOrQueueAsync(
+        IPlaidClient plaid, string itemId, string accessToken, string bankName, ILogger logger, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+            return false;
+        if (await PlaidItemRelease.ReleaseAsync(plaid, accessToken, bankName, logger, cancellationToken))
+            return true;
+
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var now = clock.UtcNow;
+        db.PendingPlaidReleases.Add(new PendingPlaidRelease
+        {
+            ItemId = itemId,
+            AccessToken = accessToken,
+            InstitutionName = bankName,
+            QueuedAtUtc = now,
+            Attempts = 1,
+            NextAttemptAtUtc = now + ReleaseRetryDelay,
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return false;
     }
 
     // Marks every institution due right now (used by "Refresh now"), including previously failed ones so

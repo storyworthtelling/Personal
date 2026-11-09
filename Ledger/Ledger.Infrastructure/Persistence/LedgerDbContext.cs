@@ -23,6 +23,7 @@ public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options)
     public DbSet<SavingsGoal> SavingsGoals => Set<SavingsGoal>();
     public DbSet<SavingsSnapshot> SavingsSnapshots => Set<SavingsSnapshot>();
     public DbSet<WorksheetSetAsideAmount> WorksheetSetAsideAmounts => Set<WorksheetSetAsideAmount>();
+    public DbSet<PendingPlaidRelease> PendingPlaidReleases => Set<PendingPlaidRelease>();
 
     // SQLite has no native DateTimeOffset, and the provider cannot translate comparisons on the
     // default TEXT mapping. Storing UTC ticks as integers makes the worker's "due institution" time

@@ -497,7 +497,9 @@ public partial class SetupPage : LedgerBinderPage
         {
             // Skipped for a hand-entered bank (blank token); a failure is logged, never thrown — the local
             // record goes either way.
-            await PlaidItemRelease.ReleaseAsync(plaid, row.AccessToken, row.Name, logger, CancellationToken.None);
+            // A release Plaid refuses (offline, say) waits in the outbox with its token and is asked again by
+            // the refresh worker, rather than leaving the Item live and billed at Plaid (error-handling §9).
+            await accounts.ReleaseOrQueueAsync(plaid, row.ItemId, row.AccessToken, row.Name, logger, CancellationToken.None);
             await accounts.RemoveInstitutionAsync(row.Id, CancellationToken.None);
             // Keep the vault's backup in step with the removal.
             try { await vaultSync.PublishAsync(CancellationToken.None); }
@@ -683,6 +685,7 @@ public partial class SetupPage : LedgerBinderPage
     {
         public Guid Id { get; init; }
         public string Name { get; init; } = string.Empty;
+        public string ItemId { get; init; } = string.Empty;
         public string AccessToken { get; init; } = string.Empty;
         public string Summary { get; init; } = string.Empty;
 
@@ -696,6 +699,7 @@ public partial class SetupPage : LedgerBinderPage
             return new InstitutionRow
             {
                 Id = institution.Id,
+                ItemId = institution.ItemId,
                 Name = institution.Name,
                 AccessToken = institution.AccessToken,
                 Summary = $"{accountsText} · {when}"
