@@ -11,6 +11,7 @@ on:
       - 'FocusPhone/Codex.Domain/**'
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
       - 'FocusPhone/Codex.Infrastructure/**'
       - 'FocusPhone/Codex.Tests/**'
       - 'Storyworthtelling.Updates/**'

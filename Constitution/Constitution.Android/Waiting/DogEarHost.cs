@@ -5,6 +5,7 @@ using Android.Widget;
 using Codex.Ui;
 using Constitution.Domain.Notices;
 using Constitution.Settings;
+using Storyworthtelling.Folds;
 
 namespace Constitution.Waiting;
 
@@ -52,7 +53,7 @@ internal sealed class DogEarHost(Context context, FrameLayout overlay)
         var view = new FoldView(context, hint, fold.Role, showsBackArrow: fold.IsUndo) { Tag = FoldTag };
         view.Click += (_, _) => Turn();
 
-        var size = PaperTheme.Dp(context, Codex.Domain.Design.DogEarGeometry.SizeDp);
+        var size = PaperTheme.Dp(context, Storyworthtelling.Folds.DogEarGeometry.SizeDp);
         overlay.AddView(view, new FrameLayout.LayoutParams(size, size, GravityFlags.Top | GravityFlags.End));
 
         if (fold.Expires is { } expires)

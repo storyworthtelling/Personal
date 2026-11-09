@@ -27,6 +27,7 @@ on:
       - 'Storyworthtelling.Diagnostics.Tests/**'
       - 'Storyworthtelling.Time/**'
       - 'Storyworthtelling.Time.Tests/**'
+      - 'Storyworthtelling.Folds/**'
       - 'Storyworthtelling.Maui/**'
       - 'Storyworthtelling.Maui.Tests/**'
       - '.github/workflows/build-shared-libs.yml'

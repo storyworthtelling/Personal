@@ -1,4 +1,4 @@
-namespace Codex.Domain.Design;
+namespace Storyworthtelling.Folds;
 
 /// <summary>
 /// The order of the notices waiting behind a dog-ear (DESIGN.md §13, mockup 17): newest first BY

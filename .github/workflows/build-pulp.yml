@@ -11,6 +11,7 @@ on:
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
       - 'Storyworthtelling.Household/**'
       - 'Storyworthtelling.Updates/**'
       - 'Tools/IconStudio/**'

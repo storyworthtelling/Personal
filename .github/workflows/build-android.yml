@@ -21,6 +21,7 @@ on:
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
       - 'Storyworthtelling.Remarkable/**'
       - '.github/workflows/build-android.yml'
 

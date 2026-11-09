@@ -3,6 +3,7 @@ using Constitution.Domain.Body.Screens;
 using Constitution.Domain.Credentials;
 using Constitution.Domain.Notices;
 using Constitution.Tests.Body;
+using Storyworthtelling.Folds;
 
 namespace Constitution.Tests.BodyScreens;
 
@@ -116,7 +117,7 @@ public class BedOfflineTests
 
         var notice = Assert.Single(board.Waiting());
         Assert.Equal(NoticeKind.BedSilent, notice.Kind);
-        Assert.Equal(Codex.Domain.Design.FoldRole.Reference, notice.Role);
+        Assert.Equal(Storyworthtelling.Folds.FoldRole.Reference, notice.Role);
         Assert.Equal(BedOffline.SilentCauseKey, notice.CauseKey);
         Assert.NotEqual(ConnectionNotices.CauseKey(CredentialIds.SleepNumber), notice.CauseKey);
     }
@@ -131,7 +132,7 @@ public class BedOfflineTests
 
         var notice = Assert.Single(board.Waiting());
         Assert.Equal(NoticeKind.BedOffline, notice.Kind);
-        Assert.Equal(Codex.Domain.Design.FoldRole.Problem, notice.Role);
+        Assert.Equal(Storyworthtelling.Folds.FoldRole.Problem, notice.Role);
         // The same cause the Settings credential check uses, so the two never stack as two cards.
         Assert.Equal(ConnectionNotices.CauseKey(CredentialIds.SleepNumber), notice.CauseKey);
     }

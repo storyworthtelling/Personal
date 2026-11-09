@@ -1,4 +1,4 @@
-namespace Codex.Domain.Design;
+namespace Storyworthtelling.Folds;
 
 /// <summary>
 /// The functional role a dog-ear notice carries (DESIGN.md §13) — the native twin of the MAUI kit's

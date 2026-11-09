@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Codex.Domain.Design;
 using Xunit;
+using Storyworthtelling.Folds;
 
 namespace Codex.Tests.Design;
 
@@ -92,13 +93,7 @@ public class NoticeSeriousnessTests
     [Fact]
     public void TheRolesAreTheKitsHuesByName()
     {
-        var kit = Regex.Match(
-            File.ReadAllText(RepoFile("Storyworthtelling.Maui/State/DogEarState.cs")),
-            @"enum DogEarHue\s*\{(?<body>.*?)\}", RegexOptions.Singleline).Groups["body"].Value;
-        var names = Regex.Matches(kit, @"^\s*(?<n>[A-Z]\w+),", RegexOptions.Multiline).Select(m => m.Groups["n"].Value).ToList();
-
-        Assert.NotEmpty(names);
-        Assert.Equal(names.Order(), Enum.GetNames<FoldRole>().Order());
+        Assert.Equal(Enum.GetNames<DogEarHue>().Order(), Enum.GetNames<FoldRole>().Order());
     }
 
     /// <summary>

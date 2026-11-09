@@ -1,4 +1,4 @@
-namespace Storyworthtelling.Maui.State;
+namespace Storyworthtelling.Folds;
 
 /// <summary>
 /// The functional colour a fold carries. Named by role rather than by hex so the decision stays
@@ -62,7 +62,7 @@ public sealed class DogEarState
     /// Every hue, most serious first — the corner wears the most serious notice waiting, not the newest
     /// (D291, mockup 12); ties go to the newest. Problem (broken), Caution (going stale), Action (a
     /// decision waiting), Progress (waiting, not wrong), Reference (only worth knowing), Resolved
-    /// (settled). The native <c>Codex.Domain.Design.NoticeSeriousness</c> holds the same order, kept
+    /// (settled). The native <c>Storyworthtelling.Folds.NoticeSeriousness</c> holds the same order, kept
     /// identical by <c>DogEarSeriousnessTests</c>.
     /// </summary>
     public static IReadOnlyList<DogEarHue> MostSeriousFirst { get; } =

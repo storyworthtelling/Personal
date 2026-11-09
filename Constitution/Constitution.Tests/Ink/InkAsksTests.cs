@@ -1,6 +1,7 @@
 using Constitution.Domain.Ink;
 using Constitution.Domain.Notices;
 using Constitution.Domain.Waiting;
+using Storyworthtelling.Folds;
 
 namespace Constitution.Tests.Ink;
 
@@ -22,7 +23,7 @@ public class InkAsksTests
 
         var item = Assert.Single(WaitingPageModel.From(board, Now).Items);
         Assert.Equal(NoticeKind.LowConfidenceRead, item.Kind);
-        Assert.Equal(Codex.Domain.Design.FoldRole.Caution, item.Role);
+        Assert.Equal(Storyworthtelling.Folds.FoldRole.Caution, item.Role);
         Assert.Equal(["right", "hard"], item.Chips.Select(c => c.Value));
         Assert.Null(item.Button);
     }

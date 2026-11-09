@@ -3,6 +3,7 @@ using Constitution.Domain.Notices;
 using Constitution.Domain.Waiting;
 using Constitution.Infrastructure.Household;
 using Storyworthtelling.Household;
+using Storyworthtelling.Folds;
 
 namespace Constitution.Tests.HouseholdHead;
 

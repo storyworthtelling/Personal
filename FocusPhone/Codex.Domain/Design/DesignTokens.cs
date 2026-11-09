@@ -1,3 +1,4 @@
+using Storyworthtelling.Folds;
 namespace Codex.Domain.Design;
 
 /// <summary>
@@ -340,7 +341,7 @@ public static class DesignTokens
     {
         public const int QuickMs = 150;
         public const int StandardMs = 200;
-        public const int UndoWindowMs = 6_000;
+        public const int UndoWindowMs = Storyworthtelling.Folds.FoldTiming.UndoWindowMs;
         public const int CutoverCountdownSeconds = 10;
     }
 

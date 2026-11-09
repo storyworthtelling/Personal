@@ -1,4 +1,4 @@
-namespace Storyworthtelling.Maui.Layout;
+namespace Storyworthtelling.Folds;
 
 /// <summary>
 /// The dog-ear's drawn geometry, in the units of mockup 17's own SVG (a 40 x 40 view box), so the MAUI

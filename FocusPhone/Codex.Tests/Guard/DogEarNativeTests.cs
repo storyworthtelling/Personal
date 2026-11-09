@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Codex.Tests.Design;
 using Xunit;
 using Storyworthtelling.Time;
+using Storyworthtelling.Folds;
 
 namespace Codex.Tests.Guard;
 
@@ -23,10 +24,7 @@ public class DogEarNativeTests
     [Fact]
     public void EveryKitHueHasANativeHueOfTheSameName()
     {
-        var kit = Regex.Match(
-            File.ReadAllText(RepoFile("Storyworthtelling.Maui/State/DogEarState.cs")),
-            @"enum DogEarHue\s*\{(?<body>.*?)\}", RegexOptions.Singleline).Groups["body"].Value;
-        var names = Regex.Matches(kit, @"^\s*(?<n>[A-Z]\w+),", RegexOptions.Multiline).Select(m => m.Groups["n"].Value).ToList();
+        var names = Enum.GetNames<DogEarHue>();
         Assert.NotEmpty(names);
 
         var native = Hues();
