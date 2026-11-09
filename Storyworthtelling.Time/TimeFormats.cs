@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Constitution.Domain.Time;
+namespace Storyworthtelling.Time;
 
 /// <summary>
 /// 12-hour, analog-sensibility time formats per DESIGN.md §11:
@@ -8,6 +8,13 @@ namespace Constitution.Domain.Time;
 /// </summary>
 public static class TimeFormats
 {
+    /// <summary>"7:30 pm" for an instant, in the viewer's zone.</summary>
+    public static string Clock12(DateTimeOffset moment, TimeZoneInfo zone)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+        return Clock12(TimeZoneInfo.ConvertTime(moment, zone).DateTime);
+    }
+
     public static string Clock12(DateTime moment) =>
         moment.ToString("h:mm", CultureInfo.InvariantCulture) +
         (moment.Hour < 12 ? " am" : " pm");

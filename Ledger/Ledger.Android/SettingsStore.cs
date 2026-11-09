@@ -222,7 +222,7 @@ public static class SettingsStore
     public static string LastWorksheetSummary =>
         string.IsNullOrEmpty(LastWorksheetOutcome) || LastWorksheetAtUtc == DateTime.MinValue
             ? "No worksheet delivered yet"
-            : $"{LastWorksheetOutcome} — {Index.Domain.Time.RelativeTime.Format(LastWorksheetAtUtc.ToLocalTime(), DateTime.Now)}";
+            : $"{LastWorksheetOutcome} — {Storyworthtelling.Time.RelativeTime.Format(LastWorksheetAtUtc.ToLocalTime(), DateTime.Now)}";
 
     // The reMarkable's long-lived device token (Storyworthtelling.Remarkable.RemarkableOptions),
     // backed up to and restored from the shared secrets vault's RemarkableSecrets.DeviceToken — the

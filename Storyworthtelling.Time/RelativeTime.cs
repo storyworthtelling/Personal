@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Foreword.Domain.Time;
+namespace Storyworthtelling.Time;
 
 /// <summary>
 /// Relative list timestamps per DESIGN.md §11: the shortest honest phrase,
@@ -8,6 +8,13 @@ namespace Foreword.Domain.Time;
 /// </summary>
 public static class RelativeTime
 {
+    /// <summary>An instant, read in the viewer's zone: what a phone holding UTC instants shows.</summary>
+    public static string Format(DateTimeOffset at, DateTimeOffset now, TimeZoneInfo zone)
+    {
+        ArgumentNullException.ThrowIfNull(zone);
+        return Format(TimeZoneInfo.ConvertTime(at, zone).DateTime, TimeZoneInfo.ConvertTime(now, zone).DateTime);
+    }
+
     public static string Format(DateTime timestampLocal, DateTime nowLocal)
     {
         var elapsed = nowLocal - timestampLocal;

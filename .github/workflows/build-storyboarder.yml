@@ -13,6 +13,7 @@ on:
       # to it must rebuild Folio too.
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Diagnostics/**'
+      - 'Storyworthtelling.Time/**'
       - 'Storyworthtelling.Voice.Tests/**'
       # The shared reMarkable delivery library also ships in the APK (Infrastructure references it).
       - 'Storyworthtelling.Remarkable/**'

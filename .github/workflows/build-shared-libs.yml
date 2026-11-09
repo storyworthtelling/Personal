@@ -25,6 +25,8 @@ on:
       - 'Storyworthtelling.Handwriting.Tests/**'
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Diagnostics.Tests/**'
+      - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Time.Tests/**'
       - 'Storyworthtelling.Maui/**'
       - 'Storyworthtelling.Maui.Tests/**'
       - '.github/workflows/build-shared-libs.yml'
@@ -63,6 +65,7 @@ jobs:
             Storyworthtelling.Household.Tests/Storyworthtelling.Household.Tests.csproj \
             Storyworthtelling.Handwriting.Tests/Storyworthtelling.Handwriting.Tests.csproj \
             Storyworthtelling.Diagnostics.Tests/Storyworthtelling.Diagnostics.Tests.csproj \
+            Storyworthtelling.Time.Tests/Storyworthtelling.Time.Tests.csproj \
             Storyworthtelling.Maui.Tests/Storyworthtelling.Maui.Tests.csproj ; do
             if [ -f "$proj" ]; then
               echo "== dotnet test $proj =="

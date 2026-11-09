@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Storyworthtelling.Time\Storyworthtelling.Time.csproj" />
     <ProjectReference Include="..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
     <ProjectReference Include="..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
   </ItemGroup>

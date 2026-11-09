@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The suite's time words (DESIGN.md §11): relative list timestamps and 12-hour clock formats. One copy,
+    referenced by every Domain and both UI kits, instead of six copies held together by a parity test that
+    covered four of them (audit 01 §13). BCL only, so Codex.Domain can reference it and stay free of
+    third-party code.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Time</RootNamespace>
+  </PropertyGroup>
+
+</Project>
