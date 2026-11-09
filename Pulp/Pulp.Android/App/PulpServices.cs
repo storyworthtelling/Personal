@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using Android.Content;
 using Codex.Ui.Voice;
 using Google.Apis.Auth.OAuth2;
@@ -216,12 +217,7 @@ public sealed class PulpServices
     private static Func<CancellationToken, Task<DriveService>> DriveFactory(VoiceGoogleAccount account) => async _ =>
     {
         var token = await account.GetAccessToken();
-        return new DriveService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-            ApplicationName = "Pulp",
-            HttpClientFactory = new GoogleHttpClientFactory(),
-        });
+        return GoogleDrive.Service(token, "Pulp");
     };
 
     public static PulpServices For(Context context)

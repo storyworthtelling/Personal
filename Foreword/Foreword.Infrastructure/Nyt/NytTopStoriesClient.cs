@@ -32,7 +32,7 @@ public class NytTopStoriesClient : INytTopStoriesClient
     private async Task<IReadOnlyList<TopStory>> FetchStories(
         string section, int count, Func<TopStory, bool> filter)
     {
-        var url = $"{BaseUrl}/{section}.json?api-key={options.ApiKey}";
+        var url = $"{BaseUrl}/{section}.json?api-key={Uri.EscapeDataString(options.ApiKey)}";
         var response = await httpClient.GetAsync(url);
 
         if (!response.IsSuccessStatusCode)

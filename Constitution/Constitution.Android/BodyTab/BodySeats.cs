@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using Android.Content;
 using Codex.Ui.Voice;
 using Constitution.Domain.Voice;
@@ -48,16 +49,7 @@ internal static class BodySeats
     private static SeatCache Build(Context context)
     {
         var account = ConstitutionGoogle.Create();
-        Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
-        {
-            var token = await account.GetAccessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = ApplicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory(),
-            });
-        };
+        var driveFactory = GoogleDrive.Factory(account.GetAccessToken, ApplicationName);
 
         // The Claude key is read from the shared vault with this head's passphrase; with none, the options stay empty and the seat is plain.
         var vault = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
@@ -70,10 +62,4 @@ internal static class BodySeats
         return new SeatCache(new SeatComposer(messenger, options), new BodySeatLineStore(context));
     }
 
-    // Routes the Google API client through AndroidMessageHandler, as the sibling heads' Drive clients do.
-    private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
-    {
-        protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>
-            new Xamarin.Android.Net.AndroidMessageHandler();
-    }
 }

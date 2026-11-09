@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
@@ -94,12 +95,7 @@ public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens)
     private async Task<DriveService> Service()
     {
         var token = await tokens.GetAccessToken();
-        return new DriveService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-            ApplicationName = "Folio",
-            HttpClientFactory = new AndroidGoogleHttpClientFactory()
-        });
+        return GoogleDrive.Service(token, "Folio");
     }
 
     // Drive query strings are single-quoted, so an apostrophe in a book title would otherwise terminate

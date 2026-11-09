@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
@@ -41,12 +42,7 @@ public sealed class HiddenTrackPass
         Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
         {
             var token = await tokens.GetAccessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = "Score",
-                HttpClientFactory = new AndroidGoogleHttpClientFactory()
-            });
+            return GoogleDrive.Service(token, "Score");
         };
 
         var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(

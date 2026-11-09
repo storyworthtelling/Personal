@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Http;
@@ -19,16 +20,7 @@ public sealed class VoiceGreeting
 
     public VoiceGreeting(Func<Task<string>> accessToken, string applicationName)
     {
-        Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
-        {
-            var token = await accessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = applicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory()
-            });
-        };
+        var driveFactory = GoogleDrive.Factory(accessToken, applicationName);
 
         // The shared Claude key now lives in the encrypted secrets vault (the single source of truth, in
         // place of the old plaintext voice config). VaultVoiceConfigStore reads it back given this head's
@@ -62,11 +54,4 @@ public sealed class VoiceGreeting
         }
     }
 
-    // Routes the Google API client's HttpClient through AndroidMessageHandler (SELinux blocks the default
-    // socket handler in an app process), matching the app's other Google clients.
-    private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
-    {
-        protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>
-            new Xamarin.Android.Net.AndroidMessageHandler();
-    }
 }

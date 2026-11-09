@@ -12,6 +12,8 @@ on:
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
       - 'Storyworthtelling.Folds/**'
+      - 'Storyworthtelling.Google/**'
+      - 'Storyworthtelling.Google.Android/**'
       - 'Storyworthtelling.Updates/**'
       - 'Tools/IconStudio/**'
       - 'Fonts/**'

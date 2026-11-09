@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Http;
@@ -48,22 +49,6 @@ public sealed class SecretsVaultAccess
     /// the factory shape every Drive seam here takes (the vault, the voice profile, the log folder).
     /// </summary>
     public static Func<CancellationToken, Task<DriveService>> DriveFactory(Func<Task<string>> accessToken, string applicationName) =>
-        async _ =>
-        {
-            var token = await accessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = applicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory()
-            });
-        };
+        GoogleDrive.Factory(accessToken, applicationName);
 
-    // Routes the Google API client's HttpClient through AndroidMessageHandler (SELinux blocks the default
-    // socket handler in an app process), matching the head's other Google clients.
-    private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
-    {
-        protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>
-            new Xamarin.Android.Net.AndroidMessageHandler();
-    }
 }

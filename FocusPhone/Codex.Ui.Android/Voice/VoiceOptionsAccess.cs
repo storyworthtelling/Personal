@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Http;
@@ -19,25 +20,11 @@ public static class VoiceOptionsAccess
 {
     public static DriveVoiceOptions ForHead(Func<Task<string>> accessToken, string applicationName)
     {
-        Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
-        {
-            var token = await accessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = applicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory(),
-            });
-        };
+        var driveFactory = GoogleDrive.Factory(accessToken, applicationName);
 
         var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         return new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
     }
 
-    private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
-    {
-        protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>
-            new Xamarin.Android.Net.AndroidMessageHandler();
-    }
 }

@@ -27,13 +27,7 @@ public sealed class DriveDocsLister
     public async Task<IReadOnlyList<DriveEntry>> ListChildrenAsync(
         string accessToken, string folderId, CancellationToken cancellationToken)
     {
-        var credential = GoogleCredential.FromAccessToken(accessToken);
-        using var service = new DriveService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = credential,
-            ApplicationName = "Folio",
-            HttpClientFactory = new AndroidGoogleHttpClientFactory()
-        });
+        using var service = Storyworthtelling.Google.Android.GoogleDrive.Service(accessToken, "Folio");
 
         var request = service.Files.List();
         request.Q = $"'{folderId}' in parents and trashed=false and " +

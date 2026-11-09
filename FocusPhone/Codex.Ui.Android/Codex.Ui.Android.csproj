@@ -13,6 +13,7 @@
          profile + Claude key from Drive and degrading to neutral copy when unavailable. -->
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Google.Android\Storyworthtelling.Google.Android.csproj" />
   </ItemGroup>
 
   <!-- Google Drive read access for the shared voice profile/config. -->

@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
@@ -32,12 +33,7 @@ public sealed class MusicTasteService
         Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
         {
             var token = await accessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = applicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory()
-            });
+            return GoogleDrive.Service(token, applicationName);
         };
 
         // The shared Claude key now lives in the encrypted secrets vault (single source of truth, in place of

@@ -17,6 +17,8 @@ on:
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
       - 'Storyworthtelling.Folds/**'
+      - 'Storyworthtelling.Google/**'
+      - 'Storyworthtelling.Google.Android/**'
       - '.github/workflows/build-post.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay

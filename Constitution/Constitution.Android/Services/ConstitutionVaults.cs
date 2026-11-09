@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using Android.Content;
 using Codex.Ui.Voice;
 using Constitution.Infrastructure.Vault;
@@ -49,16 +50,8 @@ public static class ConstitutionVaults
     /// The Drive service over the signed-in account's token, built fresh for each call. The vault and the household file both
     /// read and write through it, so there is one recipe for the client.
     /// </summary>
-    public static Func<CancellationToken, Task<DriveService>> DriveFactory(VoiceGoogleAccount account) => async _ =>
-    {
-        var token = await account.GetAccessToken();
-        return new DriveService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-            ApplicationName = ApplicationName,
-            HttpClientFactory = new AndroidGoogleHttpClientFactory(),
-        });
-    };
+    public static Func<CancellationToken, Task<DriveService>> DriveFactory(VoiceGoogleAccount account) =>
+        GoogleDrive.Factory(account.GetAccessToken, ApplicationName);
 
     private static ConstitutionVaultSync BuildSync(Context context, VoiceGoogleAccount account, IConstitutionVaultLog log)
     {
@@ -72,10 +65,4 @@ public static class ConstitutionVaults
             shared, personal, () => VoiceGoogleAccount.Email, new ConstitutionConnections(context), log);
     }
 
-    // Routes the Google API client through AndroidMessageHandler, as the sibling heads' Drive clients do.
-    private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
-    {
-        protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>
-            new Xamarin.Android.Net.AndroidMessageHandler();
-    }
 }

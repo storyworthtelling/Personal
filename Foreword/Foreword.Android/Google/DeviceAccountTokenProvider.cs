@@ -1,4 +1,4 @@
-using Android.Accounts;
+using Storyworthtelling.Google.Android;
 using Foreword.Infrastructure.Google;
 
 namespace Foreword.Android.Google;
@@ -18,44 +18,9 @@ public class DeviceAccountTokenProvider : IGoogleAccessTokenProvider
         "oauth2:https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks " +
         "https://www.googleapis.com/auth/drive";
 
-    private readonly object gate = new();
-    private string? cachedToken;
-    private DateTimeOffset expiresAt;
+    // The cache and the AccountManager fetch are the shared kit's (audit 01 §10); this head supplies its scopes,
+    // exactly as they were (Android keys a granted consent by the token-type string), and where the email is kept.
+    private readonly DeviceAccountTokens tokens = new(() => CredentialStore.GoogleAccountEmail, TokenScope, "Sign in with Google first.");
 
-    public Task<string> GetAccessToken()
-    {
-        lock (gate)
-        {
-            if (cachedToken is not null && DateTimeOffset.UtcNow < expiresAt)
-                return Task.FromResult(cachedToken);
-        }
-
-        var email = CredentialStore.GoogleAccountEmail;
-        if (string.IsNullOrEmpty(email))
-            throw new InvalidOperationException("Sign in with Google first.");
-
-        return Task.Run(() =>
-        {
-            var manager = AccountManager.Get(global::Android.App.Application.Context)!;
-            var account = new Account(email, "com.google");
-
-            // Drop any cached token first so we never hand out a stale one, then fetch fresh.
-            lock (gate)
-            {
-                if (cachedToken is not null)
-                    manager.InvalidateAuthToken("com.google", cachedToken);
-            }
-
-            var token = manager.BlockingGetAuthToken(account, TokenScope, true)
-                ?? throw new InvalidOperationException(
-                    "Could not get a Google token for the device account. Open Settings and sign in again.");
-
-            lock (gate)
-            {
-                cachedToken = token;
-                expiresAt = DateTimeOffset.UtcNow.AddMinutes(45);
-            }
-            return token;
-        });
-    }
+    public Task<string> GetAccessToken() => tokens.GetAccessToken();
 }
