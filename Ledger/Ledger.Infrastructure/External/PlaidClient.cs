@@ -5,10 +5,10 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Index.Domain.External;
 using Index.Domain.Health;
-using Index.Domain.Pipeline;
 using Index.Domain.Identity;
 using Index.Infrastructure.Configuration;
 using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Infrastructure.External;
 

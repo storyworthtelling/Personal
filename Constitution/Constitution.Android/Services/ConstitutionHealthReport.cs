@@ -9,7 +9,7 @@ namespace Constitution.Services;
 
 /// <summary>
 /// Reads the credential-health report the HTTP choke points write
-/// (<see cref="CredentialHealthStore"/>, the shared native-head store every FocusPhone head uses,
+/// (<see cref="HeadCredentialHealth"/>, the shared native-head store every FocusPhone head uses,
 /// in this app's own private preferences) and states it to a <see cref="NoticeBoard"/> through
 /// <see cref="ConnectionNotices"/>, so a notice goes when its cause does. Settings and the Body tab read the report (<see cref="Read"/>, <see cref="HealthOf"/>) for their credential
 /// lines; <see cref="Apply"/>, which states every tracked credential to the board at once, has no caller yet.
@@ -21,7 +21,7 @@ public static class ConstitutionHealthReport
         [CredentialIds.SleepNumber, CredentialIds.Remarkable, CredentialIds.Claude, CredentialIds.Gemini];
 
     /// <summary>The current report.</summary>
-    public static CredentialHealthReport Read() => new CredentialHealthStore().Load();
+    public static CredentialHealthReport Read() => HeadCredentialHealth.Store().Load();
 
     /// <summary>
     /// One credential's health in Domain's words, as it bears on the credential held now: a judgement

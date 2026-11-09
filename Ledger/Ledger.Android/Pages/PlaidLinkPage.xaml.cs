@@ -8,11 +8,11 @@ using Microsoft.Extensions.Logging;
 using Index.Android.Views;
 using Index.Domain.Connect;
 using Index.Domain.External;
-using Index.Domain.Pipeline;
 using Index.Infrastructure.Services;
 using Storyworthtelling.Maui;
 using Storyworthtelling.Paper;
 using Storyworthtelling.Voice.Secrets;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Android.Pages;
 

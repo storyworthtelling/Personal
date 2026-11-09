@@ -1,6 +1,6 @@
 using SkiaSharp;
 using Foreword.Domain.Brief;
-using Foreword.Domain.Time;
+using Storyworthtelling.Time;
 using Storyworthtelling.Paper;
 
 namespace Foreword.Infrastructure.Pdf;

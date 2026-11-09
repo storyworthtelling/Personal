@@ -95,7 +95,7 @@ public sealed class PulpServices
         var account = new VoiceGoogleAccount();
         Keys = new VaultPulpKeySource(account, Diagnostics);
         var counter = new DiagnosticsLookupCounter(files, Diagnostics);
-        var health = new CredentialHealthStore();
+        var health = HeadCredentialHealth.Store();
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromSeconds(30) };
         Posters = new Posters(http, cacheRoot, Diagnostics);
 

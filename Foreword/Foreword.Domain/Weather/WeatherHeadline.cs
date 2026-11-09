@@ -1,4 +1,4 @@
-using Foreword.Domain.Time;
+using Storyworthtelling.Time;
 
 namespace Foreword.Domain.Weather;
 

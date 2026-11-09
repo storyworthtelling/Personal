@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The dog-ear's rules (DESIGN.md §7, §13): which notice the corner wears, the order the Waiting page
+    lists, the fold's geometry, the undo decision and its window. One copy for the native heads (through
+    Codex.Domain) and the MAUI kit, instead of copies held together by parity tests (audit 01 §16). BCL
+    only, so Codex.Domain can reference it and stay free of third-party code.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Folds</RootNamespace>
+  </PropertyGroup>
+
+</Project>

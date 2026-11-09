@@ -6,4 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\Storyworthtelling.Pipeline\Storyworthtelling.Pipeline.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Folds\Storyworthtelling.Folds.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Time\Storyworthtelling.Time.csproj" />
+  </ItemGroup>
+
 </Project>

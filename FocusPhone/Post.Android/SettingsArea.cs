@@ -78,7 +78,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         }
         var passwordState = CredentialFieldState.Decide(
             !string.IsNullOrEmpty(account.GmailAppPassword),
-            new CredentialHealthStore().Load().Get(CredentialIds.GmailAppPassword));
+            HeadCredentialHealth.Store().Load().Get(CredentialIds.GmailAppPassword));
         if (passwordState.ShowEntry)
         {
             ShowPasswordField(passwordState.IsWarning ? passwordState.StatusText : passwordHelper);

@@ -449,7 +449,7 @@ public partial class SetupPage : BinderPage
     }
 
     private static CredentialHealthReport CredentialHealth() =>
-        IPlatformApplication.Current!.Services.GetRequiredService<CredentialHealthStore>().Load();
+        IPlatformApplication.Current!.Services.GetRequiredService<Storyworthtelling.Voice.Health.CredentialHealthStore>().Load();
 
     // Styles and colours live in the app-wide merged dictionaries, which a page's own Resources
     // indexer does not search; TryGetValue on the application resources walks them.

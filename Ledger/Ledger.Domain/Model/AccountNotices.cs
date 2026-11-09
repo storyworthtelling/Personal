@@ -1,10 +1,12 @@
 using System.Globalization;
 using Index.Domain.Time;
+using Storyworthtelling.Time;
+using Storyworthtelling.Folds;
 
 namespace Index.Domain.Model;
 
 /// <summary>
-/// The severity a notice carries — named to mirror <c>Storyworthtelling.Maui.State.DogEarHue</c>
+/// The severity a notice carries — named to mirror <c>Storyworthtelling.Folds.DogEarHue</c>
 /// one-for-one, so the Android layer's mapping into a real <c>DogEarNotice</c> is a plain lookup
 /// rather than a second decision. Kept as its own Domain enum rather than referencing that MAUI
 /// type directly: <c>Storyworthtelling.Maui</c> targets <c>net10.0-android</c> only, so

@@ -1,6 +1,8 @@
 using Storyworthtelling.Maui;
+using Storyworthtelling.Maui.Diagnostics;
 using Storyworthtelling.Maui.State;
 using Storyworthtelling.Maui.Views;
+using Storyworthtelling.Folds;
 
 namespace Folio.Android.Pages;
 
@@ -205,12 +207,9 @@ public abstract class FolioBinderPage : ContentPage
     /// </summary>
     protected void OfferUndo(string hint, Action reverse)
     {
-        folds.BeginUndo(hint, reverse, DateTimeOffset.Now, TimeSpan.FromMilliseconds(UndoWindowMs));
+        folds.BeginUndo(hint, reverse, DateTimeOffset.Now, FoldTiming.UndoWindow);
         corner?.Refresh();
     }
-
-    /// <summary>DESIGN.md §13's window: long enough to catch a mistake, short enough to be a fold.</summary>
-    private const int UndoWindowMs = 6_000;
 
     /// <summary>
     /// The deferred half of a destructive act nothing can literally put back (a hard delete: rows
@@ -223,15 +222,28 @@ public abstract class FolioBinderPage : ContentPage
     /// <c>DogEarState.BeginUndo</c>'s own rule for a fold nobody turned ("it simply becomes
     /// permanent") applied going forward instead of after the fact.</para>
     /// </summary>
-    protected void CommitUnlessUndone(Func<bool> wasUndone, Func<Task> commit)
+    protected void CommitUnlessUndone(Func<bool> wasUndone, Func<Task> commit) =>
+        _ = CommitAfterTheWindowAsync(wasUndone, commit);
+
+    // Awaited end to end, so a failed hard delete reaches the log instead of vanishing inside an unobserved
+    // Task<Task>, which is what the old delay-then-continue chain returned (audit 01 §16).
+    private static async Task CommitAfterTheWindowAsync(Func<bool> wasUndone, Func<Task> commit)
     {
-        _ = Task.Delay(UndoWindowMs).ContinueWith(async _ =>
+        await Task.Delay(FoldTiming.UndoWindow);
+        if (wasUndone())
         {
-            if (!wasUndone())
-            {
-                await commit();
-            }
-        }, TaskScheduler.Default);
+            return;
+        }
+
+        try
+        {
+            await commit();
+        }
+        catch (Exception e)
+        {
+            MauiLog.Current?.Write("Folio", Microsoft.Extensions.Logging.LogLevel.Error,
+                "A deleted item's undo window closed but the delete itself failed; it is hidden and may come back.", e);
+        }
     }
 
     /// <summary>

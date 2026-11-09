@@ -23,7 +23,7 @@ public class StepTimingTests
 
     private static string Face(DateTime at) => TimeFormats(at);
 
-    private static string TimeFormats(DateTime at) => Constitution.Domain.Time.TimeFormats.Clock12(at)[..^3];
+    private static string TimeFormats(DateTime at) => Storyworthtelling.Time.TimeFormats.Clock12(at)[..^3];
 
     private static float Baseline(Page page, string word, int skip = 0) =>
         (float)(page.Height - page.GetWords().Where(w => w.Text == word).Skip(skip).First().Letters[0].StartBaseLine.Y);

@@ -8,6 +8,7 @@ using Codex.Domain.Design;
 // Both System.IO and Android.Graphics define Path, and ImplicitUsings brings the
 // former in — so the bare name is ambiguous. Drawing code means the graphics one.
 using Path = Android.Graphics.Path;
+using Storyworthtelling.Folds;
 
 namespace Codex.Ui;
 

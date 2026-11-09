@@ -9,6 +9,7 @@ using Folio.Domain.Reading;
 using Folio.Infrastructure.Pipeline;
 // AndroidX.Work also defines an IClock, so alias the domain one we mean.
 using IClock = Folio.Domain.Time.IClock;
+using Storyworthtelling.Pipeline;
 
 namespace Folio.Android;
 
@@ -91,14 +92,16 @@ public class PipelineWorker : Worker
             GoToForeground(logger, ReadingStatus.Sentence(null, done: 0, total: ReadingPlan.Passes.Count));
 
             var budget = new RunBudget(
-                clock,
+                () => clock.UtcNow,
                 (delay, token) => Task.Delay(delay, token),
                 MaxIterations: 200,
                 // The read measures ~15 minutes (F49) and the figure is a floor, so the ceiling is
                 // set well above it. Foreground work has no ten-minute cap; this bound is here so a
                 // wedged cycle still ends and is retried, not to fit a platform limit.
                 MaxDuration: TimeSpan.FromMinutes(25),
-                MaxInCycleWait: TimeSpan.FromSeconds(60));
+                MaxInCycleWait: TimeSpan.FromSeconds(60),
+                // A concurrent writer changed the rows: abandon this cycle and let the next re-read them.
+                AbandonsCycle: e => e is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException);
 
             var outcome = runner.RunUntilExhaustedAsync(budget, CancellationToken.None)
                 .GetAwaiter().GetResult();

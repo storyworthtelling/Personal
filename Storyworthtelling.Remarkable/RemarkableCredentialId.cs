@@ -5,5 +5,5 @@ namespace Storyworthtelling.Remarkable;
 // string literal. Reported failing on a 401/403 exchanging the device token, Ok on a successful exchange.
 public static class RemarkableCredentialId
 {
-    public const string Value = "remarkable";
+    public const string Value = Storyworthtelling.Voice.Health.SharedCredentialIds.Remarkable;
 }

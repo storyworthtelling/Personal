@@ -20,6 +20,8 @@ on:
       # Shared libraries that ship in the APK (referenced by Infrastructure/head), so a change rebuilds it.
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Diagnostics/**'
+      - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
       - 'Storyworthtelling.Remarkable/**'
       - '.github/workflows/build-android.yml'
 

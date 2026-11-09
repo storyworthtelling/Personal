@@ -2,6 +2,7 @@ using Constitution.Domain.Body;
 using Constitution.Domain.Body.Screens;
 using Constitution.Domain.Health;
 using Constitution.Domain.Notices;
+using Storyworthtelling.Folds;
 
 namespace Constitution.Tests.BodyScreens;
 
@@ -99,7 +100,7 @@ public class PermissionAskTests
 
         var notice = Assert.Single(board.Waiting());
         Assert.Equal(NoticeKind.HealthConnectRevoked, notice.Kind);
-        Assert.Equal(Codex.Domain.Design.FoldRole.Problem, notice.Role);
+        Assert.Equal(Storyworthtelling.Folds.FoldRole.Problem, notice.Role);
     }
 
     [Fact]

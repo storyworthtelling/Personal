@@ -13,6 +13,9 @@ on:
       # The shared MAUI kit ships in the APK, and with it the file logger and the log loop's core.
       - 'Storyworthtelling.Maui/**'
       - 'Storyworthtelling.Diagnostics/**'
+      - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
+      - 'Storyworthtelling.Pipeline/**'
       - 'Storyworthtelling.Voice/**'
       - '.github/workflows/build-index.yml'
 

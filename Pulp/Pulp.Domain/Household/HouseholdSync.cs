@@ -1,3 +1,4 @@
+using Storyworthtelling.Time;
 using Pulp.Domain.Actions;
 
 namespace Pulp.Domain.Household;
@@ -67,29 +68,13 @@ public static class HouseholdSyncText
         };
     }
 
-    // Minutes and hours are elapsed time; from a day on it is a day, named by the Domain's own day label
-    // in the viewer's zone (a UTC instant just after midnight is still the day before for most of the world).
+    // The suite's relative words (DESIGN.md §11), read in the viewer's zone: an instant just after midnight UTC
+    // is still the day before for most of the world.
+    // A weekday or a date takes "on", so the line still reads as a sentence: "Synced with Drive on Friday."
     private static string Ago(DateTimeOffset at, DateTimeOffset now, TimeZoneInfo zone)
     {
-        var elapsed = now - at;
-        if (elapsed < TimeSpan.FromMinutes(1))
-        {
-            return "just now";
-        }
-
-        if (elapsed < TimeSpan.FromHours(1))
-        {
-            return $"{(int)elapsed.TotalMinutes} min ago";
-        }
-
-        if (elapsed < TimeSpan.FromDays(1))
-        {
-            return $"{(int)elapsed.TotalHours} h ago";
-        }
-
-        var day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, zone).DateTime);
-        var label = Library.RecentDayLabel.For(day, at, now, zone);
-        return label == "Yesterday" ? "yesterday" : "on " + label;
+        var words = RelativeTime.Format(at, now, zone);
+        return words is "just now" or "yesterday" || words.EndsWith(" ago", StringComparison.Ordinal) ? words : "on " + words;
     }
 }
 

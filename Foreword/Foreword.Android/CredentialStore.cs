@@ -208,7 +208,7 @@ public static class CredentialStore
     public static string LastDeliverySummary =>
         string.IsNullOrEmpty(LastDeliveryOutcome) || LastDeliveryAtUtc == DateTime.MinValue
             ? "Never delivered"
-            : $"{LastDeliveryOutcome} — {Foreword.Domain.Time.RelativeTime.Format(LastDeliveryAtUtc.ToLocalTime(), DateTime.Now)}";
+            : $"{LastDeliveryOutcome} — {Storyworthtelling.Time.RelativeTime.Format(LastDeliveryAtUtc.ToLocalTime(), DateTime.Now)}";
 
     public static bool IsConfigured =>
         !string.IsNullOrEmpty(NytSessionCookie) &&

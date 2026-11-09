@@ -7,6 +7,7 @@ using Folio.Infrastructure.Imaging;
 using Folio.Infrastructure.Services;
 using Folio.Tests.Support;
 using Xunit;
+using Storyworthtelling.Folds;
 
 namespace Folio.Tests.Shelf;
 

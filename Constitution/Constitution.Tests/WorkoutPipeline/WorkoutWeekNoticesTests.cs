@@ -6,6 +6,7 @@ using Constitution.Domain.Waiting;
 using Constitution.Domain.Workouts;
 using Constitution.Domain.Workouts.Pipeline;
 using static Constitution.Tests.Calendar.InventedFamily;
+using Storyworthtelling.Folds;
 
 namespace Constitution.Tests.WorkoutPipeline;
 

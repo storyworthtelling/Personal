@@ -84,7 +84,7 @@ public sealed class ReadBackServices
         var auth = new RemarkableAuthService(
             tabletHttp,
             Options.Create(new RemarkableOptions { DeviceToken = new ConstitutionConnections(appContext).RemarkableDeviceToken }),
-            new CredentialHealthStore());
+            HeadCredentialHealth.Store());
         return new RemarkableStorageClient(tabletHttp, auth);
     }
 
@@ -94,7 +94,7 @@ public sealed class ReadBackServices
         var appContext = context.ApplicationContext ?? context;
         var visionHttp = new HttpClient(new AndroidMessageHandler()) { Timeout = VisionTimeout };
         return new ClaudeInkVision(
-            visionHttp, Options.Create(new ClaudeVisionOptions { ApiKey = new ConstitutionConnections(appContext).ClaudeApiKey }), new CredentialHealthStore());
+            visionHttp, Options.Create(new ClaudeVisionOptions { ApiKey = new ConstitutionConnections(appContext).ClaudeApiKey }), HeadCredentialHealth.Store());
     }
 
     /// <summary>The record of whether a pen stroke has ever come through this tablet's round trip.</summary>

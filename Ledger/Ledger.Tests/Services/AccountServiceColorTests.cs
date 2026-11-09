@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Index.Domain.External;
-using Index.Domain.Pipeline;
 using Index.Infrastructure.Services;
 using Index.Tests.Support;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Tests.Services;
 

@@ -3,12 +3,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Index.Domain.External;
 using Index.Domain.Model;
-using Index.Domain.Pipeline;
 using Index.Domain.Time;
 using Index.Infrastructure.Configuration;
 using Index.Infrastructure.Persistence;
 using Index.Infrastructure.Services;
 using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Infrastructure.Pipeline;
 

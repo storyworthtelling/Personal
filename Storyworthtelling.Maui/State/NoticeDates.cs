@@ -1,4 +1,4 @@
-using Storyworthtelling.Maui.Time;
+using Storyworthtelling.Time;
 
 namespace Storyworthtelling.Maui.State;
 

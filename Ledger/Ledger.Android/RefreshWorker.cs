@@ -10,6 +10,7 @@ using Index.Infrastructure.Household;
 using Index.Infrastructure.Pipeline;
 // AndroidX.Work also defines an IClock, so alias the domain one we mean.
 using IClock = Index.Domain.Time.IClock;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Android;
 
@@ -98,11 +99,13 @@ public class RefreshWorker : Worker
             logger.LogInformation("Refresh cycle starting.");
 
             var budget = new RunBudget(
-                clock,
+                () => clock.UtcNow,
                 (delay, token) => Task.Delay(delay, token),
                 MaxIterations: 100,
                 MaxDuration: TimeSpan.FromMinutes(9),     // stay under WorkManager's ~10-minute cap
-                MaxInCycleWait: TimeSpan.FromSeconds(60));
+                MaxInCycleWait: TimeSpan.FromSeconds(60),
+                // A concurrent writer changed the rows: abandon this cycle and let the next re-read them.
+                AbandonsCycle: e => e is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException);
 
             var outcome = runner.RunUntilExhaustedAsync(budget, CancellationToken.None)
                 .GetAwaiter().GetResult();

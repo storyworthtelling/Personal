@@ -4,6 +4,7 @@ using Constitution.Domain.Notices;
 using Constitution.Infrastructure.Delivery;
 using Moq;
 using Storyworthtelling.Remarkable;
+using Storyworthtelling.Folds;
 
 namespace Constitution.Tests.Delivery;
 
@@ -62,7 +63,7 @@ public class DeliveryServiceTests
         Assert.IsType<HttpRequestException>(result.Failure);
         var notice = Assert.Single(access.Board.Waiting());
         Assert.Equal(NoticeKind.ReMarkableDelivery, notice.Kind);
-        Assert.Equal(Codex.Domain.Design.FoldRole.Problem, notice.Role);
+        Assert.Equal(Storyworthtelling.Folds.FoldRole.Problem, notice.Role);
         Assert.Equal(Now, notice.CreatedAt);
         Assert.Equal(ConnectionNotices.CauseKey("remarkable"), notice.CauseKey);
         Assert.Equal(1, service.PendingCount);

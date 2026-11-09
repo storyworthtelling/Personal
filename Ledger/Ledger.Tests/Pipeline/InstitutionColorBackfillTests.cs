@@ -4,10 +4,10 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Index.Domain.External;
 using Index.Domain.Model;
-using Index.Domain.Pipeline;
 using Index.Infrastructure.Configuration;
 using Index.Infrastructure.Pipeline;
 using Index.Tests.Support;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Tests.Pipeline;
 

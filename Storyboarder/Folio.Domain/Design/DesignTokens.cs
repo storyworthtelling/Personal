@@ -1,3 +1,4 @@
+using Storyworthtelling.Folds;
 namespace Folio.Domain.Design;
 
 /// <summary>
@@ -25,7 +26,7 @@ public static class DesignTokens
     {
         public const int QuickMs = 150;
         public const int StandardMs = 200;
-        public const int UndoWindowMs = 6_000;
+        public const int UndoWindowMs = Storyworthtelling.Folds.FoldTiming.UndoWindowMs;
     }
 
     /// <summary>Paper grain: deterministic seeded ink noise (DESIGN.md §6).</summary>

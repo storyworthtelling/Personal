@@ -13,6 +13,8 @@ on:
       - 'Storyworthtelling.Updates/**'
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Diagnostics/**'
+      - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
       - '.github/workflows/build-plate.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay

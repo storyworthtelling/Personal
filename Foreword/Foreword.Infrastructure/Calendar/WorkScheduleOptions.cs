@@ -1,6 +1,6 @@
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Models;
-using Foreword.Domain.Time;
+using Storyworthtelling.Time;
 
 namespace Foreword.Infrastructure.Calendar;
 

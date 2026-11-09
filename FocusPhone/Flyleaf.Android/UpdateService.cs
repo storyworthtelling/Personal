@@ -97,7 +97,7 @@ public static class UpdateService
 
         using var http = new HttpClient();
         var client = new GitHubReleaseClient(http, Repo, token);
-        var health = new CredentialHealthStore();
+        var health = HeadCredentialHealth.Store();
         ReleaseInfo release;
         try
         {

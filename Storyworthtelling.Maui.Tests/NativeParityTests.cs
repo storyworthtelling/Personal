@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using Storyworthtelling.Time;
+using Storyworthtelling.Folds;
 
 namespace Storyworthtelling.Maui.Tests;
 
@@ -19,9 +21,6 @@ public class NativeParityTests
 {
     [Theory]
     [InlineData("FocusPhone/Codex.Domain/Design/BinderTabLayout.cs", "Storyworthtelling.Maui/Layout/BinderTabLayout.cs")]
-    [InlineData("FocusPhone/Codex.Domain/Design/DogEarGeometry.cs", "Storyworthtelling.Maui/Layout/DogEarGeometry.cs")]
-    [InlineData("FocusPhone/Codex.Domain/Design/NoticeOrder.cs", "Storyworthtelling.Maui/State/NoticeOrder.cs")]
-    [InlineData("FocusPhone/Codex.Domain/Time/RelativeTime.cs", "Storyworthtelling.Maui/Time/RelativeTime.cs")]
     public void TheCopiedFileIsTheOriginal(string native, string kit)
     {
         Assert.Equal(Body(RepoFile(native)), Body(RepoFile(kit)));

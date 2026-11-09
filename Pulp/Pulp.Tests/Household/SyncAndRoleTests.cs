@@ -72,8 +72,8 @@ public class SyncAndRoleTests
 
     [Theory]
     [InlineData(0, "Synced with Drive just now.")]
-    [InlineData(5, "Synced with Drive 5 min ago.")]
-    [InlineData(180, "Synced with Drive 3 h ago.")]
+    [InlineData(5, "Synced with Drive 5m ago.")]
+    [InlineData(180, "Synced with Drive 3h ago.")]
     public void ASyncedLineSaysHowLongAgo(int minutesAgo, string expected) =>
         Assert.Equal(expected, HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddMinutes(-minutesAgo)), Now));
 

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Storyworthtelling.Maui.Layout;
+using Storyworthtelling.Folds;
 
 namespace Storyworthtelling.Maui.Tests;
 

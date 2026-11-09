@@ -11,6 +11,7 @@ using Folio.Infrastructure.Configuration;
 using Folio.Infrastructure.External;
 using Folio.Tests.Support;
 using Xunit;
+using Storyworthtelling.Pipeline;
 
 namespace Folio.Tests.External;
 

@@ -1,3 +1,4 @@
+using Storyworthtelling.Time;
 using System.Globalization;
 
 namespace Pulp.Domain.Sports;
@@ -14,12 +15,7 @@ public static class SportsScreenText
     private const int WeekdayWindow = 6;
 
     /// <summary>"7:30 pm": lowercase meridiem, no leading zero, in <paramref name="zone"/>.</summary>
-    public static string Clock12(DateTimeOffset moment, TimeZoneInfo zone)
-    {
-        ArgumentNullException.ThrowIfNull(zone);
-        var local = TimeZoneInfo.ConvertTime(moment, zone);
-        return local.ToString("h:mm", CultureInfo.InvariantCulture) + (local.Hour < 12 ? " am" : " pm");
-    }
+    public static string Clock12(DateTimeOffset moment, TimeZoneInfo zone) => TimeFormats.Clock12(moment, zone);
 
     /// <summary>
     /// "Today", "Tonight", "Tomorrow", a weekday within the week, otherwise "Jan 27" (the year only when

@@ -159,7 +159,7 @@ public static class SettingsStore
     public static string LastRunSummary =>
         string.IsNullOrEmpty(LastRunOutcome) || LastRunAtUtc == DateTime.MinValue
             ? "Never run"
-            : $"{LastRunOutcome} — {Folio.Domain.Time.RelativeTime.Format(LastRunAtUtc.ToLocalTime(), DateTime.Now)}";
+            : $"{LastRunOutcome} — {Storyworthtelling.Time.RelativeTime.Format(LastRunAtUtc.ToLocalTime(), DateTime.Now)}";
 
     // The pipeline can't do anything without both API keys, so the worker no-ops until they're set.
     public static bool IsConfigured =>

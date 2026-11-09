@@ -1,12 +1,13 @@
 using System.Text.RegularExpressions;
 using Storyworthtelling.Maui.State;
+using Storyworthtelling.Folds;
 
 namespace Storyworthtelling.Maui.Tests;
 
 /// <summary>
 /// D291 (Pulp P12, mockup 12) in the kit: the corner takes the colour of the MOST SERIOUS waiting
 /// notice, not the newest, while the Waiting page still runs newest first. Same order as the native
-/// <c>Codex.Domain.Design.NoticeSeriousness</c>, so the fold is one component in both dialects.
+/// <c>Storyworthtelling.Folds.NoticeSeriousness</c>, so the fold is one component in both dialects.
 /// </summary>
 public class DogEarSeriousnessTests
 {
@@ -77,17 +78,13 @@ public class DogEarSeriousnessTests
         Assert.Equal(hues.Order(), DogEarState.MostSeriousFirst.Order());
     }
 
-    /// <summary>The kit's order is the native one, read from its source.</summary>
+    /// <summary>The kit's order is the native one. Both are in Storyworthtelling.Folds now, so they are compared directly.</summary>
     [Fact]
     public void TheOrderIsTheNativeOne()
     {
-        var native = Regex.Match(
-            File.ReadAllText(RepoFile("FocusPhone/Codex.Domain/Design/NoticeSeriousness.cs")),
-            @"MostSeriousFirst\s*\{\s*get;\s*\}\s*=\s*\[(?<body>[^\]]*)\]", RegexOptions.Singleline).Groups["body"].Value;
-        var names = Regex.Matches(native, @"FoldRole\.(?<n>\w+)").Select(m => m.Groups["n"].Value).ToList();
-
-        Assert.NotEmpty(names);
-        Assert.Equal(names, DogEarState.MostSeriousFirst.Select(hue => hue.ToString()));
+        Assert.Equal(
+            NoticeSeriousness.MostSeriousFirst.Select(role => role.ToString()),
+            DogEarState.MostSeriousFirst.Select(hue => hue.ToString()));
     }
 
     private static string RepoFile(string relative)

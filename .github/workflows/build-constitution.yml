@@ -10,6 +10,8 @@ on:
       - 'FocusPhone/Codex.Domain/**'
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Diagnostics/**'
+      - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
       - 'Storyworthtelling.Updates/**'
       - 'Tools/IconStudio/**'
       - 'Fonts/**'

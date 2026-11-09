@@ -73,7 +73,7 @@ public sealed class BodyServices
         // The bed fills a night the watch missed, but only for someone who has said which side of it is theirs.
         var connections = new ConstitutionConnections(appContext);
         var bed = new SleepIqClient(
-            SleepIqClient.CreateHttpClient(new Xamarin.Android.Net.AndroidMessageHandler(), new CredentialHealthStore()),
+            SleepIqClient.CreateHttpClient(new Xamarin.Android.Net.AndroidMessageHandler(), HeadCredentialHealth.Store()),
             connections,
             log);
         var filler = BedSleepGapFiller.Create(bed, new SleeperChoice(appContext), log, new BedLoginStanding(appContext));

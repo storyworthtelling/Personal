@@ -315,7 +315,7 @@ public static class PostSync
         AccountStore account, DateTimeOffset since)
     {
         var client = new GmailClient(account.GmailAddress!, account.GmailAppPassword!);
-        var health = new CredentialHealthStore();
+        var health = HeadCredentialHealth.Store();
         try
         {
             var items = await client.FetchRecentAsync(since);

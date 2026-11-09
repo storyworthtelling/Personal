@@ -146,7 +146,7 @@ public class VaultActivity : Activity
 
         // The keys.
         body.AddView(PaperUi.Heading(this, VaultPageText.KeysHeading), Spaced(0, DesignTokens.Space.X2));
-        var report = new CredentialHealthStore().Load();
+        var report = HeadCredentialHealth.Store().Load();
         foreach (var key in VaultKeys.All)
         {
             PaintKey(key, report.Get(key.CredentialId));

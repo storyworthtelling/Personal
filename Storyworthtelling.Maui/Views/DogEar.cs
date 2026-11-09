@@ -2,6 +2,7 @@ using Microsoft.Maui.Dispatching;
 using Microsoft.Maui.Graphics;
 using Storyworthtelling.Maui.Layout;
 using Storyworthtelling.Maui.State;
+using Storyworthtelling.Folds;
 
 namespace Storyworthtelling.Maui.Views;
 
