@@ -14,6 +14,9 @@ public enum PersonalVaultStatus
 /// <summary>The outcome of a load. Vault is meaningful only when Status is Loaded.</summary>
 public sealed record PersonalVaultLoadResult(PersonalVaultStatus Status, PersonalVault Vault)
 {
+    /// <summary>The read this result came from, which a save writes over.</summary>
+    public SealedRead? Basis { get; init; }
+
     public static PersonalVaultLoadResult Empty { get; } = new(PersonalVaultStatus.Empty, PersonalVault.Empty);
 
     public static PersonalVaultLoadResult Corrupt { get; } = new(PersonalVaultStatus.Corrupt, PersonalVault.Empty);
@@ -39,40 +42,59 @@ public sealed class DrivePersonalVaultStore
 {
     public const string FileName = "storyworthtelling-personal.json";
 
-    private readonly IDriveTextFile file;
+    private readonly SealedDriveFile sealedFile;
 
-    public DrivePersonalVaultStore(IDriveTextFile file) => this.file = file;
+    public DrivePersonalVaultStore(IDriveTextFile file) =>
+        sealedFile = new SealedDriveFile(file, plaintext => VaultSchema.Of(plaintext) > PersonalVault.CurrentSchema);
 
     public async Task<PersonalVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken)
     {
-        var (status, plaintext) = VaultEnvelope.Read(await file.ReadAsync(cancellationToken), passphrase);
-        if (status != SecretsVaultStatus.Loaded)
+        var read = await sealedFile.ReadAsync(passphrase, cancellationToken);
+        read.ThrowIfUnreachable();
+        if (read.Status != SealedReadStatus.Loaded)
         {
-            return new PersonalVaultLoadResult(Map(status), PersonalVault.Empty);
+            return new PersonalVaultLoadResult(Map(read.Status), PersonalVault.Empty) { Basis = read };
         }
 
         try
         {
-            var vault = JsonSerializer.Deserialize<PersonalVault>(plaintext!, VaultEnvelope.SerializerOptions);
-            return vault is null ? PersonalVaultLoadResult.Corrupt : PersonalVaultLoadResult.Loaded(vault);
+            var vault = JsonSerializer.Deserialize<PersonalVault>(read.Plaintext!, VaultEnvelope.SerializerOptions);
+            return vault is null
+                ? PersonalVaultLoadResult.Corrupt with { Basis = read with { Status = SealedReadStatus.Corrupt } }
+                : PersonalVaultLoadResult.Loaded(vault) with { Basis = read };
         }
         catch (JsonException)
         {
-            return PersonalVaultLoadResult.Corrupt;
+            return PersonalVaultLoadResult.Corrupt with { Basis = read with { Status = SealedReadStatus.Corrupt } };
         }
     }
 
-    public Task SaveAsync(PersonalVault vault, string passphrase, CancellationToken cancellationToken) =>
-        file.WriteAsync(
-            VaultEnvelope.Write(JsonSerializer.Serialize(vault, VaultEnvelope.SerializerOptions), passphrase),
-            cancellationToken);
+    /// <summary>Writes over the file as it is now, under the sealed-file rule (G14).</summary>
+    public async Task SaveAsync(PersonalVault vault, string passphrase, CancellationToken cancellationToken) =>
+        await WriteOverAsync(vault, passphrase, await sealedFile.ReadAsync(passphrase, cancellationToken), cancellationToken);
+
+    /// <summary>Writes over the file exactly as <paramref name="basis"/> read it; a later write is a conflict.</summary>
+    public Task SaveAsync(PersonalVault vault, string passphrase, PersonalVaultLoadResult basis, CancellationToken cancellationToken) =>
+        basis.Basis is { } read
+            ? WriteOverAsync(vault, passphrase, read, cancellationToken)
+            : SaveAsync(vault, passphrase, cancellationToken);
+
+    private async Task WriteOverAsync(PersonalVault vault, string passphrase, SealedRead basis, CancellationToken cancellationToken)
+    {
+        var result = await sealedFile.WriteAsync(
+            JsonSerializer.Serialize(vault, VaultEnvelope.SerializerOptions), passphrase, basis, SealedWriteOptions.Default, cancellationToken);
+        if (!result.Succeeded)
+        {
+            throw new VaultWriteException(result);
+        }
+    }
 
     // Told apart rather than collapsed: a mistyped passphrase must never read as
     // "your sign-in is gone", or somebody pairs a phone again for no reason.
-    private static PersonalVaultStatus Map(SecretsVaultStatus status) => status switch
+    private static PersonalVaultStatus Map(SealedReadStatus status) => status switch
     {
-        SecretsVaultStatus.Empty => PersonalVaultStatus.Empty,
-        SecretsVaultStatus.WrongPassphrase => PersonalVaultStatus.WrongPassphrase,
+        SealedReadStatus.Absent => PersonalVaultStatus.Empty,
+        SealedReadStatus.WrongPassphrase => PersonalVaultStatus.WrongPassphrase,
         _ => PersonalVaultStatus.Corrupt,
     };
 }

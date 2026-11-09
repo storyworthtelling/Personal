@@ -190,6 +190,14 @@ public class PostActivity : Activity
     {
         try
         {
+            // The archive first, and on its own: it used to run only at the end of this restore, so
+            // a phone whose mail was typed in by hand never took its filed messages back down
+            // (error-handling §2). ArchiveBackup merges both ways and is retried on every sync.
+            if (VoiceGoogleAccount.IsSignedIn)
+            {
+                await new ArchiveBackup(voiceAccount.GetAccessToken, "Post").SyncAsync(this);
+            }
+
             var account = new AccountStore(this);
             if (account.IsConfigured)
             {
@@ -224,10 +232,6 @@ public class PostActivity : Activity
                 EmailSyncWorker.RunOnce(this);
             }
 
-            // A device with nothing filed takes the archive back down: after the cutover's
-            // factory reset the ghosts are the only copy of messages whose originals were
-            // deleted at the source on purpose, so there is nothing else to rebuild from.
-            await new ArchiveBackup(voiceAccount.GetAccessToken, "Post").RestoreIfEmptyAsync(this);
         }
         catch
         {

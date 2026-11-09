@@ -9,8 +9,22 @@ public interface ISecretsVaultStore
     // appropriately instead of silently treating every failure as empty.
     Task<SecretsVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken);
 
-    // Encrypts and writes the whole vault, replacing any prior file.
+    // Encrypts and writes the whole vault over the file as it is now, under the sealed-file rule (G14).
     Task SaveAsync(SecretsVault vault, string passphrase, CancellationToken cancellationToken);
+
+    // Writes over the file exactly as `basis` read it: a file another phone wrote since then is a
+    // VaultWriteException with a Conflict outcome, to read again and merge. Stores with no revisions save plainly.
+    Task SaveAsync(SecretsVault vault, string passphrase, SecretsVaultLoadResult basis, CancellationToken cancellationToken) =>
+        SaveAsync(vault, passphrase, cancellationToken);
+}
+
+/// <summary>A sealed write that did not land: refused, conflicted, not confirmed or failed. Never carries the vault.</summary>
+public sealed class VaultWriteException(SealedWriteResult result)
+    : IOException(result.Detail ?? $"The vault was not written ({result.Outcome}).")
+{
+    public SealedWriteResult Result { get; } = result;
+
+    public bool IsConflict => Result.Outcome == SealedWriteOutcome.Conflict;
 }
 
 public enum SecretsVaultStatus
@@ -36,6 +50,12 @@ public enum SecretsVaultStatus
 public sealed record SecretsVaultLoadResult(
     SecretsVaultStatus Status, SecretsVault Vault, DriveFileOwnership FileOwnership = DriveFileOwnership.None)
 {
+    /// <summary>The read this result came from, which a save writes over. Null from a store without one.</summary>
+    public SealedRead? Basis { get; init; }
+
+    /// <summary>The vault opened but a newer app wrote it (a higher schema). Status is Corrupt so nothing writes it.</summary>
+    public bool IsNewerFormat { get; init; }
+
     public static SecretsVaultLoadResult Empty { get; } = new(SecretsVaultStatus.Empty, SecretsVault.Empty);
     public static SecretsVaultLoadResult WrongPassphrase { get; } = new(SecretsVaultStatus.WrongPassphrase, SecretsVault.Empty);
     public static SecretsVaultLoadResult Corrupt { get; } = new(SecretsVaultStatus.Corrupt, SecretsVault.Empty);

@@ -128,6 +128,70 @@ public class ProjectBackupServiceTests : IDisposable
         Assert.Equal(sourceNovelId, novel.Id);
     }
 
+    // Error-handling §16: the restore overwrote the database and then deleted the output folder before copying the
+    // new one in, so low storage part way through left a database pointing at pictures and PDFs that were gone.
+    // Now nothing live is touched until the new output is fully in place beside the old.
+
+    [Fact]
+    public async Task Import_WithoutRoomForTheNewProject_ChangesNothing()
+    {
+        var (source, _) = SeedProject("source");
+        var (target, targetNovelId) = SeedProject("target");
+        using var backup = new MemoryStream();
+        await Service(source).ExportAsync(backup, CancellationToken.None);
+        backup.Position = 0;
+
+        var tight = new ProjectBackupService(Options.Create(target), freeBytes: _ => 10);
+        var thrown = await Assert.ThrowsAsync<IOException>(() => tight.ImportAsync(backup, CancellationToken.None));
+
+        Assert.Contains("space", thrown.Message, StringComparison.OrdinalIgnoreCase);
+        AssertStillTheTarget(target, targetNovelId);
+    }
+
+    [Fact]
+    public async Task Import_ThatCannotCopyTheOutput_LeavesTheLiveProjectAsItWas()
+    {
+        var (source, _) = SeedProject("source");
+        var (target, targetNovelId) = SeedProject("target");
+        using var backup = new MemoryStream();
+        await Service(source).ExportAsync(backup, CancellationToken.None);
+        backup.Position = 0;
+
+        // Something already sits where the new output would be copied, so the copy fails before the swap.
+        File.WriteAllText(target.OutputRoot.TrimEnd(Path.DirectorySeparatorChar) + ".restoring", "in the way");
+
+        await Assert.ThrowsAnyAsync<IOException>(() => Service(target).ImportAsync(backup, CancellationToken.None));
+
+        AssertStillTheTarget(target, targetNovelId);
+    }
+
+    [Fact]
+    public async Task Import_LeavesNoStagingOrSnapshotBehind()
+    {
+        var (source, _) = SeedProject("source");
+        var (target, _) = SeedProject("target");
+        using var backup = new MemoryStream();
+        await Service(source).ExportAsync(backup, CancellationToken.None);
+        backup.Position = 0;
+
+        await Service(target).ImportAsync(backup, CancellationToken.None);
+
+        var siblings = Directory.EnumerateFileSystemEntries(Path.GetDirectoryName(target.DatabasePath)!).Select(Path.GetFileName).Order().ToList();
+        Assert.Equal(["folio.db", "output"], siblings);
+    }
+
+    private static void AssertStillTheTarget(StorageOptions target, Guid targetNovelId)
+    {
+        SqliteConnection.ClearAllPools();
+        var options = new DbContextOptionsBuilder<FolioDbContext>().UseSqlite($"Data Source={target.DatabasePath}").Options;
+        using (var db = new FolioDbContext(options))
+        {
+            Assert.Equal(targetNovelId, Assert.Single(db.Novels.ToList()).Id);
+        }
+        SqliteConnection.ClearAllPools();
+        Assert.True(File.Exists(Path.Combine(target.OutputRoot, targetNovelId.ToString(), "panels", "p1.png")));
+    }
+
     [Fact]
     public async Task Import_RejectsArchiveWithoutDatabase()
     {

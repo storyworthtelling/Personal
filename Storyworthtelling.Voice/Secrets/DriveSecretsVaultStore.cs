@@ -12,10 +12,12 @@ public sealed class DriveSecretsVaultStore : ISecretsVaultStore
     public const string FileName = "storyworthtelling-secrets.json";
 
     private readonly IDriveTextFile file;
+    private readonly SealedDriveFile sealedFile;
 
     public DriveSecretsVaultStore(IDriveTextFile file)
     {
         this.file = file;
+        sealedFile = new SealedDriveFile(file, plaintext => VaultSchema.Of(plaintext) > SecretsVault.CurrentSchema);
     }
 
     public async Task<SecretsVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken)
@@ -26,27 +28,53 @@ public sealed class DriveSecretsVaultStore : ISecretsVaultStore
             ? await owned.OwnershipAsync(cancellationToken)
             : DriveFileOwnership.Shared;
 
-        var (status, plaintext) = VaultEnvelope.Read(await file.ReadAsync(cancellationToken), passphrase);
-        if (status != SecretsVaultStatus.Loaded)
+        var read = await sealedFile.ReadAsync(passphrase, cancellationToken);
+        // Not a status: a vault Drive could not be asked about is not an empty one (error-handling §1).
+        read.ThrowIfUnreachable();
+        if (read.Status != SealedReadStatus.Loaded)
         {
-            return new SecretsVaultLoadResult(status, SecretsVault.Empty, ownership);
+            return new SecretsVaultLoadResult(Map(read.Status), SecretsVault.Empty, ownership)
+            {
+                Basis = read,
+                IsNewerFormat = read.Status == SealedReadStatus.NewerFormat,
+            };
         }
 
         try
         {
-            var vault = JsonSerializer.Deserialize<SecretsVault>(plaintext!, VaultEnvelope.SerializerOptions);
+            var vault = JsonSerializer.Deserialize<SecretsVault>(read.Plaintext!, VaultEnvelope.SerializerOptions);
             return vault is null
-                ? new SecretsVaultLoadResult(SecretsVaultStatus.Corrupt, SecretsVault.Empty, ownership)
-                : new SecretsVaultLoadResult(SecretsVaultStatus.Loaded, vault, ownership);
+                ? new SecretsVaultLoadResult(SecretsVaultStatus.Corrupt, SecretsVault.Empty, ownership) { Basis = read with { Status = SealedReadStatus.Corrupt } }
+                : new SecretsVaultLoadResult(SecretsVaultStatus.Loaded, vault, ownership) { Basis = read };
         }
         catch (JsonException)
         {
-            return new SecretsVaultLoadResult(SecretsVaultStatus.Corrupt, SecretsVault.Empty, ownership);
+            return new SecretsVaultLoadResult(SecretsVaultStatus.Corrupt, SecretsVault.Empty, ownership) { Basis = read with { Status = SealedReadStatus.Corrupt } };
         }
     }
 
-    public Task SaveAsync(SecretsVault vault, string passphrase, CancellationToken cancellationToken) =>
-        file.WriteAsync(
-            VaultEnvelope.Write(JsonSerializer.Serialize(vault, VaultEnvelope.SerializerOptions), passphrase),
-            cancellationToken);
+    public async Task SaveAsync(SecretsVault vault, string passphrase, CancellationToken cancellationToken) =>
+        await WriteOverAsync(vault, passphrase, await sealedFile.ReadAsync(passphrase, cancellationToken), cancellationToken);
+
+    public Task SaveAsync(SecretsVault vault, string passphrase, SecretsVaultLoadResult basis, CancellationToken cancellationToken) =>
+        basis.Basis is { } read
+            ? WriteOverAsync(vault, passphrase, read, cancellationToken)
+            : SaveAsync(vault, passphrase, cancellationToken);
+
+    private async Task WriteOverAsync(SecretsVault vault, string passphrase, SealedRead basis, CancellationToken cancellationToken)
+    {
+        var result = await sealedFile.WriteAsync(
+            JsonSerializer.Serialize(vault, VaultEnvelope.SerializerOptions), passphrase, basis, SealedWriteOptions.Default, cancellationToken);
+        if (!result.Succeeded)
+        {
+            throw new VaultWriteException(result);
+        }
+    }
+
+    private static SecretsVaultStatus Map(SealedReadStatus status) => status switch
+    {
+        SealedReadStatus.Absent => SecretsVaultStatus.Empty,
+        SealedReadStatus.WrongPassphrase => SecretsVaultStatus.WrongPassphrase,
+        _ => SecretsVaultStatus.Corrupt,
+    };
 }

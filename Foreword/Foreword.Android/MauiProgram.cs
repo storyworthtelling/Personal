@@ -236,8 +236,9 @@ public static class MauiProgram
                 Microsoft.Maui.Storage.Preferences.Default.Set("driveFileIds", DriveFileIdMapCodec.Encode(map)));
         });
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
-            new DriveVoiceProfileStore(new DriveTextFile(
-                VoiceDriveFactory(sp), DriveVoiceProfileStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
+            DriveVoiceProfileStore.Sealed(
+                name => new DriveTextFile(VoiceDriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>()),
+                () => CredentialStore.VaultPassphrase));
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
         // the owner's passphrase (CredentialStore.VaultPassphrase). Foreword publishes its own credentials

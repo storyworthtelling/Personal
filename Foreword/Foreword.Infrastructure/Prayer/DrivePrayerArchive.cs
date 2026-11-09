@@ -39,24 +39,26 @@ public sealed class DrivePrayerArchive(IDriveTextFile file) : IPrayerArchive, IP
     /// </summary>
     public const string FileName = "storyworthtelling-prayer-archive.json";
 
+    private readonly SealedDriveFile sealedFile = new(file);
+
     public async Task<PrayerArchiveRead> LoadAsync(
         string passphrase, CancellationToken cancellationToken)
     {
-        var content = await file.ReadAsync(cancellationToken);
-
         // No passphrase means no archive. Not an error — it is the state of an app whose passphrase
         // a factory reset has wiped, and the answer is a page with nothing on it until it is
         // re-entered.
         if (string.IsNullOrEmpty(passphrase))
         {
+            await file.ReadAsync(cancellationToken);
             return PrayerArchiveRead.Nothing(PrayerArchiveStatus.Empty);
         }
 
-        var (status, plaintext) = VaultEnvelope.Read(content, passphrase);
+        var read = await sealedFile.ReadAsync(passphrase, cancellationToken);
+        read.ThrowIfUnreachable();
 
-        return status == SecretsVaultStatus.Loaded
-            ? new PrayerArchiveRead(PrayerArchiveStatus.Loaded, PrayerArchiveCodec.Read(plaintext))
-            : PrayerArchiveRead.Nothing(Told(status));
+        return read.Status == SealedReadStatus.Loaded
+            ? new PrayerArchiveRead(PrayerArchiveStatus.Loaded, PrayerArchiveCodec.Read(read.Plaintext))
+            : PrayerArchiveRead.Nothing(Told(read.Status));
     }
 
     public async Task SaveAsync(
@@ -69,23 +71,30 @@ public sealed class DrivePrayerArchive(IDriveTextFile file) : IPrayerArchive, IP
                 + "the journal under an empty one would make it unreadable to every other install.");
         }
 
-        // Read it back before writing. The archive is the only copy, so "I could not open it" has to
-        // stop the write rather than be logged beside it.
-        var existing = await file.ReadAsync(cancellationToken);
-        if (!string.IsNullOrWhiteSpace(existing))
+        // Read it before writing, under the suite's sealed-file rule. The archive is the only copy, so
+        // "I could not open it" has to stop the write rather than be logged beside it; and the write is
+        // read back, so a damaged upload is put back rather than trusted before the page is trashed.
+        var existing = await sealedFile.ReadAsync(passphrase, cancellationToken);
+        existing.ThrowIfUnreachable();
+        if (!existing.Writable)
         {
-            var (status, _) = VaultEnvelope.Read(existing, passphrase);
-            if (status != SecretsVaultStatus.Loaded)
-            {
-                throw new PrayerArchiveLockedException(
-                    "The prayer archive was not written: the file already in Drive could not be "
-                    + $"read ({Told(status)}), and it is the only copy of what was written.");
-            }
+            throw new PrayerArchiveLockedException(
+                "The prayer archive was not written: the file already in Drive could not be "
+                + $"read ({Told(existing.Status)}), and it is the only copy of what was written.");
         }
 
-        await file.WriteAsync(
-            VaultEnvelope.Write(PrayerArchiveCodec.Write(archive, this), passphrase),
-            cancellationToken);
+        var written = await sealedFile.WriteAsync(
+            PrayerArchiveCodec.Write(archive, this), passphrase, existing, SealedWriteOptions.Default, cancellationToken);
+        written.ThrowIfFailed();
+        if (written.Outcome == SealedWriteOutcome.Refused)
+        {
+            throw new PrayerArchiveLockedException("The prayer archive was not written: " + written.Detail);
+        }
+        if (!written.Succeeded)
+        {
+            // Not confirmed: the morning stops here, so the journal page is not trashed off the tablet.
+            throw new IOException("The prayer archive was not confirmed in Drive: " + written.Detail);
+        }
     }
 
     /// <summary>
@@ -93,11 +102,11 @@ public sealed class DrivePrayerArchive(IDriveTextFile file) : IPrayerArchive, IP
     /// carries no project references — it is one switch, and it is the only place the two vocabularies
     /// meet.
     /// </summary>
-    private static PrayerArchiveStatus Told(SecretsVaultStatus status) => status switch
+    private static PrayerArchiveStatus Told(SealedReadStatus status) => status switch
     {
-        SecretsVaultStatus.Loaded => PrayerArchiveStatus.Loaded,
-        SecretsVaultStatus.WrongPassphrase => PrayerArchiveStatus.WrongPassphrase,
-        SecretsVaultStatus.Corrupt => PrayerArchiveStatus.Corrupt,
-        _ => PrayerArchiveStatus.Empty,
+        SealedReadStatus.Loaded => PrayerArchiveStatus.Loaded,
+        SealedReadStatus.WrongPassphrase => PrayerArchiveStatus.WrongPassphrase,
+        SealedReadStatus.Absent => PrayerArchiveStatus.Empty,
+        _ => PrayerArchiveStatus.Corrupt,
     };
 }

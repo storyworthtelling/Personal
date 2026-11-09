@@ -1,8 +1,8 @@
 using System.Net.Sockets;
-using Folio.Domain.Pipeline;
+using Storyworthtelling.Voice.Health;
 using Xunit;
 
-namespace Folio.Tests.Pipeline;
+namespace Storyworthtelling.Voice.Tests.Health;
 
 public class NetworkFailureTests
 {

@@ -1,3 +1,4 @@
+using Foreword.Infrastructure.Vault;
 using Foreword.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -182,8 +183,15 @@ public partial class SetupPage : BinderPage
     /// Committed as it is typed, like every other field on this screen — there is no Save, and a
     /// value the owner typed and then navigated away from is exactly the one they meant to set.
     /// </summary>
-    private void OnMapsKeyChanged(object sender, TextChangedEventArgs e) =>
+    private void OnMapsKeyChanged(object sender, TextChangedEventArgs e)
+    {
         CredentialStore.MapsApiKey = (e.NewTextValue ?? string.Empty).Trim();
+        MarkChanged(ForewordVaultSection.MapsKey);
+    }
+
+    /// <summary>Records a field the owner changed, so the next vault publish may replace the vault's copy.</summary>
+    private static void MarkChanged(string field) =>
+        IPlatformApplication.Current?.Services.GetService<VaultSync>()?.MarkChanged(field);
 
     // ---- Home: found, not asked ============================================
 
@@ -330,6 +338,7 @@ public partial class SetupPage : BinderPage
         CredentialStore.HomeAddress = typed;
         CredentialStore.HomeLatitude = 0;
         CredentialStore.HomeLongitude = 0;
+        MarkChanged(ForewordVaultSection.Home);
 
         homeLookedUp = false;
         await LocateHomeAsync();
@@ -351,6 +360,7 @@ public partial class SetupPage : BinderPage
         {
             CredentialStore.HomeLatitude = latitude;
             CredentialStore.HomeLongitude = longitude;
+            MarkChanged(ForewordVaultSection.Home);
         }
     }
 
@@ -373,13 +383,13 @@ public partial class SetupPage : BinderPage
         {
             (CredentialIds.NytCookie, "New York Times — session cookie",
                 "Log into nytimes.com, open DevTools → Application → Cookies, copy the NYT-S value.",
-                () => CredentialStore.NytSessionCookie, v => CredentialStore.NytSessionCookie = v),
+                () => CredentialStore.NytSessionCookie, v => { CredentialStore.NytSessionCookie = v; MarkChanged(ForewordVaultSection.NytCookie); }),
             (CredentialIds.NytApiKey, "New York Times — API key",
                 "From developer.nytimes.com. Used to fetch the top stories list.",
-                () => CredentialStore.NytApiKey, v => CredentialStore.NytApiKey = v),
+                () => CredentialStore.NytApiKey, v => { CredentialStore.NytApiKey = v; MarkChanged(ForewordVaultSection.NytApiKey); }),
             (CredentialIds.Anthropic, "Claude — handwriting",
                 "Optional. Without it, notes written on the paper are not read back.",
-                () => CredentialStore.AnthropicApiKey, v => CredentialStore.AnthropicApiKey = v),
+                () => CredentialStore.AnthropicApiKey, v => { CredentialStore.AnthropicApiKey = v; MarkChanged(ForewordVaultSection.Anthropic); }),
         };
 
         var shown = 0;
@@ -521,6 +531,7 @@ public partial class SetupPage : BinderPage
             PairingTrail.Paired(pairingTrail);
 
             CredentialStore.RemarkableDeviceToken = token;
+            MarkChanged(ForewordVaultSection.Remarkable);
             // Back up the freshly paired token so a later reset does not force re-registration.
             await PublishToVaultAsync();
 

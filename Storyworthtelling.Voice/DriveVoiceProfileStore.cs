@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Storyworthtelling.Voice.Secrets;
 
 namespace Storyworthtelling.Voice;
 
@@ -28,16 +29,80 @@ public sealed class DriveVoiceProfileStore : IVoiceProfileStore
         WriteIndented = true
     };
 
-    private readonly IDriveTextFile file;
+    /// <summary>
+    /// The sealed profile (privacy report §5: it carries verbatim passages of the owner's manuscripts). Every app
+    /// reads it with the vault passphrase; the plaintext <see cref="FileName"/> is read until the sealed one has
+    /// been written, then trashed.
+    /// </summary>
+    public const string SealedFileName = "storyworthtelling-voice-sealed.json";
 
+    private readonly IDriveTextFile file;
+    private readonly SealedDriveFile? sealedFile;
+    private readonly Func<string?>? passphrase;
+
+    /// <summary>The plaintext profile alone: what tests of the JSON and the old shape use.</summary>
     public DriveVoiceProfileStore(IDriveTextFile file)
     {
         this.file = file;
     }
 
+    private DriveVoiceProfileStore(IDriveTextFile legacyFile, IDriveTextFile sealedFile, Func<string?> passphrase)
+    {
+        file = legacyFile;
+        this.sealedFile = new SealedDriveFile(sealedFile);
+        this.passphrase = passphrase;
+    }
+
+    /// <summary>
+    /// The production store: the sealed profile under the vault passphrase, with the plaintext one read until it
+    /// has been moved across. <paramref name="fileFor"/> builds the Drive file for a name.
+    /// </summary>
+    public static DriveVoiceProfileStore Sealed(Func<string, IDriveTextFile> fileFor, Func<string?> passphrase) =>
+        new(fileFor(FileName), fileFor(SealedFileName), passphrase);
+
     public async Task<VoiceProfile> LoadAsync(CancellationToken cancellationToken)
     {
-        var content = await file.ReadAsync(cancellationToken);
+        var key = passphrase?.Invoke();
+        if (sealedFile is not null && !string.IsNullOrEmpty(key))
+        {
+            var read = await sealedFile.ReadAsync(key, cancellationToken);
+            read.ThrowIfUnreachable();
+            if (read.Status == SealedReadStatus.Loaded)
+                return Parse(read.Plaintext);
+            if (read.Status != SealedReadStatus.Absent)
+                return VoiceProfile.Empty;
+        }
+
+        return Parse(await file.ReadAsync(cancellationToken));
+    }
+
+    public async Task SaveAsync(VoiceProfile profile, CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(profile, SerializerOptions);
+        if (sealedFile is null)
+        {
+            await file.WriteAsync(json, cancellationToken);
+            return;
+        }
+
+        var key = passphrase!();
+        if (string.IsNullOrEmpty(key))
+            throw new InvalidOperationException("The voice profile was not written: it is sealed under the vault passphrase, and this app has none.");
+
+        var read = await sealedFile.ReadAsync(key, cancellationToken);
+        read.ThrowIfUnreachable();
+        var written = await sealedFile.WriteAsync(json, key, read, SealedWriteOptions.Default, cancellationToken);
+        written.ThrowIfFailed();
+        if (!written.Succeeded)
+            throw new IOException("The voice profile was not written: " + written.Detail);
+
+        // The sealed copy is confirmed, so the plaintext one (with its passages) goes.
+        if (file is IDriveFileTrash trash && await file.ReadAsync(cancellationToken) is not null)
+            await trash.TrashAsync(cancellationToken);
+    }
+
+    private static VoiceProfile Parse(string? content)
+    {
         if (string.IsNullOrWhiteSpace(content))
             return VoiceProfile.Empty;
 
@@ -56,9 +121,6 @@ public sealed class DriveVoiceProfileStore : IVoiceProfileStore
             return VoiceProfile.Empty;
         }
     }
-
-    public Task SaveAsync(VoiceProfile profile, CancellationToken cancellationToken) =>
-        file.WriteAsync(JsonSerializer.Serialize(profile, SerializerOptions), cancellationToken);
 
     /// <summary>
     /// A document written before the refit, recognised by the two fields that only it has. Checked

@@ -13,6 +13,9 @@ on:
       - 'FocusPhone/Codex.Infrastructure/**'
       - 'FocusPhone/Codex.Tests/**'
       - 'Storyworthtelling.Updates/**'
+      # Flyleaf and Score ship the vault through Codex.Ui.Android, so a vault change must rebuild
+      # them, or their old copy stays on the phone and erases newer fields (contracts H1).
+      - 'Storyworthtelling.Voice/**'
       - '.github/workflows/build-flyleaf.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay

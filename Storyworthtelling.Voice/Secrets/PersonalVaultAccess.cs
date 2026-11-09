@@ -63,20 +63,27 @@ public sealed class PersonalVaultAccess
             return false;
         }
 
-        try
+        // A conflict is another phone of this person's having written since the read: read again and merge.
+        for (var attempt = 1; ; attempt++)
         {
-            var loaded = await store.LoadAsync(pass, cancellationToken);
-            if (loaded.Status is PersonalVaultStatus.WrongPassphrase or PersonalVaultStatus.Corrupt)
+            try
+            {
+                var loaded = await store.LoadAsync(pass, cancellationToken);
+                if (loaded.Status is PersonalVaultStatus.WrongPassphrase or PersonalVaultStatus.Corrupt)
+                {
+                    return false;
+                }
+
+                await store.SaveAsync(merge(loaded.Vault), pass, loaded, cancellationToken);
+                return true;
+            }
+            catch (VaultWriteException e) when (e.IsConflict && attempt < SecretsVaultService.MaxConflictRetries)
+            {
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
             {
                 return false;
             }
-
-            await store.SaveAsync(merge(loaded.Vault), pass, cancellationToken);
-            return true;
-        }
-        catch (Exception e) when (e is not OperationCanceledException)
-        {
-            return false;
         }
     }
 }

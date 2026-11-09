@@ -1,4 +1,5 @@
 using Storyworthtelling.Voice;
+using Foreword.Infrastructure.Vault;
 using Storyworthtelling.Voice.Secrets;
 
 namespace Foreword.Android;
@@ -24,28 +25,50 @@ public sealed class VaultSync
         this.fileIdStore = fileIdStore;
     }
 
-    // Writes Foreword's credentials into the shared vault, leaving every other app's section untouched,
-    // then this account's calendar choices into its personal vault.
+    // What the owner has changed on this phone since the last publish that landed, by
+    // ForewordVaultSection's field names. Settings commit as they are typed, so the page records each change
+    // here and the next publish carries it; anything not recorded leaves the vault's value alone.
+    private readonly HashSet<string> changed = [];
+    private readonly object changedLock = new();
+
+    public void MarkChanged(string field)
+    {
+        lock (changedLock)
+        {
+            changed.Add(field);
+        }
+    }
+
+    // Writes Foreword's credentials into the shared vault, leaving every other app's section untouched, under
+    // the suite's merge rule (VaultMerge.Pick): a blank never overwrites, and a value the vault already holds
+    // is replaced only by one the owner just changed here. Then this account's calendar choices go to its
+    // personal vault.
     public async Task<SecretsVaultPublishResult> PublishAsync(CancellationToken cancellationToken)
     {
-        var result = await vault.PublishAsync(v => RememberHousehold(v) with
+        string[] fields;
+        lock (changedLock)
         {
-            Nyt = new NytSecrets(CredentialStore.NytSessionCookie, CredentialStore.NytApiKey),
-            Remarkable = new RemarkableSecrets(CredentialStore.RemarkableDeviceToken),
-            // The calendar mapping is no longer written here: it is per account, and lives in each
-            // account's personal vault. The copy already in this file is left exactly as it is, so the
-            // owner's install can still restore from it once while it moves across.
-            Foreword = new ForewordSecrets(CredentialStore.AnthropicApiKey, v.Foreword.CalendarMappingJson),
-            // The Maps key is shared rather than Foreword's own: it bills a project, and the house
-            // beside it is the household's address, not this app's setting.
-            Maps = new MapsSecrets(
-                CredentialStore.MapsApiKey,
-                CredentialStore.HomeAddress,
-                CredentialStore.HomeLatitude,
-                CredentialStore.HomeLongitude),
-            // Fold this session's captured Drive file ids into the shared map (id wins per name).
-            DriveFileIds = MergeIds(v.DriveFileIds, fileIdStore.Snapshot())
-        }, cancellationToken);
+            fields = [.. changed];
+        }
+
+        var local = new ForewordVaultSection.Local(
+            CredentialStore.NytSessionCookie,
+            CredentialStore.NytApiKey,
+            CredentialStore.RemarkableDeviceToken,
+            CredentialStore.AnthropicApiKey,
+            CredentialStore.MapsApiKey,
+            CredentialStore.HomeAddress,
+            CredentialStore.HomeLatitude,
+            CredentialStore.HomeLongitude);
+        var result = await vault.PublishAsync(
+            v => ForewordVaultSection.Merge(RememberHousehold(v), local, fields, fileIdStore.Snapshot()), cancellationToken);
+        if (result.Succeeded)
+        {
+            lock (changedLock)
+            {
+                changed.ExceptWith(fields);
+            }
+        }
 
         await PublishCalendarAsync(cancellationToken);
         return result;
@@ -62,15 +85,6 @@ public sealed class VaultSync
             CalendarMappingJson = CredentialStore.CalendarMappingJson,
             WorkScheduleJson = CredentialStore.WorkScheduleJson,
         }, cancellationToken);
-
-    private static IReadOnlyDictionary<string, string> MergeIds(
-        IReadOnlyDictionary<string, string> existing, IReadOnlyDictionary<string, string> captured)
-    {
-        var merged = new Dictionary<string, string>(existing);
-        foreach (var (name, id) in captured)
-            merged[name] = id;
-        return merged;
-    }
 
     // Fills in any credential this install is missing from the vault. Existing local values win — restore
     // never overwrites something the owner has already entered here.

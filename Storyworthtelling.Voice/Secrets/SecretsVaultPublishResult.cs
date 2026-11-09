@@ -34,6 +34,9 @@ public sealed record SecretsVaultPublishResult(SecretsVaultPublishStatus Status,
     public static SecretsVaultPublishResult WriteFailed(string error) => new(SecretsVaultPublishStatus.WriteFailed, error);
     public static SecretsVaultPublishResult ReadOnly { get; } = new(SecretsVaultPublishStatus.ReadOnly);
 
+    /// <summary>The reason a vault written by a newer app is refused, so the message can say "update".</summary>
+    public const string NewerAppError = "The vault was written by a newer app.";
+
     // True only when the section was actually stored in the vault.
     public bool Succeeded => Status == SecretsVaultPublishStatus.Published;
 
@@ -48,6 +51,9 @@ public sealed record SecretsVaultPublishResult(SecretsVaultPublishStatus Status,
     // reassures that the local settings are safe — the vault is only the off-device backup.
     public string Message => Status switch
     {
+        SecretsVaultPublishStatus.VaultUnreadable when Error == NewerAppError =>
+            "Couldn't back up to the vault: a newer version of one of the apps wrote it. " +
+            "Your settings are saved on this device; update this app to sync the backup.",
         SecretsVaultPublishStatus.VaultUnreadable =>
             "Couldn't back up to the vault: the passphrase doesn't match the vault already on Drive. " +
             "Your settings are saved on this device; fix the passphrase to sync the backup.",

@@ -42,7 +42,10 @@ public sealed record HouseholdPublishResult(HouseholdDocument Held, HouseholdPub
 /// </summary>
 public sealed class DriveHouseholdStore : IHouseholdStore
 {
-    private readonly IDriveTextFile file;
+    /// <summary>How many times one pass reads again after finding the file changed under it.</summary>
+    public const int MaxConflicts = 3;
+
+    private readonly SealedDriveFile sealedFile;
     private readonly Func<string> passphrase;
     private readonly Func<bool> mayCreate;
 
@@ -54,7 +57,7 @@ public sealed class DriveHouseholdStore : IHouseholdStore
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         ArgumentNullException.ThrowIfNull(passphrase);
         ArgumentNullException.ThrowIfNull(mayCreate);
-        this.file = file;
+        sealedFile = new SealedDriveFile(file);
         FileName = fileName;
         this.passphrase = passphrase;
         this.mayCreate = mayCreate;
@@ -95,12 +98,41 @@ public sealed class DriveHouseholdStore : IHouseholdStore
         }
 
         var writes = 0;
+        var conflicts = 0;
+        var basis = read.Read;
         while (true)
         {
-            await file.WriteAsync(VaultEnvelope.Write(HouseholdDocumentCodec.Serialize(merged), key), cancellationToken);
+            // The file is checked against the revision it was read at, so a write from the other phone in
+            // between is merged in rather than written over; the re-read below is the confirmation.
+            var written = await sealedFile.WriteAsync(
+                HouseholdDocumentCodec.Serialize(merged), key, basis,
+                new SealedWriteOptions(MayCreate: mayCreate(), Verify: false), cancellationToken);
+            written.ThrowIfFailed();
+            if (written.Outcome == SealedWriteOutcome.Conflict)
+            {
+                if (++conflicts > MaxConflicts)
+                {
+                    return new HouseholdPublishResult(merged, HouseholdPublishOutcome.LeftForNextPass, writes);
+                }
+
+                var changed = await ReadAsync(key, cancellationToken);
+                basis = changed.Read;
+                merged = HouseholdPublish.FirstWrite(merged, changed.Document);
+                if (!HouseholdSync.NeedsWrite(merged, changed.Document))
+                {
+                    return new HouseholdPublishResult(merged,
+                        writes == 0 ? HouseholdPublishOutcome.AlreadyCurrent : HouseholdPublishOutcome.Written, writes);
+                }
+                continue;
+            }
+            if (!written.Succeeded)
+            {
+                throw new InvalidOperationException($"'{FileName}' was not written: {written.Detail}");
+            }
             writes++;
 
             var reread = await ReadAsync(key, cancellationToken);
+            basis = reread.Read;
             var step = HouseholdPublish.AfterReread(merged, reread.Document, writes);
             merged = step.Document;
             switch (step.Action)
@@ -127,29 +159,31 @@ public sealed class DriveHouseholdStore : IHouseholdStore
             : key;
     }
 
-    private async Task<(bool Exists, HouseholdDocument Document)> ReadAsync(string key, CancellationToken cancellationToken)
+    private async Task<(bool Exists, HouseholdDocument Document, SealedRead Read)> ReadAsync(string key, CancellationToken cancellationToken)
     {
-        var content = await file.ReadAsync(cancellationToken);
-        var (status, plaintext) = VaultEnvelope.Read(content, key);
-        switch (status)
+        var read = await sealedFile.ReadAsync(key, cancellationToken);
+
+        // Drive being unreachable is the caller's to decide about: its own exception, unchanged.
+        read.ThrowIfUnreachable();
+        switch (read.Status)
         {
-            case SecretsVaultStatus.Empty:
-                return (false, HouseholdDocument.Empty);
-            case SecretsVaultStatus.WrongPassphrase:
+            case SealedReadStatus.Absent:
+                return (false, HouseholdDocument.Empty, read);
+            case SealedReadStatus.WrongPassphrase:
                 throw new HouseholdUnreadableException(
                     HouseholdUnreadableReason.WrongPassphrase,
                     $"'{FileName}' in Drive does not open with this phone's vault passphrase; it is left exactly as it is.");
-            case SecretsVaultStatus.Loaded:
+            case SealedReadStatus.Loaded:
                 break;
             default:
                 throw new HouseholdUnreadableException(
                     HouseholdUnreadableReason.Damaged,
-                    $"'{FileName}' in Drive is not a readable encrypted file ({status}); it is left exactly as it is.");
+                    $"'{FileName}' in Drive is not a readable encrypted file ({read.Status}); it is left exactly as it is.");
         }
 
         try
         {
-            return (true, HouseholdDocumentCodec.Deserialize(plaintext!));
+            return (true, HouseholdDocumentCodec.Deserialize(read.Plaintext!), read);
         }
         catch (HouseholdFormatException exception)
         {

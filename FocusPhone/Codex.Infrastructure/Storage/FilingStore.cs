@@ -33,6 +33,10 @@ public class FilingStore
                 filedAtUtc TEXT NOT NULL,
                 item TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS unfiled (
+                sourceId TEXT NOT NULL PRIMARY KEY,
+                unfiledAtUtc TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS tombstones (
                 sourceId TEXT NOT NULL PRIMARY KEY,
                 filedAtUtc TEXT NOT NULL,
@@ -53,14 +57,55 @@ public class FilingStore
         upsert.Parameters.AddWithValue("$filed", ghost.FiledAtUtc.ToUniversalTime().ToString("O"));
         upsert.Parameters.AddWithValue("$item", JsonSerializer.Serialize(ghost.Item));
         upsert.ExecuteNonQuery();
+
+        // Filed again: no longer unfiled.
+        using var forget = connection.CreateCommand();
+        forget.CommandText = "DELETE FROM unfiled WHERE sourceId = $id";
+        forget.Parameters.AddWithValue("$id", ghost.Item.SourceId);
+        forget.ExecuteNonQuery();
     }
 
-    public void RemoveGhost(string sourceId)
+    /// <summary>
+    /// Takes a ghost out of Filed and remembers when, so the backup — a union — does not bring it back.
+    /// </summary>
+    public void RemoveGhost(string sourceId, DateTimeOffset unfiledAtUtc)
     {
         using var delete = connection.CreateCommand();
         delete.CommandText = "DELETE FROM ghosts WHERE sourceId = $id";
         delete.Parameters.AddWithValue("$id", sourceId);
         delete.ExecuteNonQuery();
+
+        RememberUnfiled([new UnfiledGhost(sourceId, unfiledAtUtc)]);
+    }
+
+    /// <summary>Keeps unfiled entries (this phone's, or the backup's) so a merge honours them after a restart.</summary>
+    public void RememberUnfiled(IEnumerable<UnfiledGhost> entries)
+    {
+        foreach (var entry in entries)
+        {
+            using var upsert = connection.CreateCommand();
+            upsert.CommandText = """
+                INSERT INTO unfiled (sourceId, unfiledAtUtc) VALUES ($id, $at)
+                ON CONFLICT(sourceId) DO UPDATE SET unfiledAtUtc = excluded.unfiledAtUtc
+                WHERE excluded.unfiledAtUtc > unfiled.unfiledAtUtc
+                """;
+            upsert.Parameters.AddWithValue("$id", entry.SourceId);
+            upsert.Parameters.AddWithValue("$at", entry.UnfiledAtUtc.ToUniversalTime().ToString("O"));
+            upsert.ExecuteNonQuery();
+        }
+    }
+
+    public IReadOnlyList<UnfiledGhost> LoadUnfiled()
+    {
+        var entries = new List<UnfiledGhost>();
+        using var select = connection.CreateCommand();
+        select.CommandText = "SELECT sourceId, unfiledAtUtc FROM unfiled";
+        using var reader = select.ExecuteReader();
+        while (reader.Read())
+        {
+            entries.Add(new UnfiledGhost(reader.GetString(0), DateTimeOffset.Parse(reader.GetString(1), System.Globalization.CultureInfo.InvariantCulture)));
+        }
+        return entries;
     }
 
     public GhostArchive LoadArchive()

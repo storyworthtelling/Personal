@@ -71,16 +71,18 @@ public class ArchiveBackupTests
         Assert.False(ArchiveSync.NeedsWriting(new ArchiveSnapshot([], Now), backed));
     }
 
-    // The other direction of the same rule: a device with nothing filed takes what is in
-    // Drive, and a device that already has ghosts is the authority on its own archive.
-    [Theory]
-    [InlineData(0, true)]
-    [InlineData(1, false)]
-    public void OnlyAnEmptyDeviceRestores(int localGhosts, bool expectRestore)
+    // A device with ghosts used to be "the authority" and never restored, so a phone that had filed one message
+    // before its restore ran never got the rest back. Restore is now the union's other direction: whatever the
+    // backup holds that the phone does not (ArchiveMergeTests).
+    [Fact]
+    public void ADeviceThatAlreadyHasGhostsStillGetsTheRestBack()
     {
-        var local = Enumerable.Range(0, localGhosts).Select(i => Filed($"local{i}")).ToList();
+        var phone = new ArchiveSnapshot([Filed("local0")], Now);
+        var backed = new ArchiveSnapshot([Filed("m1"), Filed("m2")], Now);
 
-        Assert.Equal(expectRestore, ArchiveSync.ShouldRestore(local));
+        var restored = ArchiveSync.ToRestore(ArchiveSync.Merge(phone, backed), phone);
+
+        Assert.Equal(2, restored.Count);
     }
 
     // A backup written by an OLD device is the bare snapshot, uncompressed, with no

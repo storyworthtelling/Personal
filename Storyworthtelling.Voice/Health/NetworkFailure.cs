@@ -1,6 +1,6 @@
 using System.Net.Sockets;
 
-namespace Folio.Domain.Pipeline;
+namespace Storyworthtelling.Voice.Health;
 
 // Tells "the phone has no connection" from "the call failed". Offline fails instantly, before anything
 // is sent, naming the host it could not look up — so nothing was billed and nothing was learned about

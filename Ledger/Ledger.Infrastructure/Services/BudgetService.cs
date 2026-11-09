@@ -915,18 +915,11 @@ public sealed class BudgetService
     }
 
     /// <summary>D100's zero check passed: the worksheet balances, and there is nothing left pending for
-    /// this month.</summary>
-    public async Task MarkBalancedAsync(Guid budgetMonthId, CancellationToken cancellationToken)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var month = await db.BudgetMonths.FirstOrDefaultAsync(m => m.Id == budgetMonthId, cancellationToken);
-        if (month is null)
-        {
-            return;
-        }
-        month.Status = BudgetMonthStatus.Approved;
-        await db.SaveChangesAsync(cancellationToken);
-    }
+    /// this month. This is where a month is approved in practice, so it approves through
+    /// <see cref="ApproveMonthAsync"/> and D66's purge runs (orphan audit §32: it used to set the status
+    /// itself, and no transaction was ever purged).</summary>
+    public Task MarkBalancedAsync(Guid budgetMonthId, CancellationToken cancellationToken) =>
+        ApproveMonthAsync(budgetMonthId, cancellationToken);
 
     /// <summary>D153: "repeats each morning until the figures balance" — the one month (there is only
     /// ever ONE zero-based cycle active at a time) whose worksheet went through a REAL balance check

@@ -3,11 +3,24 @@ using Storyworthtelling.Voice;
 namespace Codex.Tests.Support;
 
 /// <summary>An in-memory <see cref="IDriveTextFile"/> for store tests — starts absent (null) until written.</summary>
-public sealed class InMemoryDriveTextFile : IDriveTextFile
+public sealed class InMemoryDriveTextFile : IDriveTextFile, IDriveFileTrash
 {
     public string? Content { get; set; }
 
-    public Task<string?> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(Content);
+    /// <summary>When set, every read throws: Drive unreachable.</summary>
+    public bool FailReads { get; set; }
+
+    public bool Trashed { get; private set; }
+
+    public Task<string?> ReadAsync(CancellationToken cancellationToken) =>
+        FailReads ? throw new IOException("Drive could not be reached.") : Task.FromResult(Content);
+
+    public Task TrashAsync(CancellationToken cancellationToken)
+    {
+        Content = null;
+        Trashed = true;
+        return Task.CompletedTask;
+    }
 
     public Task WriteAsync(string content, CancellationToken cancellationToken)
     {

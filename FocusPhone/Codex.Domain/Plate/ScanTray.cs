@@ -60,6 +60,9 @@ public sealed record ScanTray
     /// <summary>Opens an empty tray at the door the owner picked.</summary>
     public static ScanTray For(ScanDestination destination) => new(destination, []);
 
+    /// <summary>A tray read back from storage, pages exactly as they were held (<see cref="ScanTrayCodec"/>).</summary>
+    public static ScanTray Restored(ScanDestination destination, IReadOnlyList<ScanPage> pages) => new(destination, pages);
+
     /// <summary>Where this document is going, decided before the first page was scanned.</summary>
     public ScanDestination Destination { get; }
 

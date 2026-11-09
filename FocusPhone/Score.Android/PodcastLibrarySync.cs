@@ -78,50 +78,92 @@ public sealed class PodcastLibrarySync
     /// phone). Returns true when it wrote local state, so the caller can re-render and
     /// refresh feeds. A no-op — and false — in every other case, including no backup.
     /// </summary>
+    // Whether this install has once read the Drive backup (found it, or found none). Until it has, a reconcile
+    // on a phone with shows of its own merges both ways instead of letting its first show replace the library
+    // (error-handling §17); after it, the phone is the authority and an unsubscribe propagates.
+    private const string PrefsName = "library-sync";
+    private const string RestoreConfirmedKey = "restore-confirmed";
+
+    private static bool RestoreConfirmed
+    {
+        get => global::Android.App.Application.Context.GetSharedPreferences(PrefsName, global::Android.Content.FileCreationMode.Private)!
+            .GetBoolean(RestoreConfirmedKey, false);
+        set => global::Android.App.Application.Context.GetSharedPreferences(PrefsName, global::Android.Content.FileCreationMode.Private)!
+            .Edit()!.PutBoolean(RestoreConfirmedKey, value)!.Commit();
+    }
+
     public async Task<bool> RestoreAsync(CancellationToken cancellationToken)
     {
-        var remote = await store.LoadAsync(cancellationToken);
-        if (AudioLibrarySync.Decide(BuildLocal(), remote) != LibrarySyncDirection.Restore || remote is null)
+        var read = await store.ReadAsync(cancellationToken);
+        if (!read.Readable)
         {
+            // A damaged backup is left for the owner rather than replaced or restored from.
             return false;
         }
 
-        subscriptionStore.Save(remote.Subscriptions);
-        podcastStore.SaveListenedIds([.. remote.ListenedEpisodeIds]);
-        progressStore.Save(remote.Progress);
-        if (remote.Settings is { } settings)
+        var remote = read.Snapshot;
+        var direction = AudioLibrarySync.Decide(BuildLocal(), remote, RestoreConfirmed);
+        if (direction == LibrarySyncDirection.Restore && remote is not null)
+        {
+            Apply(remote);
+            RestoreConfirmed = true;
+            return true;
+        }
+        if (direction == LibrarySyncDirection.Merge && remote is not null)
+        {
+            var merged = AudioLibrarySync.Union(BuildLocal(), remote);
+            Apply(merged);
+            await store.SaveAsync(merged, cancellationToken);
+            RestoreConfirmed = true;
+            return true;
+        }
+
+        RestoreConfirmed = true;
+        return false;
+    }
+
+    public async Task BackupAsync(CancellationToken cancellationToken)
+    {
+        var read = await store.ReadAsync(cancellationToken);
+        if (!read.Readable)
+        {
+            return;
+        }
+
+        var local = BuildLocal();
+        switch (AudioLibrarySync.Decide(local, read.Snapshot, RestoreConfirmed))
+        {
+            case LibrarySyncDirection.Backup:
+                await store.SaveAsync(local, cancellationToken);
+                break;
+            case LibrarySyncDirection.Merge:
+                var merged = AudioLibrarySync.Union(local, read.Snapshot!);
+                Apply(merged);
+                await store.SaveAsync(merged, cancellationToken);
+                break;
+        }
+
+        RestoreConfirmed = true;
+    }
+
+    private void Apply(AudioLibrarySnapshot library)
+    {
+        subscriptionStore.Save(library.Subscriptions);
+        podcastStore.SaveListenedIds([.. library.ListenedEpisodeIds]);
+        progressStore.Save(library.Progress);
+        if (library.Settings is { } settings)
         {
             settingsStore.Save(settings);
         }
 
-        // Band gains are hardware-shaped; the editor and effect already ignore/clamp a mismatched
-        // count (EqualizerActivity adopts a stored curve only when the band count matches, AudioEffects
-        // applies the overlap), so restoring across devices degrades safely rather than crashing.
-        if (remote.Equalizer is { } equalizer)
+        if (library.Equalizer is { } equalizer)
         {
             equalizerStore.SaveLibrary(equalizer);
         }
 
-        equalizerStore.LoudnessMillibels = remote.LoudnessMillibels;
-        return true;
+        equalizerStore.LoudnessMillibels = library.LoudnessMillibels;
     }
 
-    /// <summary>
-    /// Mirrors local up to Drive when it has drifted from the backup (or none exists).
-    /// Reads the remote copy first so an unchanged library skips the write.
-    /// </summary>
-    public async Task BackupAsync(CancellationToken cancellationToken)
-    {
-        var local = BuildLocal();
-        var remote = await store.LoadAsync(cancellationToken);
-        if (AudioLibrarySync.Decide(local, remote) == LibrarySyncDirection.Backup)
-        {
-            await store.SaveAsync(local, cancellationToken);
-        }
-    }
-
-    // Routes the Google client's HttpClient through AndroidMessageHandler (SELinux blocks the default
-    // socket handler in an app process), matching the head's other Google clients.
     private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
     {
         protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>

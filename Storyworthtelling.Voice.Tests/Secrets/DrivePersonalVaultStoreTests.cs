@@ -90,8 +90,9 @@ public class DrivePersonalVaultStoreTests
             PersonalVaultStatus.Empty,
             (await new DrivePersonalVaultStore(new InMemoryTextFile { Content = null }).LoadAsync(Pass, default)).Status);
 
+        // A file that is there but blank is damaged, not "no vault yet" (error-handling audit §1).
         Assert.Equal(
-            PersonalVaultStatus.Empty,
+            PersonalVaultStatus.Corrupt,
             (await new DrivePersonalVaultStore(new InMemoryTextFile { Content = "   " }).LoadAsync(Pass, default)).Status);
     }
 

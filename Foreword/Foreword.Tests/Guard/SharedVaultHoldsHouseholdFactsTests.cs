@@ -26,7 +26,8 @@ public class SharedVaultHoldsHouseholdFactsTests
         var fields = typeof(ForewordSecrets)
             .GetProperties()
             .Select(property => property.Name)
-            .Where(name => name != "EqualityContract")
+            // ExtensionData only carries back what a newer app wrote (contracts H1); it is not a field.
+            .Where(name => name is not ("EqualityContract" or "ExtensionData"))
             .OrderBy(name => name)
             .ToArray();
 

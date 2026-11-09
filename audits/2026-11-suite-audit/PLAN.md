@@ -36,7 +36,7 @@ W1 and W2 are first because they lose data or silently break features today. W3 
 
 ---
 
-## W0 · Git history and leak guards (privacy report, kept outside the repo)
+## W0 · Git history and leak guards (privacy report, kept outside the repo) — done (PR #287)
 
 1. **Prepare the rewrite (I do this).**
    - Re-scan the full history in the scratchpad and build a `filter-repo` replace-text list plus a `.mailmap`. Both stay outside the repo.
@@ -58,7 +58,7 @@ W1 and W2 are first because they lose data or silently break features today. W3 
    - Tap-watch row text (08).
 5. **Your step:** trash any `storyworthtelling-voice-config.json` left in Drive, and rotate the Claude key if it is there.
 
-## W1 · Data safety
+## W1 · Data safety — in review
 
 Goal: no failure path can overwrite or lose data.
 

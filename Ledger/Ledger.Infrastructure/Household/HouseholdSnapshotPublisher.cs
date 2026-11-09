@@ -40,7 +40,7 @@ public sealed class HouseholdSnapshotPublisher
     private readonly SnowballService snowball;
     private readonly BudgetService budget;
     private readonly SavingsService savings;
-    private readonly IDriveTextFile file;
+    private readonly SealedDriveFile sealedFile;
     private readonly IClock clock;
 
     public HouseholdSnapshotPublisher(
@@ -51,7 +51,7 @@ public sealed class HouseholdSnapshotPublisher
         this.snowball = snowball;
         this.budget = budget;
         this.savings = savings;
-        this.file = file;
+        sealedFile = new SealedDriveFile(file);
         this.clock = clock;
     }
 
@@ -75,14 +75,25 @@ public sealed class HouseholdSnapshotPublisher
             // Never take over a file another account published. Her install publishing here would
             // stamp HER address on the owner's snapshot, after which the owner's own install resolves
             // as Hers and goes read-only. The existing file is read first, with the same passphrase,
-            // and a read that cannot say who published it is also a refusal — overwriting what could not
-            // be opened is how someone else's data is lost. A damaged file (not an envelope at all) has
-            // no publisher to protect and may be replaced.
-            var existing = await new HouseholdSnapshotReader(file).ReadAsync(passphrase, cancellationToken);
+            // under the suite's sealed-file rule: a file that does not open (another passphrase, or
+            // damaged) is never replaced, since overwriting what could not be opened is how someone
+            // else's data is lost (G14, duplication audit §5).
+            var read = await sealedFile.ReadAsync(passphrase, cancellationToken);
+            if (read.Status == SealedReadStatus.Unreachable)
+            {
+                return HouseholdSnapshotPublishResult.Failed(read.Detail ?? "Drive could not be read.");
+            }
+
+            var existing = HouseholdSnapshotReader.Interpret(VaultStatus(read.Status), read.Plaintext);
             if (existing.Status == HouseholdSnapshotStatus.WrongPassphrase)
             {
                 return HouseholdSnapshotPublishResult.Refused(
                     "The household file is locked with a different passphrase; not replacing it.");
+            }
+            if (existing.Status == HouseholdSnapshotStatus.Corrupt)
+            {
+                return HouseholdSnapshotPublishResult.Refused(
+                    "The household file in Drive is damaged; not replacing it.");
             }
             // Never downgrade what it cannot understand: a file a newer Index wrote would be replaced by this
             // build's older shape, losing whatever the newer one added, with nothing on either phone saying
@@ -102,14 +113,24 @@ public sealed class HouseholdSnapshotPublisher
 
             var snapshot = await BuildSnapshotAsync(publishedByAccountEmail, cancellationToken);
             var json = JsonSerializer.Serialize(snapshot, VaultEnvelope.SerializerOptions);
-            await file.WriteAsync(VaultEnvelope.Write(json, passphrase), cancellationToken);
-            return HouseholdSnapshotPublishResult.Published();
+            var written = await sealedFile.WriteAsync(json, passphrase, read, SealedWriteOptions.Default, cancellationToken);
+            return written.Succeeded
+                ? HouseholdSnapshotPublishResult.Published()
+                : HouseholdSnapshotPublishResult.Failed(written.Detail ?? $"The household file was not written ({written.Outcome}).");
         }
         catch (Exception ex)
         {
             return HouseholdSnapshotPublishResult.Failed(ex.Message);
         }
     }
+
+    private static SecretsVaultStatus VaultStatus(SealedReadStatus status) => status switch
+    {
+        SealedReadStatus.Absent => SecretsVaultStatus.Empty,
+        SealedReadStatus.Loaded => SecretsVaultStatus.Loaded,
+        SealedReadStatus.WrongPassphrase => SecretsVaultStatus.WrongPassphrase,
+        _ => SecretsVaultStatus.Corrupt,
+    };
 
     private async Task<HouseholdSnapshot> BuildSnapshotAsync(string publishedByAccountEmail, CancellationToken cancellationToken)
     {

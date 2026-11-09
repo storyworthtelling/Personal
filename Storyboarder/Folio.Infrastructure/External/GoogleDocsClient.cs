@@ -18,6 +18,18 @@ public sealed class GoogleDocsClient : IGoogleDocsClient
     private const string ApplicationName = "Folio";
     private const string GoogleDocMime = "application/vnd.google-apps.document";
 
+    // Null on the phone (the library's own HTTP stack); a test passes a fake Drive.
+    private readonly Google.Apis.Http.IHttpClientFactory? httpClientFactory;
+
+    public GoogleDocsClient()
+    {
+    }
+
+    public GoogleDocsClient(Google.Apis.Http.IHttpClientFactory httpClientFactory)
+    {
+        this.httpClientFactory = httpClientFactory;
+    }
+
     public async Task<string> FetchText(string documentId, string accessToken, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(documentId))
@@ -29,8 +41,13 @@ public sealed class GoogleDocsClient : IGoogleDocsClient
         var initializer = new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
-            ApplicationName = ApplicationName
+            ApplicationName = ApplicationName,
+            GZipEnabled = httpClientFactory is null,
         };
+        if (httpClientFactory is not null)
+        {
+            initializer.HttpClientFactory = httpClientFactory;
+        }
 
         var (mimeType, name) = await ResolveFile(initializer, documentId, cancellationToken);
 
@@ -90,7 +107,13 @@ public sealed class GoogleDocsClient : IGoogleDocsClient
     {
         using var drive = new DriveService(initializer);
         using var buffer = new MemoryStream();
-        await drive.Files.Get(fileId).DownloadAsync(buffer, cancellationToken);
+        // The downloader reports a failed request in its progress rather than throwing; ignoring it read a
+        // failed download as an empty or corrupt manuscript (error-handling audit §1).
+        var progress = await drive.Files.Get(fileId).DownloadAsync(buffer, cancellationToken);
+        if (progress.Exception is not null)
+        {
+            throw new IOException($"Drive could not download the manuscript {fileId}.", progress.Exception);
+        }
         return buffer.ToArray();
     }
 }

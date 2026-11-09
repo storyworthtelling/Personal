@@ -12,6 +12,9 @@ namespace Codex.Infrastructure.Podcasts;
 /// <see langword="null"/> so a first run — or a corrupt file — is treated as "no
 /// backup yet" and never throws.
 /// </summary>
+/// <summary>What reading the backup came to: readable (with or without a library), or a damaged file.</summary>
+public sealed record AudioLibraryRead(bool Readable, AudioLibrarySnapshot? Snapshot);
+
 public sealed class DriveAudioLibraryStore
 {
     /// <summary>The shared file's name. One library backup, one file, found by name.</summary>
@@ -43,6 +46,29 @@ public sealed class DriveAudioLibraryStore
         catch (JsonException)
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// The backup, told apart from no backup and from a damaged one. A damaged file must not be backed up over,
+    /// since it may hold the only copy of the library (G14). Drive being unreachable throws, as the seam does.
+    /// </summary>
+    public async Task<AudioLibraryRead> ReadAsync(CancellationToken cancellationToken)
+    {
+        var content = await file.ReadAsync(cancellationToken);
+        if (content is null)
+        {
+            return new AudioLibraryRead(true, null);
+        }
+
+        try
+        {
+            var snapshot = string.IsNullOrWhiteSpace(content) ? null : JsonSerializer.Deserialize<AudioLibrarySnapshot>(content, SerializerOptions);
+            return snapshot is null ? new AudioLibraryRead(false, null) : new AudioLibraryRead(true, snapshot);
+        }
+        catch (JsonException)
+        {
+            return new AudioLibraryRead(false, null);
         }
     }
 
