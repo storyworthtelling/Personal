@@ -139,7 +139,7 @@ public class LockedOpenContractTests
     [Fact]
     public void PulpDeclaresItUsesFlyleafsPermission()
     {
-        Assert.Matches(@"\[assembly: UsesPermission\(LockedOpenHandOff\.Permission\)\]", CourierSource());
+        Assert.Contains("[assembly: UsesPermission(Name = LockedOpenHandOff.Permission)]", File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Android", "ContractPermissions.cs")), StringComparison.Ordinal);
     }
 
     /// <summary>

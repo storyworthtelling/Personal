@@ -6,9 +6,6 @@ using Android.Media.Session;
 using Codex.Domain.Apps;
 using MediaController = Android.Media.Session.MediaController;
 
-// Pulp declares RECEIVE_SESSIONS at signature level; Flyleaf must hold it for the relay to land.
-[assembly: UsesPermission(PlaybackSessionHandoff.Permission)]
-
 namespace Flyleaf;
 
 /// <summary>

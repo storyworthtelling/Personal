@@ -48,26 +48,22 @@ public class IndexHandoffContractTests
     public void Permission_MatchesIndexHandoffsByteForByte_OnTheReceiverAttribute()
     {
         var suffix = SuffixAfterApplicationId(HandoffConstant("Permission"));
-        Assert.Contains(
-            $"Permission = IndexIdentity.ApplicationId + \"{suffix}\"", ReceiverSource(), StringComparison.Ordinal);
+        Assert.Equal(HandoffConstant("Permission"), IndexIdentity.BalancePermission);
+        Assert.Contains($"BalancePermission = ApplicationId + \"{suffix}\";", File.ReadAllText(Path.Combine(RepoRoot(), "Ledger", "Ledger.Domain", "Identity", "IndexIdentity.cs")), StringComparison.Ordinal);
+        Assert.Contains("Permission = IndexIdentity.BalancePermission)]", ReceiverSource(), StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Post enforces the permission by requiring the RECEIVING app hold it; declaring the
-    /// &lt;permission&gt; tag itself is Index's own job (IndexHandoff's own remark). A receiver whose
-    /// attribute names a permission nobody DECLARES is silently unenforceable — Android just never
-    /// grants it to anyone, including Post. The raw manifest has no constant-reference idiom to check
-    /// against (XML has no C# constants), so this is the one assertion in this file that reads
-    /// IndexHandoff's full literal value directly.
+    /// Post sends under the permission, so Index must HOLD it to receive, and the receiver's guard means
+    /// Post must hold it to send. Declaring it does not grant it to the declaring app, so Index both
+    /// declares (signature level) and requests it, in the one file every head keeps its contracts in.
     /// </summary>
     [Fact]
-    public void Permission_IsDeclaredInTheManifest_AtSignatureProtectionLevel()
+    public void Permission_IsDeclaredAtSignatureLevel_AndHeld()
     {
-        var expected = HandoffConstant("Permission");
-        var manifest = File.ReadAllText(ManifestPath());
-        Assert.Contains(
-            $"<permission android:name=\"{expected}\" android:protectionLevel=\"signature\" />",
-            manifest, StringComparison.Ordinal);
+        var contracts = File.ReadAllText(Path.Combine(RepoRoot(), "Ledger", "Ledger.Android", "ContractPermissions.cs"));
+        Assert.Contains("[assembly: Permission(Name = IndexIdentity.BalancePermission, ProtectionLevel = Protection.Signature)]", contracts, StringComparison.Ordinal);
+        Assert.Contains("[assembly: UsesPermission(Name = IndexIdentity.BalancePermission)]", contracts, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -137,8 +133,6 @@ public class IndexHandoffContractTests
         return File.ReadAllText(path);
     }
 
-    private static string ManifestPath() =>
-        Path.Combine(RepoRoot(), "Ledger", "Ledger.Android", "Platforms", "Android", "AndroidManifest.xml");
 
     /// <summary>Reads one <c>IndexHandoff.&lt;name&gt; = "...";</c> string constant's literal value
     /// straight out of Post's own, frozen source file — never retyped.</summary>

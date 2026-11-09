@@ -71,9 +71,9 @@ public class LockedOpenContractTests
     [Fact]
     public void ThePermissionIsDeclaredAtSignatureLevel()
     {
-        Assert.Matches(
-            @"\[assembly: Permission\(Name = LockedOpenHandoff\.Permission, ProtectionLevel = Protection\.Signature\)\]",
-            Read("Flyleaf.Android", "LockedOpenReceiver.cs"));
+        var source = Read("Flyleaf.Android", "ContractPermissions.cs");
+        Assert.Contains("[assembly: Permission(Name = LockedOpenHandoff.Permission, ProtectionLevel = Protection.Signature)]", source, StringComparison.Ordinal);
+        Assert.Contains("[assembly: UsesPermission(Name = LockedOpenHandoff.Permission)]", source, StringComparison.Ordinal);
     }
 
     [Fact]

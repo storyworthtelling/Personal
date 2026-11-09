@@ -21,7 +21,7 @@ namespace Index.Android.Platforms.Android;
     Name = IndexIdentity.ApplicationId + ".UsageReceiver",
     Exported = true,
     Enabled = true,
-    Permission = IndexIdentity.ApplicationId + ".RECEIVE_USAGE")]
+    Permission = IndexIdentity.UsagePermission)]
 [IntentFilter([UsageReceiver.HandoffAction])]
 public class UsageReceiver : BroadcastReceiver
 {

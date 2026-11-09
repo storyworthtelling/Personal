@@ -5,9 +5,6 @@ using Android.Content;
 using Android.OS;
 using Pulp.Domain.LockedOpen;
 
-// Flyleaf declares RECEIVE_LOCKED_OPEN at signature level; Pulp must hold it for the broadcast to land.
-[assembly: UsesPermission(LockedOpenHandOff.Permission)]
-
 namespace Pulp.LockedOpen;
 
 /// <summary>

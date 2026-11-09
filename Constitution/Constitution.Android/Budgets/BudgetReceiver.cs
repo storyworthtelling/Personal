@@ -6,11 +6,6 @@ using Constitution.Domain;
 using Constitution.Domain.Budgets;
 using Constitution.Infrastructure.Budgets;
 
-// The signature permission that protects BudgetReceiver, declared here and held by Index. A permission nobody declares is
-// granted to nobody, so without this line a correctly signed sender would be refused; and it is signature level, so only an
-// app signed with the suite's one keystore can send a budget at all. Declared, not requested: no uses-permission is added.
-[assembly: Permission(Name = ConstitutionIdentity.BudgetPermission, ProtectionLevel = Protection.Signature)]
-
 namespace Constitution.Budgets;
 
 /// <summary>

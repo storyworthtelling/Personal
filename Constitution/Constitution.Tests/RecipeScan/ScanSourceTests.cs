@@ -19,7 +19,7 @@ public class ScanSourceTests
             {
                 var relative = ConstitutionSource.Relative(file);
                 return (relative.StartsWith("Constitution.Android/MealsTab/Scan", StringComparison.Ordinal))
-                    || relative == "Constitution.Android/RecipeScanPermission.cs";
+                    || relative == "Constitution.Android/ContractPermissions.cs";
             })
             .ToList();
 
@@ -48,7 +48,7 @@ public class ScanSourceTests
 
         Assert.Contains("Constitution.Android/MealsTab/ScanRecipeLauncher.cs", names);
         Assert.Contains("Constitution.Android/MealsTab/ScanReadPage.cs", names);
-        Assert.Contains("Constitution.Android/RecipeScanPermission.cs", names);
+        Assert.Contains("Constitution.Android/ContractPermissions.cs", names);
     }
 
     [Fact]

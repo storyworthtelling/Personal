@@ -561,15 +561,20 @@ public class FrozenInvariantsTests
         // Storyworthtelling.Updates cannot reference Codex.Domain (Domain is deliberately
         // dependency-free, and the MAUI apps that share the library have no Codex.Domain at
         // all), so it keeps its own copy, kept identical by
-        // EveryFocusPhonePackageInTheBandTableMatchesTheDomainConstant below. Everything else
-        // references the constant.
+        // EveryFocusPhonePackageInTheBandTableMatchesTheDomainConstant below. The repo-wide contract
+        // guard (RepoGuards ContractPermissionsTests) spells out READ_RECIPE's full value too, as the one
+        // string both ends are checked against, and Index's statement read keeps a copy because it cannot
+        // reference Codex.Domain (held equal by PlateStatementReadTests). Everything else references the constant.
         var stray = EnumerateRepoFiles("*.cs")
             .Where(file => File.ReadAllText(file).Contains(PolicyContext.PlatePackage, StringComparison.Ordinal))
             .Select(RepoRelative)
             .Where(path => !path.EndsWith("PolicyContext.cs", StringComparison.Ordinal)
                 && !path.EndsWith("FrozenInvariantsTests.cs", StringComparison.Ordinal)
                 && !path.EndsWith("VersionCode.cs", StringComparison.Ordinal)
-                && !path.EndsWith("VersionCodeTests.cs", StringComparison.Ordinal))
+                && !path.EndsWith("VersionCodeTests.cs", StringComparison.Ordinal)
+                && !path.EndsWith("ContractPermissionsTests.cs", StringComparison.Ordinal)
+                // Index cannot reference Codex.Domain; its copy is held equal by PlateStatementReadTests.
+                && !path.EndsWith("Ledger.Domain/Handoff/PlateStatementRead.cs", StringComparison.Ordinal))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToList();
 

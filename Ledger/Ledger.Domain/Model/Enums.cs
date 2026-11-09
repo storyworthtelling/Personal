@@ -47,10 +47,13 @@ public enum PaymentCadence
 // Remediation 3.3 (mockup 15): where an account's CURRENT balance came from, so its post-it can say "From
 // Post, Sep 12" instead of "Updated Sep 12", and so a date-only statement day is not read as an instant.
 // Plaid: a refresh brought it. ByHand: the owner typed it. Post: a statement Post read and handed over
-// (D15, via AccountService.ApplyBalanceReceiptAsync).
+// (D15, via AccountService.ApplyBalanceReceiptAsync). Plate: a statement the owner read with Plate from the
+// account's own post-it (audit W2, via AccountService.ApplyStatementReadAsync). Stored as an int, so a new value
+// goes on the end.
 public enum BalanceSource
 {
     Plaid,
     ByHand,
-    Post
+    Post,
+    Plate,
 }

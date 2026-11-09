@@ -152,6 +152,7 @@ jobs:
             android.permission.FOREGROUND_SERVICE \
             android.permission.POST_NOTIFICATIONS \
             com.storyworthtelling.constitution.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION \
+            com.storyworthtelling.constitution.RECEIVE_BUDGET \
             com.storyworthtelling.focusphone.camera.READ_RECIPE | sort -u)
           echo "$USES" | grep -qx "android.permission.INTERNET" || {
             echo "FAIL: Constitution's APK does not declare android.permission.INTERNET."

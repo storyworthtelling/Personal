@@ -4,9 +4,6 @@ using Pulp.Domain.Core;
 using Pulp.Domain.Hidden;
 using Pulp.Domain.Services;
 
-// Flyleaf declares RECEIVE_HIDDEN at signature level; Pulp must hold it for the broadcast to land.
-[assembly: UsesPermission(HiddenAppsHandOff.Permission)]
-
 namespace Pulp.Hidden;
 
 /// <summary>

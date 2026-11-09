@@ -4,11 +4,6 @@ using Android.Content;
 using Android.Content.PM;
 using Codex.Domain.Apps;
 
-// Pulp's locked hand-off contract (LockedOpenHandoff). Pulp holds this permission to send; declaring
-// it here at signature level is what makes the receiver's Permission enforceable at all, since a
-// permission nobody declares is never granted to anyone.
-[assembly: Permission(Name = LockedOpenHandoff.Permission, ProtectionLevel = Protection.Signature)]
-
 namespace Flyleaf;
 
 /// <summary>

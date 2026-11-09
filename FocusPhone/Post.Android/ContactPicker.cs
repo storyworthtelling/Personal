@@ -117,7 +117,13 @@ public static class ContactPicker
     /// </summary>
     /// <exception cref="InvalidOperationException">The provider would not create the contact.</exception>
     /// <exception cref="Java.Lang.SecurityException">WRITE_CONTACTS has not been granted.</exception>
-    public static void CreateContact(Context context, string name, string address)
+    public static void CreateContact(Context context, string name, string address) =>
+        CreateContact(context, name, [address]);
+
+    /// <summary>A new phone contact with every address given, in order (a business card's phone and email).</summary>
+    /// <exception cref="InvalidOperationException">The provider would not create the contact.</exception>
+    /// <exception cref="Java.Lang.SecurityException">WRITE_CONTACTS has not been granted.</exception>
+    public static void CreateContact(Context context, string name, IReadOnlyList<string> addresses)
     {
         var resolver = context.ContentResolver!;
         var rawUri = resolver.Insert(ContactsContract.RawContacts.ContentUri!, new ContentValues())
@@ -130,7 +136,10 @@ public static class ContactPicker
         nameValues.Put(ContactsContract.CommonDataKinds.StructuredName.DisplayName, name);
         resolver.Insert(ContactsContract.Data.ContentUri!, nameValues);
 
-        InsertAddress(resolver, rawContactId, address);
+        foreach (var address in addresses)
+        {
+            InsertAddress(resolver, rawContactId, address);
+        }
     }
 
     /// <summary>

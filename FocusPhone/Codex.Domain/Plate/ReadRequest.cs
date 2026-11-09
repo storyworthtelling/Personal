@@ -16,14 +16,24 @@ namespace Codex.Domain.Plate;
 /// <para>Two actions rather than one with a "kind" extra: a caller that sends the wrong
 /// kind gets an activity-not-found it can see, instead of a result it cannot use.</para>
 ///
-/// <para><b>Index does not exist yet</b> — it is P11 — so Plate's end of the statement read
-/// ships with no live counterpart, and the on-device test plan has to say so rather than
-/// imply a passing check.</para>
+/// <para>Both reads are answered by <see cref="PaperActivity"/> and only for a caller holding
+/// <see cref="PaperPermission"/>; Index starts the statement read from a hand-entered account,
+/// and Post starts the card read from the Rolodex (audit W2).</para>
 /// </summary>
 public static class ReadRequest
 {
     public const string ReadCard = "com.storyworthtelling.plate.action.READ_CARD";
     public const string ReadStatement = "com.storyworthtelling.plate.action.READ_STATEMENT";
+
+    /// <summary>
+    /// The component that answers <see cref="ReadCard"/> and <see cref="ReadStatement"/>. Its own activity, behind
+    /// <see cref="PaperPermission"/>, for the same reason as <see cref="RecipeActivity"/>: the camera filters on the
+    /// errand activity must stay open to every app, and a statement read hands back a balance.
+    /// </summary>
+    public const string PaperActivity = PolicyContext.PlatePackage + ".PaperReadActivity";
+
+    /// <summary>The signature-level permission a card or statement caller must hold.</summary>
+    public const string PaperPermission = PolicyContext.PlatePackage + ".READ_PAPER";
 
     // The recipe read (PBI C-11.2.1). Constitution holds these same words as literals of its own
     // (Recipes/RecipeReadContract) and a guard there reads this file by content, so neither side can

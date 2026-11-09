@@ -14,15 +14,14 @@ namespace Index.Android;
 /// </summary>
 public static class ConstitutionBudgetSender
 {
-    private const string LastSentKey = "ConstitutionBudgetLastSent";
-
     public static async Task SendIfChangedAsync(BudgetService budget, string yearMonth, CancellationToken cancellationToken)
     {
         var logger = IPlatformApplication.Current?.Services.GetService<ILogger<BudgetService>>();
         try
         {
             var current = await budget.GetGroceriesPayloadAsync(yearMonth, cancellationToken);
-            var previous = ConstitutionBudgetPayload.TryParseStored(Preferences.Get(LastSentKey, string.Empty));
+            Preferences.Remove(BudgetSendPlan.RetiredRecordKey);
+            var previous = ConstitutionBudgetPayload.TryParseStored(Preferences.Get(BudgetSendPlan.RecordKey, string.Empty));
             if (current is null || BudgetSendPlan.Decide(previous, current) == BudgetSendDecision.Nothing)
             {
                 return;
@@ -31,7 +30,7 @@ public static class ConstitutionBudgetSender
             var outcome = Send(Platform.AppContext, current, logger);
             if (BudgetSendPlan.AdvancesRecord(outcome))
             {
-                Preferences.Set(LastSentKey, current.ToStoredText());
+                Preferences.Set(BudgetSendPlan.RecordKey, current.ToStoredText());
             }
         }
         catch (OperationCanceledException)
@@ -49,7 +48,13 @@ public static class ConstitutionBudgetSender
     {
         if (!IsInstalled(context))
         {
-            return BudgetSendPlan.Outcome(receiverInstalled: false, sendThrew: false);
+            return BudgetSendPlan.Outcome(receiverInstalled: false, senderHoldsPermission: true, sendThrew: false);
+        }
+
+        if (context.CheckSelfPermission(ConstitutionBudgetContract.Permission) != Permission.Granted)
+        {
+            logger?.LogInformation("Budget not sent to Constitution: Index does not hold the budget permission yet.");
+            return BudgetSendPlan.Outcome(receiverInstalled: true, senderHoldsPermission: false, sendThrew: false);
         }
 
         var threw = false;
@@ -68,7 +73,7 @@ public static class ConstitutionBudgetSender
             logger?.LogInformation(ex, "Budget broadcast to Constitution failed; the next change sends again.");
         }
 
-        return BudgetSendPlan.Outcome(receiverInstalled: true, sendThrew: threw);
+        return BudgetSendPlan.Outcome(receiverInstalled: true, senderHoldsPermission: true, sendThrew: threw);
     }
 
     private static bool IsInstalled(Context context)

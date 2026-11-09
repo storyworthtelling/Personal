@@ -5,11 +5,6 @@ using Android.Content.PM;
 using Pulp.App;
 using Pulp.Domain.Sessions;
 
-// Flyleaf's playback-session relay (SessionHandOff). Flyleaf holds this permission to send; declaring
-// it here at signature level is what makes the receiver's Permission enforceable at all, since a
-// permission nobody declares is never granted to anyone.
-[assembly: Permission(Name = SessionHandOff.Permission, ProtectionLevel = Protection.Signature)]
-
 namespace Pulp.Sessions;
 
 /// <summary>

@@ -46,8 +46,6 @@ namespace Plate;
     Categories = [Intent.CategoryDefault])]
 [IntentFilter([Intent.ActionView],
     Categories = [Intent.CategoryDefault, Intent.CategoryBrowsable], DataMimeType = "image/*")]
-[IntentFilter([ReadRequest.ReadCard, ReadRequest.ReadStatement],
-    Categories = [Intent.CategoryDefault])]
 public class ErrandActivity : AppCompatActivity
 {
     private Errand errand;
@@ -332,9 +330,10 @@ public class ErrandActivity : AppCompatActivity
     }
 
     private void StartVideo() =>
-        // Deliberately not built. A requested video needs the same shoot-and-return path as
-        // a photo through the Darkroom, which is the next release; declaring the component
-        // without honouring it would be worse than saying so.
+        // Not built: a requested video needs the same shoot-and-return path as a photo
+        // through the Darkroom. The VIDEO_CAPTURE filter stays declared anyway, because on the
+        // locked phone it is what keeps another camera app from answering, and the refusal
+        // says so plainly rather than failing with nothing on screen (audit W2, report 03).
         ShowStatus("Plate cannot record for another app yet.");
 
     private void ReadFrame()

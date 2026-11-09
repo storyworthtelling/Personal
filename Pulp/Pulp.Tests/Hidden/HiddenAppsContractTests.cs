@@ -63,9 +63,7 @@ public class HiddenAppsContractTests
     [Fact]
     public void PulpDeclaresItUsesFlyleafsPermission()
     {
-        var courier = CourierSource();
-
-        Assert.Matches(@"\[assembly: UsesPermission\(HiddenAppsHandOff\.Permission\)\]", courier);
+        Assert.Contains("[assembly: UsesPermission(Name = HiddenAppsHandOff.Permission)]", File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Android", "ContractPermissions.cs")), StringComparison.Ordinal);
     }
 
     private static string CourierSource()

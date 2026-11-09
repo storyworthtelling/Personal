@@ -55,10 +55,9 @@ public class HiddenAppsContractTests
     [Fact]
     public void ThePermissionIsDeclaredAtSignatureLevel()
     {
-        var source = ReceiverSource();
-        Assert.Matches(
-            @"\[assembly: Permission\(Name = HiddenAppsHandoff\.Permission, ProtectionLevel = Protection\.Signature\)\]",
-            source);
+        var source = File.ReadAllText(Path.Combine(RepoRoot(), "FocusPhone", "Flyleaf.Android", "ContractPermissions.cs"));
+        Assert.Contains("[assembly: Permission(Name = HiddenAppsHandoff.Permission, ProtectionLevel = Protection.Signature)]", source, StringComparison.Ordinal);
+        Assert.Contains("[assembly: UsesPermission(Name = HiddenAppsHandoff.Permission)]", source, StringComparison.Ordinal);
     }
 
     /// <summary>A garbled or missing payload must not clobber the stored set; only a valid list does.</summary>

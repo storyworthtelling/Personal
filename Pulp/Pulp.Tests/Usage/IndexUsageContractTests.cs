@@ -118,10 +118,11 @@ public class IndexUsageContractTests
         Assert.Equal("com.storyworthtelling.ledger.action.USAGE", IndexUsageContract.Action);
         Assert.Equal("com.storyworthtelling.ledger.RECEIVE_USAGE", IndexUsageContract.Permission);
         Assert.Contains($"HandoffAction = IndexIdentity.ApplicationId + \"{actionSuffix}\";", receiver, StringComparison.Ordinal);
-        Assert.Contains($"Permission = IndexIdentity.ApplicationId + \"{permissionSuffix}\"", receiver, StringComparison.Ordinal);
-        Assert.Contains(
-            $"<permission android:name=\"{IndexUsageContract.Permission}\" android:protectionLevel=\"signature\" />",
-            File.ReadAllText(IndexPath("Platforms", "Android", "AndroidManifest.xml")), StringComparison.Ordinal);
+        Assert.Contains("Permission = IndexIdentity.UsagePermission)]", receiver, StringComparison.Ordinal);
+        Assert.Contains($"UsagePermission = ApplicationId + \"{permissionSuffix}\";",
+            File.ReadAllText(IndexPath("..", "Ledger.Domain", "Identity", "IndexIdentity.cs")), StringComparison.Ordinal);
+        Assert.Contains("[assembly: Permission(Name = IndexIdentity.UsagePermission, ProtectionLevel = Protection.Signature)]",
+            File.ReadAllText(IndexPath("ContractPermissions.cs")), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -151,8 +152,7 @@ public class IndexUsageContractTests
         Assert.Contains("SendBroadcast(intent, IndexUsageContract.Permission)", courier, StringComparison.Ordinal);
         Assert.Contains("new Intent(IndexUsageContract.Action)", courier, StringComparison.Ordinal);
 
-        var declaration = File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Android", "Usage", "IndexUsagePermission.cs"));
-        Assert.Contains($"UsesPermission(Name = \"{IndexUsageContract.Permission}\")", declaration, StringComparison.Ordinal);
+        Assert.Contains("[assembly: UsesPermission(Name = IndexUsageContract.Permission)]", File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Android", "ContractPermissions.cs")), StringComparison.Ordinal);
     }
 
     [Fact]

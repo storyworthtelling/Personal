@@ -14,6 +14,11 @@ public enum BudgetSendOutcome
     Sent,
     /// <summary>The platform refused the broadcast. Quiet like absence; the next change sends again.</summary>
     SendFailed,
+    /// <summary>
+    /// Index does not hold RECEIVE_BUDGET (installed before Constitution declared it, say), so the receiver would
+    /// drop the broadcast without a word. Not a send; the next refresh tries again once the grant is there.
+    /// </summary>
+    NotPermitted,
 }
 
 /// <summary>
@@ -25,6 +30,16 @@ public enum BudgetSendOutcome
 /// </summary>
 public static class BudgetSendPlan
 {
+    /// <summary>
+    /// Where the last payload delivered is kept. A new key, once: until audit W2 Constitution did not hold
+    /// RECEIVE_BUDGET, so every send recorded under <see cref="RetiredRecordKey"/> reached nobody, and keeping
+    /// that record would hold the current month back until its figures next changed.
+    /// </summary>
+    public const string RecordKey = "ConstitutionBudgetLastDelivered";
+
+    /// <summary>The record kept before audit W2, removed on the next send.</summary>
+    public const string RetiredRecordKey = "ConstitutionBudgetLastSent";
+
     public static BudgetSendDecision Decide(ConstitutionBudgetPayload? previous, ConstitutionBudgetPayload? current)
     {
         if (current is null)
@@ -35,11 +50,16 @@ public static class BudgetSendPlan
         return current.Equals(previous) ? BudgetSendDecision.Nothing : BudgetSendDecision.Send;
     }
 
-    public static BudgetSendOutcome Outcome(bool receiverInstalled, bool sendThrew)
+    public static BudgetSendOutcome Outcome(bool receiverInstalled, bool senderHoldsPermission, bool sendThrew)
     {
         if (!receiverInstalled)
         {
             return BudgetSendOutcome.ReceiverAbsent;
+        }
+
+        if (!senderHoldsPermission)
+        {
+            return BudgetSendOutcome.NotPermitted;
         }
 
         return sendThrew ? BudgetSendOutcome.SendFailed : BudgetSendOutcome.Sent;

@@ -421,6 +421,27 @@ public sealed class AccountService
         return true;
     }
 
+    // Audit W2: a statement the owner read with Plate from this account's post-it. Index asked on the account's
+    // behalf, so there is nothing to match: the balance goes on the account that asked. Its as-of is the
+    // statement's DATE, stored like a Post receipt's, or the phone's day when the statement gave none. Returns the
+    // account as stored now, or null if it was removed while Plate was open.
+    public async Task<Account?> ApplyStatementReadAsync(
+        Guid accountId, decimal balance, DateOnly? asOf, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == accountId, cancellationToken);
+        if (account is null)
+        {
+            return null;
+        }
+
+        account.CurrentBalance = balance;
+        account.BalanceAsOfUtc = CalendarDate.ToStored(asOf ?? CalendarDate.PhoneDay(clock.UtcNow));
+        account.BalanceSource = BalanceSource.Plate;
+        await db.SaveChangesAsync(cancellationToken);
+        return account;
+    }
+
     public async Task RemoveInstitutionAsync(Guid institutionId, CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);

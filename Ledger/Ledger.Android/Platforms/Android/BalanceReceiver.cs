@@ -25,7 +25,7 @@ namespace Index.Android.Platforms.Android;
 /// (or Plate) had a name to send. <see cref="Index.Domain.Model.BalanceReceiverMatch"/> and
 /// <see cref="AccountService.ApplyBalanceReceiptAsync"/> below implement D87/D91's precedence in full
 /// (Guard G6) and this receiver now calls into it with the sender name when one arrives. When
-/// <c>sender</c> is absent — an old Plate statement send, or any future sender that cannot supply one
+/// <c>sender</c> is absent — a sender that cannot supply one (Plate's statement read goes to the account that asked instead, through <c>PlateStatementReader</c>)
 /// — applying an unnamed balance to a GUESSED account would be exactly the "fabricated balance...
 /// believed" failure <c>MoneyMail</c>'s own remarks warn against, so this receiver still does not
 /// guess in that case: it logs an unroutable receipt instead, visible in Export diagnostics rather than
@@ -36,7 +36,7 @@ namespace Index.Android.Platforms.Android;
     Name = IndexIdentity.ApplicationId + ".BalanceReceiver",
     Exported = true,
     Enabled = true,
-    Permission = IndexIdentity.ApplicationId + ".RECEIVE_BALANCE")]
+    Permission = IndexIdentity.BalancePermission)]
 [IntentFilter([BalanceReceiver.HandoffAction])]
 public class BalanceReceiver : BroadcastReceiver
 {
@@ -85,7 +85,7 @@ public class BalanceReceiver : BroadcastReceiver
         var sender = intent.GetStringExtra(SenderExtra);
         if (string.IsNullOrWhiteSpace(sender))
         {
-            // No identifying signal on this receipt (an old Plate statement send, or any future
+            // No identifying signal on this receipt (any
             // sender that cannot supply one) — see this class's own remarks: applying an unnamed
             // balance to a GUESSED account would be exactly the "fabricated balance...believed"
             // failure MoneyMail's own remarks warn against, so this still does not guess.

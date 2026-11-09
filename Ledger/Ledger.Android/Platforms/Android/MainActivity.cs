@@ -101,6 +101,7 @@ public class MainActivity : MauiAppCompatActivity
         base.OnActivityResult(requestCode, resultCode, data);
         if (requestCode == Google.DeviceAccountSignIn.RequestCode)
             Google.DeviceAccountSignIn.HandleChooserResult(resultCode, data);
+        PlateStatementReader.HandleResult(requestCode, resultCode, data);
     }
 
     // LOG-LOOP-PLAN.md §4.1: every touch is handed to the tap watch before it is dispatched, since the click
