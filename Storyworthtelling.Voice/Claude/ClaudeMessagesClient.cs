@@ -223,3 +223,14 @@ public sealed class ClaudeMessagesClient(
     private static int Count(JsonElement usage, string name) =>
         usage.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetInt32() : 0;
 }
+
+/// <summary>
+/// Which Claude key an app uses (audit 01 §3): the shared vault's, read live, so a key rotated once reaches every
+/// app's next call. A key an app still holds locally from before (Foreword's old separate key, a copy Folio or
+/// Constitution made once) stands in only while the vault has none, so no phone stops working on the update.
+/// </summary>
+public static class ClaudeKeySource
+{
+    public static string Choose(string? shared, string? local) =>
+        !string.IsNullOrWhiteSpace(shared) ? shared.Trim() : local?.Trim() ?? string.Empty;
+}

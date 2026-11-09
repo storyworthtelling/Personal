@@ -71,8 +71,8 @@ public sealed class ConstitutionVaultSync
             Fill(VaultField.SleepNumberLogin, connections.SleepNumberLogin, shared.Vault.Constitution.SleepNumberLogin, value => connections.SleepNumberLogin = value, filled);
             Fill(VaultField.SleepNumberPassword, connections.SleepNumberPassword, shared.Vault.Constitution.SleepNumberPassword, value => connections.SleepNumberPassword = value, filled);
             Fill(VaultField.RemarkableDeviceToken, connections.RemarkableDeviceToken, shared.Vault.Remarkable.DeviceToken, value => connections.RemarkableDeviceToken = value, filled);
-            Fill(VaultField.ClaudeApiKey, connections.ClaudeApiKey, shared.Vault.Claude.ApiKey, value => connections.ClaudeApiKey = value, filled);
-            Fill(VaultField.GeminiApiKey, connections.GeminiApiKey, shared.Vault.Gemini.ApiKey, value => connections.GeminiApiKey = value, filled);
+            Refresh(VaultField.ClaudeApiKey, connections.ClaudeApiKey, shared.Vault.Claude.ApiKey, value => connections.ClaudeApiKey = value, filled);
+            Refresh(VaultField.GeminiApiKey, connections.GeminiApiKey, shared.Vault.Gemini.ApiKey, value => connections.GeminiApiKey = value, filled);
         }
 
         var personal = await ReadPersonalAsync(passphrase, cancellationToken);
@@ -249,6 +249,17 @@ public sealed class ConstitutionVaultSync
     // The suite's one rule for a slot (VaultMerge.Pick): a blank never overwrites, an empty slot takes what this
     // install holds, and a filled slot yields only to a value this install has just changed.
     private static string Pick(string local, string inVault, bool changed) => VaultMerge.Pick(local, inVault, changed);
+
+    // The household's shared keys belong to the vault (audit 01 §3): its value replaces a copy that has gone stale,
+    // so a key rotated in one app reaches this one on its next restore. A blank in the vault never clears a key here.
+    private static void Refresh(VaultField field, string current, string fromVault, Action<string> set, List<VaultField> filled)
+    {
+        if (!string.IsNullOrWhiteSpace(fromVault) && !string.Equals(current, fromVault, StringComparison.Ordinal))
+        {
+            set(fromVault);
+            filled.Add(field);
+        }
+    }
 
     private static void Fill(VaultField field, string current, string fromVault, Action<string> set, List<VaultField> filled)
     {

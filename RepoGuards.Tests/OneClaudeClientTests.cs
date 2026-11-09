@@ -31,4 +31,29 @@ public class OneClaudeClientTests
 
         Assert.True(offenders.Count == 0, "Use ClaudeMessagesClient instead of calling the Messages API directly:\n" + string.Join("\n", offenders));
     }
+
+    /// <summary>The shared key follows the vault in every app that keeps a copy (audit 01 §3).</summary>
+    [Fact]
+    public void AnAppThatCopiesTheSharedKeyRefreshesIt()
+    {
+        var folio = File.ReadAllText(Path.Combine(GuardScan.RepoRoot(), "Storyboarder", "Folio.Android", "VaultSync.cs"));
+        var constitution = File.ReadAllText(Path.Combine(GuardScan.RepoRoot(), "Constitution", "Constitution.Infrastructure", "Vault", "ConstitutionVaultSync.cs"));
+
+        Assert.Contains("ClaudeKeySource.Choose(result.Vault.Claude.ApiKey, SettingsStore.ClaudeApiKey)", folio, StringComparison.Ordinal);
+        Assert.Contains("Refresh(VaultField.ClaudeApiKey,", constitution, StringComparison.Ordinal);
+    }
+
+    /// <summary>One live-options type (audit 01 §18).</summary>
+    [Fact]
+    public void ThereIsOneLiveOptions()
+    {
+        var copies = Directory.EnumerateFiles(GuardScan.RepoRoot(), "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj"))
+            .Where(path => !path.Contains(".Tests" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            .Where(path => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(path), @"\bclass (LiveOptions|LiveKey)\b"))
+            .Select(path => Path.GetRelativePath(GuardScan.RepoRoot(), path).Replace('\\', '/'))
+            .ToList();
+
+        Assert.Equal(["Storyworthtelling.Voice/LiveOptions.cs"], copies);
+    }
 }

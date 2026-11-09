@@ -387,9 +387,7 @@ public partial class SetupPage : BinderPage
             (CredentialIds.NytApiKey, "New York Times — API key",
                 "From developer.nytimes.com. Used to fetch the top stories list.",
                 () => CredentialStore.NytApiKey, v => { CredentialStore.NytApiKey = v; MarkChanged(ForewordVaultSection.NytApiKey); }),
-            (CredentialIds.Anthropic, "Claude — handwriting",
-                "Optional. Without it, notes written on the paper are not read back.",
-                () => CredentialStore.AnthropicApiKey, v => { CredentialStore.AnthropicApiKey = v; MarkChanged(ForewordVaultSection.Anthropic); }),
+            // No Claude row: the key is the shared vault's, entered once in Folio, like every other app's.
         };
 
         var shown = 0;
