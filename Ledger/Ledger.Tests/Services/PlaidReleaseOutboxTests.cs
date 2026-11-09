@@ -3,12 +3,12 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Index.Domain.External;
 using Index.Domain.Model;
-using Index.Domain.Pipeline;
 using Index.Infrastructure.Configuration;
 using Index.Infrastructure.Pipeline;
 using Index.Infrastructure.Services;
 using Index.Tests.Support;
 using Xunit;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Tests.Services;
 

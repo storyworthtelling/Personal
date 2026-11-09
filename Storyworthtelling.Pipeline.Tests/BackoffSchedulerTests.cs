@@ -1,7 +1,6 @@
-using Folio.Domain.Pipeline;
 using Xunit;
 
-namespace Folio.Tests.Pipeline;
+namespace Storyworthtelling.Pipeline.Tests;
 
 public class BackoffSchedulerTests
 {

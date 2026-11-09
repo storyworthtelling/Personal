@@ -1,7 +1,5 @@
-using Microsoft.EntityFrameworkCore;
-using Index.Domain.Time;
 
-namespace Index.Infrastructure.Pipeline;
+namespace Storyworthtelling.Pipeline;
 
 public enum RunResult
 {
@@ -13,11 +11,12 @@ public enum RunResult
 // Bounds a single drain cycle so a WorkManager run finishes promptly. Delay is injected so tests can
 // run deterministically without real waits; Clock drives the wall-clock budget.
 public sealed record RunBudget(
-    IClock Clock,
+    Func<DateTimeOffset> UtcNow,
     Func<TimeSpan, CancellationToken, Task> Delay,
     int MaxIterations,
     TimeSpan MaxDuration,
-    TimeSpan MaxInCycleWait);
+    TimeSpan MaxInCycleWait,
+    Func<Exception, bool>? AbandonsCycle = null);
 
 // Repeatedly advances the pipeline until it idles, the budget is spent, or a wait is too long to sit
 // through in this cycle. Shared by the Android WorkManager worker shim and unit tests.
@@ -29,12 +28,12 @@ public sealed class PipelineRunner
 
     public async Task<RunResult> RunUntilExhaustedAsync(RunBudget budget, CancellationToken cancellationToken)
     {
-        var start = budget.Clock.UtcNow;
+        var start = budget.UtcNow();
         int iterations = 0;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (iterations >= budget.MaxIterations || budget.Clock.UtcNow - start >= budget.MaxDuration)
+            if (iterations >= budget.MaxIterations || budget.UtcNow() - start >= budget.MaxDuration)
                 return RunResult.MoreWorkPending;
 
             ProcessResult result;
@@ -47,7 +46,7 @@ public sealed class PipelineRunner
             // the database and every step is idempotent and resumable, so this cycle's now-stale work is
             // abandoned rather than crashing the run. The cycle ends as MoreWorkPending; WorkManager
             // re-runs and the next cycle re-reads fresh state.
-            catch (DbUpdateConcurrencyException)
+            catch (Exception e) when (budget.AbandonsCycle?.Invoke(e) == true)
             {
                 return RunResult.MoreWorkPending;
             }

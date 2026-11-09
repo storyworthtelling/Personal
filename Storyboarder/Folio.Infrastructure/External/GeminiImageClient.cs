@@ -7,6 +7,7 @@ using Folio.Domain.Health;
 using Folio.Domain.Pipeline;
 using Folio.Infrastructure.Configuration;
 using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Pipeline;
 
 namespace Folio.Infrastructure.External;
 

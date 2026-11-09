@@ -16,6 +16,7 @@ using Folio.Infrastructure.External;
 using Folio.Infrastructure.Persistence;
 using Storyworthtelling.Paper;
 using Storyworthtelling.Voice;
+using Storyworthtelling.Pipeline;
 
 namespace Folio.Infrastructure.Pipeline;
 

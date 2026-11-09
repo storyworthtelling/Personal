@@ -1,4 +1,4 @@
-namespace Folio.Domain.Pipeline;
+namespace Storyworthtelling.Pipeline;
 
 // One line that says what actually went wrong. The outer exception of a dropped connection says only
 // that a request failed; the cause ("Software caused connection abort") is several levels down, and a

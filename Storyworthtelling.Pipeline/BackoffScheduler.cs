@@ -1,7 +1,7 @@
-namespace Folio.Domain.Pipeline;
+namespace Storyworthtelling.Pipeline;
 
 // Pure exponential-backoff calculator with jitter and an optional server-supplied Retry-After
-// floor. The result is persisted as a unit's NextAttemptAtUtc, so backoff survives restarts.
+// floor. The result is persisted as an institution's NextAttemptAtUtc, so backoff survives restarts.
 public sealed class BackoffScheduler
 {
     private readonly TimeSpan baseDelay;

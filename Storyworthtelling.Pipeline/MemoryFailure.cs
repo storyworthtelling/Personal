@@ -1,4 +1,4 @@
-namespace Folio.Domain.Pipeline;
+namespace Storyworthtelling.Pipeline;
 
 // Tells "the phone ran out of memory" from any other failure. It is not worth a retry: the same file
 // in the same heap runs out again, and each attempt that gets partway first fills the heap further.

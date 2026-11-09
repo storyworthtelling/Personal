@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Index.Tests.Design;
 using Xunit;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Tests.Guard;
 

@@ -2,6 +2,7 @@ using Microsoft.Maui.Controls.Shapes;
 using Index.Android.Pages;
 using Index.Domain.Design;
 using Storyworthtelling.Maui;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Android.Views;
 

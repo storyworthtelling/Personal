@@ -1,4 +1,4 @@
-using Index.Domain.Pipeline;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Domain.External;
 

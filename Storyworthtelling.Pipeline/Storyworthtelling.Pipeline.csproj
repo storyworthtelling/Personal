@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The background pipeline engine Index and Folio both run from WorkManager (audit 01 §7): the drain loop
+    and its budget, one step's result, exponential backoff, the rate-limit exception, and the failure helpers
+    (the whole exception chain in one line, telling out-of-memory apart). They were copies with no parity
+    guard. BCL only, so a Domain can reference it: the one EF Core rule, that a concurrent writer abandons the
+    cycle, is passed in by each app as RunBudget.AbandonsCycle.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Pipeline</RootNamespace>
+  </PropertyGroup>
+
+</Project>

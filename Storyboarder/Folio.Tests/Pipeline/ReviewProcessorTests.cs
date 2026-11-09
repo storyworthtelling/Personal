@@ -17,6 +17,7 @@ using Folio.Tests.Support;
 using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Xunit;
+using Storyworthtelling.Pipeline;
 
 namespace Folio.Tests.Pipeline;
 

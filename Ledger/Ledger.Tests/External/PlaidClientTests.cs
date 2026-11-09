@@ -1,9 +1,9 @@
 using System.Net;
 using Microsoft.Extensions.Options;
-using Index.Domain.Pipeline;
 using Index.Infrastructure.Configuration;
 using Index.Infrastructure.External;
 using Index.Tests.Support;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Tests.External;
 

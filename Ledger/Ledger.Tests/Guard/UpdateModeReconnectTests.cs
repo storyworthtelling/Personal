@@ -1,11 +1,11 @@
 using Microsoft.Extensions.Options;
 using Index.Domain.Connect;
 using Index.Domain.External;
-using Index.Domain.Pipeline;
 using Index.Infrastructure.Configuration;
 using Index.Infrastructure.External;
 using Index.Tests.Support;
 using Xunit;
+using Storyworthtelling.Pipeline;
 
 namespace Index.Tests.Guard;
 
