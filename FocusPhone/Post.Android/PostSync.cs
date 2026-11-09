@@ -244,9 +244,9 @@ public static class PostSync
         }
         try
         {
-            var deleted = context.ContentResolver!.Delete(
-                Android.Provider.CallLog.Calls.ContentUri!, "_id = ?", [item.SourceId]);
-            return deleted > 0;
+            var uri = Android.Provider.CallLog.Calls.ContentUri!;
+            var deleted = context.ContentResolver!.Delete(uri, "_id = ?", [item.SourceId]);
+            return ProviderDeleteOutcome.Settled(deleted, () => RowExists(context, uri, item.SourceId));
         }
         catch (Java.Lang.SecurityException)
         {
@@ -280,12 +280,18 @@ public static class PostSync
         {
             var rowId = item.SourceId[prefix.Length..];
             var deleted = context.ContentResolver!.Delete(contentUri, "_id = ?", [rowId]);
-            return deleted > 0;
+            return ProviderDeleteOutcome.Settled(deleted, () => RowExists(context, contentUri, rowId));
         }
         catch (Java.Lang.SecurityException)
         {
             return false;
         }
+    }
+
+    private static bool RowExists(Context context, Android.Net.Uri contentUri, string rowId)
+    {
+        using var cursor = context.ContentResolver!.Query(contentUri, ["_id"], "_id = ?", [rowId], null);
+        return cursor is not null && cursor.MoveToFirst();
     }
 
     private static bool HoldsSmsRole(Context context)
