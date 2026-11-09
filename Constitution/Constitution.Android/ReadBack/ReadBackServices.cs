@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice;
 using Android.Content;
 using Codex.Ui.Voice;
 using Constitution.Household;
@@ -94,7 +95,7 @@ public sealed class ReadBackServices
         var appContext = context.ApplicationContext ?? context;
         var visionHttp = new HttpClient(new AndroidMessageHandler()) { Timeout = VisionTimeout };
         return new ClaudeInkVision(
-            visionHttp, Options.Create(new ClaudeVisionOptions { ApiKey = new ConstitutionConnections(appContext).ClaudeApiKey }), HeadCredentialHealth.Store());
+            visionHttp, new LiveOptions<ClaudeVisionOptions>(() => new ClaudeVisionOptions { ApiKey = new ConstitutionConnections(appContext).ClaudeApiKey }), HeadCredentialHealth.Store());
     }
 
     /// <summary>The record of whether a pen stroke has ever come through this tablet's round trip.</summary>

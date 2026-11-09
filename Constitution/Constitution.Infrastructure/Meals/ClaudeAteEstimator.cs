@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -33,12 +34,11 @@ public sealed class ClaudeAteEstimator(
     /// <summary>The largest photograph that is sent. The service takes five megabytes; this leaves room and keeps a mobile upload small.</summary>
     public const int LargestPhotoBytes = 4_000_000;
 
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
     private const int MaximumReplyTokens = 600;
     private const int LongestReason = 200;
 
     private readonly ClaudeVisionOptions settings = options.Value;
+    private readonly ClaudeMessagesClient claude = new(http, () => options.Value.ApiKey, health);
 
     public async Task<AteOutcome> EstimateAsync(string photoPath, CancellationToken cancellation)
     {
@@ -55,74 +55,26 @@ public sealed class ClaudeAteEstimator(
             return new AteOutcome.Unreadable();
         }
 
-        var payload = new
-        {
-            model = settings.Model,
-            max_tokens = MaximumReplyTokens,
-            system = new[] { new { type = "text", text = AtePrompt.System, cache_control = new { type = "ephemeral" } } },
-            messages = new[]
-            {
-                new
-                {
-                    role = "user",
-                    content = new object[]
-                    {
-                        new { type = "image", source = new { type = "base64", media_type = "image/jpeg", data = Convert.ToBase64String(picture) } },
-                        new { type = "text", text = AtePrompt.Question },
-                    },
-                },
-            },
-        };
+        var request = new ClaudeRequest(settings.Model, MaximumReplyTokens,
+            [ClaudeBlock.Text(AtePrompt.System, cache: true)],
+            [ClaudeBlock.Image("image/jpeg", Convert.ToBase64String(picture)), ClaudeBlock.Text(AtePrompt.Question)]);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        request.Headers.Add("x-api-key", settings.ApiKey);
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Content = JsonContent.Create(payload);
-
-        using var response = await http.SendAsync(request, cancellation).ConfigureAwait(false);
-        var body = await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-        {
-            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, body))
-            {
-                health?.MarkFailing(CredentialIds.Claude, $"{(int)response.StatusCode} {response.StatusCode}");
-            }
-
-            throw new HttpRequestException(
-                $"The meal estimate was refused by the service: {(int)response.StatusCode} ({response.StatusCode}){ReasonFrom(body)}", null, response.StatusCode);
-        }
-
-        health?.MarkOk(CredentialIds.Claude);
-        return AteReply.Parse(TextFrom(body));
-    }
-
-    private static string? TextFrom(string body)
-    {
+        ClaudeReply reply;
         try
         {
-            using var parsed = JsonDocument.Parse(body);
-            if (parsed.RootElement.ValueKind == JsonValueKind.Object
-                && parsed.RootElement.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var block in content.EnumerateArray())
-                {
-                    if (block.ValueKind == JsonValueKind.Object
-                        && block.TryGetProperty("type", out var type) && type.GetString() == "text"
-                        && block.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
-                    {
-                        return text.GetString();
-                    }
-                }
-            }
-
-            return null;
+            reply = await claude.SendAsync(request, cancellation).ConfigureAwait(false);
+        }
+        catch (ClaudeRequestException refused) when (refused.StatusCode is { } status)
+        {
+            throw new HttpRequestException(
+                $"The meal estimate was refused by the service: {(int)status} ({status}){ReasonFrom(refused.ResponseBody ?? string.Empty)}", refused, status);
         }
         catch (JsonException)
         {
-            // A body that is not JSON holds no answer; the estimate is "could not estimate".
-            return null;
+            return AteReply.Parse(null);
         }
+
+        return AteReply.Parse(reply.Text.Length == 0 ? null : reply.Text);
     }
 
     // The service's own words for why, when it gave some, capped; never the request.

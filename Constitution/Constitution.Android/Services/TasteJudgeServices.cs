@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice;
 using Android.Content;
 using Codex.Ui.Voice;
 using Constitution.Domain.Meals;
@@ -27,14 +28,12 @@ internal static class TasteJudgeServices
         ArgumentNullException.ThrowIfNull(box);
         return new ClaudeTasteJudge(
             Http.Value,
-            new LiveKey(new ConstitutionConnections(appContext.ApplicationContext ?? appContext)),
+            ClaudeKeyOf(new ConstitutionConnections(appContext.ApplicationContext ?? appContext)),
             new TasteDishNames(box).Of,
             HeadCredentialHealth.Store());
     }
 
-    // The shared option, with the key as it is at the moment of the call.
-    private sealed class LiveKey(ConstitutionConnections connections) : IOptions<ClaudeVisionOptions>
-    {
-        public ClaudeVisionOptions Value => new() { ApiKey = connections.ClaudeApiKey };
-    }
+    // The key as it is at the moment of the call, so one entered or restored after launch is used.
+    private static LiveOptions<ClaudeVisionOptions> ClaudeKeyOf(ConstitutionConnections connections) =>
+        new(() => new ClaudeVisionOptions { ApiKey = connections.ClaudeApiKey });
 }

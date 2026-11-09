@@ -53,7 +53,7 @@ public sealed class HiddenTrackPass
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
-        namer = new HiddenTrackNamer(http, options);
+        namer = new HiddenTrackNamer(http, options, HeadCredentialHealth.Store());
     }
 
     public bool IsWorthScanning(Track track) => track.Duration >= LongTrackThreshold;

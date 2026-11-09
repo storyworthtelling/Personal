@@ -57,10 +57,14 @@ public class ClaudeTasteJudgeTests
         return (new Judge(new HttpClient(handler), options, card => card == Risotto ? "Invented mushroom risotto" : null, health.Object), handler, health);
     }
 
+    // The request carries a lone text as a plain string (the shared client's shape) or as one text block.
+    private static string TextOf(JsonElement content) =>
+        content.ValueKind == JsonValueKind.String ? content.GetString()! : content[0].GetProperty("text").GetString()!;
+
     private static string UserText(string body)
     {
         using var document = JsonDocument.Parse(body);
-        return document.RootElement.GetProperty("messages")[0].GetProperty("content")[0].GetProperty("text").GetString()!;
+        return TextOf(document.RootElement.GetProperty("messages")[0].GetProperty("content"));
     }
 
     [Fact]
@@ -84,7 +88,7 @@ public class ClaudeTasteJudgeTests
         Assert.Equal("Dish: Invented mushroom risotto\nReason: the mushrooms again, I cannot stand them", UserText(handler.Body));
         using var body = JsonDocument.Parse(handler.Body);
         Assert.Equal(["max_tokens", "messages", "model", "system"], body.RootElement.EnumerateObject().Select(property => property.Name).Order().ToArray());
-        Assert.Equal(TasteJudgePrompt.System, body.RootElement.GetProperty("system")[0].GetProperty("text").GetString());
+        Assert.Equal(TasteJudgePrompt.System, TextOf(body.RootElement.GetProperty("system")));
     }
 
     [Fact]

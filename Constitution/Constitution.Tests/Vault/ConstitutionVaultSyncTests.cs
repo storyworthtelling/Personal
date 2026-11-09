@@ -30,7 +30,9 @@ public class ConstitutionVaultSyncTests
         phone.SeedPersonal(Invented.Personal(), Invented.Passphrase);
 
         // This install already holds a Claude key and Health Connect choices of its own. Everything
-        // else is missing, and the vaults hold something different for the two it has.
+        // else is missing, and the vaults hold something different for the two it has. The choices are this
+        // person's own and stay; the Claude key is the household's shared key, so the vault's replaces a stale
+        // copy (audit 01 §3: a key rotated in the vault never reached an app that had copied it once).
         phone.Local.ClaudeApiKey = "example-local-claude";
         phone.Local.HealthConnectChoicesJson = "{\"signals\":[\"example-local-choice\"]}";
 
@@ -43,15 +45,17 @@ public class ConstitutionVaultSyncTests
         Assert.Equal(Invented.GeminiKey, phone.Local.GeminiApiKey);
         Assert.Equal(Invented.WorkSchedule, phone.Local.WorkScheduleJson);
 
-        // What was there is untouched, even though a vault holds a different value for it.
-        Assert.Equal("example-local-claude", phone.Local.ClaudeApiKey);
+        // A person's own choice is untouched, even though a vault holds a different value for it; the shared
+        // key follows the vault.
         Assert.Equal("{\"signals\":[\"example-local-choice\"]}", phone.Local.HealthConnectChoicesJson);
+        Assert.Equal(Invented.ClaudeKey, phone.Local.ClaudeApiKey);
 
         Assert.Equal(
             [
                 VaultField.SleepNumberLogin,
                 VaultField.SleepNumberPassword,
                 VaultField.RemarkableDeviceToken,
+                VaultField.ClaudeApiKey,
                 VaultField.GeminiApiKey,
                 VaultField.WorkSchedule,
             ],

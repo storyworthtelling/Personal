@@ -82,7 +82,7 @@ public class HandwritingInstructionTests
 
     /// <summary>
     /// Foreword's DI registration builds the shared extractor with
-    /// <see cref="HandwritingInstruction.Text"/>, <see cref="CredentialIds.Anthropic"/> and a message
+    /// <see cref="HandwritingInstruction.Text"/>, <see cref="CredentialIds.Claude"/> and a message
     /// built from this account's columns — this exercises that exact combination (rather than
     /// MauiProgram.cs, which cannot be compiled or run outside CI) and asserts the wording and the
     /// account's column names actually reach the wire, the names in the message and not the
@@ -97,7 +97,7 @@ public class HandwritingInstructionTests
 
         var extractor = new ClaudeVisionHandwritingExtractor(
             HandwritingInstruction.Text,
-            CredentialIds.Anthropic,
+            CredentialIds.Claude,
             httpClient,
             Options.Create(new ClaudeVisionOptions { ApiKey = "test-key" }),
             NullLogger<ClaudeVisionHandwritingExtractor>.Instance,
@@ -110,7 +110,7 @@ public class HandwritingInstructionTests
         Assert.Contains("The columns are: Alex, Jo, Watch.", request.Body);
         Assert.DoesNotContain("The columns are", HandwritingInstruction.Text);
         Assert.Contains("write below", request.Body);
-        Assert.Equal(CredentialIds.Anthropic, healthSink.LastOk);
+        Assert.Equal(CredentialIds.Claude, healthSink.LastOk);
     }
 
     /// <summary>
@@ -128,7 +128,7 @@ public class HandwritingInstructionTests
 
         var extractor = new ClaudeVisionHandwritingExtractor(
             HandwritingInstruction.Text,
-            CredentialIds.Anthropic,
+            CredentialIds.Claude,
             httpClient,
             Options.Create(new ClaudeVisionOptions { ApiKey = "test-key" }),
             NullLogger<ClaudeVisionHandwritingExtractor>.Instance);

@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice;
 using Android.App;
 using Codex.Ui.Voice;
 using Constitution.Domain.Meals;
@@ -24,7 +25,11 @@ internal static class AteEstimatorServices
     public static IAteEstimator EstimatorOf(Activity host)
     {
         var appContext = host.ApplicationContext ?? host;
-        var key = new ConstitutionConnections(appContext).ClaudeApiKey;
-        return new ClaudeAteEstimator(Http.Value, Options.Create(new ClaudeVisionOptions { ApiKey = key }), AtePhotoScaler.Read, HeadCredentialHealth.Store());
+        var connections = new ConstitutionConnections(appContext);
+        return new ClaudeAteEstimator(
+            Http.Value,
+            new LiveOptions<ClaudeVisionOptions>(() => new ClaudeVisionOptions { ApiKey = connections.ClaudeApiKey }),
+            AtePhotoScaler.Read,
+            HeadCredentialHealth.Store());
     }
 }

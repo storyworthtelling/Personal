@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using Storyworthtelling.Voice;
 using Folio.Infrastructure.Vault;
 using Storyworthtelling.Voice.Secrets;
@@ -32,8 +33,7 @@ public sealed class VaultSync
             changed,
             fileIdStore.Snapshot()), cancellationToken);
 
-    // Fills in any key this install is missing from the vault. Existing local keys win — restore never
-    // overwrites a value the owner has already entered here.
+    // Fills in any key this install is missing from the vault; the shared Claude and Gemini keys follow the vault.
     public async Task RestoreAsync(CancellationToken cancellationToken)
     {
         var result = await vault.LoadAsync(cancellationToken);
@@ -45,10 +45,10 @@ public sealed class VaultSync
         foreach (var (name, id) in result.Vault.DriveFileIds)
             fileIdStore.Set(name, id);
 
-        if (string.IsNullOrEmpty(SettingsStore.ClaudeApiKey) && !string.IsNullOrEmpty(result.Vault.Claude.ApiKey))
-            SettingsStore.ClaudeApiKey = result.Vault.Claude.ApiKey;
-        if (string.IsNullOrEmpty(SettingsStore.GeminiApiKey) && !string.IsNullOrEmpty(result.Vault.Gemini.ApiKey))
-            SettingsStore.GeminiApiKey = result.Vault.Gemini.ApiKey;
+        // The shared Claude and Gemini keys belong to the vault (audit 01 §3): its value replaces a copy that has
+        // gone stale, so a key rotated in another app reaches Folio on its next launch. A blank never clears one.
+        SettingsStore.ClaudeApiKey = ClaudeKeySource.Choose(result.Vault.Claude.ApiKey, SettingsStore.ClaudeApiKey);
+        SettingsStore.GeminiApiKey = ClaudeKeySource.Choose(result.Vault.Gemini.ApiKey, SettingsStore.GeminiApiKey);
         // The reMarkable token may have been paired in a sibling app (e.g. Foreword) — restore it so
         // Folio delivers without a separate pairing.
         if (string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken) && !string.IsNullOrEmpty(result.Vault.Remarkable.DeviceToken))

@@ -1,4 +1,5 @@
-using System.Net.Http.Headers;
+using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Claude;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -15,8 +16,6 @@ namespace Codex.Infrastructure.Music;
 /// </summary>
 public sealed class DiscoveryClient : IDiscoveryClient
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
     private const int MaxTokens = 1_200;
 
     // The crate can ask for up to forty of each kind; a short reply is cheap, but a reply
@@ -48,12 +47,12 @@ public sealed class DiscoveryClient : IDiscoveryClient
         "{\"picks\":[{\"title\":string,\"artist\":string,\"why\":string,\"kind\":string}]}. No prose outside " +
         "the JSON.";
 
-    private readonly HttpClient httpClient;
+    private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
 
-    public DiscoveryClient(HttpClient httpClient, IOptions<VoiceOptions> options)
+    public DiscoveryClient(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null)
     {
-        this.httpClient = httpClient;
+        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, health);
         optionsAccessor = options;
     }
 
@@ -172,51 +171,9 @@ public sealed class DiscoveryClient : IDiscoveryClient
 
     private async Task<string> SendMessage(string instruction, string userText, int maxTokens, CancellationToken cancellationToken)
     {
-        var payload = new
-        {
-            model = optionsAccessor.Value.Model,
-            max_tokens = maxTokens,
-            system = instruction,
-            messages = new[] { new { role = "user", content = userText } }
-        };
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        request.Headers.Add("x-api-key", optionsAccessor.Value.ApiKey);
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException(
-                $"Anthropic discovery request failed: {(int)response.StatusCode} ({response.StatusCode}): {body}");
-        }
-
-        return ExtractText(body);
+        return (await claude.SendAsync(ClaudeRequest.Plain(optionsAccessor.Value.Model, maxTokens, instruction, userText), cancellationToken)).Text;
     }
 
-    private static string ExtractText(string body)
-    {
-        using var document = JsonDocument.Parse(body);
-        if (!document.RootElement.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
-        {
-            return string.Empty;
-        }
-
-        var text = new StringBuilder();
-        foreach (var block in content.EnumerateArray())
-        {
-            if (block.TryGetProperty("type", out var type) && type.GetString() == "text" &&
-                block.TryGetProperty("text", out var chunk))
-            {
-                text.Append(chunk.GetString());
-            }
-        }
-
-        return text.ToString();
-    }
 
     private static string? ExtractObject(string reply)
     {

@@ -1,3 +1,5 @@
+using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Claude;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -31,23 +33,21 @@ namespace Foreword.Infrastructure.Prayer;
 /// </summary>
 public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReader
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
-
     // US Letter portrait, which is what the prayer document is composed at.
     private const float PageWidth = 612f;
     private const float PageHeight = 792f;
 
-    private readonly HttpClient httpClient;
+    private readonly ClaudeMessagesClient claude;
     private readonly AnthropicOptions options;
     private readonly ILogger<ClaudeJournalTranscriber> logger;
 
     public ClaudeJournalTranscriber(
         HttpClient httpClient,
         IOptions<AnthropicOptions> options,
-        ILogger<ClaudeJournalTranscriber> logger)
+        ILogger<ClaudeJournalTranscriber> logger,
+        ICredentialHealthSink? healthSink = null)
     {
-        this.httpClient = httpClient;
+        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, healthSink);
         this.options = options.Value;
         this.logger = logger;
     }
@@ -61,19 +61,8 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
 
         try
         {
-            var response = await Ask(annotatedPdf);
-            if (!response.IsSuccessStatusCode)
-            {
-                // Deliberately not reported to the credential health sink. A rejected key would
-                // reveal the Anthropic field on the Settings screen, which is right — but this call
-                // shares the key with the handwriting extractor, which already does that, and doing
-                // it twice is two reports of one fact.
-                logger.LogWarning(
-                    "Journal transcription failed for {Date}: {Status}", date, (int)response.StatusCode);
-                return JournalRead.Nothing;
-            }
-
-            return Parse(await response.Content.ReadAsStringAsync(), date);
+            var reply = await claude.SendAsync(Ask(annotatedPdf), CancellationToken.None);
+            return Parse(reply.Text, date);
         }
         catch (Exception ex)
         {
@@ -82,50 +71,10 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
         }
     }
 
-    private Task<HttpResponseMessage> Ask(byte[] annotatedPdf)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        request.Headers.Add("x-api-key", options.ApiKey);
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Content = JsonContent.Create(new
-        {
-            model = options.Model,
-            max_tokens = 2048,
-            system = new[]
-            {
-                new
-                {
-                    type = "text",
-                    text = Instruction(),
-                    cache_control = new { type = "ephemeral" },
-                },
-            },
-            messages = new[]
-            {
-                new
-                {
-                    role = "user",
-                    content = new object[]
-                    {
-                        new
-                        {
-                            type = "document",
-                            source = new
-                            {
-                                type = "base64",
-                                media_type = "application/pdf",
-                                data = Convert.ToBase64String(annotatedPdf),
-                            },
-                        },
-                        new { type = "text", text = "Transcribe the hand-written ink." },
-                    },
-                },
-            },
-        });
-
-        return httpClient.SendAsync(request);
-    }
+    private ClaudeRequest Ask(byte[] annotatedPdf) =>
+        new(options.Model, 2048,
+            [ClaudeBlock.Text(Instruction(), cache: true)],
+            [ClaudeBlock.Pdf(Convert.ToBase64String(annotatedPdf)), ClaudeBlock.Text("Transcribe the hand-written ink.")]);
 
     /// <summary>
     /// The instruction, with the region boundary written into it from the region map rather than
@@ -155,17 +104,8 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
             + "says. Where it is written is what decides.";
     }
 
-    private JournalRead Parse(string responseJson, DateOnly date)
+    private JournalRead Parse(string text, DateOnly date)
     {
-        using var document = JsonDocument.Parse(responseJson);
-
-        var text = document.RootElement
-            .GetProperty("content")
-            .EnumerateArray()
-            .FirstOrDefault(block =>
-                block.TryGetProperty("type", out var type) && type.GetString() == "text")
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
 
         // The object is found inside the reply, because a model wraps one in prose about half the
         // time and handing the whole reply to the parser turns a good answer into a failure.

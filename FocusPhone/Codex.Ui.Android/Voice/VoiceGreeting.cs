@@ -37,7 +37,7 @@ public sealed class VoiceGreeting
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
-        var client = new VoiceClient(http, options);
+        var client = new VoiceClient(http, options, HeadCredentialHealth.Store());
         messenger = new VoicedMessenger(
             DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
             client);

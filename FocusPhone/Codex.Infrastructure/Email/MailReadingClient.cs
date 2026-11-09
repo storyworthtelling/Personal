@@ -1,4 +1,5 @@
-using System.Net.Http.Headers;
+using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Claude;
 using System.Text;
 using System.Text.Json;
 using Codex.Domain.Post;
@@ -23,8 +24,6 @@ namespace Codex.Infrastructure.Email;
 /// </summary>
 public sealed class MailReadingClient
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
     private const int MaxTokens = 400;
 
     // Bodies are truncated hard. The kind of a message and any date in it are decided in
@@ -43,12 +42,12 @@ public sealed class MailReadingClient
         "omit it entirely otherwise, and never invent a date. Omit \"startsAt\" for an all-day occasion. " +
         "No prose outside the JSON.";
 
-    private readonly HttpClient httpClient;
+    private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
 
-    public MailReadingClient(HttpClient httpClient, IOptions<VoiceOptions> options)
+    public MailReadingClient(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null)
     {
-        this.httpClient = httpClient;
+        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, health);
         optionsAccessor = options;
     }
 
@@ -70,33 +69,9 @@ public sealed class MailReadingClient
                 .Append(Truncate(body))
                 .ToString();
 
-            var payload = JsonSerializer.Serialize(new
-            {
-                model = options.FastModel,
-                max_tokens = MaxTokens,
-                system = Instruction,
-                messages = new[] { new { role = "user", content = prompt } },
-            });
-
-            using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl)
-            {
-                Content = new StringContent(payload, Encoding.UTF8, "application/json"),
-            };
-            request.Headers.Add("x-api-key", options.ApiKey);
-            request.Headers.Add("anthropic-version", AnthropicVersion);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            using var response = await httpClient.SendAsync(request, cancellation);
-            if (!response.IsSuccessStatusCode)
-            {
-                return MailReading.Nothing;
-            }
-
-            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellation));
-            var text = document.RootElement
-                .GetProperty("content")[0]
-                .GetProperty("text")
-                .GetString();
+            var reply = await claude.SendAsync(
+                ClaudeRequest.Plain(options.FastModel, MaxTokens, Instruction, prompt), cancellation);
+            var text = reply.Text;
 
             return MailReading.Parse(text);
         }

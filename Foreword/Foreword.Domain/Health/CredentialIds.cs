@@ -10,7 +10,9 @@ public static class CredentialIds
     // Must equal Storyworthtelling.Remarkable.RemarkableCredentialId.Value — the shared library's client
     // reports this credential's health, and the settings screen reads it back by this id.
     public const string Remarkable = "remarkable";
-    public const string Anthropic = "anthropic";
+    // The shared Claude key (Storyworthtelling.Voice.Health.SharedCredentialIds.Claude). Foreword used its own
+    // "anthropic" key and id until audit 01 §3; the id went with the key.
+    public const string Claude = "claude";
 
     // One id for the whole Maps Platform key, because it IS one key: routes, weather, pollen and
     // air quality are the same credential with different APIs enabled on it, so a rejection from

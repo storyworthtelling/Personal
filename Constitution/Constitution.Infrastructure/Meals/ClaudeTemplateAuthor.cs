@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -31,6 +32,8 @@ namespace Constitution.Infrastructure.Meals;
 /// </summary>
 public sealed class ClaudeTemplateAuthor(HttpClient http, IOptions<ClaudeVisionOptions> options, ICredentialHealthSink? health = null) : ITemplateAuthor
 {
+    private readonly ClaudeMessagesClient claude = new(http, () => options.Value.ApiKey, health);
+
     /// <summary>The fixed instruction. A constant: no digits, no names and nothing the household wrote.</summary>
     public const string SystemPrompt =
         "You write short, plain-words household meal lines for a weekly paper sheet. You are told which slots need new lines, how many "
@@ -53,8 +56,6 @@ public sealed class ClaudeTemplateAuthor(HttpClient http, IOptions<ClaudeVisionO
     /// <summary>The most bulleted lines a request can hold in all.</summary>
     public const int MostLines = MostApproved + MostRejected + MostWaiting + MostTastes;
 
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
     private const int MaximumReplyTokens = 800;
 
     public async Task<TemplateAuthored> ProposeAsync(TemplateRequest request, CancellationToken cancellation)
@@ -66,27 +67,16 @@ public sealed class ClaudeTemplateAuthor(HttpClient http, IOptions<ClaudeVisionO
             return new TemplateAuthored.Unavailable(AuthorUnavailable.NotConfigured);
         }
 
-        var payload = new Dictionary<string, object>
-        {
-            ["model"] = settings.Model,
-            ["max_tokens"] = MaximumReplyTokens,
-            ["system"] = new[] { new { type = "text", text = SystemPrompt } },
-            ["messages"] = new[] { new { role = "user", content = new[] { new { type = "text", text = UserMessage(request) } } } },
-        };
-
-        using var message = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        message.Headers.Add("x-api-key", settings.ApiKey);
-        message.Headers.Add("anthropic-version", AnthropicVersion);
-        message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        message.Content = JsonContent.Create(payload);
-
-        string body;
-        System.Net.HttpStatusCode status;
+        ClaudeReply reply;
         try
         {
-            using var response = await http.SendAsync(message, cancellation).ConfigureAwait(false);
-            status = response.StatusCode;
-            body = await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
+            reply = await claude.SendAsync(
+                new ClaudeRequest(settings.Model, MaximumReplyTokens, [ClaudeBlock.Text(SystemPrompt)], [ClaudeBlock.Text(UserMessage(request))]),
+                cancellation).ConfigureAwait(false);
+        }
+        catch (ClaudeRequestException refused) when (refused.Failure == ClaudeFailure.KeyRejected)
+        {
+            return new TemplateAuthored.Unavailable(AuthorUnavailable.KeyRejected);
         }
         catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
         {
@@ -97,20 +87,12 @@ public sealed class ClaudeTemplateAuthor(HttpClient http, IOptions<ClaudeVisionO
         {
             return new TemplateAuthored.Unavailable(AuthorUnavailable.Offline);
         }
-
-        if ((int)status is < 200 or > 299)
+        catch (JsonException)
         {
-            if (AuthFailure.IsHttpCredentialRejection((int)status, body))
-            {
-                health?.MarkFailing(CredentialIds.Claude, $"{(int)status} {status}");
-                return new TemplateAuthored.Unavailable(AuthorUnavailable.KeyRejected);
-            }
-
-            return new TemplateAuthored.Unavailable(AuthorUnavailable.Offline);
+            return new TemplateAuthored.Unavailable(AuthorUnavailable.ReplyUnusable);
         }
 
-        health?.MarkOk(CredentialIds.Claude);
-        var drafts = TemplateProposalParser.Parse(TextFrom(body), request);
+        var drafts = TemplateProposalParser.Parse(reply.Text.Length == 0 ? null : reply.Text, request);
         return drafts.Count == 0
             ? new TemplateAuthored.Unavailable(AuthorUnavailable.ReplyUnusable)
             : new TemplateAuthored.Drafts(drafts);
@@ -164,33 +146,5 @@ public sealed class ClaudeTemplateAuthor(HttpClient http, IOptions<ClaudeVisionO
     {
         var words = MealTemplate.Normalize(value);
         return words.Length > longest ? words[..longest] : words;
-    }
-
-    private static string? TextFrom(string body)
-    {
-        try
-        {
-            using var parsed = JsonDocument.Parse(body);
-            if (parsed.RootElement.ValueKind == JsonValueKind.Object
-                && parsed.RootElement.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var block in content.EnumerateArray())
-                {
-                    if (block.ValueKind == JsonValueKind.Object
-                        && block.TryGetProperty("type", out var type) && type.GetString() == "text"
-                        && block.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
-                    {
-                        return text.GetString();
-                    }
-                }
-            }
-
-            return null;
-        }
-        catch (JsonException)
-        {
-            // A body that is not JSON holds no answer; the reply is then unusable and proposes nothing.
-            return null;
-        }
     }
 }

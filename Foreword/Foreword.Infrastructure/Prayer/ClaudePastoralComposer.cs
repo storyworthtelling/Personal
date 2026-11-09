@@ -1,3 +1,5 @@
+using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Claude;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -24,9 +26,6 @@ namespace Foreword.Infrastructure.Prayer;
 /// </summary>
 public sealed class ClaudePastoralComposer : IPastoralComposer, IPrayerReader
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
-
     private const string Instruction =
         "You write one short line at the top of a private prayer page, in the voice of the person "
         + "whose page it is — plain, unsentimental, the way somebody talks to themselves. It "
@@ -34,16 +33,17 @@ public sealed class ClaudePastoralComposer : IPastoralComposer, IPrayerReader
         + "advice, never scripture, never encouragement of the greeting-card kind. Do not name "
         + "anybody on the list. Respond with the line and nothing else.";
 
-    private readonly HttpClient httpClient;
+    private readonly ClaudeMessagesClient claude;
     private readonly AnthropicOptions options;
     private readonly ILogger<ClaudePastoralComposer> logger;
 
     public ClaudePastoralComposer(
         HttpClient httpClient,
         IOptions<AnthropicOptions> options,
-        ILogger<ClaudePastoralComposer> logger)
+        ILogger<ClaudePastoralComposer> logger,
+        ICredentialHealthSink? healthSink = null)
     {
-        this.httpClient = httpClient;
+        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, healthSink);
         this.options = options.Value;
         this.logger = logger;
     }
@@ -57,37 +57,10 @@ public sealed class ClaudePastoralComposer : IPastoralComposer, IPrayerReader
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-            request.Headers.Add("x-api-key", options.ApiKey);
-            request.Headers.Add("anthropic-version", AnthropicVersion);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            request.Content = JsonContent.Create(new
-            {
-                model = options.Model,
-                max_tokens = 200,
-                system = new[]
-                {
-                    new
-                    {
-                        type = "text",
-                        text = Instruction,
-                        cache_control = new { type = "ephemeral" },
-                    },
-                },
-                messages = new[]
-                {
-                    new { role = "user", content = Situation(brief) },
-                },
-            });
-
-            var response = await httpClient.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.LogWarning("Pastoral line not composed: {Status}", (int)response.StatusCode);
-                return PrayerText.Empty;
-            }
-
-            return FirstLine(await response.Content.ReadAsStringAsync(cancellationToken));
+            var reply = await claude.SendAsync(
+                new ClaudeRequest(options.Model, 200, [ClaudeBlock.Text(Instruction, cache: true)], [ClaudeBlock.Text(Situation(brief))]),
+                cancellationToken);
+            return FirstLine(reply.Text);
         }
         catch (Exception ex)
         {
@@ -127,20 +100,8 @@ public sealed class ClaudePastoralComposer : IPastoralComposer, IPrayerReader
     /// One line, whatever came back. The page has room for a sentence, and a paragraph in the
     /// calligraphy hand at Title size would run over the list it is meant to introduce.
     /// </summary>
-    private static PrayerText FirstLine(string responseJson)
+    private static PrayerText FirstLine(string text)
     {
-        using var document = JsonDocument.Parse(responseJson);
-
-        var blocks = document.RootElement.GetProperty("content").EnumerateArray()
-            .Where(block => block.TryGetProperty("type", out var type) && type.GetString() == "text")
-            .ToArray();
-
-        if (blocks.Length == 0)
-        {
-            return PrayerText.Empty;
-        }
-
-        var text = blocks[0].GetProperty("text").GetString() ?? string.Empty;
 
         var line = text
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

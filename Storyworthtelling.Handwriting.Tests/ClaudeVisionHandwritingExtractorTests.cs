@@ -189,7 +189,7 @@ public class ClaudeVisionHandwritingExtractorTests
             Content = new StringContent("nope")
         });
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => extractor.Extract(FakePdf));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => extractor.Extract(FakePdf));
     }
 
     /// <summary>
@@ -207,9 +207,13 @@ public class ClaudeVisionHandwritingExtractorTests
         Assert.Contains(TestInstruction, request.Body);
     }
 
+    // A response is disposed once read, so each call needs its own: the handler hands out a fresh copy
+    // of the reply it was given every time.
     private sealed class CapturingHandler(HttpResponseMessage response, List<CapturedRequest> captured)
         : HttpMessageHandler
     {
+        private readonly string replyBody = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -219,7 +223,7 @@ public class ClaudeVisionHandwritingExtractorTests
                 request.Headers.Contains("x-api-key"),
                 request.Headers.Contains("anthropic-version"),
                 body));
-            return response;
+            return new HttpResponseMessage(response.StatusCode) { Content = new StringContent(replyBody) };
         }
     }
 }

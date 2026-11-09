@@ -40,12 +40,6 @@ namespace Index.Android;
 
 public static class MauiProgram
 {
-    // IOptions<T> caches its Configure delegate; this wrapper re-reads SettingsStore on every access so
-    // the background worker always sees the current Plaid credentials without an app restart.
-    private sealed class LiveOptions<T>(Func<T> factory) : IOptions<T> where T : class
-    {
-        public T Value => factory();
-    }
 
     public static MauiApp CreateMauiApp()
     {

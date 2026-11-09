@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -24,9 +25,6 @@ public class ClaudeTaskReader(
     ILogger<ClaudeTaskReader> logger,
     ICredentialHealthSink? healthSink = null) : ITaskReadingClient
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
-
     private const string Instruction =
         "You turn one sentence from a personal planner into a structured task rule. Respond with " +
         "ONLY a JSON object and no prose. Fields: " +
@@ -49,6 +47,7 @@ public class ClaudeTaskReader(
         "plain schedule is a \"rule\"; one with neither is \"once\".";
 
     private readonly AnthropicOptions options = options.Value;
+    private readonly ClaudeMessagesClient claude = new(httpClient, () => options.Value.ApiKey, healthSink);
 
     public async Task<ForewordTask?> Read(string sentence)
     {
@@ -58,38 +57,16 @@ public class ClaudeTaskReader(
             return null;
         }
 
-        var payload = new
-        {
-            model = options.Model,
-            max_tokens = 512,
-            system = Instruction,
-            messages = new[] { new { role = "user", content = sentence } },
-        };
-
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl)
-            {
-                Content = JsonContent.Create(payload),
-            };
-            request.Headers.TryAddWithoutValidation("x-api-key", options.ApiKey);
-            request.Headers.TryAddWithoutValidation("anthropic-version", AnthropicVersion);
-
-            var response = await httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-            {
-                if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, null))
-                {
-                    healthSink?.MarkFailing(
-                        CredentialIds.Anthropic, $"{(int)response.StatusCode} {response.StatusCode}");
-                }
-
-                logger.LogWarning("Task reading failed: {Status}", response.StatusCode);
-                return null;
-            }
-
-            healthSink?.MarkOk(CredentialIds.Anthropic);
-            return Parse(await response.Content.ReadAsStringAsync(), sentence);
+            var reply = await claude.SendAsync(
+                ClaudeRequest.Plain(options.Model, 512, Instruction, sentence), CancellationToken.None);
+            return Parse(reply.Text, sentence);
+        }
+        catch (ClaudeRequestException ex)
+        {
+            logger.LogWarning("Task reading failed: {Failure} {Status}", ex.Failure, (int?)ex.StatusCode);
+            return null;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
@@ -98,9 +75,9 @@ public class ClaudeTaskReader(
         }
     }
 
-    private static ForewordTask? Parse(string body, string sentence)
+    private static ForewordTask? Parse(string text, string sentence)
     {
-        if (Text(body) is not { } text || Object(text) is not { } rule)
+        if (Object(text) is not { } rule)
         {
             return null;
         }
@@ -145,26 +122,6 @@ public class ClaudeTaskReader(
         };
     }
 
-    /// <summary>The assistant's text, out of the Messages response.</summary>
-    private static string? Text(string body)
-    {
-        using var document = JsonDocument.Parse(body);
-
-        if (!document.RootElement.TryGetProperty("content", out var content))
-        {
-            return null;
-        }
-
-        foreach (var block in content.EnumerateArray())
-        {
-            if (block.TryGetProperty("text", out var text) && text.GetString() is { } value)
-            {
-                return value;
-            }
-        }
-
-        return null;
-    }
 
     /// <summary>
     /// The JSON object inside the reply. Found rather than required: models wrap JSON in prose

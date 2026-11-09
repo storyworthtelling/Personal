@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using Storyworthtelling.Diagnostics;
 using Foreword.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
@@ -33,13 +34,6 @@ namespace Foreword.Android;
 
 public static class MauiProgram
 {
-    // IOptions<T> is a singleton whose Configure delegate runs once and caches.
-    // This wrapper reads from CredentialStore on every access so credential
-    // updates (or late saves) are always picked up without restarting the app.
-    private sealed class LiveOptions<T>(Func<T> factory) : IOptions<T> where T : class
-    {
-        public T Value => factory();
-    }
 
     public static MauiApp CreateMauiApp()
     {
@@ -74,13 +68,21 @@ public static class MauiProgram
                 HomeLatitude = CredentialStore.HomeLatitude,
                 HomeLongitude = CredentialStore.HomeLongitude,
             }));
+        // The shared vault's Claude key, read live (audit 01 §3): this was a separate Foreword-only key, so a key
+        // rotated in Folio never reached the read-back. The old local key stands in only while the vault has none.
         builder.Services.AddSingleton<IOptions<AnthropicOptions>>(
-            _ => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions { ApiKey = CredentialStore.AnthropicApiKey }));
+            sp => new LiveOptions<AnthropicOptions>(() => new AnthropicOptions
+            {
+                ApiKey = ClaudeKeySource.Choose(sp.GetRequiredService<DriveVoiceOptions>().Value.ApiKey, CredentialStore.AnthropicApiKey),
+            }));
         // The shared Storyworthtelling.Handwriting extractor owns its own options shape (it does
         // not know Foreword's AnthropicOptions, which is shared with the task reader and the two
         // Prayer composers) — same key, same source, just its own IOptions<T> registration.
         builder.Services.AddSingleton<IOptions<ClaudeVisionOptions>>(
-            _ => new LiveOptions<ClaudeVisionOptions>(() => new ClaudeVisionOptions { ApiKey = CredentialStore.AnthropicApiKey }));
+            sp => new LiveOptions<ClaudeVisionOptions>(() => new ClaudeVisionOptions
+            {
+                ApiKey = ClaudeKeySource.Choose(sp.GetRequiredService<DriveVoiceOptions>().Value.ApiKey, CredentialStore.AnthropicApiKey),
+            }));
         // Whose phone this is (Release I). Built fresh from this install's own settings and never
         // deserialised from a shared document. Inferred, never asked: the signed-in account against
         // the account that owns the shared vault (cached by VaultSync when it reads the vault).
@@ -165,14 +167,14 @@ public static class MauiProgram
         builder.Services.AddHttpClient<ITaskReadingClient, ClaudeTaskReader>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         // Storyworthtelling.Handwriting (Index-P11 Release F): Foreword supplies its own exact
-        // instruction wording and its shared Anthropic
+        // instruction wording and the shared Claude
         // credential id as constructor arguments, which is why this is a factory registration
         // rather than the bare AddHttpClient<TClient, TImplementation>() every other typed client
         // here uses — ActivatorUtilities cannot resolve a plain string constructor parameter.
         builder.Services.AddHttpClient<IHandwritingExtractor, ClaudeVisionHandwritingExtractor>(
             (httpClient, sp) => new ClaudeVisionHandwritingExtractor(
                 HandwritingInstruction.Text,
-                CredentialIds.Anthropic,
+                CredentialIds.Claude,
                 httpClient,
                 sp.GetRequiredService<IOptions<ClaudeVisionOptions>>(),
                 sp.GetRequiredService<ILogger<ClaudeVisionHandwritingExtractor>>(),

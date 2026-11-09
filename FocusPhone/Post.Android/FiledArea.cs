@@ -10,6 +10,7 @@ using Codex.Domain.Timeline;
 using Codex.Infrastructure.Email;
 using Codex.Ui;
 using Storyworthtelling.Voice;
+using Codex.Ui.Voice;
 
 namespace Post;
 
@@ -354,7 +355,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
                 await options.RefreshAsync(CancellationToken.None);
                 voiceOptions = options;
             }
-            return new FiledSearchClient(MailAccess.Shared, voiceOptions);
+            return new FiledSearchClient(MailAccess.Shared, voiceOptions, HeadCredentialHealth.Store());
         }
         catch (Exception e)
         {

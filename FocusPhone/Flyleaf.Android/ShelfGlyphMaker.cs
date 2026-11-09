@@ -1,5 +1,6 @@
 using Codex.Domain.Apps;
 using Codex.Infrastructure.Apps;
+using Codex.Ui.Voice;
 
 namespace Flyleaf;
 
@@ -27,7 +28,7 @@ public sealed class ShelfGlyphMaker(Func<Task<string>> accessToken)
             {
                 Timeout = TimeSpan.FromSeconds(30),
             };
-            var path = await new ShelfGlyphClient(http, options).GenerateAsync(shelfName, cancellationToken);
+            var path = await new ShelfGlyphClient(http, options, HeadCredentialHealth.Store()).GenerateAsync(shelfName, cancellationToken);
             return path is not null && SvgGlyph.Parse(path) is not null ? "path:" + path : null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

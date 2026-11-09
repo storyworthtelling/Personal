@@ -1,4 +1,5 @@
-using System.Net.Http.Headers;
+using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Claude;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -32,10 +33,10 @@ public interface IHiddenTrackNamer
 /// <see cref="HiddenTrackNameResult.Unknown"/>: this only ever adds a name, it never
 /// blocks the split from taking effect.
 /// </summary>
-public sealed class HiddenTrackNamer(HttpClient httpClient, IOptions<VoiceOptions> options) : IHiddenTrackNamer
+public sealed class HiddenTrackNamer(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null) : IHiddenTrackNamer
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
+    private readonly ClaudeMessagesClient claude = new(httpClient, () => options.Value.ApiKey, health);
+
     private const int MaxTokens = 300;
 
     private const string Instruction =
@@ -85,51 +86,9 @@ public sealed class HiddenTrackNamer(HttpClient httpClient, IOptions<VoiceOption
 
     private async Task<string> SendMessage(string userText, CancellationToken cancellationToken)
     {
-        var payload = new
-        {
-            model = options.Value.Model,
-            max_tokens = MaxTokens,
-            system = Instruction,
-            messages = new[] { new { role = "user", content = userText } }
-        };
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        request.Headers.Add("x-api-key", options.Value.ApiKey);
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException(
-                $"Anthropic hidden-track request failed: {(int)response.StatusCode} ({response.StatusCode}): {body}");
-        }
-
-        return ExtractText(body);
+        return (await claude.SendAsync(ClaudeRequest.Plain(options.Value.Model, MaxTokens, Instruction, userText), cancellationToken)).Text;
     }
 
-    private static string ExtractText(string body)
-    {
-        using var document = JsonDocument.Parse(body);
-        if (!document.RootElement.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
-        {
-            return string.Empty;
-        }
-
-        var text = new StringBuilder();
-        foreach (var block in content.EnumerateArray())
-        {
-            if (block.TryGetProperty("type", out var type) && type.GetString() == "text" &&
-                block.TryGetProperty("text", out var chunk))
-            {
-                text.Append(chunk.GetString());
-            }
-        }
-
-        return text.ToString();
-    }
 
     private static string? ExtractObject(string reply)
     {

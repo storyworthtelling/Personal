@@ -341,7 +341,7 @@ public class PlateActivity : AppCompatActivity
             await voiceOptions.RefreshAsync(CancellationToken.None);
 
             using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
-            var client = new DarkroomCaptionClient(http, voiceOptions);
+            var client = new DarkroomCaptionClient(http, voiceOptions, HeadCredentialHealth.Store());
             var line = await client.CaptionAsync(jpegs, CancellationToken.None);
             if (string.IsNullOrWhiteSpace(line))
             {

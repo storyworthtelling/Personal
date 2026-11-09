@@ -1,7 +1,8 @@
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Storyworthtelling.Voice.Claude;
+using Storyworthtelling.Voice.Health;
 
 namespace Storyworthtelling.Voice;
 
@@ -15,9 +16,6 @@ namespace Storyworthtelling.Voice;
 // message; VoicedMessenger is the layer that turns a failure into a graceful fall back to neutral copy.
 public sealed class VoiceClient : IVoiceClient
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
-
     private const string RefineInstruction =
         "You are a voice analyst distilling one author's writing voice so short app messages can later be " +
         "written to sound like them. You are given the CURRENT PROFILE (possibly empty) and a NEW WRITING " +
@@ -47,15 +45,15 @@ public sealed class VoiceClient : IVoiceClient
         "specifics to reflect. Keep it within the word limit, plain text, no markup, no quotes, no " +
         "preamble — just the message itself.";
 
-    private readonly HttpClient httpClient;
+    private readonly ClaudeMessagesClient claude;
     // Read fresh on each call (not cached) so a head that supplies live options — the API key the user
     // enters in-app after launch — is seen without a restart, the same way the rest of the repo works.
     private readonly IOptions<VoiceOptions> optionsAccessor;
 
-    public VoiceClient(HttpClient httpClient, IOptions<VoiceOptions> options)
+    public VoiceClient(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null)
     {
-        this.httpClient = httpClient;
         optionsAccessor = options;
+        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, health);
     }
 
     public async Task<VoiceProfile> RefineAsync(
@@ -171,52 +169,9 @@ public sealed class VoiceClient : IVoiceClient
     }
 
     private async Task<string> SendMessage(
-        string instruction, string userText, string model, int maxTokens, CancellationToken cancellationToken)
-    {
-        var payload = new
-        {
-            model,
-            max_tokens = maxTokens,
-            system = instruction,
-            messages = new[] { new { role = "user", content = userText } }
-        };
+        string instruction, string userText, string model, int maxTokens, CancellationToken cancellationToken) =>
+        (await claude.SendAsync(ClaudeRequest.Plain(model, maxTokens, instruction, userText), cancellationToken)).Text;
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        request.Headers.Add("x-api-key", optionsAccessor.Value.ApiKey);
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException(
-                $"Anthropic voice request failed: {(int)response.StatusCode} ({response.StatusCode}): {body}");
-
-        return ExtractText(body);
-    }
-
-    // Concatenates the text blocks from a non-streaming Messages response.
-    private static string ExtractText(string body)
-    {
-        using var document = JsonDocument.Parse(body);
-        if (!document.RootElement.TryGetProperty("content", out var content) ||
-            content.ValueKind != JsonValueKind.Array)
-            return string.Empty;
-
-        var text = new StringBuilder();
-        foreach (var block in content.EnumerateArray())
-        {
-            if (block.TryGetProperty("type", out var type) && type.GetString() == "text" &&
-                block.TryGetProperty("text", out var chunk))
-                text.Append(chunk.GetString());
-        }
-        return text.ToString();
-    }
-
-    // Pulls the first balanced {...} object out of a reply, so a model that wraps its JSON in prose still
-    // parses. Returns null when there's no object to find.
     private static string? ExtractObject(string reply)
     {
         var start = reply.IndexOf('{');
