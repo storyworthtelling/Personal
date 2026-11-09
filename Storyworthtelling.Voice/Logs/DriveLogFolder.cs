@@ -142,7 +142,7 @@ public sealed class DriveLogFolder : IDriveLogFolder
     private async Task<string?> FolderId(DriveService service, bool create, CancellationToken cancellationToken)
     {
         var list = service.Files.List();
-        list.Q = $"{DriveFileChooser.NameQuery(folderName)} and mimeType='{FolderMimeType}'";
+        list.Q = DriveQuery.And(DriveFileChooser.NameQuery(folderName), DriveQuery.MimeTypeIs(FolderMimeType));
         list.Fields = DriveFileChooser.ListFields;
         list.PageSize = DriveFileChooser.ListPageSize;
         var found = await list.ExecuteAsync(cancellationToken);
@@ -165,7 +165,7 @@ public sealed class DriveLogFolder : IDriveLogFolder
     private static async Task<DriveFileChoice> Choose(DriveService service, string folderId, string name, CancellationToken cancellationToken)
     {
         var list = service.Files.List();
-        list.Q = $"{DriveFileChooser.NameQuery(name)} and '{folderId}' in parents";
+        list.Q = DriveQuery.And(DriveFileChooser.NameQuery(name), DriveQuery.ParentIs(folderId));
         list.Fields = DriveFileChooser.ListFields;
         list.PageSize = DriveFileChooser.ListPageSize;
         var found = await list.ExecuteAsync(cancellationToken);

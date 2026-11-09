@@ -38,6 +38,7 @@ using Storyworthtelling.Voice;
 // HouseholdSync, so each is spelled out.
 using HouseholdSync = Pulp.Domain.Household.HouseholdSync;
 using SharedHouseholdSync = Storyworthtelling.Household.HouseholdSync;
+using Codex.Ui.Http;
 
 namespace Pulp.App;
 
@@ -97,7 +98,7 @@ public sealed class PulpServices
         Keys = new VaultPulpKeySource(account, Diagnostics);
         var counter = new DiagnosticsLookupCounter(files, Diagnostics);
         var health = HeadCredentialHealth.Store();
-        var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromSeconds(30) };
+        var http = HeadHttp.WithTimeout(TimeSpan.FromSeconds(30));
         Posters = new Posters(http, cacheRoot, Diagnostics);
 
         Catalogue = ServiceCatalogue.Public;

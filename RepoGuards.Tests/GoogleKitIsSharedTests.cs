@@ -27,6 +27,35 @@ public partial class GoogleKitIsSharedTests
     }
 
     [Fact]
+    public void EveryDriveQueryIsBuiltByDriveQuery()
+    {
+        // A hand-written q with an interpolated value is how an apostrophe in a title broke a query (audit 01 §17).
+        var found = Sources()
+            .SelectMany(file => File.ReadLines(file).Select((line, index) => (file, line, index)))
+            .Where(hit => Regex.IsMatch(hit.line, @"\.Q\s*=\s*\$?"""))
+            .Select(hit => $"{Relative(hit.file)}:{hit.index + 1}")
+            .ToList();
+
+        Assert.True(found.Count == 0, "Build a Drive query with Storyworthtelling.Voice.DriveQuery:\n" + string.Join("\n", found));
+    }
+
+    [Fact]
+    public void DriveListingsPageThroughOneHelper()
+    {
+        // A PageToken loop written by hand is DrivePaging again; a list without one reads a single page.
+        var found = Sources()
+            .Where(file => Relative(file) != "Storyworthtelling.Voice/DriveQuery.cs")
+            .Select(file => (file, text: File.ReadAllText(file)))
+            .Where(hit => hit.text.Contains("Files.List(", StringComparison.Ordinal)
+                && hit.text.Contains(".PageToken = ", StringComparison.Ordinal))
+            .Select(hit => hit.file)
+            .Select(Relative)
+            .ToList();
+
+        Assert.True(found.Count == 0, "Use DrivePaging.ListFilesAsync rather than a hand-written page loop:\n" + string.Join("\n", found));
+    }
+
+    [Fact]
     public void TheDeadBrokerAndWeatherClientAreGone()
     {
         Assert.False(File.Exists(Path.Combine(GuardScan.RepoRoot(), "Storyworthtelling.Google", "IGoogleAccountBroker.cs")));

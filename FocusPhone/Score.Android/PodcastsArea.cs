@@ -8,6 +8,7 @@ using Storyworthtelling.Time;
 using Codex.Infrastructure.Podcasts;
 using Codex.Ui;
 using Score.Google;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -939,7 +940,7 @@ public sealed class PodcastsArea : ScoreArea
         FeedFetchResult[] results;
         try
         {
-            using var http = new HttpClient();
+            var http = HeadHttp.Shared;
             var client = new RssFeedClient(http);
             // Fetch every feed concurrently — wall time is now the slowest feed, not the sum of all.
             results = await Task.WhenAll(ordered.Select(subscription => FetchFeedAsync(client, subscription)));

@@ -3,6 +3,7 @@ using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
 using Storyworthtelling.Paper;
+using Storyworthtelling.Voice;
 using DriveFile = global::Google.Apis.Drive.v3.Data.File;
 
 namespace Folio.Android.Google;
@@ -16,7 +17,7 @@ namespace Folio.Android.Google;
 // would fail with a permission error.
 public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens) : IPaperDriveArchive
 {
-    private const string FolderMime = "application/vnd.google-apps.folder";
+    private const string FolderMime = DriveQuery.FolderMimeType;
 
     public async Task<string?> FindParentFolder(string fileId, CancellationToken cancellationToken)
     {
@@ -34,10 +35,9 @@ public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens)
         using var service = await Service();
 
         // Reuse an existing folder of this name so a re-archive (or a resumed one) doesn't pile up
-        // duplicates next to the manuscript. Escaped because a book title may well contain an apostrophe.
+        // duplicates next to the manuscript. DriveQuery escapes the title, which may well hold an apostrophe.
         var list = service.Files.List();
-        list.Q = $"'{parentFolderId}' in parents and trashed=false and " +
-                 $"mimeType='{FolderMime}' and name='{Escape(name)}'";
+        list.Q = DriveQuery.And(DriveQuery.InFolder(parentFolderId), DriveQuery.FoldersOnly, DriveQuery.NameIs(name));
         list.Fields = "files(id)";
         list.PageSize = 1;
         var existing = await list.ExecuteAsync(cancellationToken);
@@ -63,7 +63,7 @@ public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens)
         // Overwrite rather than duplicate: a retried upload must replace its own partial, not leave two
         // copies of the same volume in the folder.
         var list = service.Files.List();
-        list.Q = $"'{folderId}' in parents and trashed=false and name='{Escape(name)}'";
+        list.Q = DriveQuery.And(DriveQuery.InFolder(folderId), DriveQuery.NameIs(name));
         list.Fields = "files(id)";
         list.PageSize = 1;
         var existing = await list.ExecuteAsync(cancellationToken);
@@ -97,8 +97,4 @@ public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens)
         var token = await tokens.GetAccessToken();
         return GoogleDrive.Service(token, "Folio");
     }
-
-    // Drive query strings are single-quoted, so an apostrophe in a book title would otherwise terminate
-    // the literal and produce a malformed query.
-    private static string Escape(string value) => value.Replace("'", @"\'");
 }

@@ -8,6 +8,7 @@ using Codex.Infrastructure.Music;
 using Codex.Ui.Voice;
 using Score.Google;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -188,14 +189,14 @@ public sealed class MusicLibrary(
             var rawId = track.Id.StartsWith("tidal:", StringComparison.Ordinal)
                 ? track.Id["tidal:".Length..]
                 : track.Id;
-            var catalog = new TidalCatalogClient(new HttpClient());
+            var catalog = new TidalCatalogClient(HeadHttp.Shared);
             var artworkUrl = await catalog.GetTrackArtworkUrlAsync(
                 accessToken, rawId, TidalCountryCode, CancellationToken.None);
             var artPath = artworkUrl is null
                 ? null
                 : await new TidalArtworkCache(host).DownloadAsync(rawId, artworkUrl, CancellationToken.None);
 
-            var bpm = await new DeezerTempoClient(new HttpClient())
+            var bpm = await new DeezerTempoClient(HeadHttp.Shared)
                 .LookupAsync(track.ArtistName, track.Title, CancellationToken.None);
 
             if (artPath is null && bpm == 0)
@@ -260,7 +261,7 @@ public sealed class MusicLibrary(
                 return; // Not signed in, or a transient failure — try again next launch.
             }
 
-            var catalog = new TidalCatalogClient(new HttpClient());
+            var catalog = new TidalCatalogClient(HeadHttp.Shared);
             var changed = false;
             foreach (var track in saved)
             {

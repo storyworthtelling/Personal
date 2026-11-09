@@ -6,6 +6,7 @@ using Codex.Domain.Design;
 using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Ui;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -55,7 +56,7 @@ public sealed class PlayingArea : ScoreArea
     // as long as it plays — they do not change, and the panel is opened and closed
     // more often than the track changes.
     private readonly ILyricsSource lyricsSource = new LrcLibClient(
-        new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()));
+        HeadHttp.Shared);
     private Lyrics lyrics = Lyrics.None;
     private string? lyricsFor;
     private readonly List<TextView> lyricViews = [];

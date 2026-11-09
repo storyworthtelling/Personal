@@ -10,6 +10,7 @@ using Google.Apis.Http;
 using Google.Apis.Services;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Constitution.BodyTab;
 
@@ -54,7 +55,7 @@ internal static class BodySeats
         // The Claude key is read from the shared vault with this head's passphrase; with none, the options stay empty and the seat is plain.
         var vault = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         var options = new DriveVoiceOptions(new VaultVoiceConfigStore(vault, () => VaultPassphraseStore.Passphrase));
-        var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
+        var http = HeadHttp.WithTimeout(TimeSpan.FromMinutes(2));
         var messenger = new VoicedMessenger(
             DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
             new VoiceClient(http, options, HeadCredentialHealth.Store()));

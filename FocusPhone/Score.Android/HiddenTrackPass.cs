@@ -8,6 +8,7 @@ using Codex.Ui.Voice;
 using Score.Google;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -48,7 +49,7 @@ public sealed class HiddenTrackPass
         var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
-        var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+        var http = HeadHttp.Shared;
         namer = new HiddenTrackNamer(http, options, HeadCredentialHealth.Store());
     }
 
