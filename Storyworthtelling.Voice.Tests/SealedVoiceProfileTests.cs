@@ -20,7 +20,7 @@ public class SealedVoiceProfileTests
 
     private static VoiceProfile Profile(string passage) => VoiceProfile.Empty with
     {
-        Examples = [new VoiceExample(passage, Guid.Parse("00000000-0000-0000-0000-000000000001"))],
+        Examples = [new VoiceExample(passage, Guid.NewGuid())],
     };
 
     [Fact]
