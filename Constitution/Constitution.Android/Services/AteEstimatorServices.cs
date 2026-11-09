@@ -25,6 +25,6 @@ internal static class AteEstimatorServices
     {
         var appContext = host.ApplicationContext ?? host;
         var key = new ConstitutionConnections(appContext).ClaudeApiKey;
-        return new ClaudeAteEstimator(Http.Value, Options.Create(new ClaudeVisionOptions { ApiKey = key }), AtePhotoScaler.Read, new CredentialHealthStore());
+        return new ClaudeAteEstimator(Http.Value, Options.Create(new ClaudeVisionOptions { ApiKey = key }), AtePhotoScaler.Read, HeadCredentialHealth.Store());
     }
 }

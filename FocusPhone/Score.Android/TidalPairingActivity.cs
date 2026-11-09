@@ -56,7 +56,7 @@ namespace Score;
     DataHost = "tidal-auth")]
 public class TidalPairingActivity : Activity
 {
-    private readonly ICredentialHealthSink health = new CredentialHealthStore();
+    private readonly ICredentialHealthSink health = HeadCredentialHealth.Store();
 
     private LinearLayout body = null!;
     private string status = string.Empty;

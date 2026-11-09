@@ -250,7 +250,7 @@ public partial class SetupPage : LedgerBinderPage
     }
 
     private static CredentialHealthReport CredentialHealth() =>
-        IPlatformApplication.Current!.Services.GetRequiredService<CredentialHealthStore>().Load();
+        IPlatformApplication.Current!.Services.GetRequiredService<Storyworthtelling.Voice.Health.CredentialHealthStore>().Load();
 
     // Styles live in the app-wide merged dictionaries, which a page's own Resources indexer doesn't search;
     // TryGetValue on the application resources walks the merged dictionaries.

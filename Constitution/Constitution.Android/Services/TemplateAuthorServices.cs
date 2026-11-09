@@ -23,7 +23,7 @@ internal static class TemplateAuthorServices
     public static ITemplateAuthor AuthorOf(Context appContext)
     {
         ArgumentNullException.ThrowIfNull(appContext);
-        return new ClaudeTemplateAuthor(Http.Value, new LiveKey(new ConstitutionConnections(appContext.ApplicationContext ?? appContext)), new CredentialHealthStore());
+        return new ClaudeTemplateAuthor(Http.Value, new LiveKey(new ConstitutionConnections(appContext.ApplicationContext ?? appContext)), HeadCredentialHealth.Store());
     }
 
     // The shared option, with the key as it is at the moment of the call.

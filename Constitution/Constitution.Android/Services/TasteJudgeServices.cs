@@ -29,7 +29,7 @@ internal static class TasteJudgeServices
             Http.Value,
             new LiveKey(new ConstitutionConnections(appContext.ApplicationContext ?? appContext)),
             new TasteDishNames(box).Of,
-            new CredentialHealthStore());
+            HeadCredentialHealth.Store());
     }
 
     // The shared option, with the key as it is at the moment of the call.

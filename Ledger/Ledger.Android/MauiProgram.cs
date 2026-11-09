@@ -90,8 +90,8 @@ public static class MauiProgram
         // Credential health: the Plaid client reports Ok/Failing here (injected as ICredentialHealthSink),
         // and the Settings page reads it back to hide the credential fields while they're working. Registered
         // before the typed client so ActivatorUtilities injects it into the optional sink parameter.
-        builder.Services.AddSingleton<CredentialHealthStore>();
-        builder.Services.AddSingleton<ICredentialHealthSink>(sp => sp.GetRequiredService<CredentialHealthStore>());
+        builder.Services.AddSingleton(_ => Storyworthtelling.Maui.Health.MauiCredentialHealth.Store());
+        builder.Services.AddSingleton<ICredentialHealthSink>(sp => sp.GetRequiredService<Storyworthtelling.Voice.Health.CredentialHealthStore>());
 
         builder.Services.AddHttpClient<IPlaidClient, PlaidClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);

@@ -98,8 +98,8 @@ public static class MauiProgram
         // Credential health: the API clients report Ok/Failing here (injected as ICredentialHealthSink),
         // and the Settings page reads the report back to hide a working key's field. Registered before the
         // typed clients so ActivatorUtilities injects it into their optional sink parameter.
-        builder.Services.AddSingleton<CredentialHealthStore>();
-        builder.Services.AddSingleton<ICredentialHealthSink>(sp => sp.GetRequiredService<CredentialHealthStore>());
+        builder.Services.AddSingleton(_ => Storyworthtelling.Maui.Health.MauiCredentialHealth.Store());
+        builder.Services.AddSingleton<ICredentialHealthSink>(sp => sp.GetRequiredService<Storyworthtelling.Voice.Health.CredentialHealthStore>());
 
         builder.Services.AddHttpClient<IClaudeAnalysisClient, ClaudeAnalysisClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(10))

@@ -439,7 +439,7 @@ public class UnlockActivity : Activity
         // whether or not the field is visible.
         var tokenState = CredentialFieldState.Decide(
             !string.IsNullOrEmpty(input.Text),
-            new CredentialHealthStore().Load().Get(CredentialIds.GitHubUpdateToken));
+            HeadCredentialHealth.Store().Load().Get(CredentialIds.GitHubUpdateToken));
         var tokenStatusRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         tokenStatusRow.SetGravity(GravityFlags.CenterVertical);
         tokenStatusRow.AddView(PaperUi.Secondary(this, "Update token: " + tokenState.StatusText),

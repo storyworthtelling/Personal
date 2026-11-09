@@ -67,7 +67,7 @@ public partial class SetupPage : FolioBinderPage
     }
 
     private static CredentialHealthReport CredentialHealth() =>
-        IPlatformApplication.Current!.Services.GetRequiredService<CredentialHealthStore>().Load();
+        IPlatformApplication.Current!.Services.GetRequiredService<Storyworthtelling.Voice.Health.CredentialHealthStore>().Load();
 
     private void ApplyCredentialField(
         string credentialId, CredentialHealthReport report, string storedValue,

@@ -137,7 +137,7 @@ public sealed class SettingsArea : ScoreArea
     // TIDAL client id/secret to sign in with at all.
     private View TidalRow()
     {
-        var health = new CredentialHealthStore().Load().Get(Codex.Domain.Credentials.CredentialIds.Tidal);
+        var health = HeadCredentialHealth.Store().Load().Get(Codex.Domain.Credentials.CredentialIds.Tidal);
 
         if (new TidalAccountStore(Host).Load() is null)
         {

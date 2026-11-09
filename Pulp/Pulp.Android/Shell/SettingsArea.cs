@@ -318,7 +318,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
     private static IReadOnlyList<bool> KeysNeedingEntry(PulpServices services)
     {
         var keys = services.Keys.Keys;
-        var health = new CredentialHealthStore().Load();
+        var health = HeadCredentialHealth.Store().Load();
         return
         [
             CredentialFieldState.Decide(!string.IsNullOrWhiteSpace(keys.StreamingAvailabilityKey), health.Get(PulpCredentialIds.StreamingAvailability)).ShowEntry,
