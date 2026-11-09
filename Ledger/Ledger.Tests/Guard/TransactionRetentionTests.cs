@@ -21,6 +21,43 @@ public class TransactionRetentionTests
 
     private static BudgetService Create(TestDatabase db) => new(db, new FakeClock(Now), new Mock<IPlaidClient>().Object);
 
+    // Orphan audit §32: approval really happens when the worksheet balances (MarkBalancedAsync, from the
+    // delivery and read-back services), and that path never called ApproveMonthAsync, so nothing was ever
+    // purged. A balanced month now approves through the purge.
+    [Fact]
+    public async Task ABalancedWorksheet_ApprovesThroughThePurge()
+    {
+        using var db = new TestDatabase();
+        var service = Create(db);
+        var august = await service.GetOrCreateMonthAsync("2026-08", default);
+        var september = await service.GetOrCreateMonthAsync("2026-09", default);
+        await using (var context = db.CreateDbContext())
+        {
+            var institution = new Institution { Name = "Bank", AccessToken = string.Empty };
+            var account = new Account { Name = "Checking" };
+            institution.Accounts.Add(account);
+            context.Institutions.Add(institution);
+            context.Transactions.Add(new Transaction
+            {
+                AccountId = account.Id,
+                PlaidTransactionId = "t-aug-2",
+                MerchantName = "Invented Grocer",
+                Amount = 12.00m,
+                Date = new DateTimeOffset(2026, 8, 20, 0, 0, 0, TimeSpan.Zero),
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await service.MarkBalancedAsync(september.Id, default);
+
+        await using (var context = db.CreateDbContext())
+        {
+            Assert.Empty(context.Transactions);
+            Assert.Equal(BudgetMonthStatus.Approved, context.BudgetMonths.Single(m => m.Id == september.Id).Status);
+        }
+        _ = august;
+    }
+
     [Fact]
     public async Task ApprovingAMonth_PurgesThePreviousMonthsTransactions_ButKeepsItsCategoryTotals()
     {

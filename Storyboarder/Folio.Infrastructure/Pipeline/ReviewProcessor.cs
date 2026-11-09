@@ -8,6 +8,7 @@ using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
 using Folio.Domain.Pipeline;
+using Storyworthtelling.Voice.Health;
 using Folio.Domain.Text;
 using Folio.Domain.Time;
 using Folio.Infrastructure.Configuration;

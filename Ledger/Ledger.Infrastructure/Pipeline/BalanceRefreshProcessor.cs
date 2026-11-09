@@ -8,6 +8,7 @@ using Index.Domain.Time;
 using Index.Infrastructure.Configuration;
 using Index.Infrastructure.Persistence;
 using Index.Infrastructure.Services;
+using Storyworthtelling.Voice.Health;
 
 namespace Index.Infrastructure.Pipeline;
 
@@ -16,6 +17,14 @@ namespace Index.Infrastructure.Pipeline;
 // querying the next due institution. A single worker calls ProcessNextAsync in a loop.
 public sealed class BalanceRefreshProcessor : IPipelineStep
 {
+    /// <summary>How long a bank marked Failed waits before it is tried again, instead of waiting forever for
+    /// the owner to tap Refresh now (error-handling §5). One Plaid call a day is cheap; a bank that has come
+    /// back on its own is not left stale.</summary>
+    public const int FailedRetryHours = 24;
+
+    /// <summary>The flat wait after a failure that is the phone being offline, which spends no attempt.</summary>
+    public const int OfflineRetryMinutes = 15;
+
     private readonly IDbContextFactory<LedgerDbContext> dbContextFactory;
     private readonly IPlaidClient plaid;
     private readonly IClock clock;
@@ -45,14 +54,15 @@ public sealed class BalanceRefreshProcessor : IPipelineStep
 
         // Refresh the oldest institution that is actually due. A not-yet-due institution must not hog the
         // worker; it is recorded as the soonest Waiting so the cycle can defer instead of spinning.
-        // Failed institutions are skipped until the user reconnects. This mirrors the resumable dispatch
-        // in the repo's other on-device pipelines.
+        // A Failed institution waits FailedRetryHours and is then tried again like any other, so a bank that
+        // failed for a while is not left stale until the owner happens to tap Refresh now. This mirrors the
+        // resumable dispatch in the repo's other on-device pipelines.
         // A hand-entered institution (Release C, empty AccessToken — AccountService.AddManualAccountAsync's
         // own convention for "no Plaid Item behind this") is never selected here: calling Plaid with an
         // empty access token would fail every cycle and eventually flip it to Failed, which would then
         // wrongly raise AccountNotices' "needs reconnecting" for an account that was never connected.
         var institutions = await db.Institutions
-            .Where(i => i.RefreshStatus != WorkStatus.Failed && i.AccessToken != string.Empty)
+            .Where(i => i.AccessToken != string.Empty)
             .OrderBy(i => i.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
@@ -109,6 +119,15 @@ public sealed class BalanceRefreshProcessor : IPipelineStep
             institution.NextAttemptAtUtc = now + (ex.RetryAfter ?? backoff.NextDelay(institution.Attempts));
             logger.LogWarning("Rate limited refreshing {Name}; retrying later.", institution.Name);
         }
+        catch (Exception ex) when (NetworkFailure.IsOffline(ex))
+        {
+            // The phone has no connection: nothing reached Plaid, so nothing is learned about the bank and no
+            // attempt is spent. A dropped connection part-way is not matched, and counts as below.
+            institution.RefreshStatus = WorkStatus.NeedsRetry;
+            institution.LastError = ex.Message;
+            institution.NextAttemptAtUtc = now.AddMinutes(OfflineRetryMinutes);
+            logger.LogInformation("Offline refreshing {Name}; trying again in {Minutes} minutes.", institution.Name, OfflineRetryMinutes);
+        }
         catch (Exception ex)
         {
             institution.Attempts++;
@@ -116,7 +135,7 @@ public sealed class BalanceRefreshProcessor : IPipelineStep
             if (institution.Attempts >= options.MaxAttempts)
             {
                 institution.RefreshStatus = WorkStatus.Failed;
-                institution.NextAttemptAtUtc = null;
+                institution.NextAttemptAtUtc = now.AddHours(FailedRetryHours);
                 logger.LogError(ex, "Refresh of {Name} failed permanently after {Attempts} attempts.",
                     institution.Name, institution.Attempts);
             }

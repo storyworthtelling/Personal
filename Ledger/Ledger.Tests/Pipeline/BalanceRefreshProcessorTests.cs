@@ -182,8 +182,50 @@ public class BalanceRefreshProcessorTests
         using var context = db.CreateDbContext();
         var institution = context.Institutions.Single(i => i.Id == id);
         Assert.Equal(WorkStatus.Failed, institution.RefreshStatus);
-        Assert.Null(institution.NextAttemptAtUtc);
+        // Error-handling §5: a Failed bank used to be left alone until the owner tapped Refresh now.
+        Assert.Equal(Now.AddHours(BalanceRefreshProcessor.FailedRetryHours), institution.NextAttemptAtUtc);
         Assert.Equal("boom", institution.LastError);
+    }
+
+    // Error-handling §5: a connection drop of about eight minutes (DNS failing, a captive portal while
+    // "connected") spent all five attempts and marked the bank Failed. Offline is not the bank failing.
+    [Fact]
+    public async Task Offline_SpendsNoAttempt_AndWaitsFlat()
+    {
+        using var db = new TestDatabase();
+        var id = SeedInstitution(db);
+        var clock = new FakeClock(Now);
+        var plaid = new Mock<IPlaidClient>();
+        plaid.Setup(p => p.GetBalancesAsync("access-1", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Connection failure",
+                new IOException("Unable to resolve host \"production.plaid.com\": No address associated with hostname")));
+
+        for (var i = 0; i < 10; i++)
+        {
+            await Create(db, plaid.Object, clock, maxAttempts: 1).ProcessNextAsync(CancellationToken.None);
+            clock.Advance(TimeSpan.FromMinutes(BalanceRefreshProcessor.OfflineRetryMinutes));
+        }
+
+        using var context = db.CreateDbContext();
+        var institution = context.Institutions.Single(i => i.Id == id);
+        Assert.Equal(WorkStatus.NeedsRetry, institution.RefreshStatus);
+        Assert.Equal(0, institution.Attempts);
+    }
+
+    [Fact]
+    public async Task AFailedBank_IsTriedAgainOnceItsDayIsUp_AndComesBack()
+    {
+        using var db = new TestDatabase();
+        var id = SeedInstitution(db, WorkStatus.Failed, Now.AddHours(-1));
+        var clock = new FakeClock(Now);
+        var plaid = new Mock<IPlaidClient>();
+        plaid.Setup(p => p.GetBalancesAsync("access-1", It.IsAny<CancellationToken>())).ReturnsAsync([Depository("a1")]);
+
+        var result = await Create(db, plaid.Object, clock).ProcessNextAsync(CancellationToken.None);
+
+        using var context = db.CreateDbContext();
+        Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
+        Assert.Equal(WorkStatus.Completed, context.Institutions.Single(i => i.Id == id).RefreshStatus);
     }
 
     [Fact]
@@ -214,16 +256,16 @@ public class BalanceRefreshProcessorTests
     }
 
     [Fact]
-    public async Task FailedInstitution_IsSkipped()
+    public async Task FailedInstitution_IsSkipped_UntilItsDayIsUp()
     {
         using var db = new TestDatabase();
-        SeedInstitution(db, WorkStatus.Failed);
+        SeedInstitution(db, WorkStatus.Failed, Now.AddHours(5));
         var clock = new FakeClock(Now);
         var plaid = new Mock<IPlaidClient>();
 
         var result = await Create(db, plaid.Object, clock).ProcessNextAsync(CancellationToken.None);
 
-        Assert.Equal(ProcessOutcome.Idle, result.Outcome);
+        Assert.Equal(ProcessOutcome.Waiting, result.Outcome);
         plaid.Verify(p => p.GetBalancesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
