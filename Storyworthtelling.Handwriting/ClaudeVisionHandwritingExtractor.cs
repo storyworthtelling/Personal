@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -18,18 +19,13 @@ namespace Storyworthtelling.Handwriting;
 // its columns beside each page (userMessage), and a second caller supplies its own.
 public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
-
     private const string DefaultUserMessage = "Transcribe the hand-written notes.";
 
     private readonly string instruction;
-    private readonly string credentialId;
     private readonly Func<string>? userMessage;
-    private readonly HttpClient httpClient;
+    private readonly ClaudeMessagesClient claude;
     private readonly ClaudeVisionOptions options;
     private readonly ILogger<ClaudeVisionHandwritingExtractor> logger;
-    private readonly ICredentialHealthSink? healthSink;
 
     // userMessage is the text that rides beside the page, read afresh on every Extract. Anything
     // that varies per account or per day (the names of the columns the page prints, say) belongs
@@ -46,11 +42,9 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
         Func<string>? userMessage = null)
     {
         this.instruction = instruction;
-        this.credentialId = credentialId;
-        this.httpClient = httpClient;
         this.options = options.Value;
         this.logger = logger;
-        this.healthSink = healthSink;
+        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, healthSink, credentialId);
         this.userMessage = userMessage;
     }
 
@@ -59,78 +53,15 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
         if (annotatedPdf.Length == 0)
             return [];
 
-        var payload = new
-        {
-            model = options.Model,
-            max_tokens = 1024,
-            system = new[]
-            {
-                new
-                {
-                    type = "text",
-                    text = instruction,
-                    cache_control = new { type = "ephemeral" }
-                }
-            },
-            messages = new[]
-            {
-                new
-                {
-                    role = "user",
-                    content = new object[]
-                    {
-                        new
-                        {
-                            type = "document",
-                            source = new
-                            {
-                                type = "base64",
-                                media_type = "application/pdf",
-                                data = Convert.ToBase64String(annotatedPdf)
-                            }
-                        },
-                        new
-                        {
-                            type = "text",
-                            text = userMessage?.Invoke() ?? DefaultUserMessage
-                        }
-                    }
-                }
-            }
-        };
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        request.Headers.Add("x-api-key", options.ApiKey);
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Content = JsonContent.Create(payload);
-
-        var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
-        {
-            var body = await response.Content.ReadAsStringAsync();
-            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, body))
-                healthSink?.MarkFailing(credentialId, $"{(int)response.StatusCode} {response.StatusCode}");
-            throw new HttpRequestException(
-                $"Anthropic request failed: {(int)response.StatusCode} ({response.StatusCode}): {body}",
-                inner: null,
-                response.StatusCode);
-        }
-
-        healthSink?.MarkOk(credentialId);
-        var json = await response.Content.ReadAsStringAsync();
-        return ParseNotes(json);
+        var request = new ClaudeRequest(options.Model, 1024,
+            [ClaudeBlock.Text(instruction, cache: true)],
+            [ClaudeBlock.Pdf(Convert.ToBase64String(annotatedPdf)), ClaudeBlock.Text(userMessage?.Invoke() ?? DefaultUserMessage)]);
+        var reply = await claude.SendAsync(request, CancellationToken.None);
+        return ParseNotes(reply.Text);
     }
 
-    private IReadOnlyList<ParsedNote> ParseNotes(string responseJson)
+    private IReadOnlyList<ParsedNote> ParseNotes(string text)
     {
-        using var doc = JsonDocument.Parse(responseJson);
-        var text = doc.RootElement
-            .GetProperty("content")
-            .EnumerateArray()
-            .FirstOrDefault(b => b.TryGetProperty("type", out var t) && t.GetString() == "text")
-            .GetProperty("text")
-            .GetString() ?? string.Empty;
 
         var arrayJson = ExtractJsonArray(text);
         if (arrayJson is null)

@@ -181,7 +181,7 @@ public class VoiceClientTests
         var handler = new FakeHttpMessageHandler().Enqueue(
             HttpStatusCode.Unauthorized, """{"error":{"type":"authentication_error","message":"bad key"}}""");
 
-        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => Client(handler).ComposeAsync(
+        var ex = await Assert.ThrowsAnyAsync<HttpRequestException>(() => Client(handler).ComposeAsync(
             VoiceProfile.Empty with { Register = "v", Traits = ["a"], DocumentsAnalyzed = 1 },
             new MessageRequest("welcome"), CancellationToken.None));
 

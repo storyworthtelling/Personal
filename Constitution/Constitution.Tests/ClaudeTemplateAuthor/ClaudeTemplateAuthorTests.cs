@@ -64,10 +64,14 @@ public class ClaudeTemplateAuthorTests
         return (new Author(new HttpClient(handler), options, health.Object), handler, health);
     }
 
+    // The request carries a lone text as a plain string (the shared client's shape) or as one text block.
+    private static string TextOf(JsonElement content) =>
+        content.ValueKind == JsonValueKind.String ? content.GetString()! : content[0].GetProperty("text").GetString()!;
+
     private static string UserText(string body)
     {
         using var document = JsonDocument.Parse(body);
-        return document.RootElement.GetProperty("messages")[0].GetProperty("content")[0].GetProperty("text").GetString()!;
+        return TextOf(document.RootElement.GetProperty("messages")[0].GetProperty("content"));
     }
 
     [Fact]
@@ -92,10 +96,10 @@ public class ClaudeTemplateAuthorTests
         using var body = JsonDocument.Parse(handler.Body);
         var root = body.RootElement;
         Assert.Equal("test-model", root.GetProperty("model").GetString());
-        Assert.Equal(Author.SystemPrompt, root.GetProperty("system")[0].GetProperty("text").GetString());
+        Assert.Equal(Author.SystemPrompt, TextOf(root.GetProperty("system")));
         var content = root.GetProperty("messages")[0].GetProperty("content");
-        Assert.Equal(1, content.GetArrayLength());
-        Assert.Equal("text", content[0].GetProperty("type").GetString());
+        Assert.True(content.ValueKind == JsonValueKind.String
+            || (content.GetArrayLength() == 1 && content[0].GetProperty("type").GetString() == "text"));
         Assert.Equal(["max_tokens", "messages", "model", "system"], root.EnumerateObject().Select(property => property.Name).Order().ToArray());
         Assert.DoesNotContain("\"image\"", handler.Body, StringComparison.Ordinal);
     }

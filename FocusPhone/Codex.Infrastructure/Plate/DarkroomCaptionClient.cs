@@ -1,4 +1,5 @@
-using System.Net.Http.Headers;
+using Storyworthtelling.Voice.Health;
+using Storyworthtelling.Voice.Claude;
 using System.Text;
 using System.Text.Json;
 using Codex.Domain.Plate;
@@ -38,8 +39,6 @@ public interface IDarkroomCaptionClient
 /// </summary>
 public sealed class DarkroomCaptionClient : IDarkroomCaptionClient
 {
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
 
     /// <summary>
     /// Enough to say what they have in common, and few enough to keep the request small: the
@@ -54,12 +53,12 @@ public sealed class DarkroomCaptionClient : IDarkroomCaptionClient
         + "front of them. Do not name or identify any person. Do not tell them what to do with "
         + "the pictures. Reply with the line only — no quotes, no preamble, at most fifteen words.";
 
-    private readonly HttpClient httpClient;
+    private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
 
-    public DarkroomCaptionClient(HttpClient httpClient, IOptions<VoiceOptions> options)
+    public DarkroomCaptionClient(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null)
     {
-        this.httpClient = httpClient;
+        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, health);
         optionsAccessor = options;
     }
 
@@ -73,66 +72,19 @@ public sealed class DarkroomCaptionClient : IDarkroomCaptionClient
         }
 
         var pictures = jpegs.Take(MostPictures).ToList();
-        var content = new List<object>();
-        foreach (var jpeg in pictures)
-        {
-            content.Add(new
-            {
-                type = "image",
-                source = new
-                {
-                    type = "base64",
-                    media_type = "image/jpeg",
-                    data = Convert.ToBase64String(jpeg),
-                },
-            });
-        }
+
         // The pictures come before the words: Claude reads an image-then-text request best.
-        content.Add(new { type = "text", text = DarkroomVoice.CaptionPrompt(pictures.Count) });
+        var user = pictures.Select(jpeg => ClaudeBlock.Image("image/jpeg", Convert.ToBase64String(jpeg)))
+            .Append(ClaudeBlock.Text(DarkroomVoice.CaptionPrompt(pictures.Count)))
+            .ToList();
 
         try
         {
-            var payload = new
-            {
-                model = options.FastModel,
-                max_tokens = options.ComposeMaxTokens,
-                system = Instruction,
-                messages = new[] { new { role = "user", content } },
-            };
-
-            using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl)
-            {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"),
-            };
-            request.Headers.TryAddWithoutValidation("x-api-key", options.ApiKey);
-            request.Headers.TryAddWithoutValidation("anthropic-version", AnthropicVersion);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            using var response = await httpClient.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            using var document = JsonDocument.Parse(
-                await response.Content.ReadAsStringAsync(cancellationToken));
-            if (!document.RootElement.TryGetProperty("content", out var blocks))
-            {
-                return null;
-            }
-
-            foreach (var block in blocks.EnumerateArray())
-            {
-                if (block.TryGetProperty("type", out var type)
-                    && type.GetString() == "text"
-                    && block.TryGetProperty("text", out var text)
-                    && text.GetString() is { Length: > 0 } line)
-                {
-                    return line.Trim().Trim('"');
-                }
-            }
-            return null;
+            var reply = await claude.SendAsync(
+                new ClaudeRequest(options.FastModel, options.ComposeMaxTokens, [ClaudeBlock.Text(Instruction)], user),
+                cancellationToken);
+            var line = reply.Text.Trim().Trim('"');
+            return line.Length > 0 ? line : null;
         }
         catch (Exception)
         {

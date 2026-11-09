@@ -1,5 +1,5 @@
+using Storyworthtelling.Voice.Claude;
 using System.Globalization;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -34,11 +34,6 @@ public sealed class MoodClient : IMoodClient
     /// <summary>The shared Claude key's credential id, the same one Folio and Index report under.</summary>
     public const string CredentialId = "claude";
 
-    // The Messages endpoint and version, as VoiceClient and Score's DiscoveryClient send them; neither
-    // exposes its constants, so they are followed here rather than shared.
-    private const string MessagesUrl = "https://api.anthropic.com/v1/messages";
-    private const string AnthropicVersion = "2023-06-01";
-
     // A list of twenty names and years with a short title is a few hundred tokens; this leaves room
     // without inviting an essay.
     private const int MaxTokens = 1_200;
@@ -67,17 +62,15 @@ public sealed class MoodClient : IMoodClient
         "in a good order to watch them. title = a short playlist name, a few words. " +
         AnswerShape;
 
-    private readonly HttpClient httpClient;
+    private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
-    private readonly ICredentialHealthSink? healthSink;
 
     public MoodClient(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? healthSink = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(options);
-        this.httpClient = httpClient;
         optionsAccessor = options;
-        this.healthSink = healthSink;
+        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey?.Trim(), healthSink);
     }
 
     /// <summary>A mood search is typed and waited on, often several times an evening, so it runs on the fast tier.</summary>
@@ -125,27 +118,18 @@ public sealed class MoodClient : IMoodClient
             return MoodAnswer.NoIdea(MoodOutcome.NoKey, "No Claude key is set, so nothing was asked.");
         }
 
-        var payload = new
-        {
-            model,
-            max_tokens = MaxTokens,
-            system = instruction,
-            messages = new[] { new { role = "user", content = userContent } },
-        };
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, MessagesUrl);
-        request.Headers.Add("x-api-key", apiKey.Trim());
-        request.Headers.Add("anthropic-version", AnthropicVersion);
-        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-
-        int status;
-        string body;
+        ClaudeReply reply;
         try
         {
-            using var response = await httpClient.SendAsync(request, cancellationToken);
-            status = (int)response.StatusCode;
-            body = await response.Content.ReadAsStringAsync(cancellationToken);
+            reply = await claude.SendAsync(ClaudeRequest.Plain(model, MaxTokens, instruction, userContent), cancellationToken);
+        }
+        catch (ClaudeRequestException exception) when (exception.Failure == ClaudeFailure.KeyRejected)
+        {
+            return MoodAnswer.NoIdea(MoodOutcome.Rejected, $"The Messages API refused the key: HTTP {Status(exception)}.");
+        }
+        catch (ClaudeRequestException exception) when (exception.StatusCode is not null)
+        {
+            return MoodAnswer.NoIdea(MoodOutcome.Unavailable, $"The Messages API answered HTTP {Status(exception)}: {Excerpt(exception.ResponseBody ?? string.Empty)}");
         }
         catch (HttpRequestException exception)
         {
@@ -156,35 +140,20 @@ public sealed class MoodClient : IMoodClient
             // A timeout, not the caller cancelling: the search simply has no answer this time.
             return MoodAnswer.NoIdea(MoodOutcome.Unavailable, $"The Messages API timed out: {exception.Message}");
         }
-
-        if (status is < 200 or >= 300)
-        {
-            if (AuthFailure.IsHttpCredentialRejection(status, body))
-            {
-                healthSink?.MarkFailing(CredentialId, $"HTTP {status.ToString(CultureInfo.InvariantCulture)}");
-                return MoodAnswer.NoIdea(MoodOutcome.Rejected, $"The Messages API refused the key: HTTP {status.ToString(CultureInfo.InvariantCulture)}.");
-            }
-
-            return MoodAnswer.NoIdea(MoodOutcome.Unavailable, $"The Messages API answered HTTP {status.ToString(CultureInfo.InvariantCulture)}: {Excerpt(body)}");
-        }
-
-        healthSink?.MarkOk(CredentialId);
-        return Read(body, maxTitles * CandidateSlack);
-    }
-
-    /// <summary>Reads a Messages response into an answer; anything not the shape asked for is "no idea".</summary>
-    private static MoodAnswer Read(string body, int maxCandidates)
-    {
-        string text;
-        try
-        {
-            text = ExtractText(body);
-        }
         catch (JsonException exception)
         {
             return MoodAnswer.NoIdea(MoodOutcome.Malformed, $"The reply was not a Messages response: {exception.Message}");
         }
 
+        return Read(reply.Text, maxTitles * CandidateSlack);
+    }
+
+    private static string Status(ClaudeRequestException exception) =>
+        ((int)exception.StatusCode!.Value).ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Reads the reply's text into an answer; anything not the shape asked for is "no idea".</summary>
+    private static MoodAnswer Read(string text, int maxCandidates)
+    {
         var json = ExtractObject(text);
         if (json is null)
         {
@@ -275,29 +244,6 @@ public sealed class MoodClient : IMoodClient
     private static string KindWord(TitleKind kind) => kind == TitleKind.Film ? "film" : "show";
 
     // Concatenates the text blocks of a non-streaming Messages response, as VoiceClient does.
-    private static string ExtractText(string body)
-    {
-        using var document = JsonDocument.Parse(body);
-        if (document.RootElement.ValueKind != JsonValueKind.Object
-            || !document.RootElement.TryGetProperty("content", out var content)
-            || content.ValueKind != JsonValueKind.Array)
-        {
-            return string.Empty;
-        }
-
-        var text = new StringBuilder();
-        foreach (var block in content.EnumerateArray())
-        {
-            if (block.ValueKind == JsonValueKind.Object
-                && block.TryGetProperty("type", out var type) && type.GetString() == "text"
-                && block.TryGetProperty("text", out var chunk) && chunk.ValueKind == JsonValueKind.String)
-            {
-                text.Append(chunk.GetString());
-            }
-        }
-
-        return text.ToString();
-    }
 
     // The first balanced {...} in a reply, so a model that wraps its JSON in prose still parses.
     private static string? ExtractObject(string reply)

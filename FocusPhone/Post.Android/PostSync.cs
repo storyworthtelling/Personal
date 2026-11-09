@@ -122,7 +122,7 @@ public static class PostSync
             {
                 return null; // no key in the vault, or the vault is locked: rules only
             }
-            return new MailReadingClient(MailAccess.Shared, options);
+            return new MailReadingClient(MailAccess.Shared, options, HeadCredentialHealth.Store());
         }
         catch (Exception e)
         {

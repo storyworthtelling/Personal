@@ -47,11 +47,11 @@ public sealed class MusicTasteService
         options = new DriveVoiceOptions(
             new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
-        var client = new TasteProfileClient(http, options);
+        var client = new TasteProfileClient(http, options, HeadCredentialHealth.Store());
         store = new DriveTasteProfileStore(new DriveTextFile(
             driveFactory, DriveTasteProfileStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store));
         refresher = new TasteProfileRefresher(client, store, options);
-        discovery = new DiscoveryClient(http, options);
+        discovery = new DiscoveryClient(http, options, HeadCredentialHealth.Store());
     }
 
     /// <summary>Refreshes the Drive profile from the on-device events. Returns the profile (possibly unchanged).</summary>

@@ -65,7 +65,7 @@ internal static class BodySeats
         var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
         var messenger = new VoicedMessenger(
             DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
-            new VoiceClient(http, options));
+            new VoiceClient(http, options, HeadCredentialHealth.Store()));
 
         return new SeatCache(new SeatComposer(messenger, options), new BodySeatLineStore(context));
     }

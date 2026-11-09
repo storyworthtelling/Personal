@@ -21,6 +21,13 @@ public sealed class FakeHttpMessageHandler : HttpMessageHandler
         return this;
     }
 
+    /// <summary>Adds a header to the response queued last.</summary>
+    public FakeHttpMessageHandler LastResponseHeaders(string name, string value)
+    {
+        responses.Last().Headers.TryAddWithoutValidation(name, value);
+        return this;
+    }
+
     public FakeHttpMessageHandler EnqueueOk(string body) => Enqueue(HttpStatusCode.OK, body);
 
     protected override async Task<HttpResponseMessage> SendAsync(

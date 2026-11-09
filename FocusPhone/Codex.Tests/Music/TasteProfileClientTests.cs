@@ -80,7 +80,7 @@ public class TasteProfileClientTests
     public async Task RefineAsync_HttpError_Throws()
     {
         var handler = new QueuedHttpMessageHandler().Enqueue(System.Net.HttpStatusCode.Unauthorized, "bad key");
-        await Assert.ThrowsAsync<HttpRequestException>(() =>
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() =>
             Client(handler).RefineAsync(TasteProfile.Empty, Evidence(), CancellationToken.None));
     }
 }
