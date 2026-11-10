@@ -56,8 +56,13 @@ public sealed class DarkroomCaptionClient : IDarkroomCaptionClient
     private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
 
-    public DarkroomCaptionClient(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null)
+    private readonly Action<string>? log;
+
+    /// <param name="log">One line per failed call (audit 08 §23): the call, the failure kind, status and request id.</param>
+    public DarkroomCaptionClient(
+        HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null, Action<string>? log = null)
     {
+        this.log = log;
         claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, health);
         optionsAccessor = options;
     }
@@ -86,10 +91,11 @@ public sealed class DarkroomCaptionClient : IDarkroomCaptionClient
             var line = reply.Text.Trim().Trim('"');
             return line.Length > 0 ? line : null;
         }
-        catch (Exception)
+        catch (Exception e)
         {
             // Every failure is the same failure here: no line. A caption is a pleasant extra
             // on a screen full of the owner's own pictures, never a reason the room fails.
+            log?.Invoke(ClaudeCallLine.Failed("darkroom-caption", e));
             return null;
         }
     }

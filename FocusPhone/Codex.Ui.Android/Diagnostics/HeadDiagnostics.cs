@@ -382,6 +382,17 @@ public static class HeadLog
         HeadDiagnostics.Current?.Quiet(tag, message, exception);
     }
 
+    private static readonly PermissionDenials Denials = new();
+
+    /// <summary>A refused Android permission, said once per process (audit 08 §24).</summary>
+    public static void Denied(string permission)
+    {
+        if (Denials.First(permission) is { } line)
+        {
+            Warn("Permission", line);
+        }
+    }
+
     /// <summary>A trail for a shared library that reports a problem flag and its words (the vault's, say).</summary>
     public static Action<bool, string> Trail(string tag) => (problem, message) =>
     {

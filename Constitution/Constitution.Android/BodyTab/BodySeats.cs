@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Storyworthtelling.Google.Android;
 using Android.Content;
 using Codex.Ui.Voice;
@@ -58,7 +59,8 @@ internal static class BodySeats
         var http = HeadHttp.WithTimeout(TimeSpan.FromMinutes(2));
         var messenger = new VoicedMessenger(
             DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
-            new VoiceClient(http, options, HeadCredentialHealth.Store()));
+            new VoiceClient(http, options, HeadCredentialHealth.Store()),
+            warn: line => HeadLog.Warn("Voice", line));
 
         return new SeatCache(new SeatComposer(messenger, options), new BodySeatLineStore(context));
     }

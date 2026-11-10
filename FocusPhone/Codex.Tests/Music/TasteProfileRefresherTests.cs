@@ -84,4 +84,21 @@ public class TasteProfileRefresherTests
         Assert.Same(existing, result);
         store.Verify(s => s.SaveAsync(It.IsAny<TasteProfile>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task AFailedRefreshLeavesOneLine()
+    {
+        // It returned the old profile and said nothing, so "no taste learned yet" and "the key was refused" read alike (audit 08 §12).
+        var lines = new List<string>();
+        var client = new Mock<ITasteProfileClient>();
+        client.Setup(c => c.RefineAsync(It.IsAny<TasteProfile>(), It.IsAny<TasteEvidence>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("boom"));
+        var store = new Mock<ITasteProfileStore>();
+        store.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>())).ReturnsAsync(TasteProfile.Empty);
+
+        await new TasteProfileRefresher(client.Object, store.Object, Key("sk-test"), lines.Add)
+            .RefreshAsync(SomeEvents(), CancellationToken.None);
+
+        Assert.Equal(["CLAUDE taste-refine failed: System.Net.Http.HttpRequestException"], lines);
+    }
 }

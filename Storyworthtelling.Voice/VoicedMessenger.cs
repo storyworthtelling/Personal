@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Storyworthtelling.Voice.Claude;
 
 namespace Storyworthtelling.Voice;
 
@@ -13,12 +15,20 @@ public sealed class VoicedMessenger
     private readonly IVoiceProfileStore store;
     private readonly IVoiceClient client;
     private readonly ILogger<VoicedMessenger>? logger;
+    private readonly Action<string>? warn;
 
-    public VoicedMessenger(IVoiceProfileStore store, IVoiceClient client, ILogger<VoicedMessenger>? logger = null)
+    // A seat's failure is warned once a day per process, not on every paint: the seats compose on each screen
+    // visit, and a rejected key would otherwise fill the log with one line per visit.
+    private static readonly ConcurrentDictionary<(string Purpose, DateOnly Day), bool> Warned = new();
+
+    /// <param name="warn">For a head with no logging pipeline (the native ones): the same warning as one line.</param>
+    public VoicedMessenger(
+        IVoiceProfileStore store, IVoiceClient client, ILogger<VoicedMessenger>? logger = null, Action<string>? warn = null)
     {
         this.store = store;
         this.client = client;
         this.logger = logger;
+        this.warn = warn;
     }
 
     // Composes the message for `request` in the owner's voice, or returns `fallback` (the app's neutral
@@ -38,7 +48,14 @@ public sealed class VoicedMessenger
         {
             // Voiced messaging is a nicety layered over neutral copy; a missing key, an offline device, or
             // a transient model error must never break the screen. Degrade to the fallback, note it, move on.
-            logger?.LogDebug(ex, "Voiced message for '{Purpose}' fell back to neutral copy", request.Purpose);
+            // At WARN, with what went wrong but never the reply or the message (audit 08 §22): Debug is kept nowhere,
+            // so a rejected key on every seat in every app was invisible.
+            if (Warned.TryAdd((request.Purpose, DateOnly.FromDateTime(DateTime.Now)), true))
+            {
+                var line = ClaudeCallLine.Failed($"voice {request.Purpose}", ex);
+                logger?.LogWarning("{Line}", line);
+                warn?.Invoke(line);
+            }
             return fallback;
         }
     }

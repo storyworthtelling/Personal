@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using Microsoft.Extensions.Options;
 using Storyworthtelling.Voice;
 using Codex.Domain.Music;
@@ -16,8 +17,12 @@ public sealed class TasteProfileRefresher
     private readonly ITasteProfileStore store;
     private readonly IOptions<VoiceOptions> optionsAccessor;
 
-    public TasteProfileRefresher(ITasteProfileClient client, ITasteProfileStore store, IOptions<VoiceOptions> options)
+    private readonly Action<string>? log;
+
+    /// <param name="log">One line per failed refine (audit 08 §12): the call, the failure kind, status and request id.</param>
+    public TasteProfileRefresher(ITasteProfileClient client, ITasteProfileStore store, IOptions<VoiceOptions> options, Action<string>? log = null)
     {
+        this.log = log;
         this.client = client;
         this.store = store;
         optionsAccessor = options;
@@ -48,7 +53,8 @@ public sealed class TasteProfileRefresher
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            // A failed refine must never crash the app or clobber a good profile.
+            // A failed refine must never crash the app or clobber a good profile; it is said, though.
+            log?.Invoke(ClaudeCallLine.Failed("taste-refine", e));
             return existing;
         }
     }

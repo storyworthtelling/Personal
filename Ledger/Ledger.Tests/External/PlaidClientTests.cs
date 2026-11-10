@@ -261,6 +261,23 @@ public class PlaidClientTests
     }
 
     [Fact]
+    public async Task AFailureNamesItsEndpointAndPlaidsRequestId()
+    {
+        // Plaid support asks for the request id first; the exception never carried it, nor which call failed (audit 08 §26).
+        var (client, handler) = Create();
+        handler.Enqueue(HttpStatusCode.BadRequest, """
+        { "error_type": "INVALID_INPUT", "error_code": "INVALID_ACCESS_TOKEN",
+          "error_message": "the access token is invalid", "request_id": "req-example-1" }
+        """);
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.GetBalancesAsync("bad-token", CancellationToken.None));
+
+        Assert.Contains("/accounts/balance/get", ex.Message);
+        Assert.Contains("request req-example-1", ex.Message);
+    }
+
+    [Fact]
     public async Task ExchangePublicToken_ParsesAccessTokenAndItemId()
     {
         var (client, handler) = Create();
