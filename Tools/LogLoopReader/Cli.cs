@@ -90,7 +90,8 @@ public static class Cli
         var plan = Triage.Plan(groups, ledger);
         var folded = plan.Where(i => i.Status == TriageStatus.Folded).Select(i => i.Fingerprint).ToHashSet(StringComparer.Ordinal);
         var shown = groups.Where(g => !folded.Contains(g.Fingerprint)).ToList();
-        File.WriteAllText(markdown, LogLoopReader.Digest.Render(shown, new LogExcerptSanitizer(LogExcerptSanitizer.VocabularyFrom(RepoRoot())))
+        var health = LoopHealth.From(batches);
+        File.WriteAllText(markdown, LogLoopReader.Digest.Render(shown, new LogExcerptSanitizer(LogExcerptSanitizer.VocabularyFrom(RepoRoot())), health)
             + $"{folded.Count} routine INFO fingerprints folded ({groups.Where(g => folded.Contains(g.Fingerprint)).Sum(g => g.Count)} lines); not listed.{Environment.NewLine}");
         var triageDir = Path.Combine(outDir, TriageFolder);
         if (Directory.Exists(triageDir))
@@ -106,6 +107,7 @@ public static class Cli
         output.WriteLine($"triage: {pending} to decide, {plan.Count(i => i.Status == TriageStatus.Carried)} carried from the ledger, {folded.Count} folded; one checklist per app under {triageDir}");
         File.WriteAllText(Path.Combine(outDir, "digest.json"), JsonSerializer.Serialize(groups, new JsonSerializerOptions { WriteIndented = true }));
         output.WriteLine($"{groups.Count} fingerprints from {batches.Count} batches; digest at {markdown}");
+        output.WriteLine($"loop: {health.Dropped.Count} DROPPED line(s), {health.Silent.Count} app/phone pair(s) silent, {health.MissedWorkers.Count} worker gap(s)");
         return 0;
     }
 

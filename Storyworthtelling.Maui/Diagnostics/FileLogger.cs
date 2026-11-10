@@ -136,18 +136,16 @@ public sealed class FileLogger : ILoggerProvider
             LogLevel.Critical => "CRIT",
             _ => "INFO",
         };
-        var builder = new StringBuilder();
-        builder.Append('[').Append(clock().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)).Append("] [")
-            .Append(prefix).Append("] ").Append(ShortCategory(category)).Append(": ").Append(Cut(message));
+        string? detail = null;
         if (exception is not null)
         {
-            builder.Append("\n       ").Append(quiet ? TypeChain(exception) : Chain(exception));
+            detail = "       " + (quiet ? TypeChain(exception) : Chain(exception));
             if (exception.StackTrace is { } stack)
             {
-                builder.Append("\n       ").Append(stack.Trim());
+                detail += "\n       " + stack.Trim();
             }
         }
-        return builder.Append('\n').ToString();
+        return LogLine.Format(clock(), prefix, ShortCategory(category), Cut(message), detail);
     }
 
     private string Cut(string message)
