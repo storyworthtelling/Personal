@@ -20,8 +20,8 @@ public static class FollowUpRegions
     public const float MarginBottom = WorksheetRegions.MarginBottom;
     public const float BodyWidth = WorksheetRegions.BodyWidth;
 
-    public const float HeaderHeight = 70f;
-    public const float IntroHeight = 44f;
+    public const float HeaderHeight = WorksheetRegions.HeaderHeight;
+    public const float IntroHeight = 54f; // three intro lines under the frame's header, clear of the table
     public const float TableHeaderHeight = 20f;
 
     public const float RowPitch = RowHeight + 1f;

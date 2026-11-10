@@ -37,12 +37,17 @@ public static class WorksheetRegions
     public static string SetAsideSavings(Guid savingsAccountId) => $"{SetAsideSavingsPrefix}{savingsAccountId}";
 
     // ---- the suite's A4 page, Index's own copy (matches Folio's PageGeometry numbers exactly) ----
-    public const float PageWidth = 595f;
+    // The A4 height, on the tablet's whole glass: the board is as wide as the glass is at A4's scale (445 x 594 is 3:4),
+    // so the binder tabs sit at the true right edge (IndexSheet, held equal by IndexFrameTests).
     public const float PageHeight = 842f;
-    public const float MarginLeft = 52.8f;
-    public const float MarginRight = 52.8f;
-    public const float MarginTop = 48f;
-    public const float MarginBottom = 62.4f;
+    public const float PageWidth = PageHeight * 445f / 594f;
+
+    // The shared tablet frame's margins (Storyworthtelling.Paper.Binder.SheetFrame.Margin, BinderStrip.Gutter): the
+    // content stops clear of the tab strip, and the folio sits in the bottom margin.
+    public const float MarginLeft = 54f;
+    public const float MarginRight = 38f;
+    public const float MarginTop = 54f;
+    public const float MarginBottom = 54f;
     public const float BodyWidth = PageWidth - MarginLeft - MarginRight;
 
     // ---- taken verbatim from mockup-12.html's own CSS ----
@@ -69,8 +74,8 @@ public static class WorksheetRegions
     // ---- Index's own composed vertical layout (not a CSS transcription — see the type's own remarks).
     // Exposed (not private) so WorksheetPainter aligns its printed labels with these same offsets
     // rather than keeping a second, hand-eyeballed copy of where each block starts. ----
-    public const float HeaderHeight = 70f;        // the label + the title at Display + the rule
-    public const float IntroHeight = 36f;         // the intro paragraph (two lines)
+    public const float HeaderHeight = 44f;        // the shared frame's header (title, signature, rule) and the clear space under it
+    public const float IntroHeight = 42f;         // the intro paragraph (two lines) and the gap before the figures
     public const float IncomeBlockHeight = 76f;   // the calc rows + the correction box
     public const float SectionHeaderHeight = 20f; // ".ws-head" / ".ws-sub"
 

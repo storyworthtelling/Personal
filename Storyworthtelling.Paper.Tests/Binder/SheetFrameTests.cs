@@ -63,6 +63,23 @@ public class SheetFrameTests
     }
 
     [Fact]
+    public void ACoverCarriesEveryTabWithNoneOpenAndAnchorsNothing()
+    {
+        var sheet = TabletSheet.Fill(612f, 792f);
+        var tabs = new[] { new BinderTab("News", "brief-news", Index.Cloth, Index.Deep), new BinderTab("Games", "brief-games", Index.Cloth, Index.Deep) };
+        using var sink = new VectorPdfSink();
+        var canvas = sink.BeginPage(sheet);
+        SheetFrame.Binder(canvas, sheet, tabs, active: -1);
+        sink.EndPage();
+        var bytes = sink.Close();
+
+        using var pdf = PdfDocument.Open(bytes);
+        Assert.Equal(2, pdf.GetPage(1).GetAnnotations().Count(a => a.Type == AnnotationType.Link));
+        // Both tabs sit behind the binder edge: neither reaches the extra hairline in.
+        Assert.All(pdf.GetPage(1).GetAnnotations(), a => Assert.Equal(BinderStrip.TabWidth * sheet.Scale, a.Rectangle.Width, 1));
+    }
+
+    [Fact]
     public void TheFolioNamesThePageAndItsNumber()
     {
         using var pdf = PdfDocument.Open(TwoPages());

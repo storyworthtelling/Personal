@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SkiaSharp;
 using Foreword.Domain.Interfaces;
+using Foreword.Domain.Document;
 using Foreword.Domain.Models;
 
 using Storyworthtelling.Paper;
@@ -35,9 +36,9 @@ public class PdfComposer : IPdfComposer
         Domain.Brief.HistoryNote? history = null)
     {
         comics ??= [];
-        // The contents can only be written once the pages exist, so the stories are composed first
-        // and their page count read back — a contents page that guessed its own lengths would be
-        // wrong on exactly the mornings a story ran long.
+
+        // News first, then opinion, so each tab's section is one run of pages; within each, the order the paper gave.
+        articles = [.. articles.Where(a => !Opinion(a)), .. articles.Where(Opinion)];
         var storyPages = PdfMerger.PageCount(ComposeNews(articles));
 
         var sections = new List<Domain.Brief.BriefSection>
@@ -48,15 +49,41 @@ public class PdfComposer : IPdfComposer
             new("The crossword", null, PdfMerger.PageCount(crosswordPdfBytes)),
         };
 
-        var newsPdfBytes = ComposeNews(
+        var tabs = Domain.Brief.BriefTabs.Present(new HashSet<Domain.Brief.BriefTab>(
+            new[]
+            {
+                articles.Any(a => !Opinion(a)) ? Domain.Brief.BriefTabs.News : null,
+                articles.Any(Opinion) ? Domain.Brief.BriefTabs.Opinion : null,
+                comics.Count > 0 ? Domain.Brief.BriefTabs.Comics : null,
+                crosswordPdfBytes.Length > 0 ? Domain.Brief.BriefTabs.Games : null,
+            }.OfType<Domain.Brief.BriefTab>()));
+
+        var (newsPdfBytes, firstPages) = ComposeNews(
             articles,
             layout => ForewordPage.Draw(layout, date, voice, sections, history),
             comics,
-            crosswordFollows: crosswordPdfBytes.Length > 0);
+            crosswordFollows: crosswordPdfBytes.Length > 0,
+            tabs);
 
-        return newsPdfBytes.Length == 0
-            ? crosswordPdfBytes
-            : PdfMerger.Merge(newsPdfBytes, crosswordPdfBytes);
+        if (newsPdfBytes.Length == 0)
+        {
+            return crosswordPdfBytes;
+        }
+
+        // No crossword: Foreword's own pages are the whole brief, and Skia's link names already stand.
+        if (crosswordPdfBytes.Length == 0)
+        {
+            return newsPdfBytes;
+        }
+
+        // The crossword is the paper's own PDF and carries no strip; the Games tab lands on its first page. Merging
+        // drops the link names Skia wrote, so every section's name is written again against the merged pages.
+        var destinations = firstPages.ToDictionary(pair => pair.Key, pair => pair.Value);
+        if (crosswordPdfBytes.Length > 0)
+        {
+            destinations[Domain.Brief.BriefTabs.Games.Destination] = PdfMerger.PageCount(newsPdfBytes);
+        }
+        return PdfMerger.Merge(newsPdfBytes, crosswordPdfBytes, destinations);
     }
 
     private static bool Opinion(ArticleContent article) =>
@@ -68,35 +95,56 @@ public class PdfComposer : IPdfComposer
     /// wants. Internal so the pages can be read back and checked without merging a puzzle onto them.
     /// </summary>
     internal byte[] ComposeNews(IReadOnlyList<ArticleContent> articles) =>
-        ComposeNews(articles, foreword: null, comics: [], crosswordFollows: false);
+        ComposeNews(articles, foreword: null, comics: [], crosswordFollows: false, tabs: []).Pdf;
 
     /// <summary>
-    /// The news pages, optionally opening with the foreword page (B1) and closing with the comic
-    /// (B3).
+    /// The pages Foreword draws, every one carrying the brief's whole strip, and the page each section starts on (by its
+    /// tab's link name, 0-based) so the merge can point the tabs at them.
     /// </summary>
-    internal byte[] ComposeNews(
+    internal (byte[] Pdf, IReadOnlyDictionary<string, int> FirstPages) ComposeNews(
         IReadOnlyList<ArticleContent> articles,
         Action<SkiaPageLayout>? foreword,
         IReadOnlyList<Domain.Brief.ComicStrip> comics,
-        bool crosswordFollows)
+        bool crosswordFollows,
+        IReadOnlyList<Domain.Brief.BriefTab> tabs)
     {
         if (articles.Count == 0 && foreword is null && comics.Count == 0)
         {
-            return [];
+            return ([], new Dictionary<string, int>());
         }
 
         using var layout = new SkiaPageLayout();
+        var strip = PageFurniture.BriefStrip(tabs);
+        var firstPages = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        // Opens a section's run: anchors its first page under its tab's name, and gives every page the strip with that
+        // tab open, plus the folio this page carries.
+        Action<SkiaPageLayout> Furniture(Domain.Brief.BriefTab? section, Action<SkiaPageLayout>? folio)
+        {
+            var active = section is null ? -1 : tabs.ToList().IndexOf(section);
+            if (section is not null && firstPages.TryAdd(section.Destination, layout.PageCountInProgress - 1))
+            {
+                layout.Anchor(section.Destination);
+            }
+            return page =>
+            {
+                folio?.Invoke(page);
+                if (strip.Count > 0)
+                {
+                    PageFurniture.DrawBinder(page, strip, active, SectionTabs.FirstTabTop, anchor: false);
+                }
+            };
+        }
 
         var started = false;
 
         if (foreword is not null)
         {
+            layout.Footer = Furniture(null, null);
             foreword(layout);
             started = true;
         }
 
-        // Positions within each section, so the folio can say "1 of 8" — the question a stack of
-        // single-story pages otherwise raises, which is how much of the news is left.
         var sections = articles
             .GroupBy(Folio)
             .ToDictionary(group => group.Key, group => group.Count());
@@ -119,13 +167,13 @@ public class PdfComposer : IPdfComposer
             // to — the folio names the STORY's position, and a page two of a story is not a second
             // story. Skia closes a page and it is gone, so there is no stamping one on afterwards.
             var folio = $"{section} · {seen[section]} of {sections[section]}";
-            layout.Footer = PageFurniture.Folio(folio, null);
+            layout.Footer = Furniture(Opinion(article) ? Domain.Brief.BriefTabs.Opinion : Domain.Brief.BriefTabs.News, PageFurniture.Folio(folio, null));
 
             DrawArticle(layout, article);
         }
 
         // The comic, last. Its own footer, so the folio stops naming the news.
-        foreach (var strip in comics)
+        foreach (var comic in comics)
         {
             if (started)
             {
@@ -133,10 +181,10 @@ public class PdfComposer : IPdfComposer
             }
 
             started = true;
-            ComicPage.Draw(layout, strip, crosswordFollows);
+            ComicPage.Draw(layout, comic, crosswordFollows, folio => Furniture(Domain.Brief.BriefTabs.Comics, folio));
         }
 
-        return layout.ToPdf();
+        return (layout.ToPdf(), firstPages);
     }
 
     private void DrawArticle(SkiaPageLayout layout, ArticleContent article)

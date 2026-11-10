@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper.Binder;
 using System.Globalization;
 using Index.Domain.Worksheet;
 using Index.Infrastructure.Worksheet;
@@ -88,7 +89,6 @@ public class WorksheetPageDriftTests
     {
         var boxLeft = WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth - WorksheetRegions.BoxColumnWidth;
         Assert.Equal(boxLeft - WorksheetRegions.ColumnGap, WorksheetRegions.LastMonthColumnRight, 0.01f);
-        Assert.Equal(380.2f, WorksheetRegions.LastMonthColumnRight, 0.05f);
     }
 
     [Fact]
@@ -116,12 +116,14 @@ public class WorksheetPageDriftTests
     }
 
     [Fact]
-    public void TheTitleIsSetAtTheDisplayRung()
+    public void TheTitleIsTheFramesSerifAtTheTitleRung()
     {
+        // The shared tablet frame's header, as on every Foreword page: "October 2026 budget" in Serif at the Title rung.
         using var document = Open(MockupPlan());
-        var title = document.GetPage(1).Letters.First(l => l.Value == "O" && PdfProbe.Board(l.PointSize) > 20);
+        var title = document.GetPage(1).Letters.First(l => l.Value == "O" && !PdfProbe.IsSignature(l));
 
-        Assert.Equal(PaperTypeScale.Display, PdfProbe.Board(title.PointSize), 0.3f);
+        Assert.Equal(PaperTypeScale.Title, PdfProbe.Board(title.PointSize), 0.3f);
+        Assert.Contains("SourceSerif4", title.FontName ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -167,7 +169,10 @@ public class WorksheetPageDriftTests
     {
         using var document = Open(MockupPlan());
         var page = document.GetPage(1);
-        var intro = page.GetWords().Where(w => PdfProbe.Box(page, w.BoundingBox).Top < WorksheetRegions.IncomeBlockTop).ToList();
+        var intro = page.GetWords()
+            .Where(w => PdfProbe.Box(page, w.BoundingBox).Top < WorksheetRegions.IncomeBlockTop && !w.Letters.Any(PdfProbe.IsSignature)
+                && w.Letters.All(l => Math.Abs(l.EndBaseLine.Y - l.StartBaseLine.Y) < 0.01))
+            .ToList();
         var right = WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth;
 
         Assert.Contains(intro, w => w.Text == "reads");
@@ -177,8 +182,9 @@ public class WorksheetPageDriftTests
     // ---- the footer ----
 
     [Fact]
-    public void TheFooterDateIsMono_AndRightAlignedToTheBody()
+    public void TheFolioDateIsRightAlignedToTheBody()
     {
+        // The shared folio, in the bottom margin: the page's name by the maker's mark, the printed date at the right.
         using var document = Open(MockupPlan());
         var page = document.GetPage(1);
         var words = page.GetWords().Where(w => w.Text is "printed" or "Sep" or "30").ToList();
@@ -186,7 +192,7 @@ public class WorksheetPageDriftTests
 
         Assert.Equal(3, words.Count);
         Assert.Equal(WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth, PdfProbe.BoardX((float)lastWord.BoundingBox.Right), Tolerance);
-        Assert.All(words, w => Assert.Contains("Cascadia", w.Letters[0].FontName ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+        Assert.True(PdfProbe.Box(page, lastWord.BoundingBox).Top > WorksheetRegions.PageHeight - WorksheetRegions.MarginBottom);
     }
 
     [Fact]
@@ -233,15 +239,17 @@ public class WorksheetPageDriftTests
     }
 
     [Fact]
-    public void TheHeaderRuleUnderTheTitleIsOnePointFiveInTheIdentityColour()
+    public void TheHeaderRuleUnderTheTitleIsTheFramesBarInIndexsMark()
     {
         using var document = Open(MockupPlan());
-        var identity = PdfProbe.HorizontalRules(document.GetPage(1))
-            .Where(r => PdfProbe.SameColor(r.Color, PdfProbe.Rgb(PaperColorTokens.PositiveDoc)) && r.Length > 400)
+        var identity = PdfProbe.Bars(document.GetPage(1))
+            .Where(b => PdfProbe.SameColor(b.Color, PdfProbe.Rgb(AppIdentityTokens.IndexMarkHex)))
             .ToList();
 
         var rule = Assert.Single(identity);
-        Assert.Equal(1.5, rule.Width, 0.01);
+        Assert.Equal(SheetFrame.RuleHeight, rule.Bottom - rule.Top, 0.05f);
+        Assert.Equal(WorksheetRegions.BodyWidth, rule.Right - rule.Left, 0.5f);
+        Assert.True(rule.Bottom < WorksheetRegions.IncomeBlockTop);
     }
 
     [Fact]

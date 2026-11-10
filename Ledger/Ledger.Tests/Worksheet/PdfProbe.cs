@@ -71,6 +71,22 @@ internal static class PdfProbe
         return rules;
     }
 
+    /// <summary>A letter of the frame's signature, the app's name in the owner's hand: its flourish may overhang the edge.</summary>
+    public static bool IsSignature(UglyToad.PdfPig.Content.Letter letter) =>
+        (letter.FontName ?? string.Empty).Contains("Pinyon", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Every filled bar (a rectangle much wider than tall) on the page, with its fill colour, in board points.</summary>
+    public static List<(float Left, float Top, float Right, float Bottom, (double R, double G, double B) Color)> Bars(Page page) =>
+        page.Paths
+            .Where(path => path.IsFilled && path.GetBoundingRectangle() is { } r && r.Width > 10 * r.Height)
+            .Select(path =>
+            {
+                var (left, top, right, bottom) = Box(page, path.GetBoundingRectangle()!.Value);
+                var (r, g, b) = path.FillColor.ToRGBValues();
+                return (left, top, right, bottom, (r, g, b));
+            })
+            .ToList();
+
     public static bool IsInk(Rule rule) => SameColor(rule.Color, Rgb(PaperColorTokens.Ink));
     public static bool IsHairline(Rule rule) => SameColor(rule.Color, Rgb(PaperColorTokens.Hairline));
 }
