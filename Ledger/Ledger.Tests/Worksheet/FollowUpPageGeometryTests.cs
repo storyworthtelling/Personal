@@ -40,7 +40,7 @@ public class FollowUpPageGeometryTests
     }
 
     private static Rect ToTopLeft(UglyToad.PdfPig.Core.PdfRectangle r) =>
-        new((float)r.Left, FollowUpRegions.PageHeight - (float)r.Top, (float)r.Right, FollowUpRegions.PageHeight - (float)r.Bottom);
+        new(PdfProbe.BoardX((float)r.Left), PdfProbe.BoardY((float)r.Top), PdfProbe.BoardX((float)r.Right), PdfProbe.BoardY((float)r.Bottom));
 
     private static Rect Of(WorksheetBox b) => new(b.Left, b.Top, b.Left + b.Width, b.Top + b.Height);
 
@@ -143,7 +143,7 @@ public class FollowUpPageGeometryTests
         var instruction = FollowUpReadBackInstruction.Build(
             plan.ActionableLines.Select(l => (l.Key, l.Name)).ToList(), plan.ReferenceLines.Count);
 
-        foreach (var box in FollowUpPainter.BoxesFor(plan))
+        foreach (var box in FollowUpPainter.BoxesFor(plan).Select(PdfProbe.OnPage))
         {
             Assert.Contains($"\"{box.Name}\" at ({box.Left:0.0}, {box.Top:0.0}, {box.Width:0.0}, {box.Height:0.0})", instruction);
         }

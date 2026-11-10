@@ -84,8 +84,12 @@ public class JournalTranscriptionTests
         Assert.Contains(JournalRegions.Journalling, body!);
         Assert.Contains(JournalRegions.Adding, body!);
 
-        var adding = JournalRegions.For(612, 792)[1];
-        Assert.Contains(((int)adding.Top).ToString(System.Globalization.CultureInfo.InvariantCulture), body!);
+        // In the page's own points: the PDF the model reads is the tablet's page, not the Letter board it was drawn on.
+        var sheet = Foreword.Infrastructure.Pdf.ForewordSheet.Portrait;
+        var drawn = JournalRegions.For(sheet.DesignWidth, sheet.DesignHeight)[1];
+        var adding = sheet.ToPage(new Storyworthtelling.Paper.SheetRect(drawn.Left, drawn.Top, drawn.Width, drawn.Height));
+        Assert.Contains($"y={(int)adding.Top} ", body!);
+        Assert.Contains("445 by 594 points", body!);
     }
 
     /// <summary>

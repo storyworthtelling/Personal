@@ -12,7 +12,7 @@ namespace Index.Infrastructure.Worksheet;
 ///
 /// <para><b>Reuses <see cref="WorksheetRegions"/>'s own coordinates, the same numbers
 /// <see cref="WorksheetPainter"/> draws from (Guard G18)</b>: every box is listed by its exact
-/// left/top/width/height in points on the 595&#215;842 page, plus, for a category's own box, which
+/// left/top/width/height in points on the tablet page the A4 board is placed on (<see cref="IndexSheet"/>), plus, for a category's own box, which
 /// printed row (top-to-bottom) it belongs to — so the model can cross-reference by position AND by
 /// whatever category name it can itself read printed next to the box, rather than coordinates alone (a
 /// vision call reasons far more reliably about "the box next to the printed category name" than about
@@ -44,8 +44,8 @@ public static class WorksheetReadBackInstruction
         {
             sb.Append("It runs to ").Append(pageCount).Append(" pages (the second continues the first); each page is exactly ");
         }
-        sb.Append(WorksheetRegions.PageWidth.ToString("0.0", CultureInfo.InvariantCulture))
-            .Append(" by ").Append(WorksheetRegions.PageHeight.ToString("0.0", CultureInfo.InvariantCulture))
+        sb.Append(IndexSheet.Page.PageWidth.ToString("0.0", CultureInfo.InvariantCulture))
+            .Append(" by ").Append(IndexSheet.Page.PageHeight.ToString("0.0", CultureInfo.InvariantCulture))
             .Append(" points, measured in points from the page's top-left corner. Ignore all printed/typed text ")
             .Append("except where it names a printed category next to a box. Look ONLY at the hand-written ink ")
             .Append("inside the boxes listed below; every box is a small rounded rectangle drawn in ink, most ")
@@ -100,8 +100,12 @@ public static class WorksheetReadBackInstruction
 
     private static string OnPage(WorksheetBox box) => $"on page {box.Page + 1}";
 
-    private static string Coords(WorksheetBox box) => string.Create(CultureInfo.InvariantCulture,
-        $"{box.Left:0.0}, {box.Top:0.0}, {box.Width:0.0}, {box.Height:0.0}");
+    // Drawn on the A4 board, told in the tablet page's own points (IndexSheet).
+    private static string Coords(WorksheetBox board)
+    {
+        var box = IndexSheet.Box(board);
+        return string.Create(CultureInfo.InvariantCulture, $"{box.Left:0.0}, {box.Top:0.0}, {box.Width:0.0}, {box.Height:0.0}");
+    }
 
     private static string Ordinal(int n) => (n % 100) switch
     {

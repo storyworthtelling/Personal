@@ -47,12 +47,13 @@ public class WorksheetTwoPageRegionsTests
     private static List<(float Left, float Top, float Width, float Height)> PaintedBoxes(UglyToad.PdfPig.Content.Page page) =>
         page.Paths
             .Select(p => p.GetBoundingRectangle())
-            .Where(r => r.HasValue && r.Value.Height >= 20 && r.Value.Height <= 30 && r.Value.Width > 20)
+            .Where(r => r.HasValue)
             .Select(r => (
-                Left: (float)r!.Value.Left,
-                Top: WorksheetRegions.PageHeight - (float)r.Value.Top,
-                Width: (float)r.Value.Width,
-                Height: (float)r.Value.Height))
+                Left: PdfProbe.BoardX((float)r!.Value.Left),
+                Top: PdfProbe.BoardY((float)r.Value.Top),
+                Width: PdfProbe.Board(r.Value.Width),
+                Height: PdfProbe.Board(r.Value.Height)))
+            .Where(r => r.Height >= 20 && r.Height <= 30 && r.Width > 20)
             .ToList();
 
     private static bool Matches((float Left, float Top, float Width, float Height) painted, WorksheetBox box) =>
@@ -93,7 +94,7 @@ public class WorksheetTwoPageRegionsTests
         var plan = MakePlan(categories, setAside);
         var instruction = WorksheetReadBackInstruction.Build(plan.CategoryIdsInPrintedOrder, plan.SetAsideKeysInPrintedOrder);
 
-        foreach (var box in WorksheetPainter.BoxesFor(plan))
+        foreach (var box in WorksheetPainter.BoxesFor(plan).Select(PdfProbe.OnPage))
         {
             var line = $"\"{box.Name}\" at ({box.Left:0.0}, {box.Top:0.0}, {box.Width:0.0}, {box.Height:0.0})";
             Assert.True(instruction.Contains(line, StringComparison.Ordinal), $"the prompt does not describe {line}");

@@ -99,20 +99,20 @@ public class FollowUpPageDriftTests
         using var document = Open(OverPlan());
         var page = document.GetPage(1);
 
-        Assert.Equal(FollowUpRegions.PreviousRight, (float)Assert.Single(WordsIn(page, "SEPT")).BoundingBox.Right, Tolerance);
-        Assert.Equal(FollowUpRegions.WroteRight, (float)Assert.Single(WordsIn(page, "WROTE")).BoundingBox.Right, Tolerance);
-        Assert.Equal(FollowUpRegions.SuggestRight, (float)Assert.Single(WordsIn(page, "SUGGEST")).BoundingBox.Right, Tolerance);
-        Assert.Equal(FollowUpRegions.FinalBoxLeft, (float)Assert.Single(WordsIn(page, "FINAL")).BoundingBox.Left, Tolerance);
+        Assert.Equal(FollowUpRegions.PreviousRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "SEPT")).BoundingBox.Right), Tolerance);
+        Assert.Equal(FollowUpRegions.WroteRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "WROTE")).BoundingBox.Right), Tolerance);
+        Assert.Equal(FollowUpRegions.SuggestRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "SUGGEST")).BoundingBox.Right), Tolerance);
+        Assert.Equal(FollowUpRegions.FinalBoxLeft, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "FINAL")).BoundingBox.Left), Tolerance);
 
         // Clothing 104 / 248 / 104 and Gifts 55 / 158 / 111 — figures of different widths end on one edge.
-        Assert.Equal(FollowUpRegions.PreviousRight, (float)Assert.Single(WordsIn(page, "$55")).BoundingBox.Right, Tolerance);
+        Assert.Equal(FollowUpRegions.PreviousRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "$55")).BoundingBox.Right), Tolerance);
         // $548 is both Groceries' previous figure and its (unchanged) suggestion: one on each edge.
-        var groceries = WordsIn(page, "$548").Select(w => (float)w.BoundingBox.Right).OrderBy(r => r).ToList();
+        var groceries = WordsIn(page, "$548").Select(w => PdfProbe.BoardX((float)w.BoundingBox.Right)).OrderBy(r => r).ToList();
         Assert.Equal(2, groceries.Count);
         Assert.Equal(FollowUpRegions.PreviousRight, groceries[0], Tolerance);
         Assert.Equal(FollowUpRegions.SuggestRight, groceries[1], Tolerance);
-        Assert.Equal(FollowUpRegions.WroteRight, (float)Assert.Single(WordsIn(page, "$158")).BoundingBox.Right, Tolerance);
-        Assert.Equal(FollowUpRegions.SuggestRight, (float)Assert.Single(WordsIn(page, "$111")).BoundingBox.Right, Tolerance);
+        Assert.Equal(FollowUpRegions.WroteRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "$158")).BoundingBox.Right), Tolerance);
+        Assert.Equal(FollowUpRegions.SuggestRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "$111")).BoundingBox.Right), Tolerance);
     }
 
     [Fact]
@@ -123,8 +123,8 @@ public class FollowUpPageDriftTests
 
         // Row 0 is Dining out | Fuel's neighbour... the list fills across then down: (Dining out, Fuel),
         // (Household, Kids), (Utilities, Subscriptions) ...
-        Assert.Equal(FollowUpRegions.ReferenceColumnRight(0), (float)Assert.Single(WordsIn(page, "$284")).BoundingBox.Right, Tolerance);
-        Assert.Equal(FollowUpRegions.ReferenceColumnRight(1), (float)Assert.Single(WordsIn(page, "$162")).BoundingBox.Right, Tolerance);
+        Assert.Equal(FollowUpRegions.ReferenceColumnRight(0), PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "$284")).BoundingBox.Right), Tolerance);
+        Assert.Equal(FollowUpRegions.ReferenceColumnRight(1), PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "$162")).BoundingBox.Right), Tolerance);
 
         var diningBaseline = PdfProbe.Box(page, Assert.Single(WordsIn(page, "Dining")).BoundingBox).Bottom;
         var householdBaseline = PdfProbe.Box(page, Assert.Single(WordsIn(page, "Household")).BoundingBox).Bottom;
@@ -138,10 +138,10 @@ public class FollowUpPageDriftTests
     {
         using var document = Open(OverPlan());
         var page = document.GetPage(1);
-        var title = page.Letters.Where(l => l.PointSize > 20).ToList();
+        var title = page.Letters.Where(l => PdfProbe.Board(l.PointSize) > 20).ToList();
 
         Assert.NotEmpty(title);
-        Assert.All(title, l => Assert.Equal(PaperTypeScale.Display, (float)l.PointSize, 0.3f));
+        Assert.All(title, l => Assert.Equal(PaperTypeScale.Display, PdfProbe.Board(l.PointSize), 0.3f));
         var rule = PdfProbe.HorizontalRules(page).First(r => Math.Abs(r.Width - 1.5) < 0.01 && r.Length > 400);
         Assert.True(title.Max(l => PdfProbe.Box(page, l.GlyphRectangle).Bottom) < rule.Top);
     }
@@ -225,7 +225,7 @@ public class FollowUpPageDriftTests
             var date = page.GetWords().Where(w => w.Text is "printed" or "Oct" or "2").ToList();
 
             Assert.Equal(3, date.Count);
-            Assert.Equal(WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth, (float)date.Single(w => w.Text == "2").BoundingBox.Right, Tolerance);
+            Assert.Equal(WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth, PdfProbe.BoardX((float)date.Single(w => w.Text == "2").BoundingBox.Right), Tolerance);
             Assert.All(date, w => Assert.Contains("Cascadia", w.Letters[0].FontName ?? string.Empty, StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain("oct.", page.Text, StringComparison.Ordinal);
         }

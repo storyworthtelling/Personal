@@ -43,6 +43,9 @@ public class DayPdfComposerTests
             var page = document.Pages[i];
             Assert.True(page.Width.Point > page.Height.Point,
                 $"Page {i + 1} is {page.Width.Point} by {page.Height.Point} points: portrait.");
+            // The tablet's own page on its side, not Letter for the tablet to shrink and letterbox.
+            Assert.Equal(594d, Math.Round(page.Width.Point));
+            Assert.Equal(445d, Math.Round(page.Height.Point));
         }
     }
 

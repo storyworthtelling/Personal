@@ -81,7 +81,10 @@ public class DayTabLinksTests
         using var document = PdfDocument.Open(new MemoryStream(FourTabbedPages()));
 
         var page = document.GetPage(1);
-        var expected = SectionTabs.Layout(792f, DaySection.Day);
+        var sheet = ForewordSheet.Landscape;
+        var expected = SectionTabs.Layout(sheet.DesignWidth, DaySection.Day)
+            .Select(tab => sheet.ToPage(new Storyworthtelling.Paper.SheetRect(tab.Left, tab.Top, tab.Width, tab.Height)))
+            .ToList();
         var links = page.GetAnnotations()
             .Where(a => a.Type == UglyToad.PdfPig.Annotations.AnnotationType.Link)
             .OrderByDescending(a => a.Rectangle.Top)
@@ -91,7 +94,7 @@ public class DayTabLinksTests
         {
             Assert.Equal(expected[i].Left, links[i].Rectangle.Left, 1);
             // Flipped: the top of a tab measured from the page top is this far from the bottom.
-            Assert.Equal(612f - expected[i].Top, links[i].Rectangle.Top, 1);
+            Assert.Equal(sheet.PageHeight - expected[i].Top, links[i].Rectangle.Top, 1);
             Assert.Equal(expected[i].Width, links[i].Rectangle.Width, 1);
             Assert.Equal(expected[i].Height, links[i].Rectangle.Height, 1);
         }

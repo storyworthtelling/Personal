@@ -98,10 +98,10 @@ public class WorksheetPageDriftTests
         var page = document.GetPage(1);
 
         var figure = Single(page, "$548");
-        Assert.Equal(WorksheetRegions.LastMonthColumnRight, (float)figure.BoundingBox.Right, Tolerance);
+        Assert.Equal(WorksheetRegions.LastMonthColumnRight, PdfProbe.BoardX((float)figure.BoundingBox.Right), Tolerance);
 
         var header = Single(page, "SEPTEMBER");
-        Assert.Equal(WorksheetRegions.LastMonthColumnRight, (float)header.BoundingBox.Right, Tolerance);
+        Assert.Equal(WorksheetRegions.LastMonthColumnRight, PdfProbe.BoardX((float)header.BoundingBox.Right), Tolerance);
     }
 
     // ---- the calc column, the title, the name box ----
@@ -112,16 +112,16 @@ public class WorksheetPageDriftTests
         using var document = Open(MockupPlan());
         var income = Single(document.GetPage(1), "$9,350");
 
-        Assert.Equal(WorksheetRegions.MarginLeft + 270f, (float)income.BoundingBox.Right, Tolerance);
+        Assert.Equal(WorksheetRegions.MarginLeft + 270f, PdfProbe.BoardX((float)income.BoundingBox.Right), Tolerance);
     }
 
     [Fact]
     public void TheTitleIsSetAtTheDisplayRung()
     {
         using var document = Open(MockupPlan());
-        var title = document.GetPage(1).Letters.First(l => l.Value == "O" && l.PointSize > 20);
+        var title = document.GetPage(1).Letters.First(l => l.Value == "O" && PdfProbe.Board(l.PointSize) > 20);
 
-        Assert.Equal(PaperTypeScale.Display, (float)title.PointSize, 0.3f);
+        Assert.Equal(PaperTypeScale.Display, PdfProbe.Board(title.PointSize), 0.3f);
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public class WorksheetPageDriftTests
     {
         using var document = Open(MockupPlan());
         var page = document.GetPage(1);
-        var title = page.Letters.Where(l => l.PointSize > 20).ToList();
+        var title = page.Letters.Where(l => PdfProbe.Board(l.PointSize) > 20).ToList();
         var titleBottom = title.Max(l => PdfProbe.Box(page, l.GlyphRectangle).Bottom);
         var identityRule = PdfProbe.HorizontalRules(page).First(r => Math.Abs(r.Width - 1.5) < 0.01 && r.Length > 400);
 
@@ -171,7 +171,7 @@ public class WorksheetPageDriftTests
         var right = WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth;
 
         Assert.Contains(intro, w => w.Text == "reads");
-        Assert.All(intro, w => Assert.True(w.BoundingBox.Right <= right + 0.5, $"'{w.Text}' ends at {w.BoundingBox.Right:0.#}, past {right:0.#}"));
+        Assert.All(intro, w => Assert.True(PdfProbe.BoardX((float)w.BoundingBox.Right) <= right + 0.5, $"'{w.Text}' ends at {PdfProbe.BoardX((float)w.BoundingBox.Right):0.#}, past {right:0.#}"));
     }
 
     // ---- the footer ----
@@ -185,7 +185,7 @@ public class WorksheetPageDriftTests
         var lastWord = words.Single(w => w.Text == "30");
 
         Assert.Equal(3, words.Count);
-        Assert.Equal(WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth, (float)lastWord.BoundingBox.Right, Tolerance);
+        Assert.Equal(WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth, PdfProbe.BoardX((float)lastWord.BoundingBox.Right), Tolerance);
         Assert.All(words, w => Assert.Contains("Cascadia", w.Letters[0].FontName ?? string.Empty, StringComparison.OrdinalIgnoreCase));
     }
 
