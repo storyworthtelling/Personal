@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
@@ -47,7 +48,7 @@ public class DigestWorker : Worker
         catch (Exception e)
         {
             new BodyLog(context).Outcome($"digest worker failed: {e.GetType().Name}");
-            HeadDiagnostics.Current?.Quiet("Worker", "DigestWorker failed", e);
+            HeadDiagnostics.Current?.Quiet(LogSources.Worker, "DigestWorker failed", e);
             return Result.InvokeFailure();
         }
     }
@@ -79,7 +80,7 @@ public class DigestWorker : Worker
             catch (Exception e)
             {
                 new BodyLog(application).Outcome($"digest worker failed: {e.GetType().Name}");
-                HeadDiagnostics.Current?.Quiet("Worker", "DigestWorker failed", e);
+                HeadDiagnostics.Current?.Quiet(LogSources.Worker, "DigestWorker failed", e);
             }
         });
     }

@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.App;
 using Android.Content;
@@ -107,7 +108,7 @@ public sealed class PlateRemarkable(VoiceGoogleAccount account)
         {
             // Restore is a convenience. Settings pairs by hand when it cannot happen.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet("Vault", "reMarkable pairing restore did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "reMarkable pairing restore did not complete", e);
         }
     });
 
@@ -134,7 +135,7 @@ public sealed class PlateRemarkable(VoiceGoogleAccount account)
         {
             // The pairing still works on this phone; only the backup did not happen.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet("Vault", "reMarkable pairing backup did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "reMarkable pairing backup did not complete", e);
         }
     });
 }

@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
@@ -54,7 +55,7 @@ public class BodySyncWorker : Worker
         {
             // The type name is the whole report; the next period tries again on its own.
             log.Outcome($"body sync worker failed: {e.GetType().Name}");
-            HeadDiagnostics.Current?.Quiet("Worker", "BodySyncWorker failed", e);
+            HeadDiagnostics.Current?.Quiet(LogSources.Worker, "BodySyncWorker failed", e);
             return Result.InvokeFailure();
         }
     }

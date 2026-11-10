@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui.Voice;
 using Pulp.Domain.Core;
 using Pulp.Domain.Household;
@@ -50,7 +51,7 @@ public sealed class VaultPulpKeySource : IPulpKeySource
             var result = await vault.Service.LoadAsync(cancellationToken);
             if (result.Status != SecretsVaultStatus.Loaded)
             {
-                diagnostics.Warn("vault", $"The vault was not read ({result.Status}); Pulp's keys stay as they were.");
+                diagnostics.Warn(LogSources.Vault, $"The vault was not read ({result.Status}); Pulp's keys stay as they were.");
                 return;
             }
 
@@ -61,7 +62,7 @@ public sealed class VaultPulpKeySource : IPulpKeySource
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
             // Restore is a convenience; the clients' MissingKey path says what is missing.
-            diagnostics.Warn("vault", "Pulp's keys could not be restored from the vault.", exception);
+            diagnostics.Warn(LogSources.Vault, "Pulp's keys could not be restored from the vault.", exception);
         }
     }
 

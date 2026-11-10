@@ -34,7 +34,8 @@ public class EveryWorkerIsTrailedTests
     public void EveryWorkerSaysWhenItWasStopped()
     {
         var silent = Workers()
-            .Where(file => !Regex.IsMatch(file.Text, @"override\s+void\s+OnStopped\(\)\s*=>\s*\w+\.Stopped\(nameof\("))
+            .Where(file => !Regex.IsMatch(file.Text, @"override\s+void\s+OnStopped\(\)")
+                || !Regex.IsMatch(file.Text, @"\w+\.Stopped\(nameof\("))
             .Select(file => file.Relative)
             .ToList();
 

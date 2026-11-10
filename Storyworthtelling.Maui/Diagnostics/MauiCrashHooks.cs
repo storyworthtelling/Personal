@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Storyworthtelling.Maui.Diagnostics;
@@ -19,14 +20,14 @@ public static class MauiCrashHooks
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
             record("Unhandled exception", args.ExceptionObject?.ToString() ?? "(no details)");
-            MauiLog.Current?.Write("Crash", LogLevel.Critical, "Unhandled exception", args.ExceptionObject as Exception);
+            MauiLog.Current?.Write(LogSources.Crash, LogLevel.Critical, "Unhandled exception", args.ExceptionObject as Exception);
         };
 
         // A faulted task nobody awaited otherwise vanishes. Observed, so it cannot escalate.
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
             record("Unobserved task exception", args.Exception.ToString());
-            MauiLog.Current?.Write("Crash", LogLevel.Warning, "Unobserved task exception", args.Exception);
+            MauiLog.Current?.Write(LogSources.Crash, LogLevel.Warning, "Unobserved task exception", args.Exception);
             args.SetObserved();
         };
     }
@@ -39,7 +40,7 @@ public static class MauiCrashHooks
         public void UncaughtException(Java.Lang.Thread? thread, Java.Lang.Throwable? ex)
         {
             record($"Uncaught exception on thread '{thread?.Name}'", ex?.ToString() ?? "(no details)");
-            MauiLog.Current?.Write("Crash", LogLevel.Critical, $"Uncaught exception on thread '{thread?.Name}'", ex);
+            MauiLog.Current?.Write(LogSources.Crash, LogLevel.Critical, $"Uncaught exception on thread '{thread?.Name}'", ex);
             previous?.UncaughtException(thread, ex);
         }
     }

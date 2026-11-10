@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
@@ -51,7 +52,7 @@ public class MealWeekWorker : Worker
         {
             // The type name is the whole report; the next hour tries again on its own.
             new MealsLog(context).Outcome($"meal week worker failed: {e.GetType().Name}");
-            HeadDiagnostics.Current?.Quiet("Worker", "MealWeekWorker failed", e);
+            HeadDiagnostics.Current?.Quiet(LogSources.Worker, "MealWeekWorker failed", e);
             return Result.InvokeFailure();
         }
     }
@@ -103,7 +104,7 @@ public class MealWeekWorker : Worker
             catch (Exception e)
             {
                 new MealsLog(application).Outcome($"meal week worker failed: {e.GetType().Name}");
-                HeadDiagnostics.Current?.Quiet("Worker", "MealWeekWorker failed", e);
+                HeadDiagnostics.Current?.Quiet(LogSources.Worker, "MealWeekWorker failed", e);
             }
         });
     }

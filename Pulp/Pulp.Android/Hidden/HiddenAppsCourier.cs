@@ -26,7 +26,7 @@ internal static class HiddenAppsCourier
         var before = ContractCourier.Before(context, HiddenAppsHandOff.Package, HiddenAppsHandOff.Permission);
         if (before != ContractSendOutcome.Sent)
         {
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, before));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, before));
             return before == ContractSendOutcome.ReceiverAbsent;
         }
 
@@ -42,12 +42,12 @@ internal static class HiddenAppsCourier
             }
 
             context.SendBroadcast(intent, HiddenAppsHandOff.Permission);
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
             return true;
         }
         catch (Exception e)
         {
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
             return false;
         }
     }

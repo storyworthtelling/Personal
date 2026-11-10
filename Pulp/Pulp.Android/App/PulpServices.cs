@@ -207,7 +207,7 @@ public sealed class PulpServices
         }
         catch (Exception exception)
         {
-            Diagnostics.Warn("vault", "The vault could not be read at launch; keys and the household role stay as remembered.", exception);
+            Diagnostics.Warn(LogSources.Vault, "The vault could not be read at launch; keys and the household role stay as remembered.", exception);
         }
     }
 
@@ -307,7 +307,7 @@ public sealed class PulpServices
         }
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
-            Diagnostics.Warn("vault", "The shared Claude key could not be read; mood search answers 'no idea' until it can.", exception);
+            Diagnostics.Warn(LogSources.Vault, "The shared Claude key could not be read; mood search answers 'no idea' until it can.", exception);
         }
     }
 

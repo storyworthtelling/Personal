@@ -101,11 +101,11 @@ public sealed class HeadDiagnostics
         {
             if (problem)
             {
-                head.Warn("Exit", line);
+                head.Warn(LogSources.Exit, line);
             }
             else
             {
-                head.Info("Exit", line);
+                head.Info(LogSources.Exit, line);
             }
         });
         TapWatch.Install(head.Tap);
@@ -164,10 +164,10 @@ public sealed class HeadDiagnostics
     /// — rethrown, so WorkManager sees exactly what it saw before. A process with no head installed just runs it.
     /// </summary>
     /// <summary>WorkManager stopped a run before it returned: the cap, a lost constraint, a cancel (audit 08 §20).</summary>
-    public static void Stopped(string name, int reason) => Current?.Warn("Worker", WorkerTrail.StoppedLine(name, reason));
+    public static void Stopped(string name, int reason) => Current?.Warn(LogSources.Worker, WorkerTrail.StoppedLine(name, reason));
 
     /// <summary>A run that had nothing to do, and why (audit 08 §37).</summary>
-    public static void Skipped(string name, string why) => Current?.Info("Worker", WorkerTrail.SkippedLine(name, why));
+    public static void Skipped(string name, string why) => Current?.Info(LogSources.Worker, WorkerTrail.SkippedLine(name, why));
 
     public static T Worker<T>(string name, Func<T> body)
     {
@@ -177,11 +177,11 @@ public sealed class HeadDiagnostics
             return body();
         }
         var started = System.Diagnostics.Stopwatch.StartNew();
-        head.Info("Worker", WorkerTrail.StartedLine(name));
+        head.Info(LogSources.Worker, WorkerTrail.StartedLine(name));
         try
         {
             var result = body();
-            head.Info("Worker", WorkerTrail.FinishedLine(name, ResultName(result), started.Elapsed));
+            head.Info(LogSources.Worker, WorkerTrail.FinishedLine(name, ResultName(result), started.Elapsed));
             return result;
         }
         catch (Exception e)
@@ -389,7 +389,7 @@ public static class HeadLog
     {
         if (Denials.First(permission) is { } line)
         {
-            Warn("Permission", line);
+            Warn(LogSources.Permission, line);
         }
     }
 

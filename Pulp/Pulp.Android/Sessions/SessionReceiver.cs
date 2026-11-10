@@ -47,7 +47,7 @@ public class SessionReceiver : BroadcastReceiver
         var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
         if (!ContractBroadcast.Accepts(version))
         {
-            Codex.Ui.HeadLog.Info("Pulp", ContractBroadcast.ReceiptLine("playback-sessions", version));
+            Codex.Ui.HeadLog.Info(LogSources.Contract("playback-sessions"), ContractBroadcast.ReceiptLine("playback-sessions", version));
             return;
         }
 

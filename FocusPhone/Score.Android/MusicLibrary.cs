@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Codex.Domain.Diagnostics;
 using AndroidX.Lifecycle;
@@ -473,7 +474,7 @@ public sealed class MusicLibrary(
         {
             // Ignore: restore is a convenience; the folder picker is always available.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet("Vault", "Music folder restore did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Music folder restore did not complete", e);
         }
     });
 
@@ -661,7 +662,7 @@ public sealed class MusicLibrary(
         {
             // Best-effort: the vault picks the folder up on the next successful publish.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet("Vault", "Music folder backup did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Music folder backup did not complete", e);
         }
     }
 }

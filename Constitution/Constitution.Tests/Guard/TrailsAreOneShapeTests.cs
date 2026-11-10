@@ -17,7 +17,7 @@ public class TrailsAreOneShapeTests
         var missing = Android()
             .Where(file => file.Relative.EndsWith("Worker.cs", StringComparison.Ordinal))
             .Where(file => Regex.Matches(file.Text, @"worker failed: \{e\.GetType\(\)\.Name\}").Count
-                != Regex.Matches(file.Text, @"\.Quiet\(""Worker"",").Count)
+                != Regex.Matches(file.Text, @"\.Quiet\((LogSources\.Worker|""Worker""),").Count)
             .Select(file => file.Relative)
             .ToList();
 

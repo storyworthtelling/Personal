@@ -28,7 +28,7 @@ internal static class IndexCourier
         if (before != ContractSendOutcome.Sent)
         {
             // Index not being installed is the ordinary case today, not a fault worth telling the owner about.
-            HeadLog.Info("Post", ContractBroadcast.SendLine(Contract, before));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, before));
             return;
         }
 
@@ -43,12 +43,12 @@ internal static class IndexCourier
             }
 
             context.SendBroadcast(intent, IndexHandoff.Permission);
-            HeadLog.Info("Post", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
         }
         catch (Exception e)
         {
             // Dropped on purpose; the type name only, since a message can carry the payload.
-            HeadLog.Info("Post", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
         }
     }
 

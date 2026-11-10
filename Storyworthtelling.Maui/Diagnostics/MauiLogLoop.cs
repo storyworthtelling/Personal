@@ -68,27 +68,27 @@ public static class MauiLogLoop
     public static T Worker<T>(string name, Func<T> body)
     {
         var started = System.Diagnostics.Stopwatch.StartNew();
-        MauiLog.Current?.Write("Worker", LogLevel.Information, WorkerTrail.StartedLine(name), null);
+        MauiLog.Current?.Write(LogSources.Worker, LogLevel.Information, WorkerTrail.StartedLine(name), null);
         try
         {
             var result = body();
-            MauiLog.Current?.Write("Worker", LogLevel.Information, WorkerTrail.FinishedLine(name, ResultName(result), started.Elapsed), null);
+            MauiLog.Current?.Write(LogSources.Worker, LogLevel.Information, WorkerTrail.FinishedLine(name, ResultName(result), started.Elapsed), null);
             return result;
         }
         catch (Exception e)
         {
-            MauiLog.Current?.Write("Worker", LogLevel.Warning, WorkerTrail.ThrewLine(name, started.Elapsed, e), e);
+            MauiLog.Current?.Write(LogSources.Worker, LogLevel.Warning, WorkerTrail.ThrewLine(name, started.Elapsed, e), e);
             throw;
         }
     }
 
     /// <summary>WorkManager stopped a run before it returned: the cap, a lost constraint, a cancel (audit 08 §20).</summary>
     public static void Stopped(string name, int reason) =>
-        MauiLog.Current?.Write("Worker", LogLevel.Warning, WorkerTrail.StoppedLine(name, reason), null);
+        MauiLog.Current?.Write(LogSources.Worker, LogLevel.Warning, WorkerTrail.StoppedLine(name, reason), null);
 
     /// <summary>A run that had nothing to do, and why (audit 08 §37).</summary>
     public static void Skipped(string name, string why) =>
-        MauiLog.Current?.Write("Worker", LogLevel.Information, WorkerTrail.SkippedLine(name, why), null);
+        MauiLog.Current?.Write(LogSources.Worker, LogLevel.Information, WorkerTrail.SkippedLine(name, why), null);
 
     /// <summary>From the head's worker: uploads only inside the Saturday window, until a run is confirmed.</summary>
     public static async Task UploadIfDueAsync(CancellationToken cancellationToken)
@@ -158,7 +158,7 @@ public static class MauiLogLoop
             foreach (var record in fresh)
             {
                 var when = DateTimeOffset.FromUnixTimeMilliseconds(record.Timestamp).ToLocalTime();
-                MauiLog.Current?.Write("Exit", ExitReasonPhrases.IsProblem(record.Reason) ? LogLevel.Warning : LogLevel.Information,
+                MauiLog.Current?.Write(LogSources.Exit, ExitReasonPhrases.IsProblem(record.Reason) ? LogLevel.Warning : LogLevel.Information,
                     $"EXIT at {when:yyyy-MM-dd HH:mm:ss zzz} — {ExitReasonPhrases.Describe(record)}{Anr(infos, record)}", null);
             }
             if (fresh.Count > 0)
