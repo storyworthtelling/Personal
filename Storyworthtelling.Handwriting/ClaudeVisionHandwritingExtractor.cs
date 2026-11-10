@@ -23,8 +23,7 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
 
     private readonly string instruction;
     private readonly Func<string>? userMessage;
-    private readonly ClaudeMessagesClient claude;
-    private readonly ClaudeVisionOptions options;
+    private readonly PageReader reader;
     private readonly ILogger<ClaudeVisionHandwritingExtractor> logger;
 
     // userMessage is the text that rides beside the page, read afresh on every Extract. Anything
@@ -42,9 +41,8 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
         Func<string>? userMessage = null)
     {
         this.instruction = instruction;
-        this.options = options.Value;
         this.logger = logger;
-        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, healthSink, credentialId);
+        reader = new PageReader(httpClient, () => options.Value.ApiKey, () => options.Value.Model, healthSink, credentialId);
         this.userMessage = userMessage;
     }
 
@@ -53,11 +51,9 @@ public class ClaudeVisionHandwritingExtractor : IHandwritingExtractor
         if (annotatedPdf.Length == 0)
             return [];
 
-        var request = new ClaudeRequest(options.Model, 1024,
-            [ClaudeBlock.Text(instruction, cache: true)],
-            [ClaudeBlock.Pdf(Convert.ToBase64String(annotatedPdf)), ClaudeBlock.Text(userMessage?.Invoke() ?? DefaultUserMessage)]);
-        var reply = await claude.SendAsync(request, CancellationToken.None);
-        return ParseNotes(reply.Text);
+        var text = await reader.ReadAsync(
+            annotatedPdf, instruction, userMessage?.Invoke() ?? DefaultUserMessage, 1024, CancellationToken.None);
+        return ParseNotes(text);
     }
 
     private IReadOnlyList<ParsedNote> ParseNotes(string text)

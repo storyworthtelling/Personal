@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Prayer;
 using Foreword.Infrastructure.Handwriting;
+using Storyworthtelling.Handwriting;
 
 namespace Foreword.Infrastructure.Prayer;
 
@@ -37,8 +38,7 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
     private const float PageWidth = 612f;
     private const float PageHeight = 792f;
 
-    private readonly ClaudeMessagesClient claude;
-    private readonly AnthropicOptions options;
+    private readonly PageReader reader;
     private readonly ILogger<ClaudeJournalTranscriber> logger;
 
     public ClaudeJournalTranscriber(
@@ -47,8 +47,7 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
         ILogger<ClaudeJournalTranscriber> logger,
         ICredentialHealthSink? healthSink = null)
     {
-        claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, healthSink);
-        this.options = options.Value;
+        reader = new PageReader(httpClient, () => options.Value.ApiKey, () => options.Value.Model, healthSink);
         this.logger = logger;
     }
 
@@ -61,8 +60,9 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
 
         try
         {
-            var reply = await claude.SendAsync(Ask(annotatedPdf), CancellationToken.None);
-            return Parse(reply.Text, date);
+            var text = await reader.ReadAsync(
+                annotatedPdf, Instruction(), "Transcribe the hand-written ink.", 2048, CancellationToken.None);
+            return Parse(text, date);
         }
         catch (Exception ex)
         {
@@ -70,11 +70,6 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
             return JournalRead.Nothing;
         }
     }
-
-    private ClaudeRequest Ask(byte[] annotatedPdf) =>
-        new(options.Model, 2048,
-            [ClaudeBlock.Text(Instruction(), cache: true)],
-            [ClaudeBlock.Pdf(Convert.ToBase64String(annotatedPdf)), ClaudeBlock.Text("Transcribe the hand-written ink.")]);
 
     /// <summary>
     /// The instruction, with the region boundary written into it from the region map rather than

@@ -3,7 +3,8 @@ namespace Constitution.Domain.Documents;
 /// <summary>
 /// The tablet's own page: 445 by 594 points, the native 3:4 of the reMarkable (D13), so a point on
 /// the page is a point on the glass and nothing is scaled or cropped. Every document begins its pages
-/// at this size through <c>VectorPdfSink.BeginPage</c> and never at a number of its own.
+/// at this size through <c>VectorPdfSink.BeginPage</c> and never at a number of its own. The two numbers are the
+/// suite's registered tablet page, <c>Storyworthtelling.Paper.RemarkablePage</c>, held equal by <c>TabletPageIsSharedTests</c>.
 /// </summary>
 public static class ConstitutionPage
 {

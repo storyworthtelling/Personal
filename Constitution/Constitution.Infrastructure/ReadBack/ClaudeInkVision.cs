@@ -28,14 +28,12 @@ namespace Constitution.Infrastructure.ReadBack;
 /// </summary>
 public sealed class ClaudeInkVision(HttpClient http, IOptions<ClaudeVisionOptions> options, ICredentialHealthSink? health = null) : IInkVision
 {
-    private readonly ClaudeMessagesClient claude = new(http, () => options.Value.ApiKey, health);
+    private readonly PageReader reader = new(http, () => options.Value.ApiKey, () => options.Value.Model, health);
 
 
     // A page of a dozen boxes is a few hundred tokens of reply; this leaves room for a long meal sheet.
     private const int MaximumReplyTokens = 4096;
     private const int LongestReason = 200;
-
-    private readonly ClaudeVisionOptions settings = options.Value;
 
     public async Task<InkDocumentRead> Read(ExpectedDocument document, byte[] annotatedPdf, CancellationToken cancellation)
     {
@@ -51,19 +49,16 @@ public sealed class ClaudeInkVision(HttpClient http, IOptions<ClaudeVisionOption
             throw new ArgumentException("The tablet returned an empty file, so there is no page to send.", nameof(annotatedPdf));
         }
 
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        if (!reader.HasKey)
         {
             throw new InvalidOperationException("The Claude key is not set, so the page cannot be read yet. It is read again once the key is in place.");
         }
 
-        var request = new ClaudeRequest(settings.Model, MaximumReplyTokens,
-            [ClaudeBlock.Text(InkInstruction.System, cache: true)],
-            [ClaudeBlock.Pdf(Convert.ToBase64String(annotatedPdf)), ClaudeBlock.Text(InkInstruction.Request(document))]);
-
-        ClaudeReply reply;
+        string reply;
         try
         {
-            reply = await claude.SendAsync(request, cancellation);
+            reply = await reader.ReadAsync(
+                annotatedPdf, InkInstruction.System, InkInstruction.Request(document), MaximumReplyTokens, cancellation);
         }
         catch (ClaudeRequestException refused) when (refused.StatusCode is { } status)
         {
@@ -76,7 +71,7 @@ public sealed class ClaudeInkVision(HttpClient http, IOptions<ClaudeVisionOption
             return InkReply.Parse(null, document);
         }
 
-        return InkReply.Parse(reply.Text.Length == 0 ? null : reply.Text, document);
+        return InkReply.Parse(reply.Length == 0 ? null : reply, document);
     }
 
     // The service's own words for why, when it gave some, capped; never the request.

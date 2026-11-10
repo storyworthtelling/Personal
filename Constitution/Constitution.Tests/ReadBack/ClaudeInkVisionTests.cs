@@ -245,4 +245,21 @@ public class ClaudeInkVisionTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => vision.Read(Workout(), Pdf, cancel.Token));
     }
+
+    [Fact]
+    public async Task AKeyAddedAfterStartIsUsedWithoutARestart()
+    {
+        // The read used to hold a copy of the options taken when it was built, so a key entered later read as "not set".
+        var document = Workout();
+        var key = string.Empty;
+        var handler = new Handler((_, _) => Reply(Everything(document)));
+        var vision = new ClaudeInkVision(
+            new HttpClient(handler),
+            new Storyworthtelling.Voice.LiveOptions<ClaudeVisionOptions>(() => Options(key)));
+
+        key = "sample-test-value";
+        await vision.Read(document, Pdf, CancellationToken.None);
+
+        Assert.Equal(1, handler.Calls);
+    }
 }
