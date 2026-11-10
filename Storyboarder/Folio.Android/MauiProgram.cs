@@ -157,12 +157,7 @@ public static class MauiProgram
             return async _ =>
             {
                 var token = await tokens.GetAccessToken();
-                return new DriveService(new GoogleClientInitializer
-                {
-                    HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                    ApplicationName = "Folio",
-                    HttpClientFactory = new AndroidGoogleHttpClientFactory()
-                });
+                return Storyworthtelling.Google.Android.GoogleDrive.Service(token, "Folio");
             };
         }
         // Drive-by-ID (#13): a shared, vault-seeded cache of well-known-file-name -> stable Drive id, so a

@@ -49,7 +49,7 @@ public class GoogleWeatherClient(
         var daily = await Read(DailyUrl());
         var hourly = await Read(HourlyUrl());
         var pollen = await Read(PollenUrl());
-        var air = await Post($"{AirQualityBase}/currentConditions:lookup?key={options.ApiKey}", AirBody());
+        var air = await Post($"{AirQualityBase}/currentConditions:lookup?key={Uri.EscapeDataString(options.ApiKey)}", AirBody());
 
         var week = daily is null ? [] : Week(daily.Value);
         var hours = hourly is null ? [] : Hours(hourly.Value, today);
@@ -69,15 +69,15 @@ public class GoogleWeatherClient(
     // ---- the calls ----
 
     private string DailyUrl() =>
-        $"{WeatherBase}/forecast/days:lookup?key={options.ApiKey}&{Location()}"
+        $"{WeatherBase}/forecast/days:lookup?key={Uri.EscapeDataString(options.ApiKey)}&{Location()}"
         + $"&days={WeekDays}&pageSize={WeekDays}&unitsSystem=IMPERIAL";
 
     private string HourlyUrl() =>
-        $"{WeatherBase}/forecast/hours:lookup?key={options.ApiKey}&{Location()}"
+        $"{WeatherBase}/forecast/hours:lookup?key={Uri.EscapeDataString(options.ApiKey)}&{Location()}"
         + $"&hours=24&pageSize=24&unitsSystem=IMPERIAL";
 
     private string PollenUrl() =>
-        $"{PollenBase}/forecast:lookup?key={options.ApiKey}"
+        $"{PollenBase}/forecast:lookup?key={Uri.EscapeDataString(options.ApiKey)}"
         + $"&location.latitude={Number(options.HomeLatitude)}"
         + $"&location.longitude={Number(options.HomeLongitude)}&days=1";
 

@@ -9,6 +9,7 @@ using Codex.Ui;
 using Codex.Ui.Voice;
 using Storyworthtelling.Updates;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -77,7 +78,7 @@ public static class ScoreUpdateService
             return UpdateRunResult.NoToken();
         }
 
-        using var http = new HttpClient();
+        var http = HeadHttp.Shared;
         ReleaseInfo release;
         try
         {

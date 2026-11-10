@@ -7,6 +7,7 @@ using Constitution.MealsTab;
 using Microsoft.Extensions.Options;
 using Storyworthtelling.Handwriting;
 using Xamarin.Android.Net;
+using Codex.Ui.Http;
 
 namespace Constitution.Services;
 
@@ -20,14 +21,14 @@ internal static class AteEstimatorServices
 {
     // A photo through a vision model is a few seconds; this leaves room for a poor connection.
     private static readonly TimeSpan EstimateTimeout = TimeSpan.FromMinutes(2);
-    private static readonly Lazy<HttpClient> Http = new(() => new HttpClient(new AndroidMessageHandler()) { Timeout = EstimateTimeout });
+    private static HttpClient Http => HeadHttp.WithTimeout(EstimateTimeout);
 
     public static IAteEstimator EstimatorOf(Activity host)
     {
         var appContext = host.ApplicationContext ?? host;
         var connections = new ConstitutionConnections(appContext);
         return new ClaudeAteEstimator(
-            Http.Value,
+            Http,
             new LiveOptions<ClaudeVisionOptions>(() => new ClaudeVisionOptions { ApiKey = connections.ClaudeApiKey }),
             AtePhotoScaler.Read,
             HeadCredentialHealth.Store());

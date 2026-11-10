@@ -1,6 +1,7 @@
 using Codex.Domain.Apps;
 using Codex.Infrastructure.Apps;
 using Codex.Ui.Voice;
+using Codex.Ui.Http;
 
 namespace Flyleaf;
 
@@ -24,10 +25,7 @@ public sealed class ShelfGlyphMaker(Func<Task<string>> accessToken)
         {
             var options = Codex.Ui.Voice.VoiceOptionsAccess.ForHead(accessToken, "Flyleaf");
             await options.RefreshAsync(cancellationToken);
-            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler())
-            {
-                Timeout = TimeSpan.FromSeconds(30),
-            };
+            var http = HeadHttp.WithTimeout(TimeSpan.FromSeconds(30));
             var path = await new ShelfGlyphClient(http, options, HeadCredentialHealth.Store()).GenerateAsync(shelfName, cancellationToken);
             return path is not null && SvgGlyph.Parse(path) is not null ? "path:" + path : null;
         }

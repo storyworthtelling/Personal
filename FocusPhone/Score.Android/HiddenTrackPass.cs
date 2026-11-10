@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
@@ -7,6 +8,7 @@ using Codex.Ui.Voice;
 using Score.Google;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -41,18 +43,13 @@ public sealed class HiddenTrackPass
         Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
         {
             var token = await tokens.GetAccessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = "Score",
-                HttpClientFactory = new AndroidGoogleHttpClientFactory()
-            });
+            return GoogleDrive.Service(token, "Score");
         };
 
         var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
-        var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+        var http = HeadHttp.Shared;
         namer = new HiddenTrackNamer(http, options, HeadCredentialHealth.Store());
     }
 

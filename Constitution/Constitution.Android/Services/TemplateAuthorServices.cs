@@ -6,6 +6,7 @@ using Constitution.Infrastructure.Meals;
 using Microsoft.Extensions.Options;
 using Storyworthtelling.Handwriting;
 using Xamarin.Android.Net;
+using Codex.Ui.Http;
 
 namespace Constitution.Services;
 
@@ -19,12 +20,12 @@ internal static class TemplateAuthorServices
 {
     // A short text reply; this leaves room for a poor connection.
     private static readonly TimeSpan AuthorTimeout = TimeSpan.FromMinutes(2);
-    private static readonly Lazy<HttpClient> Http = new(() => new HttpClient(new AndroidMessageHandler()) { Timeout = AuthorTimeout });
+    private static HttpClient Http => HeadHttp.WithTimeout(AuthorTimeout);
 
     public static ITemplateAuthor AuthorOf(Context appContext)
     {
         ArgumentNullException.ThrowIfNull(appContext);
-        return new ClaudeTemplateAuthor(Http.Value, ClaudeKeyOf(new ConstitutionConnections(appContext.ApplicationContext ?? appContext)), HeadCredentialHealth.Store());
+        return new ClaudeTemplateAuthor(Http, ClaudeKeyOf(new ConstitutionConnections(appContext.ApplicationContext ?? appContext)), HeadCredentialHealth.Store());
     }
 
     // The key as it is at the moment of the call, so one entered or restored after launch is used.

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Android half of the Google kit (audit 01 §8, §10): the device-account token, the Google SDK's HTTP
+    transport on the Android stack, one Drive service factory and the app's signing certificate. Twelve transport
+    factories, five token providers and three AppSigningInfo copies collapse into this. Referenced by
+    Codex.Ui.Android (the native heads) and Storyworthtelling.Maui (the MAUI heads). The pure parts (scopes, the
+    token cache) are in Storyworthtelling.Google, where they are tested.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Google.Android</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Storyworthtelling.Google\Storyworthtelling.Google.csproj" />
+  </ItemGroup>
+
+</Project>

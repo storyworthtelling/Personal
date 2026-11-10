@@ -155,7 +155,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IGoogleClientFactory>(sp =>
             new GoogleClientFactory(
                 sp.GetRequiredService<IGoogleAccessTokenProvider>(),
-                new AndroidGoogleHttpClientFactory()));
+                new Storyworthtelling.Google.Android.GoogleHttpClientFactory()));
         builder.Services.AddTransient<IGoogleCalendarClient, GoogleCalendarClient>();
         builder.Services.AddTransient<IGoogleTasksClient, GoogleTasksClient>();
         builder.Services.AddTransient<CalendarColumnMapper>();
@@ -218,12 +218,7 @@ public static class MauiProgram
             return async _ =>
             {
                 var token = await tokens.GetAccessToken();
-                return new VoiceDriveService(new VoiceClientInitializer
-                {
-                    HttpClientInitializer = VoiceGoogleCredential.FromAccessToken(token),
-                    ApplicationName = "Foreword",
-                    HttpClientFactory = new AndroidGoogleHttpClientFactory()
-                });
+                return Storyworthtelling.Google.Android.GoogleDrive.Service(token, "Foreword");
             };
         }
         // Drive-by-ID (#13): shared, vault-seeded cache of well-known-file-name -> stable Drive id so a

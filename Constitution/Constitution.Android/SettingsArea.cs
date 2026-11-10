@@ -26,6 +26,7 @@ using Constitution.Services;
 using Constitution.Settings;
 using Constitution.WorkoutsTab;
 using Storyworthtelling.Remarkable;
+using Codex.Ui.Http;
 
 namespace Constitution;
 
@@ -566,7 +567,7 @@ public sealed class SettingsArea(Activity host)
             string token;
             try
             {
-                using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+                var http = HeadHttp.Shared;
                 token = await new RemarkableRegistrationClient(http).Register(code, CancellationToken.None);
                 if (string.IsNullOrWhiteSpace(token))
                 {

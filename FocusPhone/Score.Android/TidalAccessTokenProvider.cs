@@ -2,6 +2,7 @@ using Android.Content;
 using Codex.Infrastructure.Music;
 using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -36,7 +37,7 @@ public sealed class TidalAccessTokenProvider(Context context)
             return new TidalTokenPollResult(TidalTokenPollStatus.Error);
         }
 
-        var result = await new TidalDeviceAuthClient(new HttpClient()).RefreshAsync(
+        var result = await new TidalDeviceAuthClient(HeadHttp.Shared).RefreshAsync(
             vaultResult.Vault.Tidal.ClientId, vaultResult.Vault.Tidal.ClientSecret, account.RefreshToken,
             cancellationToken);
 

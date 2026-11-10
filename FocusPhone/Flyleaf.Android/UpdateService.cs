@@ -11,6 +11,7 @@ using Codex.Infrastructure.Updates;
 using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
 using Codex.Ui;
+using Codex.Ui.Http;
 
 namespace Flyleaf;
 
@@ -95,7 +96,7 @@ public static class UpdateService
             return UpdateRunResult.NotDeviceOwner();
         }
 
-        using var http = new HttpClient();
+        var http = HeadHttp.Shared;
         var client = new GitHubReleaseClient(http, Repo, token);
         var health = HeadCredentialHealth.Store();
         ReleaseInfo release;

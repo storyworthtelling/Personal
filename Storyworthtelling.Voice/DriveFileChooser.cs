@@ -42,8 +42,7 @@ public static class DriveFileChooser
     public const int ListPageSize = 100;
 
     /// <summary>The files.list <c>q</c> for a well-known name, excluding trashed files.</summary>
-    public static string NameQuery(string fileName) =>
-        $"name='{fileName.Replace("'", @"\'", StringComparison.Ordinal)}' and trashed=false";
+    public static string NameQuery(string fileName) => DriveQuery.Name(fileName);
 
     public static DriveFileChoice Choose(IEnumerable<DriveFileCandidate> candidates)
     {

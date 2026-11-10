@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using Android.Content;
 using Codex.Ui.Voice;
 using Constitution.Domain.Voice;
@@ -9,6 +10,7 @@ using Google.Apis.Http;
 using Google.Apis.Services;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Constitution.BodyTab;
 
@@ -48,21 +50,12 @@ internal static class BodySeats
     private static SeatCache Build(Context context)
     {
         var account = ConstitutionGoogle.Create();
-        Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
-        {
-            var token = await account.GetAccessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = ApplicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory(),
-            });
-        };
+        var driveFactory = GoogleDrive.Factory(account.GetAccessToken, ApplicationName);
 
         // The Claude key is read from the shared vault with this head's passphrase; with none, the options stay empty and the seat is plain.
         var vault = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         var options = new DriveVoiceOptions(new VaultVoiceConfigStore(vault, () => VaultPassphraseStore.Passphrase));
-        var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
+        var http = HeadHttp.WithTimeout(TimeSpan.FromMinutes(2));
         var messenger = new VoicedMessenger(
             DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
             new VoiceClient(http, options, HeadCredentialHealth.Store()));
@@ -70,10 +63,4 @@ internal static class BodySeats
         return new SeatCache(new SeatComposer(messenger, options), new BodySeatLineStore(context));
     }
 
-    // Routes the Google API client through AndroidMessageHandler, as the sibling heads' Drive clients do.
-    private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
-    {
-        protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>
-            new Xamarin.Android.Net.AndroidMessageHandler();
-    }
 }

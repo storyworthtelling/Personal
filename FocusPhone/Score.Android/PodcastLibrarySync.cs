@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Http;
@@ -51,12 +52,7 @@ public sealed class PodcastLibrarySync
         Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
         {
             var token = await accessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = applicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory()
-            });
+            return GoogleDrive.Service(token, applicationName);
         };
 
         store = new DriveAudioLibraryStore(new DriveTextFile(
@@ -164,9 +160,4 @@ public sealed class PodcastLibrarySync
         equalizerStore.LoudnessMillibels = library.LoudnessMillibels;
     }
 
-    private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
-    {
-        protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>
-            new Xamarin.Android.Net.AndroidMessageHandler();
-    }
 }

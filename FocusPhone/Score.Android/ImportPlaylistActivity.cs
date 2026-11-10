@@ -7,6 +7,7 @@ using Codex.Domain.Design;
 using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Ui;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -31,7 +32,7 @@ namespace Score;
 [IntentFilter([Intent.ActionSend], Categories = [Intent.CategoryDefault], DataMimeType = "text/plain")]
 public class ImportPlaylistActivity : Activity
 {
-    private readonly ISharedPlaylistSource source = new SpotifyPlaylistClient(new HttpClient());
+    private readonly ISharedPlaylistSource source = new SpotifyPlaylistClient(HeadHttp.Shared);
 
     private LinearLayout body = null!;
     private EditText name = null!;

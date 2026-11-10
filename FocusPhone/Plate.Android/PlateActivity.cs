@@ -10,6 +10,7 @@ using Codex.Domain.Plate;
 using Codex.Infrastructure.Plate;
 using Codex.Ui;
 using Codex.Ui.Voice;
+using Codex.Ui.Http;
 
 namespace Plate;
 
@@ -340,7 +341,7 @@ public class PlateActivity : AppCompatActivity
             var voiceOptions = VoiceOptionsAccess.ForHead(Account.GetAccessToken, "Plate");
             await voiceOptions.RefreshAsync(CancellationToken.None);
 
-            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+            var http = HeadHttp.Shared;
             var client = new DarkroomCaptionClient(http, voiceOptions, HeadCredentialHealth.Store());
             var line = await client.CaptionAsync(jpegs, CancellationToken.None);
             if (string.IsNullOrWhiteSpace(line))

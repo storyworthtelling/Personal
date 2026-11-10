@@ -1,6 +1,7 @@
 using Android.Content;
 using Codex.Domain.Audio;
 using Codex.Infrastructure.Podcasts;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -45,14 +46,14 @@ public sealed class PodcastArtworkCache(Context context)
 
         try
         {
-            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
-
             // The same identity the feed and the audio send. These CDNs answer 403 to
             // a client that does not introduce itself, and the artwork is served by
-            // the hosts that taught us that.
-            http.DefaultRequestHeaders.UserAgent.ParseAdd(PodcastHttp.UserAgent);
-
-            var bytes = await http.GetByteArrayAsync(imageUrl, cancellationToken);
+            // the hosts that taught us that. On the request, since the client is shared.
+            using var request = new HttpRequestMessage(HttpMethod.Get, imageUrl);
+            request.Headers.UserAgent.ParseAdd(PodcastHttp.UserAgent);
+            using var response = await HeadHttp.Shared.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
             System.IO.Directory.CreateDirectory(directory);
             await System.IO.File.WriteAllBytesAsync(path, bytes, cancellationToken);
             return path;

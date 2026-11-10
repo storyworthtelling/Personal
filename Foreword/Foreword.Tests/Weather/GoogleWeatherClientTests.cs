@@ -274,6 +274,27 @@ public class GoogleWeatherClientTests
         Assert.True((await client.GetReport(Day)).IsEmpty);
     }
 
+    // Audit 01 §9: the key went into each URL as it was, so one holding '&' or '#' split the query. It is escaped now,
+    // and every request carries exactly the key it was given and no parameter it smuggled in.
+    [Fact]
+    public async Task TheKeyIsEscapedInEveryUrl()
+    {
+        var seen = new List<Uri>();
+        var client = new GoogleWeatherClient(
+            new HttpClient(new StubHandler(request => { seen.Add(request.RequestUri!); return Route(request); })),
+            Options.Create(new MapsOptions { ApiKey = "k&units=METRIC#x", HomeLatitude = 39.78, HomeLongitude = -89.65 }));
+
+        await client.GetReport(Day);
+
+        Assert.NotEmpty(seen);
+        foreach (var uri in seen)
+        {
+            var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+            Assert.Equal("k&units=METRIC#x", query["key"]);
+            Assert.Null(query["units"] == "METRIC#x" ? "smuggled" : null);
+        }
+    }
+
     private sealed class StubHandler(Func<HttpRequestMessage, string> respond) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(

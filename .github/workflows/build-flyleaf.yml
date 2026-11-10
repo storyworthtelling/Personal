@@ -12,6 +12,8 @@ on:
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
       - 'Storyworthtelling.Folds/**'
+      - 'Storyworthtelling.Google/**'
+      - 'Storyworthtelling.Google.Android/**'
       - 'FocusPhone/Codex.Infrastructure/**'
       - 'FocusPhone/Codex.Tests/**'
       - 'Storyworthtelling.Updates/**'

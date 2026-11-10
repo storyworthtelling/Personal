@@ -1,6 +1,7 @@
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
+using Storyworthtelling.Voice;
 
 namespace Folio.Android.Google;
 
@@ -9,7 +10,7 @@ namespace Folio.Android.Google;
 // transport goes through AndroidMessageHandler.
 public sealed class DriveDocsLister
 {
-    private const string FolderMime = "application/vnd.google-apps.folder";
+    private const string FolderMime = DriveQuery.FolderMimeType;
     private const string DocMime = "application/vnd.google-apps.document";
     private const string DocxMime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -27,23 +28,15 @@ public sealed class DriveDocsLister
     public async Task<IReadOnlyList<DriveEntry>> ListChildrenAsync(
         string accessToken, string folderId, CancellationToken cancellationToken)
     {
-        var credential = GoogleCredential.FromAccessToken(accessToken);
-        using var service = new DriveService(new BaseClientService.Initializer
-        {
-            HttpClientInitializer = credential,
-            ApplicationName = "Folio",
-            HttpClientFactory = new AndroidGoogleHttpClientFactory()
-        });
+        using var service = Storyworthtelling.Google.Android.GoogleDrive.Service(accessToken, "Folio");
 
-        var request = service.Files.List();
-        request.Q = $"'{folderId}' in parents and trashed=false and " +
-                    $"(mimeType='{FolderMime}' or mimeType='{DocMime}' or mimeType='{DocxMime}')";
-        request.Fields = "files(id,name,mimeType)";
-        request.OrderBy = "folder,name";
-        request.PageSize = 200;
-
-        var response = await request.ExecuteAsync(cancellationToken);
-        return response.Files
+        // Every page: a folder with more than one page of documents used to lose the rest without a word.
+        var query = DriveQuery.And(
+            DriveQuery.InFolder(folderId),
+            $"({DriveQuery.FoldersOnly} or {DriveQuery.MimeTypeIs(DocMime)} or {DriveQuery.MimeTypeIs(DocxMime)})");
+        var files = await DrivePaging.ListFilesAsync(
+            service, query, "id,name,mimeType", 200, cancellationToken, orderBy: "folder,name");
+        return files
             .Where(f => !string.IsNullOrEmpty(f.Id))
             .Select(f => new DriveEntry(f.Id, f.Name ?? "(untitled)", f.MimeType == FolderMime))
             .ToList();

@@ -2,6 +2,7 @@ using Android.Content;
 using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Infrastructure.Storage;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -32,7 +33,7 @@ public sealed class TempoBackfill
     {
         this.context = context;
         this.source = source ?? new DeezerTempoClient(
-            new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()));
+            HeadHttp.Shared);
     }
 
     /// <summary>

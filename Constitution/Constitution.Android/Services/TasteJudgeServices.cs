@@ -7,6 +7,7 @@ using Constitution.Infrastructure.Meals;
 using Microsoft.Extensions.Options;
 using Storyworthtelling.Handwriting;
 using Xamarin.Android.Net;
+using Codex.Ui.Http;
 
 namespace Constitution.Services;
 
@@ -19,7 +20,7 @@ internal static class TasteJudgeServices
 {
     // A short JSON reply; this leaves room for a poor connection.
     private static readonly TimeSpan JudgeTimeout = TimeSpan.FromMinutes(1);
-    private static readonly Lazy<HttpClient> Http = new(() => new HttpClient(new AndroidMessageHandler()) { Timeout = JudgeTimeout });
+    private static HttpClient Http => HeadHttp.WithTimeout(JudgeTimeout);
 
     /// <summary>The judge, looking dish names up in the recipe box it is handed.</summary>
     public static ITasteJudge JudgeOf(Context appContext, IRecipeBoxSource box)
@@ -27,7 +28,7 @@ internal static class TasteJudgeServices
         ArgumentNullException.ThrowIfNull(appContext);
         ArgumentNullException.ThrowIfNull(box);
         return new ClaudeTasteJudge(
-            Http.Value,
+            Http,
             ClaudeKeyOf(new ConstitutionConnections(appContext.ApplicationContext ?? appContext)),
             new TasteDishNames(box).Of,
             HeadCredentialHealth.Store());

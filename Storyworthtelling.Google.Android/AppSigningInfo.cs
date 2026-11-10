@@ -2,12 +2,13 @@ using System.Text;
 using Android.Content.PM;
 using Java.Security;
 
-namespace Folio.Android.Google;
+namespace Storyworthtelling.Google.Android;
 
 // Reads the running APK's package name and signing-certificate SHA-1. Google matches AccountManager
 // OAuth token requests against this (package, certificate) pair, so these are the exact values the
 // user must register as an Android OAuth client in the Google Cloud Console. Shown on the Settings
-// page and in the "app isn't registered" sign-in error so registration is copy-paste.
+// page and in the "app isn't registered" sign-in error so registration is copy-paste. One copy for every
+// head (audit 01 §10); Score, Plate and Folio each kept their own.
 public static class AppSigningInfo
 {
     public static string PackageName =>

@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
 using global::Google.Apis.Services;
@@ -6,6 +7,7 @@ using Storyworthtelling.Voice.Secrets;
 using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Ui.Voice;
+using Codex.Ui.Http;
 
 namespace Score.Google;
 
@@ -32,12 +34,7 @@ public sealed class MusicTasteService
         Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
         {
             var token = await accessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = applicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory()
-            });
+            return GoogleDrive.Service(token, applicationName);
         };
 
         // The shared Claude key now lives in the encrypted secrets vault (single source of truth, in place of
@@ -46,7 +43,7 @@ public sealed class MusicTasteService
             driveFactory, DriveSecretsVaultStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store));
         options = new DriveVoiceOptions(
             new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
-        var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()) { Timeout = TimeSpan.FromMinutes(2) };
+        var http = HeadHttp.WithTimeout(TimeSpan.FromMinutes(2));
         var client = new TasteProfileClient(http, options, HeadCredentialHealth.Store());
         store = new DriveTasteProfileStore(new DriveTextFile(
             driveFactory, DriveTasteProfileStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store));

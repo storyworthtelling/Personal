@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using Android.Content;
 using Codex.Ui.Voice;
 using Constitution.Body;
@@ -118,24 +119,9 @@ public static class BodyBackups
 
     private static DriveTextFile BuildDriveFile(VoiceGoogleAccount account)
     {
-        Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
-        {
-            var token = await account.GetAccessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = ApplicationName,
-                HttpClientFactory = new AndroidGoogleHttpClientFactory(),
-            });
-        };
+        var driveFactory = GoogleDrive.Factory(account.GetAccessToken, ApplicationName);
 
         return new DriveTextFile(driveFactory, BodyBackup.FileName, SharedDriveFileIds.Store);
     }
 
-    // Routes the Google API client through AndroidMessageHandler, as the vaults' Drive client does.
-    private sealed class AndroidGoogleHttpClientFactory : HttpClientFactory
-    {
-        protected override HttpMessageHandler CreateHandler(CreateHttpClientArgs args) =>
-            new Xamarin.Android.Net.AndroidMessageHandler();
-    }
 }

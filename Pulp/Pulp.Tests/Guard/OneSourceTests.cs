@@ -39,9 +39,10 @@ public class OneSourceTests
     public void OnlyTheCompositionRootMakesAnHttpClient() =>
         OnlyIn(
             "Pulp.Android",
-            new Regex(@"new\s+HttpClient\s*\(|HttpClient\s+\w+\s*=\s*new\s*\("),
+            // The client itself comes from the shared HeadHttp (audit 01 §19); the root is the one place that takes it.
+            new Regex(@"new\s+HttpClient\s*\(|HttpClient\s+\w+\s*=\s*new\s*\(|HeadHttp\."),
             path => path.StartsWith("Pulp.Android/App/", StringComparison.Ordinal),
-            "makes an HttpClient");
+            "takes an HttpClient");
 
     [Fact]
     public void OnlyPostersDownloadsAPoster() =>

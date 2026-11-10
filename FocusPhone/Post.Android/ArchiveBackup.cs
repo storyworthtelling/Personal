@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using Android.Content;
 using Codex.Domain.Post;
 using Codex.Infrastructure.Post;
@@ -35,12 +36,7 @@ internal sealed class ArchiveBackup
         Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
         {
             var token = await accessToken();
-            return new DriveService(new BaseClientService.Initializer
-            {
-                HttpClientInitializer = GoogleCredential.FromAccessToken(token),
-                ApplicationName = applicationName,
-                HttpClientFactory = new GoogleHttpClientFactory(),
-            });
+            return GoogleDrive.Service(token, applicationName);
         };
 
         sync = new ArchiveBackupSync(

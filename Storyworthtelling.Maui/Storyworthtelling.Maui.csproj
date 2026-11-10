@@ -44,6 +44,7 @@
     <ProjectReference Include="..\Storyworthtelling.Folds\Storyworthtelling.Folds.csproj" />
     <ProjectReference Include="..\Storyworthtelling.Time\Storyworthtelling.Time.csproj" />
     <ProjectReference Include="..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
+    <ProjectReference Include="..\Storyworthtelling.Google.Android\Storyworthtelling.Google.Android.csproj" />
     <!-- The Drive half of the loop (the log folder, the uploader) and the vault's ownership rule. -->
     <ProjectReference Include="..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
   </ItemGroup>

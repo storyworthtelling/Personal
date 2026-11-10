@@ -88,7 +88,9 @@ public partial class MauiTapWatchInstalledTests
     [MemberData(nameof(Apps))]
     public void TheGooglePickerIsTrailed(string app)
     {
-        var signIn = Read(For(app).Folder, "DeviceAccountSignIn.cs");
+        // The flow is the kit's one (audit 01 §10); each head's sign-in hands its picker to it.
+        Assert.Contains("Storyworthtelling.Maui.Google.DeviceAccountSignInFlow", Read(For(app).Folder, "DeviceAccountSignIn.cs"), StringComparison.Ordinal);
+        var signIn = File.ReadAllText(Path.Combine(RepoRoot(), "Storyworthtelling.Maui", "Google", "DeviceAccountSignInFlow.cs"));
 
         foreach (var step in new[] { "DeviceAccountTrail.Begin(", "DeviceAccountTrail.LeftApp()", "DeviceAccountTrail.Chosen()", "DeviceAccountTrail.Cancelled()", "DeviceAccountTrail.Token(", "DeviceAccountTrail.Failed(" })
         {

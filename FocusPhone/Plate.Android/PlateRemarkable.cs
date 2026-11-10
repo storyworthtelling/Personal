@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Plate;
 
@@ -46,7 +47,7 @@ public sealed class PlateRemarkable(VoiceGoogleAccount account)
     /// </summary>
     public static async Task<string> Pair(string oneTimeCode, CancellationToken cancellationToken = default)
     {
-        using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+        var http = HeadHttp.Shared;
         var token = await new RemarkableRegistrationClient(http).Register(oneTimeCode, cancellationToken);
         DeviceToken = token;
         return token;
@@ -66,8 +67,8 @@ public sealed class PlateRemarkable(VoiceGoogleAccount account)
 
         // Two clients rather than one: the auth exchange and the storage calls are separate
         // hosts, and the shared library takes an HttpClient each.
-        using var authHttp = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
-        using var storageHttp = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+        var authHttp = HeadHttp.Shared;
+        var storageHttp = HeadHttp.Shared;
 
         var auth = new RemarkableAuthService(
             authHttp, Options.Create(new RemarkableOptions { DeviceToken = DeviceToken }));

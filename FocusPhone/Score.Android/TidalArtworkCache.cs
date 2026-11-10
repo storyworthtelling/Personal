@@ -1,4 +1,5 @@
 using Android.Content;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -22,7 +23,7 @@ public sealed class TidalArtworkCache(Context context)
     {
         try
         {
-            using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+            var http = HeadHttp.Shared;
             var bytes = await http.GetByteArrayAsync(url, cancellationToken);
             System.IO.Directory.CreateDirectory(directory);
             var path = System.IO.Path.Combine(directory, SafeName(trackId) + ".art");

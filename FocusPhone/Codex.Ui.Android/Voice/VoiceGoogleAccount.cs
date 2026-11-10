@@ -1,3 +1,4 @@
+using Storyworthtelling.Google.Android;
 using global::Android.Accounts;
 using global::Android.App;
 using global::Android.Content;
@@ -43,9 +44,7 @@ public sealed class VoiceGoogleAccount
     }
 
     private static TaskCompletionSource<string>? pendingChoice;
-    private readonly object gate = new();
-    private string? cachedToken;
-    private DateTimeOffset expiresAt;
+    private DeviceAccountTokens? tokens;
 
     private static ISharedPreferences Prefs() =>
         global::Android.App.Application.Context.GetSharedPreferences(PrefsName, FileCreationMode.Private)!;
@@ -61,38 +60,8 @@ public sealed class VoiceGoogleAccount
         editor.Apply();
     }
 
-    public Task<string> GetAccessToken()
-    {
-        lock (gate)
-        {
-            if (cachedToken is not null && DateTimeOffset.UtcNow < expiresAt)
-                return Task.FromResult(cachedToken);
-        }
-
-        var email = Email;
-        if (string.IsNullOrEmpty(email))
-            throw new InvalidOperationException("Sign in with Google first.");
-
-        return Task.Run(() =>
-        {
-            var manager = AccountManager.Get(global::Android.App.Application.Context)!;
-            var account = new Account(email, "com.google");
-            lock (gate)
-            {
-                if (cachedToken is not null)
-                    manager.InvalidateAuthToken("com.google", cachedToken);
-            }
-
-            var token = manager.BlockingGetAuthToken(account, tokenScope, true)
-                ?? throw new InvalidOperationException("Could not get a Google token. Sign in again.");
-            lock (gate)
-            {
-                cachedToken = token;
-                expiresAt = DateTimeOffset.UtcNow.AddMinutes(45);
-            }
-            return token;
-        });
-    }
+    public Task<string> GetAccessToken() =>
+        (tokens ??= new DeviceAccountTokens(() => Email, tokenScope, "Sign in with Google first.")).GetAccessToken();
 
     // The sign-in under way and where its trail goes once it ends (LOG-LOOP-PLAN.md §4.2). Static, like
     // pendingChoice, because the picker's answer arrives through the activity, not through this instance.

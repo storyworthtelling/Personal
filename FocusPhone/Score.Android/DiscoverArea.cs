@@ -5,6 +5,7 @@ using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Infrastructure.Podcasts;
 using Codex.Ui;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -47,7 +48,7 @@ public sealed class DiscoverArea : ScoreArea
     private readonly MusicLibrary library;
     private readonly FridayPicksStore picksStore;
     private readonly IPodcastSearch search = new PodcastSearchClient(
-        new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler()));
+        HeadHttp.Shared);
     private readonly SubscriptionStore subscriptionStore;
 
     // The dealer's note. One line per record, composed in the owner's voice and kept
@@ -308,7 +309,7 @@ public sealed class DiscoverArea : ScoreArea
             return;
         }
 
-        var found = await new TidalCatalogClient(new HttpClient())
+        var found = await new TidalCatalogClient(HeadHttp.Shared)
             .SearchAsync(accessToken, asked, MusicLibrary.TidalCountryCode, CancellationToken.None);
         trackResults = found;
         trackSearchStatus = found.Count == 0 ? $"No tracks found for “{asked}”." : null;
@@ -597,7 +598,7 @@ public sealed class DiscoverArea : ScoreArea
             return;
         }
 
-        var found = await new TidalCatalogClient(new HttpClient())
+        var found = await new TidalCatalogClient(HeadHttp.Shared)
             .SearchAsync(accessToken, $"{pick.Subtitle} {pick.Title}", MusicLibrary.TidalCountryCode, CancellationToken.None);
         if (found.Count == 0)
         {
@@ -629,7 +630,7 @@ public sealed class DiscoverArea : ScoreArea
             return;
         }
 
-        var found = await new TidalCatalogClient(new HttpClient())
+        var found = await new TidalCatalogClient(HeadHttp.Shared)
             .SearchAsync(accessToken, $"{pick.Subtitle} {pick.Title}", MusicLibrary.TidalCountryCode, CancellationToken.None);
         var match = Discoveries.FindAlbumTrack(found, pick.Title, pick.Subtitle);
         if (match is null)
@@ -652,7 +653,7 @@ public sealed class DiscoverArea : ScoreArea
         }
 
         var rawId = trackId.StartsWith("tidal:", StringComparison.Ordinal) ? trackId["tidal:".Length..] : trackId;
-        var tracks = await new TidalCatalogClient(new HttpClient())
+        var tracks = await new TidalCatalogClient(HeadHttp.Shared)
             .GetAlbumTracksAsync(accessToken, rawId, MusicLibrary.TidalCountryCode, CancellationToken.None);
         if (tracks.Count == 0)
         {
@@ -696,7 +697,7 @@ public sealed class DiscoverArea : ScoreArea
             return;
         }
 
-        var found = await new TidalCatalogClient(new HttpClient())
+        var found = await new TidalCatalogClient(HeadHttp.Shared)
             .SearchAsync(accessToken, $"{pick.Subtitle} {pick.Title}", MusicLibrary.TidalCountryCode, CancellationToken.None);
         if (found.Count == 0)
         {

@@ -3,6 +3,7 @@ using Score.Google;
 using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Infrastructure.Storage;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -94,7 +95,7 @@ public sealed class MusicScanner
             return new MusicScanRunResult(true, new RescanOutcome(0, 0, removed));
         }
 
-        using var http = new HttpClient(new Xamarin.Android.Net.AndroidMessageHandler());
+        var http = HeadHttp.Shared;
         var elapsed = timeBudget is null ? null : Stopwatch.StartNew();
         var done = 0;
         var added = 0;

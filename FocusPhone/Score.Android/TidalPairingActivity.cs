@@ -12,6 +12,7 @@ using Codex.Ui;
 using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
+using Codex.Ui.Http;
 
 namespace Score;
 
@@ -288,7 +289,7 @@ public class TidalPairingActivity : Activity
         TidalTokenPollResult exchanged;
         try
         {
-            using var http = new HttpClient();
+            var http = HeadHttp.Shared;
             exchanged = await new TidalDeviceAuthClient(http).ExchangeCodeAsync(
                 clientId, clientSecret, code, pkce.Verifier, TidalSignIn.RedirectUri, CancellationToken.None);
         }

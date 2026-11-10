@@ -15,6 +15,8 @@ on:
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
       - 'Storyworthtelling.Folds/**'
+      - 'Storyworthtelling.Google/**'
+      - 'Storyworthtelling.Google.Android/**'
       - 'Storyworthtelling.Pipeline/**'
       - 'Storyworthtelling.Voice.Tests/**'
       # The shared reMarkable delivery library also ships in the APK (Infrastructure references it).

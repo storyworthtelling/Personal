@@ -5,6 +5,7 @@ using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Storyworthtelling.Diagnostics;
+using Storyworthtelling.Voice;
 
 namespace LogLoopReader;
 
@@ -44,26 +45,14 @@ public sealed class DriveLogSource : ILogSource
     public async Task<IReadOnlyList<RemoteLogFile>> ListAsync(CancellationToken cancellationToken)
     {
         var folders = service.Files.List();
-        folders.Q = $"name='{folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        folders.Q = DriveQuery.And(DriveQuery.Name(folderName), DriveQuery.FoldersOnly);
         folders.Fields = "files(id)";
         var folder = (await folders.ExecuteAsync(cancellationToken)).Files.FirstOrDefault()
             ?? throw new InvalidOperationException($"No Drive folder named {folderName} is visible to the reader's key.");
 
-        var files = new List<RemoteLogFile>();
-        string? page = null;
-        do
-        {
-            var list = service.Files.List();
-            list.Q = $"'{folder.Id}' in parents and trashed=false";
-            list.Fields = "nextPageToken, files(id, name)";
-            list.PageSize = 1000;
-            list.PageToken = page;
-            var result = await list.ExecuteAsync(cancellationToken);
-            files.AddRange(result.Files.Select(f => new RemoteLogFile(f.Id, f.Name)));
-            page = result.NextPageToken;
-        }
-        while (page is not null);
-        return files;
+        var files = await DrivePaging.ListFilesAsync(
+            service, DriveQuery.InFolder(folder.Id), "id,name", 1000, cancellationToken);
+        return files.Select(f => new RemoteLogFile(f.Id, f.Name)).ToList();
     }
 
     public async Task<string> DownloadAsync(string id, CancellationToken cancellationToken)

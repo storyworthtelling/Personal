@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Storyworthtelling.Handwriting;
 using Storyworthtelling.Remarkable;
 using Xamarin.Android.Net;
+using Codex.Ui.Http;
 
 namespace Constitution.ReadBack;
 
@@ -81,7 +82,7 @@ public sealed class ReadBackServices
     public static IRemarkableClient TabletOf(Context context)
     {
         var appContext = context.ApplicationContext ?? context;
-        var tabletHttp = new HttpClient(new AndroidMessageHandler());
+        var tabletHttp = HeadHttp.Shared;
         var auth = new RemarkableAuthService(
             tabletHttp,
             Options.Create(new RemarkableOptions { DeviceToken = new ConstitutionConnections(appContext).RemarkableDeviceToken }),
@@ -93,7 +94,7 @@ public sealed class ReadBackServices
     public static ClaudeInkVision VisionOf(Context context)
     {
         var appContext = context.ApplicationContext ?? context;
-        var visionHttp = new HttpClient(new AndroidMessageHandler()) { Timeout = VisionTimeout };
+        var visionHttp = HeadHttp.WithTimeout(VisionTimeout);
         return new ClaudeInkVision(
             visionHttp, new LiveOptions<ClaudeVisionOptions>(() => new ClaudeVisionOptions { ApiKey = new ConstitutionConnections(appContext).ClaudeApiKey }), HeadCredentialHealth.Store());
     }
