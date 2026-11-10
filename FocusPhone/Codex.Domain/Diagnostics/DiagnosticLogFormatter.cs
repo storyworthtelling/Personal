@@ -15,7 +15,8 @@ public static class DiagnosticLogFormatter
     public static string FormatEntry(DiagnosticEntry entry)
     {
         var builder = new StringBuilder();
-        builder.Append('[').Append(TimeFormats.Stamp(entry.When.DateTime)).Append("] ");
+        // The file's stamp is ISO-8601 with the offset (audit 08 §25); the friendly time stays on the screens.
+        builder.Append('[').Append(Storyworthtelling.Diagnostics.LogLine.Stamp(entry.When)).Append("] ");
         builder.Append(entry.Level).Append(' ').Append(entry.Source).Append(" — ").Append(entry.Message);
         if (!string.IsNullOrEmpty(entry.Detail))
         {

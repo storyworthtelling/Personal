@@ -168,4 +168,14 @@ public class DigestHealthTests
         var unfinished = Assert.Single(health.Unfinished);
         Assert.Equal(("index", "owner", "RefreshWorker", 1), (unfinished.App, unfinished.Phone, unfinished.Worker, unfinished.Count));
     }
+
+    [Fact]
+    public void AnIsoStampIsReadToTheMillisecondInItsZone()
+    {
+        var header = Support.Batch("post", "owner", string.Empty).Header;
+
+        Assert.Equal(
+            new DateTimeOffset(2026, 10, 30, 13, 15, 5, 250, TimeSpan.Zero),
+            EntryTime.Read("2026-10-30T09:15:05.250-04:00", header));
+    }
 }

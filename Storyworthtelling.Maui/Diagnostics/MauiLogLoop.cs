@@ -150,7 +150,8 @@ public static class MauiLogLoop
             {
                 return;
             }
-            var records = (manager.GetHistoricalProcessExitReasons(context.PackageName, 0, 0) ?? [])
+            var infos = (manager.GetHistoricalProcessExitReasons(context.PackageName, 0, 0) ?? []).ToList();
+            var records = infos
                 .Select(info => new ExitRecord(info.Reason, info.Status, info.Description, info.Timestamp, info.Importance))
                 .ToList();
             var fresh = ExitReasonPhrases.NewSince(records, Preferences.Default.Get(ExitLastSeenKey, 0L));
@@ -158,7 +159,7 @@ public static class MauiLogLoop
             {
                 var when = DateTimeOffset.FromUnixTimeMilliseconds(record.Timestamp).ToLocalTime();
                 MauiLog.Current?.Write("Exit", ExitReasonPhrases.IsProblem(record.Reason) ? LogLevel.Warning : LogLevel.Information,
-                    $"EXIT at {when:yyyy-MM-dd HH:mm:ss zzz} — {ExitReasonPhrases.Describe(record)}", null);
+                    $"EXIT at {when:yyyy-MM-dd HH:mm:ss zzz} — {ExitReasonPhrases.Describe(record)}{Anr(infos, record)}", null);
             }
             if (fresh.Count > 0)
             {
@@ -196,6 +197,24 @@ public static class MauiLogLoop
         {
             get => Preferences.Default.Get("logLoop.waitingForPassphrase", false);
             set => Preferences.Default.Set("logLoop.waitingForPassphrase", value);
+        }
+    }
+
+    // An ANR's main-thread frames, from the dump Android kept with the exit (audit 08 §36); nothing for any other exit.
+    private static string Anr(IReadOnlyList<ApplicationExitInfo> infos, ExitRecord record)
+    {
+        if (record.Reason != AnrTrace.Reason)
+        {
+            return string.Empty;
+        }
+        try
+        {
+            var excerpt = AnrTrace.FromStream(infos.FirstOrDefault(info => info.Timestamp == record.Timestamp)?.TraceInputStream);
+            return excerpt.Length == 0 ? string.Empty : "\n" + excerpt;
+        }
+        catch (Exception e) when (e is IOException or Java.Lang.Exception)
+        {
+            return string.Empty;
         }
     }
 }

@@ -11,10 +11,17 @@ namespace Storyworthtelling.Diagnostics;
 /// </summary>
 public static class LogLine
 {
+    /// <summary>
+    /// The file stamp: ISO-8601 to the millisecond with the phone's offset (audit 08 §25). A minute-only stamp with no
+    /// year or zone could not order a tap, an action and a crash inside one minute, nor be matched to an Exit line.
+    /// </summary>
+    public static string Stamp(DateTimeOffset moment) =>
+        moment.ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", CultureInfo.InvariantCulture);
+
     public static string Format(DateTimeOffset stamp, string level, string source, string message, string? detail)
     {
         var builder = new StringBuilder();
-        builder.Append('[').Append(stamp.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)).Append("] ")
+        builder.Append('[').Append(Stamp(stamp)).Append("] ")
             .Append(level).Append(' ').Append(source).Append(" — ").Append(message);
         if (!string.IsNullOrEmpty(detail))
         {

@@ -23,12 +23,13 @@ public class DiagnosticLogFormatterTests
     }
 
     [Fact]
-    public void FormatEntry_IncludesFriendlyTwelveHourTime()
+    public void FormatEntry_StampsTheFileInIsoWithItsOffset()
     {
-        // DESIGN.md §9: detail timestamps are 12-hour, lowercase meridiem.
+        // A minute-only stamp with no year or zone could not order a tap, an action and a crash inside one minute, nor
+        // match an Exit line (audit 08 §25). The file is for the log loop; the screen keeps its friendly time.
         var line = DiagnosticLogFormatter.FormatEntry(Sample());
 
-        Assert.Contains("2:30 pm", line);
+        Assert.StartsWith("[2026-07-10T14:30:00.000-04:00] ", line, StringComparison.Ordinal);
     }
 
     [Fact]
