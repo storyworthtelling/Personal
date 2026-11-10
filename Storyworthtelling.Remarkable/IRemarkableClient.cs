@@ -4,16 +4,15 @@ namespace Storyworthtelling.Remarkable;
 // download / trash (used by Foreword to locate and retire yesterday's documents).
 public interface IRemarkableClient
 {
-    // Uploads a PDF as a document at the account root (the original behavior).
-    Task Upload(string title, byte[] pdfBytes);
-
     // Uploads a PDF into a folder (collection) — parentFolderId from EnsureFolder — or at the root when it
-    // is null. A separate overload from the root one so existing callers and their mocks are unaffected.
-    Task Upload(string title, byte[] pdfBytes, string? parentFolderId);
+    // is null. Refuses (RemarkableRefusedException) a file over RemarkableLimits.MaxBytes before sending, and
+    // turns running out of memory into the same refusal, since neither is worth a retry. An app calls this
+    // through Storyworthtelling.Paper.IPaperDelivery, never directly (OneRemarkableDoorTests).
+    Task Upload(string title, byte[] pdfBytes, string? parentFolderId, CancellationToken cancellationToken);
 
     // Finds a folder (collection) with the given name at the account root, creating it if absent, and
     // returns its id — so a caller can deliver into a named folder. Mirrors IDriveArchive.EnsureFolder.
-    Task<string> EnsureFolder(string name);
+    Task<string> EnsureFolder(string name, CancellationToken cancellationToken);
 
     // The most recent documents in the account's root, used to locate documents by their (dated) titles.
     Task<IReadOnlyList<RemarkableDoc>> ListRecent();

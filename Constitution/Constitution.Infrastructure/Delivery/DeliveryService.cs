@@ -1,13 +1,14 @@
 using Constitution.Domain.Credentials;
 using Constitution.Domain.Delivery;
 using Constitution.Domain.Notices;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 
 namespace Constitution.Infrastructure.Delivery;
 
 /// <summary>
 /// Puts each document on the tablet, at the account root, under <see cref="DeliveredName"/> (C-2.2.2).
-/// The client it is given is already bound to this phone's own pairing (D85: the device token in the
+/// The delivery seam it is given is already bound to this phone's own pairing (D85: the device token in the
 /// vault, read live by the shared library), so there is no token here and none is read or logged.
 ///
 /// <para><b>A failure is a notice, never a second route.</b> A refused token or a failed upload raises
@@ -20,7 +21,7 @@ namespace Constitution.Infrastructure.Delivery;
 /// <para>Not held across a process death: if Android reclaims the process while a document waits, the
 /// next scheduled run builds and delivers it again, which costs a render, not a page.</para>
 /// </summary>
-public sealed class DeliveryService(IRemarkableClient remarkable, INoticeBoardAccess notices, Func<DateTimeOffset> clock)
+public sealed class DeliveryService(IPaperDelivery delivery, INoticeBoardAccess notices, Func<DateTimeOffset> clock)
 {
     private readonly Dictionary<string, byte[]> pending = [];
     private readonly object gate = new();
@@ -49,6 +50,13 @@ public sealed class DeliveryService(IRemarkableClient remarkable, INoticeBoardAc
             return new DeliveryResult(name, true, null);
         }
 
+        if (failure is RemarkableRefusedException)
+        {
+            // Too large, or the phone ran out of memory sending it: the same bytes fail the same way and pairing again
+            // would not help, so the document is neither kept for a retry nor shown as a pairing problem.
+            return new DeliveryResult(name, false, failure);
+        }
+
         lock (gate)
         {
             pending[name] = pdf;
@@ -70,10 +78,16 @@ public sealed class DeliveryService(IRemarkableClient remarkable, INoticeBoardAc
         var delivered = 0;
         foreach (var (name, pdf) in waiting)
         {
-            if (await TryUpload(name, pdf) is null)
+            var failure = await TryUpload(name, pdf);
+            if (failure is null)
             {
                 Settled(name);
                 delivered++;
+            }
+            else if (failure is RemarkableRefusedException)
+            {
+                // Final: dropped from the queue rather than tried again every time the pairing is fixed.
+                Settled(name);
             }
         }
 
@@ -85,8 +99,12 @@ public sealed class DeliveryService(IRemarkableClient remarkable, INoticeBoardAc
     {
         try
         {
-            await remarkable.Upload(name, pdf);
+            await delivery.DeliverToRemarkableRoot(name, pdf);
             return null;
+        }
+        catch (RemarkableRefusedException refused)
+        {
+            return refused;
         }
         catch (HttpRequestException refused)
         {

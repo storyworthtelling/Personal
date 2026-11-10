@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper;
 using Index.Domain.External;
 using Index.Domain.Model;
 using Index.Infrastructure.Services;
@@ -30,7 +31,7 @@ public class WorksheetDeliveryServiceTests
         var followUpPlanBuilder = new FollowUpPlanBuilder(budget, snowball, savings, clock);
         var followUpReadBack = new FollowUpReadBackService(budget, snowball, remarkable, factory);
 
-        return new WorksheetDeliveryService(budget, planBuilder, readBack, snowball, followUpPlanBuilder, followUpReadBack, remarkable, clock);
+        return new WorksheetDeliveryService(budget, planBuilder, readBack, snowball, followUpPlanBuilder, followUpReadBack, remarkable, new PaperDelivery(remarkable), clock);
     }
 
     [Fact]
@@ -167,7 +168,7 @@ public class WorksheetDeliveryServiceTests
         var readBack = new WorksheetReadBackService(budget, remarkable, factory, snowball);
         var followUpPlanBuilder = new FollowUpPlanBuilder(budget, snowball, savings, clock);
         var followUpReadBack = new FollowUpReadBackService(budget, snowball, remarkable, factory);
-        var service = new WorksheetDeliveryService(budget, planBuilder, readBack, snowball, followUpPlanBuilder, followUpReadBack, remarkable, clock);
+        var service = new WorksheetDeliveryService(budget, planBuilder, readBack, snowball, followUpPlanBuilder, followUpReadBack, remarkable, new PaperDelivery(remarkable), clock);
 
         var result = await service.RunCycleAsync(default);
 

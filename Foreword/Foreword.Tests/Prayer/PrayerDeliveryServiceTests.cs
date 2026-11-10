@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Prayer;
 using Foreword.Infrastructure.Prayer;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Xunit;
 
@@ -100,7 +101,7 @@ public class PrayerDeliveryServiceTests
 
         public bool UploadFails { get; set; }
 
-        public Task Upload(string title, byte[] pdf)
+        public Task Upload(string title, byte[] pdf, string? parentFolderId, CancellationToken cancellationToken)
         {
             if (UploadFails)
             {
@@ -111,9 +112,7 @@ public class PrayerDeliveryServiceTests
             return Task.CompletedTask;
         }
 
-        public Task Upload(string title, byte[] pdf, string? parentFolderId) => Upload(title, pdf);
-
-        public Task<string> EnsureFolder(string name) => Task.FromResult(name);
+        public Task<string> EnsureFolder(string name, CancellationToken cancellationToken) => Task.FromResult(name);
 
         public Task<IReadOnlyList<RemarkableDoc>> ListRecent() =>
             Task.FromResult<IReadOnlyList<RemarkableDoc>>(
@@ -139,7 +138,7 @@ public class PrayerDeliveryServiceTests
     private static PrayerDeliveryService Service(
         FakeArchive archive, FakeTranscriber transcriber, FakeRemarkable remarkable,
         FakePages pages, FakePastoral pastoral) =>
-        new(archive, transcriber, pastoral, pages, remarkable, () => Passphrase,
+        new(archive, transcriber, pastoral, pages, remarkable, new PaperDelivery(remarkable), () => Passphrase,
             NullLogger<PrayerDeliveryService>.Instance);
 
     private static JournalRead Wrote(string journalled, params string[] added) =>
@@ -384,7 +383,7 @@ public class PrayerDeliveryServiceTests
 
         var service = new PrayerDeliveryService(
             archive, new FakeTranscriber(JournalRead.Nothing), new FakePastoral(), new FakePages(),
-            remarkable, () => string.Empty, NullLogger<PrayerDeliveryService>.Instance);
+            remarkable, new PaperDelivery(remarkable), () => string.Empty, NullLogger<PrayerDeliveryService>.Instance);
 
         await service.Deliver(Today);
 

@@ -2,13 +2,13 @@ using Microsoft.Extensions.Logging;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Brief;
 using Foreword.Domain.Models;
-using Storyworthtelling.Remarkable;
+using Storyworthtelling.Paper;
 
 namespace Foreword.Infrastructure.Delivery;
 
 public class CrosswordDeliveryService(
     INytCrosswordClient nytClient,
-    IRemarkableClient remarkableClient,
+    IPaperDelivery delivery,
     INytTopStoriesClient topStoriesClient,
     INytArticleClient articleClient,
     IPdfComposer pdfComposer,
@@ -29,7 +29,7 @@ public class CrosswordDeliveryService(
         // The delivered document is the morning brief (news + puzzle), not "the crossword".
         var title = $"Morning Brief {date:yyyy-MM-dd}";
         logger.LogInformation("Uploading to reMarkable: {Title} ({NewsStatus})", title, newsStatus);
-        await remarkableClient.Upload(title, finalBytes);
+        await delivery.DeliverToRemarkableRoot(title, finalBytes);
 
         return newsStatus;
     }
@@ -41,7 +41,7 @@ public class CrosswordDeliveryService(
 
         var title = $"Bonus Puzzle — {date:MMMM yyyy}";
         logger.LogInformation("Uploading to reMarkable: {Title}", title);
-        await remarkableClient.Upload(title, pdfBytes);
+        await delivery.DeliverToRemarkableRoot(title, pdfBytes);
     }
 
     /// <summary>

@@ -9,6 +9,7 @@ using Constitution.Infrastructure.Workouts;
 using Constitution.Tests.Placement;
 using static Constitution.Tests.Calendar.InventedFamily;
 using static Constitution.Tests.Workouts.WorkoutFixture;
+using Storyworthtelling.Paper;
 
 namespace Constitution.Tests.WorkoutPipeline;
 
@@ -26,7 +27,7 @@ internal sealed class WeekRig : IDisposable
     {
         Expected = new FileExpectedDocuments(Path.Combine(folder.FullName, "expected.json"));
         Delivered = new FileDeliveredWorkouts(Path.Combine(folder.FullName, "delivered.json"));
-        Delivery = new DeliveryService(Tablet, Access, () => Clock);
+        Delivery = new DeliveryService(new PaperDelivery(Tablet), Access, () => Clock);
         Seams = Build();
         Run = new WorkoutWeekRun(Seams);
     }

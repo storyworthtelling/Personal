@@ -282,7 +282,7 @@ public class MealDocumentsStepTests
     public async Task APageAlreadyUnderTheTitleIsNotMadeTwice()
     {
         var rig = new DocsRig();
-        await rig.Tablet.Upload(rig.SheetTitle, [1, 2, 3]);
+        await rig.Tablet.Upload(rig.SheetTitle, [1, 2, 3], null, CancellationToken.None);
 
         var done = await rig.RunAsync();
 

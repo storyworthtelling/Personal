@@ -7,6 +7,7 @@ using Foreword.Domain.Models;
 using Foreword.Domain.Tasks;
 using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Handwriting;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 
 namespace Foreword.Infrastructure.Delivery;
@@ -27,6 +28,7 @@ public class DailyDeliveryService(
     IRouteClient routes,
     Storyworthtelling.Handwriting.IHandwritingExtractor handwriting,
     IRemarkableClient remarkable,
+    IPaperDelivery delivery,
     IOptions<AnthropicOptions> anthropicOptions,
     ILogger<DailyDeliveryService> logger)
 {
@@ -218,7 +220,7 @@ public class DailyDeliveryService(
     {
         try
         {
-            await remarkable.Upload(title, pdf);
+            await delivery.DeliverToRemarkableRoot(title, pdf);
             logger.LogInformation("Uploaded {Title}", title);
             return true;
         }

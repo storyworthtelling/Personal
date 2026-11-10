@@ -10,6 +10,7 @@ using Constitution.Infrastructure.ReadBack;
 using Constitution.Tests.WorkoutPipeline;
 using static Constitution.Tests.Calendar.InventedFamily;
 using static Constitution.Tests.MealWeekDocuments.DocsData;
+using Storyworthtelling.Paper;
 
 namespace Constitution.Tests.MealWeekDocuments;
 
@@ -18,7 +19,7 @@ internal sealed class DocsRig
 {
     public DocsRig()
     {
-        Delivery = new DeliveryService(Tablet, Board, () => Now);
+        Delivery = new DeliveryService(new PaperDelivery(Tablet), Board, () => Now);
         Seams = new MealDocumentSeams(Delivery, Tablet, Probe, Expected, Delivered, Roster, Pantry, Budgets, Holidays, Log);
     }
 

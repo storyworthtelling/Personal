@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Prayer;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 
 namespace Foreword.Infrastructure.Prayer;
@@ -25,6 +26,7 @@ public sealed class PrayerDeliveryService(
     IPastoralComposer pastoral,
     IPrayerPdfComposer pages,
     IRemarkableClient remarkable,
+    IPaperDelivery delivery,
     Func<string> passphrase,
     ILogger<PrayerDeliveryService> logger)
 {
@@ -193,7 +195,7 @@ public sealed class PrayerDeliveryService(
 
         try
         {
-            await remarkable.Upload(title, document);
+            await delivery.DeliverToRemarkableRoot(title, document);
             logger.LogInformation("Uploaded {Title}", title);
             return true;
         }

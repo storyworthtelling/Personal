@@ -11,6 +11,7 @@ using Foreword.Infrastructure.Calendar;
 using Foreword.Infrastructure.Delivery;
 using Foreword.Infrastructure.Google;
 using Foreword.Infrastructure.Handwriting;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 // Foreword's own ParsedNote (Foreword.Domain.Models, PersonColumn and all — via the plain
 // "using Foreword.Domain.Models;" above) and the shared extractor's generic ParsedNote share a
@@ -66,7 +67,7 @@ public class DailyDeliveryServiceTests
             new OutlookSelector(),
             taskStore,
             taskReader.Object, dayComposer.Object, weather.Object, routes.Object,
-            handwriting.Object, remarkable.Object,
+            handwriting.Object, remarkable.Object, new PaperDelivery(remarkable.Object),
             Options.Create(new AnthropicOptions { ConfidenceThreshold = 0.6 }),
             NullLogger<DailyDeliveryService>.Instance);
 
@@ -100,8 +101,8 @@ public class DailyDeliveryServiceTests
     {
         await CreateService().DeliverDailyDocuments(Date);
 
-        remarkable.Verify(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>()), Times.Once);
-        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Once);
+        remarkable.Verify(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>
@@ -208,7 +209,7 @@ public class DailyDeliveryServiceTests
 
         await CreateService().DeliverDailyDocuments(Date);
 
-        remarkable.Verify(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>()), Times.Once);
+        remarkable.Verify(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -219,7 +220,7 @@ public class DailyDeliveryServiceTests
 
         await CreateService().DeliverDailyDocuments(Date);
 
-        remarkable.Verify(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>()), Times.Once);
+        remarkable.Verify(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -299,7 +300,7 @@ public class DailyDeliveryServiceTests
     public async Task DoesNotTrash_WhenTheUploadFails()
     {
         SetupYesterdayDoc(YesterdayCalendar, "cal-y", []);
-        remarkable.Setup(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>()))
+        remarkable.Setup(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("boom"));
 
         await CreateService().DeliverDailyDocuments(Date);
@@ -315,6 +316,6 @@ public class DailyDeliveryServiceTests
 
         await CreateService().DeliverDailyDocuments(Date);
 
-        remarkable.Verify(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>()), Times.Once);
+        remarkable.Verify(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

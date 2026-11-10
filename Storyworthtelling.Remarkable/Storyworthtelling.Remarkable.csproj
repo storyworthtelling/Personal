@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
+    <ProjectReference Include="..\Storyworthtelling.Pipeline\Storyworthtelling.Pipeline.csproj" />
   </ItemGroup>
 
 </Project>

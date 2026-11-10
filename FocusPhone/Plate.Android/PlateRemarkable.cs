@@ -1,7 +1,7 @@
 using Android.App;
 using Android.Content;
 using Codex.Ui.Voice;
-using Microsoft.Extensions.Options;
+using Storyworthtelling.Voice;
 using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice.Secrets;
@@ -65,15 +65,13 @@ public sealed class PlateRemarkable(VoiceGoogleAccount account)
             throw new InvalidOperationException("The reMarkable is not paired on this phone.");
         }
 
-        // Two clients rather than one: the auth exchange and the storage calls are separate
-        // hosts, and the shared library takes an HttpClient each.
-        var authHttp = HeadHttp.Shared;
-        var storageHttp = HeadHttp.Shared;
-
-        var auth = new RemarkableAuthService(
-            authHttp, Options.Create(new RemarkableOptions { DeviceToken = DeviceToken }));
-        var delivery = new PaperDelivery(new RemarkableStorageClient(storageHttp, auth));
-        await delivery.DeliverToRemarkableRoot(title, pdf, cancellationToken);
+        // The shared factory: one client for the auth exchange and the storage calls, the token read live,
+        // and a rejected pairing reported to the health store (the auth service here used to have no sink).
+        var tablet = RemarkableConnection.Create(
+            HeadHttp.WithTimeout(RemarkableLimits.Timeout),
+            new LiveOptions<RemarkableOptions>(() => new RemarkableOptions { DeviceToken = DeviceToken }),
+            HeadCredentialHealth.Store());
+        await new PaperDelivery(tablet).DeliverToRemarkableRoot(title, pdf, cancellationToken);
     }
 
     /// <summary>

@@ -39,7 +39,7 @@ public class RemarkableAuthServiceTests
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent($"\"{token}\"") },
             out var requests);
 
-        await service.GetUserToken();
+        await service.GetUserToken(CancellationToken.None);
 
         Assert.Single(requests);
         Assert.Equal(HttpMethod.Post, requests[0].Method);
@@ -57,7 +57,7 @@ public class RemarkableAuthServiceTests
             out var requests,
             deviceToken: "my-device-token");
 
-        await service.GetUserToken();
+        await service.GetUserToken(CancellationToken.None);
 
         Assert.Equal("Bearer", requests[0].Headers.Authorization!.Scheme);
         Assert.Equal("my-device-token", requests[0].Headers.Authorization.Parameter);
@@ -71,7 +71,7 @@ public class RemarkableAuthServiceTests
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent($"\"{expectedToken}\"") },
             out _);
 
-        var result = await service.GetUserToken();
+        var result = await service.GetUserToken(CancellationToken.None);
 
         Assert.Equal(expectedToken, result);
     }
@@ -84,8 +84,8 @@ public class RemarkableAuthServiceTests
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent($"\"{token}\"") },
             out var requests);
 
-        await service.GetUserToken();
-        await service.GetUserToken();
+        await service.GetUserToken(CancellationToken.None);
+        await service.GetUserToken(CancellationToken.None);
 
         Assert.Single(requests);
     }
@@ -97,7 +97,7 @@ public class RemarkableAuthServiceTests
             new HttpResponseMessage(HttpStatusCode.Unauthorized),
             out _);
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => service.GetUserToken());
+        await Assert.ThrowsAsync<HttpRequestException>(() => service.GetUserToken(CancellationToken.None));
     }
 
     private sealed class CapturingHandler(HttpResponseMessage response, List<HttpRequestMessage> captured)

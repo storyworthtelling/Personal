@@ -7,6 +7,7 @@ using Constitution.Infrastructure.Documents;
 using Constitution.Infrastructure.ReadBack;
 using Constitution.Tests.WorkoutPipeline;
 using UglyToad.PdfPig;
+using Storyworthtelling.Paper;
 
 namespace Constitution.Tests.DigestPages;
 
@@ -32,7 +33,7 @@ public class SaturdayDigestRunTests
         public FakeExpected Expected { get; } = new();
 
         public SaturdayDigestRun Run() =>
-            new(Sources, new DeliveryService(Tablet, Notices, () => SaturdayMorning), Expected, Stamps);
+            new(Sources, new DeliveryService(new PaperDelivery(Tablet), Notices, () => SaturdayMorning), Expected, Stamps);
     }
 
     private sealed class FakeExpected : IExpectedDocuments

@@ -29,5 +29,5 @@ public sealed class RecordingHandler : HttpMessageHandler
 // A fixed user token, so the client tests don't exercise the auth exchange.
 public sealed class StubAuthProvider(string token = "fake-user-token") : IRemarkableAuthProvider
 {
-    public Task<string> GetUserToken() => Task.FromResult(token);
+    public Task<string> GetUserToken(CancellationToken cancellationToken) => Task.FromResult(token);
 }

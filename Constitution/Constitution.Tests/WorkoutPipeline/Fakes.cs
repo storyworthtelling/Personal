@@ -36,9 +36,7 @@ internal sealed class FakeTablet : IRemarkableClient
 
     public byte[] PdfOf(string title) => Pdfs[Titles.Single(pair => pair.Value == title).Key];
 
-    public Task Upload(string title, byte[] pdfBytes) => Upload(title, pdfBytes, null);
-
-    public Task Upload(string title, byte[] pdfBytes, string? parentFolderId)
+    public Task Upload(string title, byte[] pdfBytes, string? parentFolderId, CancellationToken cancellationToken)
     {
         Calls.Add("upload:" + title);
         if (UploadFails is not null)
@@ -52,7 +50,7 @@ internal sealed class FakeTablet : IRemarkableClient
         return Task.CompletedTask;
     }
 
-    public Task<string> EnsureFolder(string name) => throw new InvalidOperationException("Documents are delivered at the root.");
+    public Task<string> EnsureFolder(string name, CancellationToken cancellationToken) => throw new InvalidOperationException("Documents are delivered at the root.");
 
     public Task<IReadOnlyList<RemarkableDoc>> ListRecent()
     {

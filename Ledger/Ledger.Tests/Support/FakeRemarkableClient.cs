@@ -15,9 +15,7 @@ public sealed class FakeRemarkableClient : IRemarkableClient
     public bool ThrowOnUpload { get; set; }
     public bool ThrowOnDownload { get; set; }
 
-    public Task Upload(string title, byte[] pdfBytes) => Upload(title, pdfBytes, null);
-
-    public Task Upload(string title, byte[] pdfBytes, string? parentFolderId)
+    public Task Upload(string title, byte[] pdfBytes, string? parentFolderId, CancellationToken cancellationToken)
     {
         if (ThrowOnUpload)
         {
@@ -27,7 +25,7 @@ public sealed class FakeRemarkableClient : IRemarkableClient
         return Task.CompletedTask;
     }
 
-    public Task<string> EnsureFolder(string name) => Task.FromResult($"folder:{name}");
+    public Task<string> EnsureFolder(string name, CancellationToken cancellationToken) => Task.FromResult($"folder:{name}");
 
     public Task<IReadOnlyList<RemarkableDoc>> ListRecent() =>
         Task.FromResult<IReadOnlyList<RemarkableDoc>>(Existing is null ? [] : [Existing]);
