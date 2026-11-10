@@ -49,7 +49,7 @@ public static class WorkoutDocument
     {
         var sore = model.Soreness is not null;
         var shift = sore ? SoreShift : 0f;
-        var draft = new PageDraft(model.Title);
+        var draft = new PageDraft(model.Title) { Section = "Workout" };
 
         draft.Kicker($"WORKOUT · {PageDraft.DayAndTime(model.Start)}");
         draft.Footer(model.Title, model.Start, 1, pages);
@@ -131,7 +131,7 @@ public static class WorkoutDocument
     {
         var exercise = model.Exercises[index];
         var sore = model.Soreness;
-        var draft = new PageDraft(exercise.Name);
+        var draft = new PageDraft(exercise.Name) { Section = "Exercises" };
 
         var kicker = $"EXERCISE {index + 1} OF {model.Exercises.Count} · {model.Title.ToUpperInvariant()}";
         if (sore is not null)

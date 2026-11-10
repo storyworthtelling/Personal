@@ -10,7 +10,7 @@ namespace Foreword.Infrastructure.Pdf;
 /// </summary>
 public static class ForewordSheet
 {
-    public static readonly TabletSheet Portrait = TabletSheet.Fill(612f, 792f);
+    public static readonly TabletSheet Portrait = Storyworthtelling.Paper.Binder.SheetFrame.LetterBoard;
 
     public static readonly TabletSheet Landscape = TabletSheet.Fill(792f, 612f);
 }

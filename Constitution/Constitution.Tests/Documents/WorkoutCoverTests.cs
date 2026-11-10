@@ -98,7 +98,7 @@ public class WorkoutCoverTests
     [Fact]
     public void NothingRunsOutsideTheMargins()
     {
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([Cover()]));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([Cover()]));
         var page = document.GetPage(1);
 
         Assert.All(page.Letters, l =>

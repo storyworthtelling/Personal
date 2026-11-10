@@ -114,6 +114,13 @@ internal static class PdfReadBack
         };
     }
 
+    /// <summary>
+    /// The owner's voice on a page: Pinyon Script below the header. The shared frame signs every tablet page with the
+    /// app's name in the same hand, above its rule; that is the app's signature, not a voiced line.
+    /// </summary>
+    public static bool IsVoiceHand(Page page, Letter letter) =>
+        letter.FontName.Contains("Pinyon", StringComparison.Ordinal) && page.Height - letter.GlyphRectangle.Bottom > ConstitutionPage.HeaderRuleTop;
+
     public static (double R, double G, double B) Rgb(SkiaSharp.SKColor colour) =>
         (colour.Red / 255.0, colour.Green / 255.0, colour.Blue / 255.0);
 

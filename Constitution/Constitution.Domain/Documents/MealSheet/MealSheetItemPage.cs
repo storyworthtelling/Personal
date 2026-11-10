@@ -34,7 +34,7 @@ internal static class MealSheetItemPage
 
     public static InkPageLayout Build(MealSheetModel model, int sheetNumber, string title, string intro, IReadOnlyList<MealSheetGroup> groups)
     {
-        var draft = new PageDraft(title);
+        var draft = new PageDraft(title) { Section = title == MealSheetItems.BreakfastTitle ? "Breakfast" : title };
         draft.Kicker($"{MealSheetDocument.Kind} · {sheetNumber.ToString(CultureInfo.InvariantCulture)} OF {model.Pages.ToString(CultureInfo.InvariantCulture)}");
         draft.Line(PrintedRole.Small, PageDraft.Left, IntroBaseline, PageDraft.FullWidth, intro, name: "intro");
 

@@ -311,7 +311,7 @@ internal static class MealSheetGroceryPages
 
         private void Begin(string title)
         {
-            var draft = new PageDraft(title);
+            var draft = new PageDraft(title) { Section = Title };
             draft.Kicker($"{MealSheetDocument.Kind} · {(firstSheet + drafts.Count).ToString(CultureInfo.InvariantCulture)} OF {total.ToString(CultureInfo.InvariantCulture)}");
             drafts.Add(draft);
             Y = Top;

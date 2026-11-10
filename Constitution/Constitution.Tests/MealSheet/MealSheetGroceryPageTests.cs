@@ -226,7 +226,7 @@ public class GroceryPageTests
     public void OnlyTheHeaderRuleIsInColour()
     {
         var pages = GroceryPages(MealSheetGrocerySamples.Model());
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render(pages));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent(pages));
         var header = PdfReadBack.Rgb(AppIdentityTokens.ConstitutionDocument);
         string[] neutral =
         [
@@ -237,8 +237,8 @@ public class GroceryPageTests
             .Where(c => !neutral.Any(hex => PdfReadBack.SameColour((c.R, c.G, c.B), PdfReadBack.Rgb(hex)))
                 && !(c.R > 0.99 && c.G > 0.99 && c.B > 0.99)).ToList();
 
-        Assert.NotEmpty(coloured);
-        Assert.All(coloured, c => Assert.True(PdfReadBack.SameColour((c.R, c.G, c.B), header), "only the header rule is coloured"));
+        // The page\'s own content is ink only: its one coloured rule is the shared frame\'s now (ConstitutionFrameTests).
+        Assert.Empty(coloured);
     }
 
     [Fact]

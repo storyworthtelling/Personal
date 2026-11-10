@@ -19,13 +19,15 @@ public class DocumentGreyscaleTests
         PaperColorTokens.Hairline, PaperColorTokens.Ink, PaperColorTokens.InkSoft, PaperColorTokens.InkMuted,
     ];
 
-    private static (double R, double G, double B) HeaderRule => PdfReadBack.Rgb(AppIdentityTokens.ConstitutionDocument);
 
     private static bool IsNeutral((double R, double G, double B) colour) =>
         NeutralHexes.Any(hex => PdfReadBack.SameColour(colour, PdfReadBack.Rgb(hex)))
         || (colour.R > 0.99 && colour.G > 0.99 && colour.B > 0.99);
 
     private static byte[] Render() => ConstitutionDocumentRenderer.Render(DocumentSamples.Pages());
+
+    /// <summary>The pages' own content, without the shared frame: what Constitution's ink rules hold.</summary>
+    private static byte[] RenderContent() => ConstitutionDocumentRenderer.RenderContent(DocumentSamples.Pages());
 
     [Fact]
     public void TargetsPrintInMutedInk()
@@ -73,31 +75,18 @@ public class DocumentGreyscaleTests
     }
 
     [Fact]
-    public void OnlyTheHeaderRuleIsColoured()
+    public void ThePagesOwnContentIsInkOnly()
     {
-        using var document = PdfReadBack.Open(Render());
-        var headerStrokes = 0;
+        // The one coloured stroke a Constitution page carries, the cerulean rule under its title, is the shared tablet
+        // frame's now (owner's decision: every tablet document wears Foreword's frame); ConstitutionFrameTests holds it.
+        using var document = PdfReadBack.Open(RenderContent());
 
         foreach (var page in document.GetPages())
         {
             var painted = PdfReadBack.PaintedColours(page);
             Assert.NotEmpty(painted);
-
-            var coloured = painted.Where(c => !IsNeutral((c.R, c.G, c.B))).ToList();
-            Assert.All(coloured, c =>
-            {
-                Assert.Equal("stroke", c.Use);
-                Assert.True(PdfReadBack.SameColour((c.R, c.G, c.B), HeaderRule), $"An unexpected colour was painted as a {c.Use}.");
-            });
-
-            var rules = PdfReadBack.Paths(page).Where(p => p.Stroked && PdfReadBack.SameColour(p.Stroke, HeaderRule)).ToList();
-            var rule = Assert.Single(rules);
-            Assert.Equal(ConstitutionPage.HeaderRuleTop, rule.Bounds.Top, 0.05f);
-            Assert.Equal(0f, rule.Bounds.Height, 0.05f);
-            headerStrokes += coloured.Count;
+            Assert.DoesNotContain(painted, c => !IsNeutral((c.R, c.G, c.B)));
         }
-
-        Assert.Equal(document.NumberOfPages, headerStrokes);
     }
 
     [Fact]
@@ -120,13 +109,13 @@ public class DocumentGreyscaleTests
         var coloured = painted.Where(c => !IsNeutral((c.R, c.G, c.B))).ToList();
 
         Assert.Equal(2, coloured.Count);
-        Assert.Contains(coloured, c => !PdfReadBack.SameColour((c.R, c.G, c.B), HeaderRule));
+        Assert.Contains(coloured, c => !PdfReadBack.SameColour((c.R, c.G, c.B), PdfReadBack.Rgb(AppIdentityTokens.ConstitutionDocument)));
     }
 
     [Fact]
     public void TextIsSetInInkNeverInAHue()
     {
-        using var document = PdfReadBack.Open(Render());
+        using var document = PdfReadBack.Open(RenderContent());
 
         foreach (var page in document.GetPages())
         {
@@ -175,7 +164,7 @@ public class DocumentGreyscaleTests
     {
         // The ground is the one exempted colour (sheets stay white), and not painting one is what lets
         // a single file serve a warm colour panel and a grey one.
-        using var document = PdfReadBack.Open(Render());
+        using var document = PdfReadBack.Open(RenderContent());
 
         foreach (var page in document.GetPages())
         {

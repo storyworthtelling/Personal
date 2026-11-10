@@ -160,9 +160,9 @@ public static class RecipeDocument
         }
     }
 
-    private static PageDraft StartPage(RecipeDocumentModel model, string title, string kicker, int page, int total, float notesTop = PageDraft.NotesTop)
+    private static PageDraft StartPage(RecipeDocumentModel model, string title, string kicker, int page, int total, float notesTop = PageDraft.NotesTop, string section = "Recipe")
     {
-        var draft = new PageDraft(title);
+        var draft = new PageDraft(title) { Section = section };
         draft.Kicker(kicker);
         draft.NotesColumn(notesTop);
         Footer(draft, model, page, total);
@@ -415,7 +415,7 @@ public static class RecipeDocument
         for (var i = 0; i < dealt.Count; i++)
         {
             var page = firstPage + i;
-            var draft = StartPage(model, title, i == 0 ? kicker : kicker + " · CONTINUED", page, numbers.Total, StepsNotesTop);
+            var draft = StartPage(model, title, i == 0 ? kicker : kicker + " · CONTINUED", page, numbers.Total, StepsNotesTop, "Steps");
             var lead = i == 0 ? leadWords : $"Continued from page {(page - 1).ToString(CultureInfo.InvariantCulture)}.";
             draft.Line(PrintedRole.Small, PageDraft.Left, LeadBaseline, PageDraft.FullWidth, lead, name: "step-lead");
             DrawRows(draft, dealt[i], firstRule, ref number);
@@ -431,7 +431,7 @@ public static class RecipeDocument
         var clock = RecipeSchedule.Plan(meal.Steps, model.DinnerAt, model.StartAt, model.NotBefore);
         var rows = clock.Rows.Select(r => ToRow(r, meal.DinnerLine.Trim(), null, numbers)).ToList();
 
-        var draft = StartPage(model, meal.Title.Trim(), kicker, firstPage, numbers.Total);
+        var draft = StartPage(model, meal.Title.Trim(), kicker, firstPage, numbers.Total, section: "Kids");
         var baseline = HeadcountBaseline;
         var first = true;
         foreach (var line in PageText.Wrap("For " + NameList(meal.Children), HeadcountChars))
@@ -471,7 +471,7 @@ public static class RecipeDocument
         for (var i = 1; i < dealt.Count; i++)
         {
             var page = firstPage + i;
-            var more = StartPage(model, meal.Title.Trim(), kicker + " · CONTINUED", page, numbers.Total, StepsNotesTop);
+            var more = StartPage(model, meal.Title.Trim(), kicker + " · CONTINUED", page, numbers.Total, StepsNotesTop, "Kids");
             more.Line(PrintedRole.Small, PageDraft.Left, LeadBaseline, PageDraft.FullWidth, $"Continued from page {(page - 1).ToString(CultureInfo.InvariantCulture)}.", name: "step-lead");
             DrawRows(more, dealt[i], laterRule, ref number);
             layouts.Add(more.ToLayout());

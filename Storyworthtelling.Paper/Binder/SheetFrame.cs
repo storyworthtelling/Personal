@@ -21,6 +21,13 @@ public static class SheetFrame
     public const float RuleHeight = 2f;
     public const float RuleGap = 5f;
 
+    /// <summary>
+    /// The board the frame is measured on: US Letter, grown to the glass (Foreword's sheet). A document drawn in the
+    /// tablet's own points (Constitution) draws its frame on this board, scaled, so the header, tabs and folio are one
+    /// size on every tablet document.
+    /// </summary>
+    public static readonly TabletSheet LetterBoard = TabletSheet.Fill(612f, 792f);
+
     /// <summary>Where a document's strip starts unless its header sits lower.</summary>
     public const float FirstTabTop = 96f;
 
@@ -88,9 +95,13 @@ public static class SheetFrame
         var width = BinderStrip.ContentRight(sheet.DesignWidth) - Margin;
         var box = new SKRect(Margin, top, Margin + width, top + HeaderHeight);
 
-        Text(canvas, title, Serif(PaperTypeScale.Title), box, alignRight: false, Ink);
-        // The app's name in the owner's hand — the one place on a document where the app signs it.
-        Text(canvas, signature.Name, Script(PaperTypeScale.Title), box, alignRight: true, signature.Mark);
+        // The app's name in the owner's hand — the one place on a document where the app signs it. A title too long to
+        // sit beside it is shortened with an ellipsis rather than run under the signature.
+        var script = Script(PaperTypeScale.Title);
+        var serif = Serif(PaperTypeScale.Title);
+        var room = width - script.MeasureText(signature.Name) - 12f;
+        Text(canvas, Fit(title, serif, room), serif, box, alignRight: false, Ink);
+        Text(canvas, signature.Name, script, box, alignRight: true, signature.Mark);
 
         var ruleTop = top + HeaderHeight + RuleGap;
         using var fill = new SKPaint { Color = signature.Mark, IsAntialias = true, Style = SKPaintStyle.Fill };
@@ -178,6 +189,30 @@ public static class SheetFrame
         font.GetFontMetrics(out var m);
         var x = alignRight ? box.Right - font.MeasureText(text) : box.Left;
         canvas.DrawText(text, x, box.Top - m.Ascent, font, paint);
+    }
+
+    /// <summary>The text as given if it fits <paramref name="width"/>; otherwise cut at a word and ended with an ellipsis.</summary>
+    public static string Fit(string text, SKFont font, float width)
+    {
+        if (font.MeasureText(text) <= width)
+        {
+            return text;
+        }
+        var words = text.Split(' ');
+        for (var count = words.Length - 1; count > 0; count--)
+        {
+            var shorter = string.Join(' ', words.Take(count)).TrimEnd(',', ';', ':', '·', '-') + "…";
+            if (font.MeasureText(shorter) <= width)
+            {
+                return shorter;
+            }
+        }
+        var cut = text;
+        while (cut.Length > 1 && font.MeasureText(cut + "…") > width)
+        {
+            cut = cut[..^1];
+        }
+        return cut + "…";
     }
 
     private static SKFont Font(SKTypeface typeface, float size) =>

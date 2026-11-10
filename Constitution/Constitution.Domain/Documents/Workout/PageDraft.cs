@@ -45,6 +45,9 @@ internal sealed class PageDraft
 
     public string Title { get; }
 
+    /// <summary>The binder tab this page sits under; the title when unset (<see cref="InkPageLayout.Section"/>).</summary>
+    public string? Section { get; set; }
+
     /// <summary>The height of a role's ink box, ascent and descent together.</summary>
     public static float InkHeight(PrintedRole role) => role switch
     {
@@ -94,7 +97,7 @@ internal sealed class PageDraft
     public void Rule(string name, float left, float top, float width, float height, string? owner = null) =>
         printed.Add(new PrintedItem(name, PrintedRole.Rule, new InkRect(left, top, width, height), null, owner));
 
-    public InkPageLayout ToLayout() => InkPageLayout.Create(Title, targets, printed);
+    public InkPageLayout ToLayout() => InkPageLayout.Create(Title, targets, printed, Section);
 
     /// <summary>The small caps line above the title: "EXERCISE 2 OF 7 · STRENGTH".</summary>
     public void Kicker(string text) => Line(PrintedRole.Label, Left, KickerBaseline, FullWidth, text, name: "kicker");

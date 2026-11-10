@@ -80,7 +80,7 @@ public static class RecipeRatingPage
     {
         Validate(model, page, total);
 
-        var draft = new PageDraft(Title);
+        var draft = new PageDraft(Title) { Section = "Rating" };
         draft.Kicker(Kicker);
         Footer(draft, model, page, total);
         draft.Line(PrintedRole.Small, PageDraft.Left, 112f, PageDraft.FullWidth, "Underlined is each person’s last rating of this dish.", name: "intro-1");

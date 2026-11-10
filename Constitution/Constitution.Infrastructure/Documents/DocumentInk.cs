@@ -12,7 +12,6 @@ namespace Constitution.Infrastructure.Documents;
 /// </summary>
 internal sealed class DocumentInk : IDisposable
 {
-    public SKFont Title { get; } = new(EmbeddedTypefaces.SerifBlack, PaperTypeScale.Title);
     public SKFont Dose { get; } = new(EmbeddedTypefaces.SerifBlack, PaperTypeScale.Dose);
     public SKFont Body { get; } = new(EmbeddedTypefaces.SansRegular, PaperTypeScale.Body);
     public SKFont Label { get; } = new(EmbeddedTypefaces.SansSemibold, PaperTypeScale.Label);
@@ -45,14 +44,6 @@ internal sealed class DocumentInk : IDisposable
     /// <summary>The digest's weekly line: the ink itself at a pen's weight, neutral, never coloured.</summary>
     public SKPaint ChartStroke { get; } = Stroke(PaperColorTokens.Ink, 1.2f);
 
-    public SKPaint HeaderRule { get; } = new()
-    {
-        Color = AppIdentityTokens.ConstitutionDocument,
-        Style = SKPaintStyle.Stroke,
-        StrokeWidth = ConstitutionPage.HeaderRuleWeight,
-        IsAntialias = true,
-    };
-
     public SKFont FontFor(PrintedRole role) => role switch
     {
         PrintedRole.Dose => Dose,
@@ -70,12 +61,12 @@ internal sealed class DocumentInk : IDisposable
 
     public void Dispose()
     {
-        foreach (var font in new[] { Title, Dose, Body, Label, Heading, Choice, Strong, Small, Mono, Time, Voice })
+        foreach (var font in new[] { Dose, Body, Label, Heading, Choice, Strong, Small, Mono, Time, Voice })
         {
             font.Dispose();
         }
 
-        foreach (var paint in new[] { Ink, Soft, Shade, Bright, TargetStroke, DividerStroke, DottedStroke, ChartStroke, HeaderRule })
+        foreach (var paint in new[] { Ink, Soft, Shade, Bright, TargetStroke, DividerStroke, DottedStroke, ChartStroke })
         {
             paint.Dispose();
         }

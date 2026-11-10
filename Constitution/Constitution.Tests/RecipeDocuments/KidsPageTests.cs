@@ -179,7 +179,7 @@ public class KidsPageTests
     [Fact]
     public void OnlyTheHeaderRuleIsColouredAndEverythingElseIsMuted()
     {
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([Kids()]));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([Kids()]));
         var neutral = new[]
         {
             PaperColorTokens.Paper, PaperColorTokens.PaperBright, PaperColorTokens.PaperDeep, PaperColorTokens.PaperShade,
@@ -190,14 +190,14 @@ public class KidsPageTests
             .Where(c => !neutral.Any(n => PdfReadBack.SameColour((c.R, c.G, c.B), n)) && !(c.R > 0.99 && c.G > 0.99 && c.B > 0.99))
             .ToList();
 
-        Assert.Single(coloured);
-        Assert.True(PdfReadBack.SameColour((coloured[0].R, coloured[0].G, coloured[0].B), PdfReadBack.Rgb(AppIdentityTokens.ConstitutionDocument)));
+        // The page\'s own content is ink only: its one coloured rule is the shared frame\'s now (ConstitutionFrameTests).
+        Assert.Empty(coloured);
     }
 
     [Fact]
     public void OnlyRegisteredTypeRungsArePrinted()
     {
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([Kids()]));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([Kids()]));
         var allowed = new[] { PaperTypeScale.Title, PaperTypeScale.Body, PaperTypeScale.Secondary, PaperTypeScale.Label, PaperTypeScale.Mono };
 
         Assert.All(document.GetPage(1).Letters.Select(l => (float)l.PointSize).Distinct(), size => Assert.Contains(allowed, rung => Math.Abs(rung - size) < 0.1f));

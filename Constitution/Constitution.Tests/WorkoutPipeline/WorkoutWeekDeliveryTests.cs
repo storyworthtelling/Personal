@@ -394,7 +394,7 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
     }
 
     private static bool HasTheVoiceHand(byte[] pdf) =>
-        PdfReadBack.Open(pdf).GetPages().SelectMany(page => page.Letters).Any(letter => letter.FontName.Contains("Pinyon", StringComparison.Ordinal));
+        PdfReadBack.Open(pdf).GetPages().Any(page => page.Letters.Any(letter => PdfReadBack.IsVoiceHand(page, letter)));
 
     private async Task<byte[]> PageForALiftThatWentUp(bool voiced)
     {
