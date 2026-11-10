@@ -99,7 +99,7 @@ public class MealSheetPageTests
         Assert.Contains("EATING OUT", words);
         Assert.Equal(3, words.Count(w => w is "SLOW COOKER" or "NEW RECIPE" or "EATING OUT"));
 
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([page]));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([page]));
         var header = PdfReadBack.Rgb(AppIdentityTokens.ConstitutionDocument);
         string[] neutral =
         [
@@ -110,8 +110,8 @@ public class MealSheetPageTests
             .Where(c => !neutral.Any(hex => PdfReadBack.SameColour((c.R, c.G, c.B), PdfReadBack.Rgb(hex)))
                 && !(c.R > 0.99 && c.G > 0.99 && c.B > 0.99)).ToList();
 
-        Assert.NotEmpty(coloured);
-        Assert.All(coloured, c => Assert.True(PdfReadBack.SameColour((c.R, c.G, c.B), header), "only the header rule is coloured"));
+        // The page\'s own content is ink only: its one coloured rule is the shared frame\'s now (ConstitutionFrameTests).
+        Assert.Empty(coloured);
     }
 
     [Fact]

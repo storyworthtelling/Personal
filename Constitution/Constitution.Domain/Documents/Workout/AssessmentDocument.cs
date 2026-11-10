@@ -37,7 +37,7 @@ public static class AssessmentDocument
 
     private static InkPageLayout Cover(AssessmentDocumentModel model, int pages)
     {
-        var draft = new PageDraft(CoverTitle);
+        var draft = new PageDraft(CoverTitle) { Section = "Assessment" };
         draft.Kicker($"ASSESSMENT WEEK · DAY {model.Day} OF {model.OfDays} · {PageDraft.DayAndTime(model.Start)}");
         draft.Footer(Name, model.Start, 1, pages);
 
@@ -79,7 +79,7 @@ public static class AssessmentDocument
     private static InkPageLayout TestPage(AssessmentDocumentModel model, int index, int pages)
     {
         var test = model.Tests[index];
-        var draft = new PageDraft(test.Name);
+        var draft = new PageDraft(test.Name) { Section = "Tests" };
         draft.Kicker($"ASSESSMENT · TEST {index + 1} OF {model.Tests.Count}");
         draft.Footer(Name, model.Start, PageOfTest(index), pages);
         draft.NotesColumn();

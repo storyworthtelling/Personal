@@ -80,6 +80,25 @@ public class SheetFrameTests
     }
 
     [Fact]
+    public void ATitleTooLongForTheLineIsShortenedAtAWordAndNeverRunsUnderTheSignature()
+    {
+        var sheet = TabletSheet.Fill(612f, 792f);
+        const string title = "The Juniper Street neighbourhood midwinter lantern supper and carol walk";
+        using var sink = new VectorPdfSink();
+        var canvas = sink.BeginPage(sheet);
+        SheetFrame.Header(canvas, sheet, title, Index);
+        sink.EndPage();
+
+        using var pdf = PdfDocument.Open(sink.Close());
+        var page = pdf.GetPage(1);
+        var serif = page.Letters.Where(l => !(l.FontName ?? "").Contains("Pinyon", StringComparison.Ordinal)).ToList();
+        var script = page.Letters.Where(l => (l.FontName ?? "").Contains("Pinyon", StringComparison.Ordinal)).ToList();
+        Assert.EndsWith("…", string.Concat(serif.Select(l => l.Value)));
+        Assert.True(serif.Max(l => l.GlyphRectangle.Right) < script.Min(l => l.GlyphRectangle.Left));
+        Assert.Equal("The Juniper", SheetFrame.Fit("The Juniper", SheetFrame.Serif(PaperTypeScale.Title), 400f));
+    }
+
+    [Fact]
     public void TheFolioNamesThePageAndItsNumber()
     {
         using var pdf = PdfDocument.Open(TwoPages());

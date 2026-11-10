@@ -155,7 +155,7 @@ public class AssessmentPageTests
         var pages = Pages();
         Assert.All(pages, p => Assert.Empty(p.Violations()));
 
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render(pages));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent(pages));
         Assert.Equal(5, document.NumberOfPages);
         foreach (var page in document.GetPages())
         {

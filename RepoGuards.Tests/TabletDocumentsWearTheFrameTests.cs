@@ -15,7 +15,6 @@ public class TabletDocumentsWearTheFrameTests
     /// </summary>
     private static readonly HashSet<string> NotYetFramed = new(StringComparer.Ordinal)
     {
-        "Constitution/Constitution.Infrastructure/Documents/ConstitutionPageSink.cs", // step 3, Constitution
         "Storyboarder/Folio.Infrastructure/Imaging/PageWriter.cs",            // step 4, Folio
     };
 
@@ -24,7 +23,24 @@ public class TabletDocumentsWearTheFrameTests
     {
         "Storyworthtelling.Paper/VectorPdfSink.cs",
         "Foreword/Foreword.Infrastructure/Pdf/SkiaPageLayout.cs",
+        "Constitution/Constitution.Infrastructure/Documents/ConstitutionPageSink.cs",
     };
+
+    [Fact]
+    public void ConstitutionsRendererFramesEveryPageItBegins()
+    {
+        // Constitution begins its pages through its sink; the renderer that calls it draws the frame on each.
+        var renderer = File.ReadAllText(Path.Combine(GuardScan.RepoRoot(), "Constitution", "Constitution.Infrastructure", "Documents", "ConstitutionDocumentRenderer.cs"));
+        Assert.Contains("ConstitutionPageSink.Begin(", renderer, StringComparison.Ordinal);
+        Assert.Contains("ConstitutionSheet.Draw(", renderer, StringComparison.Ordinal);
+        var callers = Directory.EnumerateFiles(GuardScan.RepoRoot(), "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj"))
+            .Where(path => !path.Contains(".Tests" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            .Where(file => File.ReadAllText(file).Contains("ConstitutionPageSink.Begin(", StringComparison.Ordinal))
+            .Select(Relative)
+            .ToList();
+        Assert.Equal(["Constitution/Constitution.Infrastructure/Documents/ConstitutionDocumentRenderer.cs"], callers);
+    }
 
     [Fact]
     public void EveryPainterThatBeginsATabletPageDrawsTheSharedFrame()

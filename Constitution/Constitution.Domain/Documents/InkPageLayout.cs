@@ -23,27 +23,34 @@ public sealed class InkPageLayout
 {
     private readonly List<PrintedItem> printed;
 
-    private InkPageLayout(string title, InkMap map, List<PrintedItem> printed)
+    private InkPageLayout(string title, InkMap map, List<PrintedItem> printed, string section)
     {
         Title = title;
+        Section = section;
         Map = map;
         this.printed = printed;
     }
 
     public string Title { get; }
 
+    /// <summary>
+    /// The binder tab this page sits under: a short word for the run of pages it belongs to ("Exercises", "Groceries"),
+    /// the page's own title when it is a section of one. The renderer gives each run one tab, linked to its first page.
+    /// </summary>
+    public string Section { get; }
+
     public InkMap Map { get; }
 
     public IReadOnlyList<PrintedItem> Printed => printed;
 
-    public static InkPageLayout Create(string title, IEnumerable<InkTarget> targets, IEnumerable<PrintedItem> printed)
+    public static InkPageLayout Create(string title, IEnumerable<InkTarget> targets, IEnumerable<PrintedItem> printed, string? section = null)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
             throw new ArgumentException("A page needs a title; the header prints it above the rule.", nameof(title));
         }
 
-        return new InkPageLayout(title, new InkMap(targets), printed.ToList());
+        return new InkPageLayout(title, new InkMap(targets), printed.ToList(), string.IsNullOrWhiteSpace(section) ? title : section);
     }
 
     /// <summary>

@@ -343,7 +343,7 @@ public class StepTimingTests
     {
         foreach (var page in Pages().Skip(1))
         {
-            using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([page]));
+            using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([page]));
             var neutral = new[]
             {
                 PaperColorTokens.Paper, PaperColorTokens.PaperBright, PaperColorTokens.PaperDeep, PaperColorTokens.PaperShade,
@@ -355,8 +355,8 @@ public class StepTimingTests
                 .Where(c => !neutral.Any(n => PdfReadBack.SameColour((c.R, c.G, c.B), n)) && !(c.R > 0.99 && c.G > 0.99 && c.B > 0.99))
                 .ToList();
 
-            Assert.Single(coloured);
-            Assert.True(PdfReadBack.SameColour((coloured[0].R, coloured[0].G, coloured[0].B), header));
+            // The page\'s own content is ink only: its one coloured rule is the shared frame\'s now (ConstitutionFrameTests).
+            Assert.Empty(coloured);
         }
     }
 
@@ -397,7 +397,7 @@ public class StepTimingTests
         var allowed = new[] { PaperTypeScale.Title, PaperTypeScale.Body, PaperTypeScale.Secondary, PaperTypeScale.Label, PaperTypeScale.Mono };
         foreach (var page in Pages())
         {
-            using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([page]));
+            using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([page]));
             Assert.All(document.GetPage(1).Letters.Select(l => (float)l.PointSize).Distinct(), size => Assert.Contains(allowed, rung => Math.Abs(rung - size) < 0.1f));
         }
     }

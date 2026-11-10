@@ -182,13 +182,13 @@ public class MealSheetDailyPageTests
 
         foreach (var page in new[] { Breakfast(), Box() })
         {
-            using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([page]));
+            using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([page]));
             var coloured = PdfReadBack.PaintedColours(document.GetPage(1))
                 .Where(c => !neutral.Any(hex => PdfReadBack.SameColour((c.R, c.G, c.B), PdfReadBack.Rgb(hex)))
                     && !(c.R > 0.99 && c.G > 0.99 && c.B > 0.99)).ToList();
 
-            Assert.NotEmpty(coloured);
-            Assert.All(coloured, c => Assert.True(PdfReadBack.SameColour((c.R, c.G, c.B), header), "only the header rule is coloured"));
+            // The page\'s own content is ink only: its one coloured rule is the shared frame\'s now (ConstitutionFrameTests).
+            Assert.Empty(coloured);
         }
     }
 

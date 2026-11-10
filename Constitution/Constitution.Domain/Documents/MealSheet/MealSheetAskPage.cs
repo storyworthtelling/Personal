@@ -26,7 +26,7 @@ internal static class MealSheetAskPage
 
     public static InkPageLayout Build(MealSheetModel model, HolidayAsk ask, int sheetNumber)
     {
-        var draft = new PageDraft(ask.Title);
+        var draft = new PageDraft(ask.Title) { Section = "Holiday" };
         draft.Kicker($"{MealSheetDocument.Kind} · {sheetNumber.ToString(CultureInfo.InvariantCulture)} OF {model.Pages.ToString(CultureInfo.InvariantCulture)} · {KickerTail}");
 
         var baseline = WhenBaseline;

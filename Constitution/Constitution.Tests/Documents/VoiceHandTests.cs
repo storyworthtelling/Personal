@@ -17,7 +17,8 @@ public class VoiceHandTests
     private static List<UglyToad.PdfPig.Content.Letter> LettersOf(ExercisePageModel page)
     {
         var model = WorkoutSamples.Workout(exercises: [page]);
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([WorkoutDocument.Build(model)[1]]));
+        // The page's own content: the frame's signature is in the same hand and is not the owner's voice.
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([WorkoutDocument.Build(model)[1]]));
         return document.GetPage(1).Letters.ToList();
     }
 

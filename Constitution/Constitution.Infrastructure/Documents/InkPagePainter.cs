@@ -21,8 +21,6 @@ internal static class InkPagePainter
                 + string.Join("; ", violations.Select(v => $"{v.Kind} at {v.TargetId} ({v.Other})")));
         }
 
-        DrawHeader(canvas, layout, ink);
-
         // Grounds first, so a tick on a shaded band is drawn over the shade and never under it.
         foreach (var item in layout.Printed.Where(i => i.Role == PrintedRole.Band))
         {
@@ -35,20 +33,11 @@ internal static class InkPagePainter
             DrawTarget(canvas, target, ink, bands.Any(band => band.Encloses(target.Bounds)));
         }
 
-        foreach (var item in layout.Printed)
+        // The header and the footer line are the shared frame's (ConstitutionSheet); every other printed item is the page's.
+        foreach (var item in layout.Printed.Where(i => i.Name is not (ConstitutionSheet.FooterName or ConstitutionSheet.PageNumberName)))
         {
             DrawPrinted(canvas, item, ink);
         }
-    }
-
-    private static void DrawHeader(SKCanvas canvas, InkPageLayout layout, DocumentInk ink)
-    {
-        var title = ConstitutionPage.TitleBounds;
-        canvas.DrawText(layout.Title, title.Left, title.Bottom - ink.Title.Metrics.Descent, ink.Title, ink.Ink);
-        canvas.DrawLine(
-            ConstitutionPage.MarginLeft, ConstitutionPage.HeaderRuleTop,
-            ConstitutionPage.Width - ConstitutionPage.MarginRight, ConstitutionPage.HeaderRuleTop,
-            ink.HeaderRule);
     }
 
     /// <summary>

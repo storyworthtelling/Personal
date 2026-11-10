@@ -129,7 +129,7 @@ public class MealSheetHolidayTests
     public void TheAskPageHasOnlyTheHeaderRuleInColour()
     {
         var page = MealSheetGrocerySamples.Pages(MealSheetGrocerySamples.Model(ask: Ask()))[4];
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([page]));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([page]));
         var header = PdfReadBack.Rgb(AppIdentityTokens.ConstitutionDocument);
         string[] neutral =
         [
@@ -140,8 +140,8 @@ public class MealSheetHolidayTests
             .Where(c => !neutral.Any(hex => PdfReadBack.SameColour((c.R, c.G, c.B), PdfReadBack.Rgb(hex)))
                 && !(c.R > 0.99 && c.G > 0.99 && c.B > 0.99)).ToList();
 
-        Assert.NotEmpty(coloured);
-        Assert.All(coloured, c => Assert.True(PdfReadBack.SameColour((c.R, c.G, c.B), header)));
+        // The page\'s own content is ink only: its one coloured rule is the shared frame\'s now (ConstitutionFrameTests).
+        Assert.Empty(coloured);
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class MealSheetHolidayTests
     {
         var ask = Decide(new HolidayEvent("The Juniper Street neighbourhood midwinter lantern supper", Week.AddDays(10), HolidayRole.Visiting, "the Robin and Lee Okafor family’s lakeside cabin", new TimeOnly(17, 30)))!;
         var page = MealSheetGrocerySamples.Pages(MealSheetGrocerySamples.Model(ask: ask))[4];
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([page]));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([page]));
         var first = document.GetPage(1);
 
         foreach (var item in page.Printed.Where(i => i.Name.StartsWith("ask-", StringComparison.Ordinal) && i.Text is not null))

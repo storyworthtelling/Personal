@@ -296,7 +296,7 @@ public class ExercisePageTests
     [Fact]
     public void OnlyTheHeaderRuleIsColouredAndTextIsInk()
     {
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render(WorkoutSamples.AllPages()));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent(WorkoutSamples.AllPages()));
         var header = PdfReadBack.Rgb(AppIdentityTokens.ConstitutionDocument);
         string[] neutral = [PaperColorTokens.Paper, PaperColorTokens.PaperBright, PaperColorTokens.PaperDeep, PaperColorTokens.PaperShade, PaperColorTokens.Hairline, PaperColorTokens.Ink, PaperColorTokens.InkSoft, PaperColorTokens.InkMuted];
 

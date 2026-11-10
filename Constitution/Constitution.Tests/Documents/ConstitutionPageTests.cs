@@ -80,7 +80,7 @@ public class ConstitutionPageTests
             .Select(f => (float)f.GetRawConstantValue()!)
             .ToArray();
 
-        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render(DocumentSamples.Pages()));
+        using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent(DocumentSamples.Pages()));
         var sizes = document.GetPages().SelectMany(p => p.Letters).Select(l => (float)l.PointSize).Distinct().ToList();
 
         Assert.NotEmpty(sizes);
