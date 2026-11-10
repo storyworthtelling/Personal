@@ -38,15 +38,8 @@ public class MainApplication : MauiApplication
 
     public override void OnCreate()
     {
-        var prevHandler = Java.Lang.Thread.DefaultUncaughtExceptionHandler;
-        Java.Lang.Thread.DefaultUncaughtExceptionHandler = new CrashLogger(prevHandler);
-
-        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-        {
-            CrashLogger.Log(args.ExceptionObject?.ToString() ?? "(no details)");
-            // The same fault, in the file log the weekly upload carries (LOG-LOOP-PLAN.md §4.4).
-            MauiLog.Current?.Write("Unhandled", Microsoft.Extensions.Logging.LogLevel.Critical, "Unhandled exception", args.ExceptionObject as Exception);
-        };
+        // Every route a fault can take goes to crash.log and to the file log the weekly upload carries (audit 08 §19).
+        MauiCrashHooks.Install((title, detail) => CrashLogger.Log($"{title}:\n{detail}"));
 
         base.OnCreate();
 
@@ -93,21 +86,10 @@ public class MainApplication : MauiApplication
         }
     }
 
-    private sealed class CrashLogger : Java.Lang.Object, Java.Lang.Thread.IUncaughtExceptionHandler
+    // The head's own crash.log, shown and shared from Settings.
+    private static class CrashLogger
     {
         private const string LogTag = "Folio";
-        private readonly Java.Lang.Thread.IUncaughtExceptionHandler? previous;
-
-        public CrashLogger(Java.Lang.Thread.IUncaughtExceptionHandler? previous)
-        {
-            this.previous = previous;
-        }
-
-        public void UncaughtException(Java.Lang.Thread? thread, Java.Lang.Throwable? ex)
-        {
-            Log($"Uncaught exception on thread '{thread?.Name}':\n{ex}");
-            previous?.UncaughtException(thread, ex);
-        }
 
         internal static void Log(string message)
         {
