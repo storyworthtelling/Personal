@@ -6,6 +6,7 @@ using PdfSharp.Pdf.IO;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
 using Folio.Domain.External;
+using Folio.Domain.Imaging;
 using Folio.Domain.Model;
 using Folio.Domain.Pipeline;
 using Folio.Infrastructure.Configuration;
@@ -185,11 +186,11 @@ public class ReviewProcessorTests : IDisposable
 
     private ReviewProcessor NewProcessor(
         ArchiveOptions? archiveOptions = null, IRemarkableClient? remarkable = null,
-        IPaperDriveArchive? driveArchive = null, ILogger<ReviewProcessor>? logger = null) => new(
+        IPaperDriveArchive? driveArchive = null, ILogger<ReviewProcessor>? logger = null, IImageStore? store = null) => new(
         database,
         claude.Object,
         gemini.Object,
-        new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
+        store ?? new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
         new AnalysisPdfComposer(new AnalysisDocumentRenderer()),
         clock,
         Options.Create(new RateLimitOptions
@@ -887,8 +888,8 @@ public class ReviewProcessorTests : IDisposable
         // Named through the same function the Drive upload uses, so the two targets cannot come to
         // different names for one document — which is what a hand-written "Analysis" here let happen.
         remarkable.Verify(
-            r => r.Upload(DeliveredDocument.Name("Quest", 1), It.IsAny<byte[]>()), Times.Once);
-        remarkable.Verify(r => r.EnsureFolder(It.IsAny<string>()), Times.Never);
+            r => r.Upload(DeliveredDocument.Name("Quest", 1), It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        remarkable.Verify(r => r.EnsureFolder(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
         using var context = database.NewContext();
         Assert.True(context.BookAnalyses.Single(a => a.NovelId == id).DeliveredToRemarkable);
@@ -902,14 +903,14 @@ public class ReviewProcessorTests : IDisposable
         SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = false }, remarkable.Object));
 
-        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Never);
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Review_StillCompletes_WhenRemarkableDeliveryKeepsFailing()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()))
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("reMarkable is down"));
 
         var id = SeedManuscript();
@@ -939,16 +940,16 @@ public class ReviewProcessorTests : IDisposable
     public async Task AnUploadThatRunsOutOfMemoryIsNotRepeated()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()))
-            .ThrowsAsync(new Exception(
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new RemarkableRefusedException(RemarkableRefusal.OutOfMemory, 5_000_000, new Exception(
                 "Failed to allocate a 8208 byte allocation with 203360 free bytes and 198KB until OOM, " +
-                "target footprint 268435456, growth limit 268435456"));
+                "target footprint 268435456, growth limit 268435456")));
         var logger = new CapturingLogger<ReviewProcessor>();
 
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object, logger: logger));
 
-        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Once());
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once());
         using var context = database.NewContext();
         Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
         var analysis = AnalysisOf(id);
@@ -964,9 +965,10 @@ public class ReviewProcessorTests : IDisposable
 
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor(
-            new ArchiveOptions { DeliverToRemarkable = true, RemarkableMaxBytes = 1_000 }, remarkable.Object));
+            new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object,
+            store: new OversizedReports(new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })))));
 
-        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()), Times.Never());
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never());
         var analysis = AnalysisOf(id);
         Assert.True(analysis.DeliveredToRemarkable);
         Assert.Contains("MB", analysis.RemarkableNote);
@@ -977,7 +979,7 @@ public class ReviewProcessorTests : IDisposable
     public async Task ADeliveryThatGaveUpLeavesANoteEvenAfterDriveSucceeds()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>()))
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("reMarkable is down"));
 
         var id = SeedManuscript();
@@ -990,7 +992,7 @@ public class ReviewProcessorTests : IDisposable
     public async Task ASuccessfulDeliveryLeavesNoNote()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>())).Returns(Task.CompletedTask);
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
@@ -1258,5 +1260,15 @@ public class ReviewProcessorTests : IDisposable
         var sheets = context.DesignRefs.Where(r => r.NovelId == id && r.NeedsSheet).ToList();
         Assert.NotEmpty(sheets);
         Assert.All(sheets, r => Assert.Equal(WorkStatus.Completed, r.ReferenceSheetStatus));
+    }
+
+    // Reports every stored file as one byte over the tablet's limit, so the size refusal is reached without writing 100 MB.
+    private sealed class OversizedReports(IImageStore inner) : IImageStore
+    {
+        public string Save(string relativePath, byte[] content) => inner.Save(relativePath, content);
+        public byte[] Read(string absolutePath) => inner.Read(absolutePath);
+        public bool Exists(string absolutePath) => inner.Exists(absolutePath);
+        public long Size(string absolutePath) => RemarkableLimits.MaxBytes + 1;
+        public void Delete(string relativePath) => inner.Delete(relativePath);
     }
 }

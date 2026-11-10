@@ -3,6 +3,7 @@ using Constitution.Domain.Workouts.Pipeline;
 using Constitution.Infrastructure.Delivery;
 using Constitution.Infrastructure.Workouts;
 using static Constitution.Tests.Calendar.InventedFamily;
+using Storyworthtelling.Paper;
 
 namespace Constitution.Tests.WorkoutPipeline;
 
@@ -21,7 +22,7 @@ public class InkGuardDeliveryTests
     {
         var tablet = new FakeTablet();
         var probe = new FakeInkProbe { Answer = answer ?? InkProbe.Blank };
-        var service = new DeliveryService(tablet, new Access(), () => Est(11, 3, 6));
+        var service = new DeliveryService(new PaperDelivery(tablet), new Access(), () => Est(11, 3, 6));
         return (new WorkoutDocumentDelivery(service, tablet, probe), tablet, probe);
     }
 

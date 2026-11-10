@@ -9,6 +9,7 @@ using Constitution.Infrastructure.Workouts;
 using Constitution.ReadBack;
 using Constitution.WorkoutDelivery;
 using Storyworthtelling.Remarkable;
+using Storyworthtelling.Paper;
 
 namespace Constitution.WorkoutWeek;
 
@@ -55,7 +56,7 @@ public static class WorkoutWeekDeliverySeams
             expected,
             () => proof.Current.IsEstablished);
 
-        var delivery = new DeliveryService(tablet, new ConnectionNoticeBoardAccess(), () => DateTimeOffset.Now);
+        var delivery = new DeliveryService(new PaperDelivery(tablet), new ConnectionNoticeBoardAccess(), () => DateTimeOffset.Now);
         var log = new BodyLog(appContext);
         var weekLog = new BodyWeekLog(log);
 

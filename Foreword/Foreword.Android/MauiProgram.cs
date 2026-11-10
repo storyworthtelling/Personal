@@ -22,6 +22,7 @@ using Foreword.Infrastructure.Install;
 using Foreword.Infrastructure.Prayer;
 using Foreword.Android.Google;
 using Storyworthtelling.Handwriting;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
@@ -129,10 +130,15 @@ public static class MauiProgram
         builder.Services.AddSingleton<IArticlePageFetcher, WebViewPageFetcher>();
         builder.Services.AddHttpClient<INytArticleClient, NytArticleClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
-        builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>()
+        // The tablet: one client for the auth exchange and the storage calls, built by the shared factory with the
+        // shared timeout, and every upload through the delivery seam (audit 01 §11).
+        builder.Services.AddHttpClient(nameof(RemarkableConnection), client => client.Timeout = RemarkableLimits.Timeout)
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
-        builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>()
-            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddSingleton<IRemarkableClient>(sp => RemarkableConnection.Create(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(RemarkableConnection)),
+            sp.GetRequiredService<IOptions<RemarkableOptions>>(),
+            sp.GetService<ICredentialHealthSink>()));
+        builder.Services.AddSingleton<IPaperDelivery>(sp => new PaperDelivery(sp.GetRequiredService<IRemarkableClient>()));
         // The one-time device-code pairing, now via the shared library instead of an inline POST.
         builder.Services.AddHttpClient<IRemarkableRegistration, RemarkableRegistrationClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
@@ -269,6 +275,7 @@ public static class MauiProgram
             sp.GetRequiredService<IPastoralComposer>(),
             sp.GetRequiredService<IPrayerPdfComposer>(),
             sp.GetRequiredService<IRemarkableClient>(),
+            sp.GetRequiredService<IPaperDelivery>(),
             () => CredentialStore.VaultPassphrase,
             sp.GetRequiredService<ILogger<PrayerDeliveryService>>()));
         builder.Services.AddSingleton<IVoiceConfigStore>(sp =>

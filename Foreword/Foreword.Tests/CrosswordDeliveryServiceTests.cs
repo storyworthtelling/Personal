@@ -4,6 +4,7 @@ using Foreword.Domain.Brief;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Delivery;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Xunit;
 
@@ -50,7 +51,7 @@ public class CrosswordDeliveryServiceTests
     }
 
     private CrosswordDeliveryService CreateService() =>
-        new(nytClient.Object, remarkableClient.Object, topStoriesClient.Object,
+        new(nytClient.Object, new PaperDelivery(remarkableClient.Object), topStoriesClient.Object,
             articleClient.Object, pdfComposer.Object, preferences, comics.Object, history.Object,
             NullLogger<CrosswordDeliveryService>.Instance);
 
@@ -139,7 +140,7 @@ public class CrosswordDeliveryServiceTests
 
         await CreateService().DeliverDailyPuzzle(date);
 
-        remarkableClient.Verify(c => c.Upload(It.IsAny<string>(), composedBytes), Times.Once);
+        remarkableClient.Verify(c => c.Upload(It.IsAny<string>(), composedBytes, null, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -158,7 +159,7 @@ public class CrosswordDeliveryServiceTests
 
         remarkableClient.Verify(c => c.Upload(
             It.Is<string>(t => t.Contains("2025-04-14")),
-            It.IsAny<byte[]>()),
+            It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -178,7 +179,7 @@ public class CrosswordDeliveryServiceTests
 
         remarkableClient.Verify(c => c.Upload(
             It.Is<string>(t => t.Contains("Morning Brief") && !t.Contains("Crossword")),
-            It.IsAny<byte[]>()),
+            It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -192,7 +193,7 @@ public class CrosswordDeliveryServiceTests
 
         remarkableClient.Verify(c => c.Upload(
             It.Is<string>(t => !t.Contains("Crossword")),
-            It.IsAny<byte[]>()),
+            It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -207,7 +208,7 @@ public class CrosswordDeliveryServiceTests
 
         await CreateService().DeliverDailyPuzzle(date);
 
-        remarkableClient.Verify(c => c.Upload(It.IsAny<string>(), crosswordBytes), Times.Once);
+        remarkableClient.Verify(c => c.Upload(It.IsAny<string>(), crosswordBytes, null, It.IsAny<CancellationToken>()), Times.Once);
         pdfComposer.Verify(c => c.Compose(It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
             It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()), Times.Never);
     }
@@ -284,7 +285,7 @@ public class CrosswordDeliveryServiceTests
 
         remarkableClient.Verify(c => c.Upload(
             It.Is<string>(t => t.Contains("June") && t.Contains("2025")),
-            It.IsAny<byte[]>()),
+            It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

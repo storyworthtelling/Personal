@@ -27,6 +27,7 @@ using Index.Infrastructure.Voice;
 using Index.Infrastructure.Worksheet;
 using Index.Android.Google;
 using Storyworthtelling.Handwriting;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
@@ -229,10 +230,15 @@ public static class MauiProgram
             sp.GetRequiredService<ILogger<VoiceSeatComposer>>()));
 
         // Release F (Index-P11): the worksheet's reMarkable delivery and hand-written read-back.
-        builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>()
+        // One client for the auth exchange and the storage calls, from the shared factory with the shared timeout;
+        // every upload goes through the delivery seam (audit 01 §11).
+        builder.Services.AddHttpClient(nameof(RemarkableConnection), client => client.Timeout = RemarkableLimits.Timeout)
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
-        builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>()
-            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddSingleton<IRemarkableClient>(sp => RemarkableConnection.Create(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(RemarkableConnection)),
+            sp.GetRequiredService<IOptions<RemarkableOptions>>(),
+            sp.GetService<ICredentialHealthSink>()));
+        builder.Services.AddSingleton<IPaperDelivery>(sp => new PaperDelivery(sp.GetRequiredService<IRemarkableClient>()));
 
         // The shared Claude key already lives in DriveVoiceOptions above (the same key Folio's
         // Settings publishes); ClaudeVisionOptions is the extractor's own options shape, matching

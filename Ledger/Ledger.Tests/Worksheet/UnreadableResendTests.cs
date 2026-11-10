@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper;
 using Index.Domain.External;
 using Index.Domain.Model;
 using Index.Domain.Worksheet;
@@ -96,6 +97,7 @@ public class UnreadableResendTests
             planBuilder,
             new FollowUpReadBackService(budget, snowball, remarkable, factory),
             remarkable,
+            new PaperDelivery(remarkable),
             clock);
 
         return new Rig

@@ -7,7 +7,6 @@ using Constitution.Infrastructure.ReadBack;
 using Constitution.Infrastructure.Workouts;
 using Constitution.Services;
 using Constitution.WorkoutDelivery;
-using Microsoft.Extensions.Options;
 using Storyworthtelling.Handwriting;
 using Storyworthtelling.Remarkable;
 using Xamarin.Android.Net;
@@ -82,12 +81,10 @@ public sealed class ReadBackServices
     public static IRemarkableClient TabletOf(Context context)
     {
         var appContext = context.ApplicationContext ?? context;
-        var tabletHttp = HeadHttp.Shared;
-        var auth = new RemarkableAuthService(
-            tabletHttp,
-            Options.Create(new RemarkableOptions { DeviceToken = new ConstitutionConnections(appContext).RemarkableDeviceToken }),
+        return RemarkableConnection.Create(
+            HeadHttp.WithTimeout(RemarkableLimits.Timeout),
+            new LiveOptions<RemarkableOptions>(() => new RemarkableOptions { DeviceToken = new ConstitutionConnections(appContext).RemarkableDeviceToken }),
             HeadCredentialHealth.Store());
-        return new RemarkableStorageClient(tabletHttp, auth);
     }
 
     /// <summary>The page reader. With no Claude key it answers that it cannot read yet, which callers treat as "unknown".</summary>

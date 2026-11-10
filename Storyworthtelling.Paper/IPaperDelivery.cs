@@ -4,9 +4,10 @@ namespace Storyworthtelling.Paper;
 
 /// <summary>
 /// The unified delivery seam for a finished, already-rendered PDF: the reMarkable path (root upload — the
-/// proven Foreword path) and the Drive-beside-source archive behind one interface, so every app delivers
-/// the same way. The colour profile of the bytes is chosen by the caller via <see cref="DeliveryProfilePolicy"/>
-/// before rendering; this seam is a byte-pipe. Either transport may be absent on a given head (no reMarkable
+/// proven Foreword path — or a named folder) and the Drive-beside-source archive behind one interface, so every
+/// app delivers the same way. It is the only door to the tablet for an upload (audit 01 §11,
+/// <c>OneRemarkableDoorTests</c>); an app may still read, list and trash through <see cref="IRemarkableClient"/>.
+/// The colour profile of the bytes is chosen by the caller via <see cref="DeliveryProfilePolicy"/> before rendering; this seam is a byte-pipe. Either transport may be absent on a given head (no reMarkable
 /// pairing, or the Drive write scope not yet granted), reported by the capability flags so the caller can skip
 /// a target rather than fail.
 /// </summary>
@@ -15,8 +16,19 @@ public interface IPaperDelivery
     bool CanDeliverToRemarkable { get; }
     bool CanArchiveToDrive { get; }
 
-    /// <summary>Delivers the PDF to the root of the paired reMarkable tablet.</summary>
+    /// <summary>
+    /// Delivers the PDF to the root of the paired reMarkable tablet. Throws
+    /// <see cref="RemarkableRefusedException"/> for a file the tablet will never take (over
+    /// <see cref="RemarkableLimits.MaxBytes"/>, or the phone ran out of memory sending it), which a caller settles
+    /// rather than retries; any other failure propagates as it was.
+    /// </summary>
     Task DeliverToRemarkableRoot(string title, byte[] pdf, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Delivers the PDF into the named folder at the tablet's root, creating the folder when absent. The folder
+    /// wire format is reconstructed, not yet seen working on a live account; the root path is the proven one.
+    /// </summary>
+    Task DeliverToRemarkableFolder(string folderName, string title, byte[] pdf, CancellationToken cancellationToken = default);
 
     // The Drive archive, three resumable operations beside the source document (see IPaperDriveArchive).
     Task<string?> FindDriveParentFolder(string sourceFileId, CancellationToken cancellationToken = default);
@@ -45,7 +57,15 @@ public sealed class PaperDelivery : IPaperDelivery
     public bool CanArchiveToDrive => drive is not null;
 
     public Task DeliverToRemarkableRoot(string title, byte[] pdf, CancellationToken cancellationToken = default) =>
-        Require(remarkable).Upload(title, pdf);
+        Require(remarkable).Upload(title, pdf, null, cancellationToken);
+
+    public async Task DeliverToRemarkableFolder(
+        string folderName, string title, byte[] pdf, CancellationToken cancellationToken = default)
+    {
+        var tablet = Require(remarkable);
+        var folderId = await tablet.EnsureFolder(folderName, cancellationToken);
+        await tablet.Upload(title, pdf, folderId, cancellationToken);
+    }
 
     public Task<string?> FindDriveParentFolder(string sourceFileId, CancellationToken cancellationToken = default) =>
         Require(drive).FindParentFolder(sourceFileId, cancellationToken);

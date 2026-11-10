@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper;
 using Index.Domain.External;
 using Index.Domain.Model;
 using Index.Domain.Worksheet;
@@ -51,7 +52,7 @@ internal sealed class WorkedExample : IDisposable
         var readBack = new WorksheetReadBackService(Budget, Remarkable, factory, Snowball);
         FollowUpBuilder = new FollowUpPlanBuilder(Budget, Snowball, Savings, Clock);
         var followUpReadBack = new FollowUpReadBackService(Budget, Snowball, Remarkable, factory);
-        Service = new WorksheetDeliveryService(Budget, PlanBuilder, readBack, Snowball, FollowUpBuilder, followUpReadBack, Remarkable, Clock);
+        Service = new WorksheetDeliveryService(Budget, PlanBuilder, readBack, Snowball, FollowUpBuilder, followUpReadBack, Remarkable, new PaperDelivery(Remarkable), Clock);
     }
 
     /// <param name="withLoans">The ten loans of Appendix A's sheet, summed to $1,250 a week.</param>

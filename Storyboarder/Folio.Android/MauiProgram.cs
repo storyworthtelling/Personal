@@ -108,14 +108,15 @@ public static class MauiProgram
         builder.Services.AddHttpClient<IVoiceClient, VoiceClient>()
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(2))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
-        // The shared reMarkable delivery client (Phase 4): the auth service exchanges the paired device
-        // token for a session JWT (reporting its health), the storage client uploads the report into the
-        // tablet, and the registration client handles the one-time device-code pairing.
-        builder.Services.AddHttpClient<IRemarkableAuthProvider, RemarkableAuthService>()
+        // The shared reMarkable delivery client (Phase 4), built by the shared factory with the shared timeout: the
+        // auth exchange and the storage calls on one client (reporting the pairing's health), and the registration
+        // client for the one-time device-code pairing.
+        builder.Services.AddHttpClient(nameof(RemarkableConnection), client => client.Timeout = RemarkableLimits.Timeout)
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
-        builder.Services.AddHttpClient<IRemarkableClient, RemarkableStorageClient>()
-            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5))
-            .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
+        builder.Services.AddSingleton<IRemarkableClient>(sp => RemarkableConnection.Create(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(RemarkableConnection)),
+            sp.GetRequiredService<IOptions<RemarkableOptions>>(),
+            sp.GetService<ICredentialHealthSink>()));
         builder.Services.AddHttpClient<IRemarkableRegistration, RemarkableRegistrationClient>()
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
 

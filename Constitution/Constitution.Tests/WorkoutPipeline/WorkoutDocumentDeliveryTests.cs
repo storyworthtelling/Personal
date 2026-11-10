@@ -4,6 +4,7 @@ using Constitution.Infrastructure.Delivery;
 using Constitution.Infrastructure.Workouts;
 using Storyworthtelling.Remarkable;
 using static Constitution.Tests.Calendar.InventedFamily;
+using Storyworthtelling.Paper;
 
 namespace Constitution.Tests.WorkoutPipeline;
 
@@ -21,7 +22,7 @@ public class WorkoutDocumentDeliveryTests
     {
         var tablet = new FakeTablet();
         var access = new Access();
-        var service = new DeliveryService(tablet, access, () => Est(11, 3, 6));
+        var service = new DeliveryService(new PaperDelivery(tablet), access, () => Est(11, 3, 6));
         return (new WorkoutDocumentDelivery(service, tablet, new FakeInkProbe()), tablet, access);
     }
 

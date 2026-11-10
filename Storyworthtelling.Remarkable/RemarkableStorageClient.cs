@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Storyworthtelling.Pipeline;
 
 namespace Storyworthtelling.Remarkable;
 
@@ -17,44 +18,54 @@ public class RemarkableStorageClient : IRemarkableClient
         this.authProvider = authProvider;
     }
 
-    public Task Upload(string title, byte[] pdfBytes) => Upload(title, pdfBytes, null);
-
-    public async Task Upload(string title, byte[] pdfBytes, string? parentFolderId)
+    public async Task Upload(string title, byte[] pdfBytes, string? parentFolderId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (RemarkableLimits.TooLarge(pdfBytes.LongLength) is { } tooLarge)
+            throw tooLarge;
+
+
         // The document metadata: file_name always, and parent only when delivering into a folder — an
         // empty/absent parent means the account root, so the root path is byte-identical to before.
         var meta = string.IsNullOrEmpty(parentFolderId)
             ? Base64Meta(new { file_name = title })
             : Base64Meta(new { file_name = title, parent = parentFolderId });
 
-        using var request = await CreateRequest(HttpMethod.Post, FilesUrl);
-        request.Headers.Add("rm-meta", meta);
-        request.Headers.Add("rm-source", "RoR-Browser");
-        request.Content = new ByteArrayContent(pdfBytes);
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        try
+        {
+            using var request = await CreateRequest(HttpMethod.Post, FilesUrl, cancellationToken);
+            request.Headers.Add("rm-meta", meta);
+            request.Headers.Add("rm-source", "RoR-Browser");
+            request.Content = new ByteArrayContent(pdfBytes);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
 
-        var response = await httpClient.SendAsync(request);
-        await EnsureSuccess(response, "upload", title);
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            await EnsureSuccess(response, "upload", title);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && MemoryFailure.IsOutOfMemory(ex))
+        {
+            throw new RemarkableRefusedException(RemarkableRefusal.OutOfMemory, pdfBytes.LongLength, ex);
+        }
     }
 
-    public async Task<string> EnsureFolder(string name)
+    public async Task<string> EnsureFolder(string name, CancellationToken cancellationToken)
     {
         // Reuse an existing folder of this name (so delivery doesn't spawn duplicate folders); otherwise
         // create one. The collection wire format is reconstructed from the docs — a metadata-only POST with
         // type=collection and no PDF body — and the first live run verifies the cloud accepts it.
-        var existing = await FindCollectionId(name);
+        var existing = await FindCollectionId(name, cancellationToken);
         if (existing is not null)
             return existing;
 
         var meta = Base64Meta(new { file_name = name, type = "collection" });
-        using var request = await CreateRequest(HttpMethod.Post, FilesUrl);
+        using var request = await CreateRequest(HttpMethod.Post, FilesUrl, cancellationToken);
         request.Headers.Add("rm-meta", meta);
         request.Headers.Add("rm-source", "RoR-Browser");
 
-        var response = await httpClient.SendAsync(request);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
         await EnsureSuccess(response, "folder create", name);
 
-        var body = await response.Content.ReadAsStringAsync();
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
         return ReadCreatedId(body)
             ?? throw new HttpRequestException($"reMarkable folder create for '{name}' returned no id.");
     }
@@ -127,22 +138,23 @@ public class RemarkableStorageClient : IRemarkableClient
     private static string Base64Meta(object metadata) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(metadata)));
 
-    private async Task<HttpRequestMessage> CreateRequest(HttpMethod method, string url)
+    private async Task<HttpRequestMessage> CreateRequest(
+        HttpMethod method, string url, CancellationToken cancellationToken = default)
     {
-        var userToken = await authProvider.GetUserToken();
+        var userToken = await authProvider.GetUserToken(cancellationToken);
         var request = new HttpRequestMessage(method, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
         return request;
     }
 
     // The id of an existing folder (collection) with this name, or null if none exists.
-    private async Task<string?> FindCollectionId(string name)
+    private async Task<string?> FindCollectionId(string name, CancellationToken cancellationToken)
     {
-        using var request = await CreateRequest(HttpMethod.Get, FilesUrl);
-        var response = await httpClient.SendAsync(request);
+        using var request = await CreateRequest(HttpMethod.Get, FilesUrl, cancellationToken);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
         await EnsureSuccess(response, "list");
 
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return ParseEntries(json)
             .FirstOrDefault(e => e.IsCollection && string.Equals(e.Title, name, StringComparison.OrdinalIgnoreCase))
             ?.Id;

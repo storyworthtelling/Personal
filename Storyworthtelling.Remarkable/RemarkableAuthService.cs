@@ -11,33 +11,36 @@ public class RemarkableAuthService : IRemarkableAuthProvider
         "https://webapp-prod.cloud.remarkable.engineering/token/json/2/user/new";
 
     private readonly HttpClient httpClient;
-    private readonly RemarkableOptions options;
+    private readonly IOptions<RemarkableOptions> options;
     private readonly ICredentialHealthSink? healthSink;
     private readonly SemaphoreSlim refreshLock = new(1, 1);
 
     private string? userToken;
+    private string? exchangedFor;
     private DateTimeOffset tokenExpiry = DateTimeOffset.MinValue;
 
     public RemarkableAuthService(
         HttpClient httpClient, IOptions<RemarkableOptions> options, ICredentialHealthSink? healthSink = null)
     {
         this.httpClient = httpClient;
-        this.options = options.Value;
+        // Kept as the options, not their value: a re-pair takes effect on the next exchange, with no restart.
+        this.options = options;
         this.healthSink = healthSink;
     }
 
-    public async Task<string> GetUserToken()
+    public async Task<string> GetUserToken(CancellationToken cancellationToken)
     {
-        if (userToken != null && DateTimeOffset.UtcNow < tokenExpiry.AddMinutes(-5))
-            return userToken;
+        var deviceToken = options.Value.DeviceToken;
+        if (IsCurrent(deviceToken))
+            return userToken!;
 
-        await refreshLock.WaitAsync();
+        await refreshLock.WaitAsync(cancellationToken);
         try
         {
-            if (userToken != null && DateTimeOffset.UtcNow < tokenExpiry.AddMinutes(-5))
-                return userToken;
+            if (IsCurrent(deviceToken))
+                return userToken!;
 
-            return await FetchUserToken();
+            return await FetchUserToken(deviceToken, cancellationToken);
         }
         finally
         {
@@ -45,13 +48,17 @@ public class RemarkableAuthService : IRemarkableAuthProvider
         }
     }
 
-    private async Task<string> FetchUserToken()
+    // A session token is reused only for the pairing it was exchanged for, and only until five minutes before it expires.
+    private bool IsCurrent(string deviceToken) =>
+        userToken != null && exchangedFor == deviceToken && DateTimeOffset.UtcNow < tokenExpiry.AddMinutes(-5);
+
+    private async Task<string> FetchUserToken(string deviceToken, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, UserTokenUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.DeviceToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", deviceToken);
         request.Content = new StringContent(string.Empty, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.SendAsync(request);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -65,11 +72,12 @@ public class RemarkableAuthService : IRemarkableAuthProvider
         }
 
         healthSink?.MarkOk(RemarkableCredentialId.Value);
-        var raw = await response.Content.ReadAsStringAsync();
+        var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         var token = raw.Trim().Trim('"');
         var (_, expiry) = JwtPayload.Parse(token);
 
         userToken = token;
+        exchangedFor = deviceToken;
         tokenExpiry = expiry;
         return token;
     }

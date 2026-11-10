@@ -28,7 +28,7 @@ public class RemarkableStorageClientTests
     {
         var (client, handler) = Create(RecordingHandler.Ok());
 
-        await client.Upload("NYT Crossword 2026-04-30", [37, 80, 68, 70]);
+        await client.Upload("NYT Crossword 2026-04-30", [37, 80, 68, 70], null, CancellationToken.None);
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
@@ -47,7 +47,7 @@ public class RemarkableStorageClientTests
     {
         var (client, handler) = Create(RecordingHandler.Ok());
 
-        await client.Upload("Book — Draft 2 — Analysis", [1, 2, 3], parentFolderId: "folder-123");
+        await client.Upload("Book — Draft 2 — Analysis", [1, 2, 3], "folder-123", CancellationToken.None);
 
         var meta = DecodeMeta(handler.Requests.Single());
         Assert.Equal("folder-123", meta.GetProperty("parent").GetString());
@@ -58,7 +58,7 @@ public class RemarkableStorageClientTests
     {
         var (client, _) = Create(new HttpResponseMessage(HttpStatusCode.Unauthorized));
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => client.Upload("Test", [1, 2, 3]));
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.Upload("Test", [1, 2, 3], null, CancellationToken.None));
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class RemarkableStorageClientTests
         };
         var (client, _) = Create(response);
 
-        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.Upload("Test", [1, 2, 3]));
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.Upload("Test", [1, 2, 3], null, CancellationToken.None));
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, ex.StatusCode);
         Assert.Contains("405", ex.Message);
@@ -89,7 +89,7 @@ public class RemarkableStorageClientTests
             "{\"id\":\"doc-1\",\"file_name\":\"Canonizer\",\"type\":\"DocumentType\"}]");
         var (client, handler) = Create(listing);
 
-        var id = await client.EnsureFolder("Canonizer");
+        var id = await client.EnsureFolder("Canonizer", CancellationToken.None);
 
         Assert.Equal("col-1", id);                       // the collection, not the same-named document
         Assert.Single(handler.Requests);                 // only the GET listing, no create POST
@@ -102,7 +102,7 @@ public class RemarkableStorageClientTests
         // First response: an empty listing. Second: the create response carrying the new id.
         var (client, handler) = Create(RecordingHandler.Ok("[]"), RecordingHandler.Ok("{\"id\":\"new-col\"}"));
 
-        var id = await client.EnsureFolder("Canonizer");
+        var id = await client.EnsureFolder("Canonizer", CancellationToken.None);
 
         Assert.Equal("new-col", id);
         Assert.Equal(2, handler.Requests.Count);

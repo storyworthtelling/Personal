@@ -2,5 +2,5 @@ namespace Storyworthtelling.Remarkable;
 
 public interface IRemarkableAuthProvider
 {
-    Task<string> GetUserToken();
+    Task<string> GetUserToken(CancellationToken cancellationToken);
 }

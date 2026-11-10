@@ -3,6 +3,7 @@ using Index.Domain.Model;
 using Index.Domain.Time;
 using Index.Domain.Worksheet;
 using Index.Infrastructure.Services;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 
 namespace Index.Infrastructure.Worksheet;
@@ -30,6 +31,7 @@ public sealed class WorksheetDeliveryService
     private readonly FollowUpPlanBuilder followUpPlanBuilder;
     private readonly FollowUpReadBackService followUpReadBack;
     private readonly IRemarkableClient remarkable;
+    private readonly IPaperDelivery delivery;
     private readonly IClock clock;
     private readonly ILogger<WorksheetDeliveryService>? logger;
 
@@ -41,6 +43,7 @@ public sealed class WorksheetDeliveryService
         FollowUpPlanBuilder followUpPlanBuilder,
         FollowUpReadBackService followUpReadBack,
         IRemarkableClient remarkable,
+        IPaperDelivery delivery,
         IClock clock,
         ILogger<WorksheetDeliveryService>? logger = null)
     {
@@ -51,6 +54,7 @@ public sealed class WorksheetDeliveryService
         this.followUpPlanBuilder = followUpPlanBuilder;
         this.followUpReadBack = followUpReadBack;
         this.remarkable = remarkable;
+        this.delivery = delivery;
         this.clock = clock;
         this.logger = logger;
     }
@@ -174,15 +178,13 @@ public sealed class WorksheetDeliveryService
     {
         try
         {
-            var folderId = await remarkable.EnsureFolder(WorksheetTitles.Folder);
-
             var previous = await remarkable.DownloadByTitle(WorksheetTitles.Current);
             if (previous is not null)
             {
                 await remarkable.MoveToTrash(previous.Id);
             }
 
-            await remarkable.Upload(WorksheetTitles.Current, pdfBytes, folderId);
+            await delivery.DeliverToRemarkableFolder(WorksheetTitles.Folder, WorksheetTitles.Current, pdfBytes, cancellationToken);
             return true;
         }
         catch (Exception ex)
@@ -292,15 +294,13 @@ public sealed class WorksheetDeliveryService
     {
         try
         {
-            var folderId = await remarkable.EnsureFolder(WorksheetTitles.Folder);
-
             var previous = await remarkable.DownloadByTitle(WorksheetTitles.FollowUpCurrent);
             if (previous is not null)
             {
                 await remarkable.MoveToTrash(previous.Id);
             }
 
-            await remarkable.Upload(WorksheetTitles.FollowUpCurrent, pdfBytes, folderId);
+            await delivery.DeliverToRemarkableFolder(WorksheetTitles.Folder, WorksheetTitles.FollowUpCurrent, pdfBytes, cancellationToken);
             return true;
         }
         catch (Exception ex)

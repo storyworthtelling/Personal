@@ -15,6 +15,7 @@ using Folio.Infrastructure.Configuration;
 using Folio.Infrastructure.External;
 using Folio.Infrastructure.Persistence;
 using Storyworthtelling.Paper;
+using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Pipeline;
 
@@ -1277,17 +1278,16 @@ public sealed class ReviewProcessor : IPipelineStep
     {
         // The upload holds the whole file in memory (and the HTTP stack buffers a second copy), so a file
         // over the tablet's limit is refused before it is even read: on a real book a 173 MB report ran
-        // the phone out of memory, six times over.
+        // the phone out of memory, six times over. The limit is the shared one (RemarkableLimits).
         var size = imageStore.Size(analysis.PdfPath!);
-        if (size > archive.RemarkableMaxBytes)
+        if (RemarkableLimits.TooLarge(size) is { } tooLarge)
         {
             logger.LogWarning(
                 "Manuscript {NovelId}: the report is {SizeMb:0} MB, over the {LimitMb:0} MB the reMarkable takes; " +
                 "not sending it to the tablet (the report remains available elsewhere)",
-                novel.Id, size / 1_000_000.0, archive.RemarkableMaxBytes / 1_000_000.0);
+                novel.Id, size / 1_000_000.0, RemarkableLimits.MaxBytes / 1_000_000.0);
             return await SettleWithoutTablet(db, novel, analysis,
-                $"It did not reach the reMarkable: the PDF is {size / 1_000_000.0:0} MB, over the tablet's " +
-                $"{archive.RemarkableMaxBytes / 1_000_000.0:0} MB limit.", cancellationToken);
+                $"It did not reach the reMarkable: {tooLarge.Sentence}.", cancellationToken);
         }
 
         try
@@ -1305,16 +1305,15 @@ public sealed class ReviewProcessor : IPipelineStep
             logger.LogInformation("Delivered the revision report of manuscript {NovelId} to the reMarkable root", novel.Id);
             return ProcessResult.DidWork(novel.Id);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException && MemoryFailure.IsOutOfMemory(ex))
+        catch (RemarkableRefusedException refused)
         {
-            // The same file in the same heap runs out again, and each attempt fills the heap further
-            // before it does, so this is not tried a second time.
-            logger.LogWarning(ex,
-                "Manuscript {NovelId}: the phone ran out of memory sending the report to the reMarkable; " +
-                "not repeating it with the same file ({SizeMb:0} MB)", novel.Id, size / 1_000_000.0);
+            // Final, not a failure to retry: the same file in the same heap runs out again, and each attempt
+            // fills the heap further before it does.
+            logger.LogWarning(refused,
+                "Manuscript {NovelId}: the reMarkable delivery was refused ({Reason}); not repeating it with the " +
+                "same file ({SizeMb:0} MB)", novel.Id, refused.Reason, size / 1_000_000.0);
             return await SettleWithoutTablet(db, novel, analysis,
-                $"It did not reach the reMarkable: the phone ran out of memory sending it ({size / 1_000_000.0:0} MB).",
-                cancellationToken);
+                $"It did not reach the reMarkable: {refused.Sentence}.", cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
