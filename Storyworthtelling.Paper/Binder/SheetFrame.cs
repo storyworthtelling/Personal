@@ -103,9 +103,15 @@ public static class SheetFrame
     /// ink; the page is anchored under the active tab's name so the others' links land here. The whole tab is the
     /// target, including the one it is already on: leaving it out makes one tab inert for no reason a finger could see.
     /// </summary>
-    public static void Binder(SKCanvas canvas, TabletSheet sheet, IReadOnlyList<BinderTab> tabs, int active, float firstTabTop = FirstTabTop)
+    /// <para>A cover passes <c>active: -1</c>: every tab is drawn behind the binder edge and none is open. A section's
+    /// later pages pass <paramref name="anchor"/> false, so the section's link still lands on its first page.</para>
+    public static void Binder(
+        SKCanvas canvas, TabletSheet sheet, IReadOnlyList<BinderTab> tabs, int active, float firstTabTop = FirstTabTop, bool anchor = true)
     {
-        canvas.DrawNamedDestinationAnnotation(new SKPoint(0, 0), tabs[active].Destination);
+        if (anchor && active >= 0)
+        {
+            canvas.DrawNamedDestinationAnnotation(new SKPoint(0, 0), tabs[active].Destination);
+        }
 
         var edgeX = sheet.DesignWidth - BinderStrip.BinderEdgeInset;
         using (var edge = Stroke(Hairline, BinderStrip.Hairline))

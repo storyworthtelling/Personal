@@ -16,7 +16,11 @@ internal static class ComicPage
     private const double Keyline = 1;
     private const double Gap = 14;
 
-    public static void Draw(SkiaPageLayout layout, ComicStrip strip, bool crosswordFollows)
+    /// <param name="furniture">Wraps the comic's folio with the brief's strip, set before any content so a strip
+    /// whose hover text runs on carries it on every page.</param>
+    public static void Draw(
+        SkiaPageLayout layout, ComicStrip strip, bool crosswordFollows,
+        Func<Action<SkiaPageLayout>, Action<SkiaPageLayout>>? furniture = null)
     {
         var kickerFont = SkiaPageLayout.Sans(PaperTypeScale.Label, bold: true);
         var titleFont = SkiaPageLayout.Serif(PaperTypeScale.Heading);
@@ -25,7 +29,8 @@ internal static class ComicPage
         // The folio says what comes next, because a comic is the last thing before the puzzle and a
         // reader who has just finished the news wants to know whether there is more paper coming.
         var folio = crosswordFollows ? "xkcd · then the crossword" : "xkcd";
-        layout.Footer = PageFurniture.Folio(folio, null);
+        var footer = PageFurniture.Folio(folio, null);
+        layout.Footer = furniture is null ? footer : furniture(footer);
 
         layout.DrawWrapped($"XKCD · NO. {strip.Number}", kickerFont);
         layout.Advance(4);
