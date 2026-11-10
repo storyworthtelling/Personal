@@ -186,7 +186,7 @@ public static class MauiProgram
             new DriveSecretsVaultStore(new DriveTextFile(
                 DriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
         builder.Services.AddSingleton(sp =>
-            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase));
+            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase, MauiLog.Trail("Vault")));
         builder.Services.AddSingleton<VaultSync>();
         builder.Services.AddSingleton<IVoiceConfigStore>(sp =>
             new VaultVoiceConfigStore(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase));

@@ -494,9 +494,11 @@ public class UnlockActivity : Activity
                 v => v with { GitHubUpdateToken = token ?? string.Empty },
                 System.Threading.CancellationToken.None);
         }
-        catch
+        catch (Exception e)
         {
             // Best-effort: the vault picks the token up on the next successful save.
+            // Kept by its shape, never its message (audit 08 §6, §28).
+            HeadLog.Quiet("Vault", "Update token backup did not complete", e);
         }
     }
 

@@ -40,9 +40,12 @@ public class MainActivity : MauiAppCompatActivity
             var sync = IPlatformApplication.Current!.Services.GetRequiredService<VaultSync>();
             sync.RestoreAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore: restore is a convenience; the Settings page always accepts the keys manually.
+            // Restore is a convenience (the Settings page always accepts the keys manually), but the reason it did not
+            // complete is kept, as Index keeps it (audit 08 §7). The vault's own outcome is already its trail line.
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write(
+                "Vault", Microsoft.Extensions.Logging.LogLevel.Warning, "Vault restore at launch did not complete", ex);
         }
     });
 
@@ -61,9 +64,11 @@ public class MainActivity : MauiAppCompatActivity
             if (projects.HasActiveWorkAsync(CancellationToken.None).GetAwaiter().GetResult())
                 PipelineWorker.RunNow(this);
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore: resume is an optimization; the scheduled periodic worker is the backbone.
+            // Resume is an optimization (the scheduled periodic worker is the backbone), but a heal that failed is kept.
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write(
+                "Resume", Microsoft.Extensions.Logging.LogLevel.Warning, "Launch-time heal and resume did not complete", ex);
         }
     });
 

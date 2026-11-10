@@ -47,7 +47,8 @@ public class MealWeekWorker : Worker
         catch (Exception e)
         {
             // The type name is the whole report; the next hour tries again on its own.
-            new BodyLog(context).Outcome($"meal week worker failed: {e.GetType().Name}");
+            new MealsLog(context).Outcome($"meal week worker failed: {e.GetType().Name}");
+            HeadDiagnostics.Current?.Quiet("Worker", "MealWeekWorker failed", e);
             return Result.InvokeFailure();
         }
     }
@@ -98,7 +99,8 @@ public class MealWeekWorker : Worker
             }
             catch (Exception e)
             {
-                new BodyLog(application).Outcome($"meal week worker failed: {e.GetType().Name}");
+                new MealsLog(application).Outcome($"meal week worker failed: {e.GetType().Name}");
+                HeadDiagnostics.Current?.Quiet("Worker", "MealWeekWorker failed", e);
             }
         });
     }

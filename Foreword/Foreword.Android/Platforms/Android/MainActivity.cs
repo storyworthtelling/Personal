@@ -42,9 +42,12 @@ public class MainActivity : MauiAppCompatActivity
             var sync = IPlatformApplication.Current!.Services.GetRequiredService<VaultSync>();
             sync.RestoreAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore: restore is a convenience; the Settings page always accepts the credentials manually.
+            // Restore is a convenience (the Settings page always accepts the credentials manually), but the reason it did not
+            // complete is kept, as Index keeps it (audit 08 §7). The vault's own outcome is already its trail line.
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write(
+                "Vault", Microsoft.Extensions.Logging.LogLevel.Warning, "Vault restore at launch did not complete", ex);
         }
     });
 

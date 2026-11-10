@@ -251,14 +251,15 @@ public static class MauiProgram
             new DriveSecretsVaultStore(new DriveTextFile(
                 VoiceDriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
         builder.Services.AddSingleton(sp =>
-            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase));
+            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase, MauiLog.Trail("Vault")));
         // This account's own vault, in its own Drive: the calendar choices live here because they
         // differ between the household's installs, where the shared vault holds what they have in common.
         builder.Services.AddSingleton(sp =>
             new PersonalVaultAccess(
                 new DrivePersonalVaultStore(new DriveTextFile(
                     VoiceDriveFactory(sp), DrivePersonalVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())),
-                () => CredentialStore.VaultPassphrase));
+                () => CredentialStore.VaultPassphrase,
+                MauiLog.Trail("Vault")));
         builder.Services.AddSingleton<VaultSync>();
 
         // The private prayer archive: its own Drive file, encrypted with the same passphrase the

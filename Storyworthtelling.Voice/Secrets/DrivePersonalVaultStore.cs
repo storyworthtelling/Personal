@@ -2,13 +2,19 @@ using System.Text.Json;
 
 namespace Storyworthtelling.Voice.Secrets;
 
-/// <summary>The four ways loading a personal vault can go, matching the shared one.</summary>
+/// <summary>The ways loading a personal vault can go: the shared one's four, and Drive not answering.</summary>
 public enum PersonalVaultStatus
 {
     Empty,
     Loaded,
     WrongPassphrase,
     Corrupt,
+
+    /// <summary>
+    /// Drive could not be read (no scope, no network). Not "no backup": a caller that took it for Empty would believe
+    /// there is nothing to restore (audit 08 §8).
+    /// </summary>
+    Unreachable,
 }
 
 /// <summary>The outcome of a load. Vault is meaningful only when Status is Loaded.</summary>
@@ -20,6 +26,8 @@ public sealed record PersonalVaultLoadResult(PersonalVaultStatus Status, Persona
     public static PersonalVaultLoadResult Empty { get; } = new(PersonalVaultStatus.Empty, PersonalVault.Empty);
 
     public static PersonalVaultLoadResult Corrupt { get; } = new(PersonalVaultStatus.Corrupt, PersonalVault.Empty);
+
+    public static PersonalVaultLoadResult Unreachable { get; } = new(PersonalVaultStatus.Unreachable, PersonalVault.Empty);
 
     public static PersonalVaultLoadResult Loaded(PersonalVault vault) => new(PersonalVaultStatus.Loaded, vault);
 }

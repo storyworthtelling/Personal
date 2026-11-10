@@ -97,4 +97,52 @@ public class SecretsVaultServiceTests
         Assert.False(result.Succeeded);
         Assert.Contains("403", result.Message);
     }
+
+    [Fact]
+    public async Task EveryRestoreAndPublishLeavesOneTrailLine()
+    {
+        var lines = new List<(bool Problem, string Line)>();
+        var file = new InMemoryTextFile();
+        await new SecretsVaultService(new DriveSecretsVaultStore(file), () => "real-pass")
+            .PublishAsync(v => v with { Nyt = new NytSecrets("cookie", "key") }, default);
+        var wrong = new SecretsVaultService(new DriveSecretsVaultStore(file), () => "wrong-pass", (p, l) => lines.Add((p, l)));
+
+        await wrong.LoadAsync(default);
+        await wrong.PublishAsync(v => v, default);
+
+        Assert.Equal([(true, "VAULT shared restore: WrongPassphrase"), (true, "VAULT shared publish: VaultUnreadable")], lines);
+    }
+
+    [Fact]
+    public async Task AFailedWriteIsTrailedByTypeAndNotByItsMessage()
+    {
+        var lines = new List<(bool Problem, string Line)>();
+        var service = new SecretsVaultService(new WriteFailingStore(), () => Pass, (p, l) => lines.Add((p, l)));
+
+        await service.PublishAsync(v => v, default);
+
+        var (problem, line) = Assert.Single(lines);
+        Assert.True(problem);
+        Assert.Equal("VAULT shared publish: WriteFailed (System.InvalidOperationException)", line);
+    }
+
+    [Fact]
+    public async Task ARestoreThatThrowsIsTrailedAndStillThrows()
+    {
+        var lines = new List<(bool Problem, string Line)>();
+        var service = new SecretsVaultService(new ThrowingStore(), () => Pass, (p, l) => lines.Add((p, l)));
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => service.LoadAsync(default));
+
+        Assert.Equal([(true, "VAULT shared restore: Unreachable (System.Net.Http.HttpRequestException)")], lines);
+    }
+
+    private sealed class ThrowingStore : ISecretsVaultStore
+    {
+        public Task<SecretsVaultLoadResult> LoadAsync(string passphrase, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("no network");
+
+        public Task SaveAsync(SecretsVault vault, string passphrase, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("no network");
+    }
 }

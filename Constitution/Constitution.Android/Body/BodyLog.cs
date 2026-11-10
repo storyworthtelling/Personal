@@ -1,7 +1,5 @@
-using Storyworthtelling.Diagnostics;
-using Codex.Ui;
 using Android.Content;
-using Codex.Domain.Diagnostics;
+using Constitution.Services;
 using Constitution.Domain.Body;
 using Constitution.Infrastructure.SleepNumber;
 
@@ -14,7 +12,7 @@ namespace Constitution.Body;
 /// exception type names. A phrase carries no reading, no package name and no person's name, and nothing else is written.
 /// It also takes the bed's phrases, which have the same rule.
 /// </summary>
-public sealed class BodyLog : IBodyLog, ISleepIqLog
+public sealed class BodyLog : ConstitutionTrail, IBodyLog, ISleepIqLog
 {
     /// <summary>The trail's file name, beside the failure log and the vault trail.</summary>
     public const string FileName = "body.log";
@@ -23,39 +21,8 @@ public sealed class BodyLog : IBodyLog, ISleepIqLog
     public const long MaxBytes = 32 * 1024;
     private const string Source = "Body";
 
-    private readonly DiagnosticLog? log;
-
     public BodyLog(Context context)
+        : base(context, FileName, MaxBytes, Source)
     {
-        var directory = context.NoBackupFilesDir?.AbsolutePath;
-        // The head's own instance when the Application has installed it, so one outbox counts every seal;
-        // a process that never ran it (a test host) gets its own, still sealing rather than discarding.
-        log = HeadDiagnostics.Current?.Trail(FileName)
-            ?? (directory is null ? null : new DiagnosticLog(directory, MaxBytes, FileName, new LogOutbox(directory)));
-    }
-
-    /// <summary>Everything the trail holds, oldest first; empty when nothing was recorded.</summary>
-    public string ReadAll() => log?.ReadAll() ?? string.Empty;
-
-    public void Outcome(string phrase)
-    {
-        if (log is null)
-        {
-            return;
-        }
-
-        try
-        {
-            log.Append(new DiagnosticEntry(DateTimeOffset.Now, DiagnosticLevel.Info, Source, phrase));
-        }
-        catch (IOException e)
-        {
-            // The disk is full or gone; a missing trail line must not break the read it describes.
-            Android.Util.Log.Warn(Source, $"body trail not written: {e.GetType().Name}");
-        }
-        catch (UnauthorizedAccessException e)
-        {
-            Android.Util.Log.Warn(Source, $"body trail not written: {e.GetType().Name}");
-        }
     }
 }

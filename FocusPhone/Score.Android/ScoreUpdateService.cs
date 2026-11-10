@@ -68,7 +68,7 @@ public static class ScoreUpdateService
         // phone the honest answer is that this is not Score's job.
         if (Duty(context) != UpdateRole.SelfOnly)
         {
-            Log.Info(Tag, "A custodian looks after updates on this device; nothing to do.");
+            HeadLog.Info(Tag, "A custodian looks after updates on this device; nothing to do.");
             return UpdateRunResult.Ran([]);
         }
 
@@ -86,7 +86,7 @@ public static class ScoreUpdateService
         }
         catch (HttpRequestException e)
         {
-            Log.Warn(Tag, $"Release fetch failed: {e.Message}");
+            HeadLog.Warn(Tag, $"Release fetch failed: {e.Message}");
             return UpdateRunResult.FetchFailed(e.Message);
         }
 
@@ -124,7 +124,7 @@ public static class ScoreUpdateService
             {
                 // Left unprocessed on purpose so the next run retries — the confirmed
                 // installer's commonest failure is nobody being near the phone.
-                Log.Warn(Tag, $"{asset.Name}: {e.Message}");
+                HeadLog.Warn(Tag, $"{asset.Name}: {e.Message}");
                 results.Add(new AppInstallResult(asset.Name, 0, InstallOutcome.Failed, e.Message));
             }
             finally
@@ -203,7 +203,7 @@ public static class ScoreUpdateService
         }
         catch (Exception e)
         {
-            Log.Warn(Tag, $"Could not delete {path}: {e.Message}");
+            HeadLog.Warn(Tag, $"Could not delete {path}: {e.Message}");
         }
     }
 
@@ -235,7 +235,7 @@ public static class ScoreUpdateService
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            Log.Warn(Tag, $"Could not read the update token: {e.Message}");
+            HeadLog.Warn(Tag, $"Could not read the update token: {e.Message}");
             return null;
         }
     }

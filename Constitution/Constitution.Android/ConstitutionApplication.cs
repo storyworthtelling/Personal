@@ -43,6 +43,7 @@ public class ConstitutionApplication : Application
                 (ConstitutionVaultLog.FileName, ConstitutionVaultLog.MaxBytes),
                 (WorkoutsLog.FileName, WorkoutsLog.MaxBytes),
                 (BudgetTrail.FileName, BudgetTrail.MaxBytes),
+                (WeeklyMeals.MealsLog.FileName, WeeklyMeals.MealsLog.MaxBytes),
             ]));
     }
 }

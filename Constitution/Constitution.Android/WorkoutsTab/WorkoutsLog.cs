@@ -1,7 +1,5 @@
-using Storyworthtelling.Diagnostics;
-using Codex.Ui;
 using Android.Content;
-using Codex.Domain.Diagnostics;
+using Constitution.Services;
 
 namespace Constitution.WorkoutsTab;
 
@@ -10,7 +8,7 @@ namespace Constitution.WorkoutsTab;
 /// open cannot roll a failure history out. A phrase names the act and the exception's type; it never carries a day, a
 /// session, a person or an event.
 /// </summary>
-public sealed class WorkoutsLog
+public sealed class WorkoutsLog : ConstitutionTrail
 {
     public const string FileName = "workouts.log";
 
@@ -18,36 +16,8 @@ public sealed class WorkoutsLog
     public const long MaxBytes = 32 * 1024;
     private const string Source = "Workouts";
 
-    private readonly DiagnosticLog? log;
-
     public WorkoutsLog(Context context)
+        : base(context, FileName, MaxBytes, Source)
     {
-        var directory = context.NoBackupFilesDir?.AbsolutePath;
-        // The head's own instance when the Application has installed it, so one outbox counts every seal;
-        // a process that never ran it (a test host) gets its own, still sealing rather than discarding.
-        log = HeadDiagnostics.Current?.Trail(FileName)
-            ?? (directory is null ? null : new DiagnosticLog(directory, MaxBytes, FileName, new LogOutbox(directory)));
-    }
-
-    public void Outcome(string phrase)
-    {
-        if (log is null)
-        {
-            return;
-        }
-
-        try
-        {
-            log.Append(new DiagnosticEntry(DateTimeOffset.Now, DiagnosticLevel.Info, Source, phrase));
-        }
-        catch (IOException e)
-        {
-            // The disk is full or gone; a missing trail line must not break the act it describes.
-            Android.Util.Log.Warn(Source, $"workouts trail not written: {e.GetType().Name}");
-        }
-        catch (UnauthorizedAccessException e)
-        {
-            Android.Util.Log.Warn(Source, $"workouts trail not written: {e.GetType().Name}");
-        }
     }
 }

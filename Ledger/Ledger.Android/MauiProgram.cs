@@ -193,7 +193,8 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(
                 sp.GetRequiredService<ISecretsVaultStore>(),
-                () => SettingsStore.VaultPassphrase));
+                () => SettingsStore.VaultPassphrase,
+                MauiLog.Trail("Vault")));
         builder.Services.AddScoped<VaultSync>();
         // One restore at a time, process-wide: the launch and a passphrase save both bring the vault's
         // banks back, and the Accounts page asks this gate whether banks are on their way (task 2.6).

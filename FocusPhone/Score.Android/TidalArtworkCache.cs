@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using Codex.Ui.Http;
 
@@ -32,7 +33,7 @@ public sealed class TidalArtworkCache(Context context)
         }
         catch (Exception e)
         {
-            Android.Util.Log.Warn("TidalArtworkCache", $"DownloadAsync({trackId}) threw: {e}");
+            HeadLog.Warn("TidalArtworkCache", $"DownloadAsync threw: {Storyworthtelling.Diagnostics.ExceptionShape.TypeChain(e)}");
             return null;
         }
     }

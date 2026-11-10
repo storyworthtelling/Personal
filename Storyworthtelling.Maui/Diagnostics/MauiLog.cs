@@ -9,6 +9,10 @@ public static class MauiLog
 {
     public static FileLogger? Current { get; private set; }
 
+    /// <summary>A trail for a shared library that reports a problem flag and its words (the vault's, say).</summary>
+    public static Action<bool, string> Trail(string category) => (problem, message) =>
+        Current?.Write(category, problem ? Microsoft.Extensions.Logging.LogLevel.Warning : Microsoft.Extensions.Logging.LogLevel.Information, message, null);
+
     /// <summary>Installs the head's file log and returns it, to hand to <c>builder.Logging.AddProvider</c>.</summary>
     public static FileLogger Install(FileLoggerOptions options)
     {

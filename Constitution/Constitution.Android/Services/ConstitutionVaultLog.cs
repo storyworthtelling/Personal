@@ -1,7 +1,4 @@
-using Storyworthtelling.Diagnostics;
-using Codex.Ui;
 using Android.Content;
-using Codex.Domain.Diagnostics;
 using Constitution.Infrastructure.Vault;
 
 namespace Constitution.Services;
@@ -12,7 +9,7 @@ namespace Constitution.Services;
 /// line per launch cannot roll a failure history out. The sync hands over phrases that carry no value,
 /// passphrase or name, and nothing else is ever written here.
 /// </summary>
-public sealed class ConstitutionVaultLog : IConstitutionVaultLog
+public sealed class ConstitutionVaultLog : ConstitutionTrail, IConstitutionVaultLog
 {
     /// <summary>The trail's file name, beside the failure log.</summary>
     public const string FileName = "vault.log";
@@ -21,39 +18,8 @@ public sealed class ConstitutionVaultLog : IConstitutionVaultLog
     public const long MaxBytes = 32 * 1024;
     private const string Source = "Vault";
 
-    private readonly DiagnosticLog? log;
-
     public ConstitutionVaultLog(Context context)
+        : base(context, FileName, MaxBytes, Source)
     {
-        var directory = context.NoBackupFilesDir?.AbsolutePath;
-        // The head's own instance when the Application has installed it, so one outbox counts every seal;
-        // a process that never ran it (a test host) gets its own, still sealing rather than discarding.
-        log = HeadDiagnostics.Current?.Trail(FileName)
-            ?? (directory is null ? null : new DiagnosticLog(directory, MaxBytes, FileName, new LogOutbox(directory)));
-    }
-
-    /// <summary>Everything the trail holds, oldest first; empty when nothing was recorded.</summary>
-    public string ReadAll() => log?.ReadAll() ?? string.Empty;
-
-    public void Outcome(string phrase)
-    {
-        if (log is null)
-        {
-            return;
-        }
-
-        try
-        {
-            log.Append(new DiagnosticEntry(DateTimeOffset.Now, DiagnosticLevel.Info, Source, phrase));
-        }
-        catch (IOException e)
-        {
-            // The disk is full or gone; a missing trail line must not break the sync it describes.
-            Android.Util.Log.Warn(Source, $"vault trail not written: {e.GetType().Name}");
-        }
-        catch (UnauthorizedAccessException e)
-        {
-            Android.Util.Log.Warn(Source, $"vault trail not written: {e.GetType().Name}");
-        }
     }
 }

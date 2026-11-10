@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
@@ -61,6 +62,8 @@ public sealed class MusicTasteService
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
+            // One line per failed call, so "no taste learned yet" and "the key was refused" read apart (audit 08 §12).
+            AudioDiagnostics.LogWarning("Taste", ClaudeCallLine.Failed("taste-refresh", e));
             return TasteProfile.Empty;
         }
     }
@@ -74,6 +77,8 @@ public sealed class MusicTasteService
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
+            // One line per failed call, so "no taste learned yet" and "the key was refused" read apart (audit 08 §12).
+            AudioDiagnostics.LogWarning("Taste", ClaudeCallLine.Failed("taste-load", e));
             return TasteProfile.Empty;
         }
     }
@@ -91,6 +96,8 @@ public sealed class MusicTasteService
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
+            // One line per failed call, so "no taste learned yet" and "the key was refused" read apart (audit 08 §12).
+            AudioDiagnostics.LogWarning("Taste", ClaudeCallLine.Failed("discovery-playlist", e));
             return DiscoveryPlaylist.Empty;
         }
     }
@@ -120,6 +127,8 @@ public sealed class MusicTasteService
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
+            // One line per failed call, so "no taste learned yet" and "the key was refused" read apart (audit 08 §12).
+            AudioDiagnostics.LogWarning("Taste", ClaudeCallLine.Failed("taste-veto-fold", e));
             // The crate is replaced either way. A week of strikes is worth having, not
             // worth wedging the weekly run over.
         }
@@ -147,6 +156,8 @@ public sealed class MusicTasteService
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
+            // One line per failed call, so "no taste learned yet" and "the key was refused" read apart (audit 08 §12).
+            AudioDiagnostics.LogWarning("Taste", ClaudeCallLine.Failed("weekly-discoveries", e));
             return [];
         }
     }

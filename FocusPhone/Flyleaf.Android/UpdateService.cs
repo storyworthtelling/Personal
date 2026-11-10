@@ -67,6 +67,15 @@ public static class UpdateService
         // other's cache files and install sessions.
         var result = await RunGate.RunAsync(() => RunAsync(context, force));
         new UpdateStatusStore(context).Record(result.Summarize());
+        // The run's own sentence too, so a run with no per-app lines (no token, not device owner) still leaves one (audit 08 §16).
+        if (result.AnyFailed || result.State is UpdateRunState.FetchFailed)
+        {
+            HeadDiagnostics.Current?.Warn("Update", result.Summarize());
+        }
+        else
+        {
+            HeadDiagnostics.Current?.Info("Update", result.Summarize());
+        }
         // One line per app (LOG-LOOP-PLAN.md §4.5), not just the summary the settings panel shows.
         foreach (var line in result.Lines())
         {
@@ -111,6 +120,7 @@ public static class UpdateService
         {
             // Only a rejected token (401/403) flags the credential; a transient failure retries silently.
             health.MarkFailing(CredentialIds.GitHubUpdateToken, $"{(int)ex.StatusCode} {ex.StatusCode}");
+            HeadLog.Warn(Tag, $"The update token was rejected: {(int)ex.StatusCode} {ex.StatusCode}");
             return UpdateRunResult.FetchFailed($"{(int)ex.StatusCode} {ex.StatusCode}");
         }
         catch (HttpRequestException ex)

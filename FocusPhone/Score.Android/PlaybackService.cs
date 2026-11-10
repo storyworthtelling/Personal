@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -106,6 +107,8 @@ public class PlaybackService : MediaLibraryService
             .SetAudioAttributes(audioAttributes, true)
             .SetHandleAudioBecomingNoisy(true)
             .Build()!;
+        // A Drive 401, a codec failure or a dead podcast redirect used to leave no trace at all (audit 08 §13).
+        player.AddListener(new PlayerErrorListener(player));
         var tree = new MediaBrowseTree(LoadCatalog());
         driveMediaSession = new MediaLibrarySession.Builder(this, player, new LibraryCallback(tree))
             .SetId(DriveSessionId)!
@@ -148,7 +151,7 @@ public class PlaybackService : MediaLibraryService
         var probe = await tokenProvider.RefreshAsync(CancellationToken.None);
         if (probe.Status != TidalTokenPollStatus.Success)
         {
-            Android.Util.Log.Warn(logTag, $"Stored TIDAL refresh token did not exchange (status={probe.Status}); " +
+            HeadLog.Warn(logTag, $"Stored TIDAL refresh token did not exchange (status={probe.Status}); " +
                 "skipping the TIDAL session.");
             return;
         }
@@ -321,4 +324,12 @@ public class PlaybackService : MediaLibraryService
     {
         public MediaBrowseTree Tree { get; } = tree;
     }
+}
+
+/// <summary>Writes each playback error to the head's log: the error code, the kind of source and its host, nothing else.</summary>
+internal sealed class PlayerErrorListener(IPlayer player) : Java.Lang.Object, IPlayerListener
+{
+    public void OnPlayerError(PlaybackException? error) =>
+        HeadLog.Warn("Player", PlayerErrorLine.Format(
+            error?.ErrorCodeName ?? "unknown", player.CurrentMediaItem?.PlaybackProperties?.Uri?.ToString()));
 }
