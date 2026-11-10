@@ -251,7 +251,7 @@ public static class MauiProgram
             new DriveSecretsVaultStore(new DriveTextFile(
                 VoiceDriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
         builder.Services.AddSingleton(sp =>
-            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase, MauiLog.Trail("Vault")));
+            new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase, MauiLog.Trail(LogSources.Vault)));
         // This account's own vault, in its own Drive: the calendar choices live here because they
         // differ between the household's installs, where the shared vault holds what they have in common.
         builder.Services.AddSingleton(sp =>
@@ -259,7 +259,7 @@ public static class MauiProgram
                 new DrivePersonalVaultStore(new DriveTextFile(
                     VoiceDriveFactory(sp), DrivePersonalVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())),
                 () => CredentialStore.VaultPassphrase,
-                MauiLog.Trail("Vault")));
+                MauiLog.Trail(LogSources.Vault)));
         builder.Services.AddSingleton<VaultSync>();
 
         // The private prayer archive: its own Drive file, encrypted with the same passphrase the
@@ -296,9 +296,14 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
         // The delivery log (LOG-LOOP-PLAN.md §4.4), now with the cap it never had and sealed into the log loop's
-        // outbox when full. The prayer categories keep only templates, levels and exception types (A2).
+        // outbox when full. The prayer categories keep only templates, levels and exception types (A2). Only Foreword's
+        // own categories are kept from Information, as Index and Folio do: every category at Information let
+        // HttpClientFactory write four lines a request across ten clients, burying the delivery lines and filling the
+        // file, with request URLs whose query carries keys and the home's coordinates (audit 08 §32). Everything else,
+        // System.Net.Http included, is kept from Warning.
         builder.Logging.AddProvider(MauiLog.Install(new FileLoggerOptions(
-            FileSystem.AppDataDirectory, "delivery.log", 1_000_000, _ => true, PrayerLogCategories.Quiet)));
+            FileSystem.AppDataDirectory, "delivery.log", 1_000_000,
+            category => category.StartsWith("Foreword", StringComparison.Ordinal), PrayerLogCategories.Quiet)));
 
         // The log loop (LOG-LOOP-PLAN.md §3, §4): the tap watch, then — once the services exist — the launch line,
         // exit reasons and the Drive upload the head's worker runs inside the Saturday window.

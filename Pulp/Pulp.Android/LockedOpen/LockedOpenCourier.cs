@@ -46,7 +46,7 @@ internal static class LockedOpenCourier
         if (before != ContractSendOutcome.Sent)
         {
             // Flyleaf is not here, or Pulp cannot reach it: the caller falls back to the plain hand-off.
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, before));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, before));
             return false;
         }
 
@@ -87,12 +87,12 @@ internal static class LockedOpenCourier
                 LockedOpenHandOff.ResultRefused,
                 null,
                 null);
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
             return true;
         }
         catch (Exception e)
         {
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
             HeadLog.Warn("Pulp", PulpLogLines.LockedOpenNotSent(e.GetType().Name), e);
             asking.Failed(PulpLogLines.LockedOpenNotSent(e.GetType().Name));
             return false;

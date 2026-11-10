@@ -32,25 +32,9 @@ public class MainApplication : MauiApplication
 
     public override void OnCreate()
     {
-        var prevHandler = Java.Lang.Thread.DefaultUncaughtExceptionHandler;
-        Java.Lang.Thread.DefaultUncaughtExceptionHandler = new CrashLogger(prevHandler);
-
-        // Every route a fault can take to the process lands in LaunchFaults.Record, so the next launch
-        // shows it whether it killed the app or was only logged.
-        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-        {
-            LaunchFaults.Record("Unhandled exception", args.ExceptionObject?.ToString() ?? "(no details)");
-            // The same fault, in the file log the weekly upload carries (LOG-LOOP-PLAN.md §4.4).
-            MauiLog.Current?.Write("Unhandled", Microsoft.Extensions.Logging.LogLevel.Critical, "Unhandled exception", args.ExceptionObject as Exception);
-        };
-
-        // A faulted Task nobody awaited (e.g. a fire-and-forget background refresh) otherwise vanishes;
-        // capture it so a silent failure still lands in the crash log. Mark it observed so it can't escalate.
-        TaskScheduler.UnobservedTaskException += (_, args) =>
-        {
-            LaunchFaults.Record("Unobserved task exception", args.Exception.ToString());
-            args.SetObserved();
-        };
+        // Every route a fault can take lands in LaunchFaults.Record, so the next launch shows it whether it killed the app or
+        // was only logged, and in the file log the weekly upload carries (audit 08 §19).
+        MauiCrashHooks.Install((where, detail) => LaunchFaults.Record(where, detail));
 
         base.OnCreate();
 
@@ -75,25 +59,6 @@ public class MainApplication : MauiApplication
         {
             SettingsStore.LastMigrationError = ex.Message;
             LaunchFaults.Record("Database migration", ex);
-        }
-    }
-
-    // The Java-side handler: the uncaught exceptions the managed hook does not see on the Android
-    // thread. It records the fault, then hands it to the handler that was there before, so the process
-    // still dies the way it would have.
-    private sealed class CrashLogger : Java.Lang.Object, Java.Lang.Thread.IUncaughtExceptionHandler
-    {
-        private readonly Java.Lang.Thread.IUncaughtExceptionHandler? previous;
-
-        public CrashLogger(Java.Lang.Thread.IUncaughtExceptionHandler? previous)
-        {
-            this.previous = previous;
-        }
-
-        public void UncaughtException(Java.Lang.Thread? thread, Java.Lang.Throwable? ex)
-        {
-            LaunchFaults.Record($"Uncaught exception on thread '{thread?.Name}'", ex?.ToString() ?? "(no details)");
-            previous?.UncaughtException(thread, ex);
         }
     }
 }

@@ -342,7 +342,7 @@ public class PlateActivity : AppCompatActivity
             await voiceOptions.RefreshAsync(CancellationToken.None);
 
             var http = HeadHttp.Shared;
-            var client = new DarkroomCaptionClient(http, voiceOptions, HeadCredentialHealth.Store());
+            var client = new DarkroomCaptionClient(http, voiceOptions, HeadCredentialHealth.Store(), line => HeadLog.Warn("Caption", line));
             var line = await client.CaptionAsync(jpegs, CancellationToken.None);
             if (string.IsNullOrWhiteSpace(line))
             {

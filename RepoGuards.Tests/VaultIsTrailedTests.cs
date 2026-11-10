@@ -27,7 +27,7 @@ public class VaultIsTrailedTests
             .Where(file => !Exempt.Contains(file.relative))
             .Select(file => (file.relative, text: File.ReadAllText(file.path)))
             .Where(file => Regex.Matches(file.text, @"new (SecretsVaultService|PersonalVaultAccess)\(").Count
-                > Regex.Matches(file.text, @"Trail\(""Vault""\)").Count)
+                > Regex.Matches(file.text, @"Trail\((LogSources\.Vault|""Vault"")\)").Count)
             .Select(file => file.relative)
             .ToList();
 

@@ -4,16 +4,17 @@ using Storyworthtelling.Diagnostics;
 namespace LogLoopReader;
 
 /// <summary>
-/// When an entry was written, from its own stamp (audit 08 §3). The native heads stamp <c>Oct 30, 9:15 AM</c> with no
-/// year and no zone, the MAUI heads <c>2026-10-30 09:15:00</c>; both are the phone's local clock, read here as UTC, which
-/// is close enough to order a week and to see a worker that stopped. A stamp that cannot be read, or that falls outside
+/// When an entry was written, from its own stamp (audit 08 §3). Every head now stamps ISO-8601 with the phone's offset
+/// (<c>2026-10-30T09:15:05.250-04:00</c>, audit 08 §25), read exactly. Older segments still carry the native
+/// <c>Oct 30, 9:15 AM</c> (no year, no zone) or the MAUI <c>2026-10-30 09:15:00</c>; both are the phone's local clock, read
+/// here as UTC, which is close enough to order a week and to see a worker that stopped. A stamp that cannot be read, or that falls outside
 /// the batch it came in, gives way to the batch's own range.
 /// </summary>
 public static class EntryTime
 {
     private static readonly string[] Shapes =
     [
-        "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm:ssK", "yyyy-MM-dd HH:mm:ss zzz",
+        "yyyy-MM-dd'T'HH:mm:ss.fffzzz", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm:ssK", "yyyy-MM-dd HH:mm:ss zzz",
     ];
 
     private static readonly string[] YearlessShapes = ["MMM d, h:mm tt", "MMM d, h:mm:ss tt", "MMM d, HH:mm"];

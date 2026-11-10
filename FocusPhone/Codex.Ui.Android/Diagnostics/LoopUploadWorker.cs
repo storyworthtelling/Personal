@@ -35,13 +35,22 @@ public class LoopUploadWorker : Worker
             WorkName, ExistingPeriodicWorkPolicy.Keep!, (PeriodicWorkRequest)request);
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(LoopUploadWorker), StopReason);
+
     public override Result DoWork() => HeadDiagnostics.Worker(nameof(LoopUploadWorker), Upload);
 
     private static Result Upload()
     {
         var head = HeadDiagnostics.Current;
-        if (head is null || !UploadWindow.Due(head.History.LastConfirmed, DateTimeOffset.Now))
+        if (head is null)
         {
+            return Result.InvokeSuccess();
+        }
+        if (!UploadWindow.Due(head.History.LastConfirmed, DateTimeOffset.Now))
+        {
+            // Said, so a day with nothing due does not read as an upload that ran (audit 08 §37).
+            HeadDiagnostics.Skipped(nameof(LoopUploadWorker), "outside the upload window or already sent this week");
             return Result.InvokeSuccess();
         }
         // A failed run is still a finished one: tomorrow's run is the retry, recorded by the head.

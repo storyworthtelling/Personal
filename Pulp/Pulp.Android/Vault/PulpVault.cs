@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Android.App;
 using Android.Content;
 using Codex.Ui.Voice;
@@ -59,7 +60,7 @@ internal sealed class PulpVault
         }
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
-            services.Diagnostics.Warn("vault", "The vault could not be read from Drive.", exception);
+            services.Diagnostics.Warn(LogSources.Vault, "The vault could not be read from Drive.", exception);
             return VaultRestoreOutcome.Failed;
         }
 
@@ -115,7 +116,7 @@ internal sealed class PulpVault
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
             // The publish's own read of the vault can throw before it reaches its write (no token, no network).
-            services.Diagnostics.Warn("vault", "Pulp's keys could not be published to the vault.", exception);
+            services.Diagnostics.Warn(LogSources.Vault, "Pulp's keys could not be published to the vault.", exception);
             return VaultSaveOutcome.WriteFailed;
         }
 
@@ -131,7 +132,7 @@ internal sealed class PulpVault
 
         if (outcome == VaultSaveOutcome.WriteFailed)
         {
-            services.Diagnostics.Warn("vault", "The vault write failed: " + result.Error);
+            services.Diagnostics.Warn(LogSources.Vault, "The vault write failed: " + result.Error);
         }
 
         if (outcome == VaultSaveOutcome.Saved)

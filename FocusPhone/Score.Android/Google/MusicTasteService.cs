@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Storyworthtelling.Voice.Claude;
 using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
@@ -48,7 +49,7 @@ public sealed class MusicTasteService
         var client = new TasteProfileClient(http, options, HeadCredentialHealth.Store());
         store = new DriveTasteProfileStore(new DriveTextFile(
             driveFactory, DriveTasteProfileStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store));
-        refresher = new TasteProfileRefresher(client, store, options);
+        refresher = new TasteProfileRefresher(client, store, options, line => HeadLog.Warn("Taste", line));
         discovery = new DiscoveryClient(http, options, HeadCredentialHealth.Store());
     }
 

@@ -21,14 +21,18 @@ public class LaunchFaultGuardTests
     [Fact]
     public void EveryManagedAndTaskFaultRoutesThroughTheRecorder()
     {
+        // The three routes now live once in the MAUI kit's MauiCrashHooks (audit 08 §19), which hands each to the recorder
+        // Index gives it and writes it to the uploaded log as well.
         var application = Source("Ledger.Android/Platforms/Android/MainApplication.cs");
+        var hooks = File.ReadAllText(Path.Combine(DesignTestHelpers.LedgerRoot(), "..", "Storyworthtelling.Maui", "Diagnostics", "MauiCrashHooks.cs"));
 
-        Assert.Contains("AppDomain.CurrentDomain.UnhandledException", application, StringComparison.Ordinal);
-        Assert.Contains("TaskScheduler.UnobservedTaskException", application, StringComparison.Ordinal);
-        Assert.Contains("DefaultUncaughtExceptionHandler", application, StringComparison.Ordinal);
-        Assert.Contains("LaunchFaults.Record(\"Unhandled exception\"", application, StringComparison.Ordinal);
-        Assert.Contains("LaunchFaults.Record(\"Unobserved task exception\"", application, StringComparison.Ordinal);
-        Assert.Contains("LaunchFaults.Record($\"Uncaught exception on thread", application, StringComparison.Ordinal);
+        Assert.Contains("MauiCrashHooks.Install((where, detail) => LaunchFaults.Record(where, detail))", application, StringComparison.Ordinal);
+        Assert.Contains("AppDomain.CurrentDomain.UnhandledException", hooks, StringComparison.Ordinal);
+        Assert.Contains("TaskScheduler.UnobservedTaskException", hooks, StringComparison.Ordinal);
+        Assert.Contains("DefaultUncaughtExceptionHandler", hooks, StringComparison.Ordinal);
+        Assert.Contains("record(\"Unhandled exception\"", hooks, StringComparison.Ordinal);
+        Assert.Contains("record(\"Unobserved task exception\"", hooks, StringComparison.Ordinal);
+        Assert.Contains("record($\"Uncaught exception on thread", hooks, StringComparison.Ordinal);
     }
 
     [Fact]

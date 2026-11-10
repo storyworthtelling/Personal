@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Storyworthtelling.Google.Android;
 using Android.Content;
 using Codex.Ui.Voice;
@@ -206,7 +207,7 @@ public sealed class PulpServices
         }
         catch (Exception exception)
         {
-            Diagnostics.Warn("vault", "The vault could not be read at launch; keys and the household role stay as remembered.", exception);
+            Diagnostics.Warn(LogSources.Vault, "The vault could not be read at launch; keys and the household role stay as remembered.", exception);
         }
     }
 
@@ -306,7 +307,7 @@ public sealed class PulpServices
         }
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
-            Diagnostics.Warn("vault", "The shared Claude key could not be read; mood search answers 'no idea' until it can.", exception);
+            Diagnostics.Warn(LogSources.Vault, "The shared Claude key could not be read; mood search answers 'no idea' until it can.", exception);
         }
     }
 
@@ -786,7 +787,7 @@ public sealed class PulpServices
         }
         catch (CatalogueLookupException exception)
         {
-            Diagnostics.Warn("catalogue", $"A title could not be refreshed ({exception.Failure}); the cached copy stands.", exception);
+            CatalogueFailure($"refresh:{exception.Failure}", $"A title could not be refreshed ({exception.Failure}); the cached copy stands.", exception);
             return cached?.Title;
         }
 
@@ -984,6 +985,19 @@ public sealed class PulpServices
         return read.Entry;
     }
 
+    // A missing key or a spent quota fails every title of every refresh the same way: the first of each kind in a window
+    // is logged with its stack, the rest are counted and said once (audit 08 §33), so they cannot roll the log.
+    private readonly RepeatedFailures catalogueFailures = new(TimeSpan.FromMinutes(15));
+
+    private void CatalogueFailure(string kind, string message, Exception exception)
+    {
+        var (inFull, summary) = catalogueFailures.Note(kind, DateTimeOffset.UtcNow);
+        if (inFull)
+        {
+            Diagnostics.Warn("catalogue", summary is null ? message : $"{message} ({summary})", exception);
+        }
+    }
+
     private async Task<CatalogueTitle> WithRatingAsync(CatalogueTitle title, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(title.ImdbId))
@@ -997,7 +1011,7 @@ public sealed class PulpServices
         }
         catch (CatalogueLookupException exception)
         {
-            Diagnostics.Warn("catalogue", $"A title has no rating ({exception.Failure}); it stays unrated, which hides it from a child (D128).", exception);
+            CatalogueFailure($"rating:{exception.Failure}", $"A title has no rating ({exception.Failure}); it stays unrated, which hides it from a child (D128).", exception);
             return title;
         }
     }
@@ -1016,7 +1030,7 @@ public sealed class PulpServices
         }
         catch (CatalogueLookupException exception)
         {
-            Diagnostics.Warn("catalogue", $"A show has no air dates ({exception.Failure}).", exception);
+            CatalogueFailure($"air-dates:{exception.Failure}", $"A show has no air dates ({exception.Failure}).", exception);
             return title;
         }
     }

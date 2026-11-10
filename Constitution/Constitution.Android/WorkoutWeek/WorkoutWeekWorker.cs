@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
@@ -32,6 +33,9 @@ public class WorkoutWeekWorker : Worker
     {
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(WorkoutWeekWorker), StopReason);
+
     public override Result DoWork() => HeadDiagnostics.Worker(nameof(WorkoutWeekWorker), Work);
 
     private Result Work()
@@ -48,7 +52,7 @@ public class WorkoutWeekWorker : Worker
         {
             // The type name is the whole report; the next morning tries again on its own.
             new BodyLog(context).Outcome($"workout week worker failed: {e.GetType().Name}");
-            HeadDiagnostics.Current?.Quiet("Worker", "WorkoutWeekWorker failed", e);
+            HeadDiagnostics.Current?.Quiet(LogSources.Worker, "WorkoutWeekWorker failed", e);
             return Result.InvokeFailure();
         }
     }
@@ -96,7 +100,7 @@ public class WorkoutWeekWorker : Worker
             catch (Exception e)
             {
                 new BodyLog(application).Outcome($"workout week worker failed: {e.GetType().Name}");
-                HeadDiagnostics.Current?.Quiet("Worker", "WorkoutWeekWorker failed", e);
+                HeadDiagnostics.Current?.Quiet(LogSources.Worker, "WorkoutWeekWorker failed", e);
             }
         });
     }

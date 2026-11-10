@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
@@ -33,7 +34,8 @@ public sealed class VoiceGreeting
         var client = new VoiceClient(http, options, HeadCredentialHealth.Store());
         messenger = new VoicedMessenger(
             DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
-            client);
+            client,
+            warn: line => HeadLog.Warn("Voice", line));
     }
 
     // Composes a greeting in the owner's voice for the occasion, or "" when it can't (no profile, no key,
@@ -51,6 +53,8 @@ public sealed class VoiceGreeting
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // The key or profile could not be read from Drive; the greeting hides, and the reason is kept (audit 08 §22).
+            HeadLog.Quiet("Voice", "Greeting not composed", ex);
             return string.Empty;
         }
     }

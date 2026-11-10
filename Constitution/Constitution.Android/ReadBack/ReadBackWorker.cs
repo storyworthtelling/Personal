@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
@@ -29,6 +30,9 @@ public class ReadBackWorker : Worker
     {
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(ReadBackWorker), StopReason);
+
     public override Result DoWork() => HeadDiagnostics.Worker(nameof(ReadBackWorker), Work);
 
     private Result Work()
@@ -48,7 +52,7 @@ public class ReadBackWorker : Worker
         {
             // The type name is the whole report; the next morning tries again on its own.
             log.Outcome($"ink read back worker failed: {e.GetType().Name}");
-            HeadDiagnostics.Current?.Quiet("Worker", "ReadBackWorker failed", e);
+            HeadDiagnostics.Current?.Quiet(LogSources.Worker, "ReadBackWorker failed", e);
             return Result.InvokeFailure();
         }
     }

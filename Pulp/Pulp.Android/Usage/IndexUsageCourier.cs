@@ -36,7 +36,7 @@ internal static class IndexUsageCourier
         if (before != ContractSendOutcome.Sent)
         {
             // Index not being installed is the ordinary case.
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, before));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, before));
             return;
         }
 
@@ -51,11 +51,11 @@ internal static class IndexUsageCourier
             }
 
             context.SendBroadcast(intent, IndexUsageContract.Permission);
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
         }
         catch (Exception e)
         {
-            HeadLog.Info("Pulp", ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
+            HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Failed, e.GetType().Name));
         }
     }
 

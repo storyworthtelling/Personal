@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Android;
 using Android.App;
 using Android.Content;
@@ -237,7 +238,7 @@ public class PostActivity : Activity
         {
             // Ignore: restore is a convenience; Settings always accepts the credentials manually.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet("Vault", "Mail credential restore did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Mail credential restore did not complete", e);
         }
     });
 

@@ -44,11 +44,15 @@ public sealed class MailReadingClient
 
     private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
+    private readonly Action<string>? log;
 
-    public MailReadingClient(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null)
+    /// <param name="log">One line per failed call (audit 08 §23): the call, the failure kind, status and request id.</param>
+    public MailReadingClient(
+        HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null, Action<string>? log = null)
     {
         claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, health);
         optionsAccessor = options;
+        this.log = log;
     }
 
     public async Task<MailReading> ReadAsync(
@@ -75,10 +79,11 @@ public sealed class MailReadingClient
 
             return MailReading.Parse(text);
         }
-        catch (Exception)
+        catch (Exception e)
         {
             // Deliberately broad. Anything at all going wrong here means "no idea", never
-            // a failed sync — mail arriving matters more than mail being sorted.
+            // a failed sync — mail arriving matters more than mail being sorted. It is said, though.
+            log?.Invoke(ClaudeCallLine.Failed("mail-reading", e));
             return MailReading.Nothing;
         }
     }

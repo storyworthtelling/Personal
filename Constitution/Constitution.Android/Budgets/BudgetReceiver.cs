@@ -34,7 +34,7 @@ public class BudgetReceiver : BroadcastReceiver
         }
 
         var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
-        HeadLog.Info("Constitution", ContractBroadcast.ReceiptLine("budget", version));
+        HeadLog.Info(LogSources.Contract("budget"), ContractBroadcast.ReceiptLine("budget", version));
         if (!ContractBroadcast.Accepts(version))
         {
             return; // a newer Index may mean something else by the figures

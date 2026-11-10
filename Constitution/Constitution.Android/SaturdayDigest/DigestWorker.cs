@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
@@ -29,6 +30,9 @@ public class DigestWorker : Worker
     {
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(DigestWorker), StopReason);
+
     public override Result DoWork() => HeadDiagnostics.Worker(nameof(DigestWorker), Work);
 
     private Result Work()
@@ -44,7 +48,7 @@ public class DigestWorker : Worker
         catch (Exception e)
         {
             new BodyLog(context).Outcome($"digest worker failed: {e.GetType().Name}");
-            HeadDiagnostics.Current?.Quiet("Worker", "DigestWorker failed", e);
+            HeadDiagnostics.Current?.Quiet(LogSources.Worker, "DigestWorker failed", e);
             return Result.InvokeFailure();
         }
     }
@@ -76,7 +80,7 @@ public class DigestWorker : Worker
             catch (Exception e)
             {
                 new BodyLog(application).Outcome($"digest worker failed: {e.GetType().Name}");
-                HeadDiagnostics.Current?.Quiet("Worker", "DigestWorker failed", e);
+                HeadDiagnostics.Current?.Quiet(LogSources.Worker, "DigestWorker failed", e);
             }
         });
     }

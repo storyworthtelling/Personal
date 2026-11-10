@@ -44,11 +44,20 @@ public class RefreshWorker : Worker
     {
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => MauiLogLoop.Stopped(nameof(RefreshWorker), StopReason);
+
     public override Result DoWork() => MauiLogLoop.Worker(nameof(RefreshWorker), () =>
     {
-        var result = Work();
-        UploadLogs();
-        return result;
+        try
+        {
+            return Work();
+        }
+        finally
+        {
+            // In a finally: when the work throws, the logs that would explain it are the ones that must go (audit 08 §21).
+            UploadLogs();
+        }
     });
 
     // The log loop's upload rides this worker (LOG-LOOP-PLAN.md §3.3): it acts only inside the Saturday window,

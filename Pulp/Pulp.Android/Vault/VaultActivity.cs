@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -228,7 +229,7 @@ public class VaultActivity : Activity
         }
         catch (Exception exception)
         {
-            services.Diagnostics.Warn("vault", "Google sign-in did not complete.", exception);
+            services.Diagnostics.Warn(LogSources.Vault, "Google sign-in did not complete.", exception);
             ShowStatus(null);
             Raise(VaultOutcomes.SignInFailed(DateTimeOffset.UtcNow));
         }
@@ -253,7 +254,7 @@ public class VaultActivity : Activity
         }
         catch (Exception exception)
         {
-            services.Diagnostics.Warn("vault", "Calendar consent did not complete.", exception);
+            services.Diagnostics.Warn(LogSources.Vault, "Calendar consent did not complete.", exception);
             calendarProblem = "The calendar could not be connected. Try again.";
         }
 
@@ -309,7 +310,7 @@ public class VaultActivity : Activity
         catch (Exception exception)
         {
             // Anything else — a timeout included — folds into the dog-ear and un-sticks the page.
-            services.Diagnostics.Warn("vault", "Saving the Vault page failed.", exception);
+            services.Diagnostics.Warn(LogSources.Vault, "Saving the Vault page failed.", exception);
             Settle(null, VaultOutcomes.Notice(VaultSaveOutcome.WriteFailed, DateTimeOffset.UtcNow));
         }
         finally

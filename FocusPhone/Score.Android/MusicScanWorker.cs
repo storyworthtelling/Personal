@@ -117,15 +117,15 @@ public class MusicScanWorker : Worker
 
     public override void OnStopped()
     {
+        // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+        HeadDiagnostics.Stopped(nameof(MusicScanWorker), StopReason);
         cts.Cancel();
         base.OnStopped();
     }
 
     public override Result DoWork() => HeadDiagnostics.Worker(nameof(MusicScanWorker), Work);
 
-
     private Result Work()
-
     {
         var folderId = MusicSettingsStore.MusicFolderId;
         if (string.IsNullOrEmpty(folderId))

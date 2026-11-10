@@ -25,7 +25,8 @@ public static class ExitTrail
             {
                 return;
             }
-            var records = (manager.GetHistoricalProcessExitReasons(context.PackageName, 0, 0) ?? [])
+            var infos = (manager.GetHistoricalProcessExitReasons(context.PackageName, 0, 0) ?? []).ToList();
+            var records = infos
                 .Select(info => new ExitRecord(info.Reason, info.Status, info.Description, info.Timestamp, info.Importance))
                 .ToList();
 
@@ -34,7 +35,7 @@ public static class ExitTrail
             foreach (var record in fresh)
             {
                 var when = DateTimeOffset.FromUnixTimeMilliseconds(record.Timestamp).ToLocalTime();
-                log(ExitReasonPhrases.IsProblem(record.Reason), $"EXIT at {when:yyyy-MM-dd HH:mm:ss zzz} — {ExitReasonPhrases.Describe(record)}");
+                log(ExitReasonPhrases.IsProblem(record.Reason), $"EXIT at {when:yyyy-MM-dd HH:mm:ss zzz} — {ExitReasonPhrases.Describe(record)}{Anr(infos, record)}");
             }
             if (fresh.Count > 0)
             {
@@ -44,6 +45,24 @@ public static class ExitTrail
         catch (Exception e)
         {
             Android.Util.Log.Warn("ExitTrail", $"Could not read the exit reasons: {e.Message}");
+        }
+    }
+
+    // An ANR's main-thread frames, from the dump Android kept with the exit (audit 08 §36); nothing for any other exit.
+    private static string Anr(IReadOnlyList<ApplicationExitInfo> infos, ExitRecord record)
+    {
+        if (record.Reason != AnrTrace.Reason)
+        {
+            return string.Empty;
+        }
+        try
+        {
+            var excerpt = AnrTrace.FromStream(infos.FirstOrDefault(info => info.Timestamp == record.Timestamp)?.TraceInputStream);
+            return excerpt.Length == 0 ? string.Empty : "\n" + excerpt;
+        }
+        catch (Exception e) when (e is IOException or Java.Lang.Exception)
+        {
+            return string.Empty;
         }
     }
 }

@@ -38,8 +38,13 @@ public sealed class ShelfGlyphClient : IShelfGlyphClient
     private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
 
-    public ShelfGlyphClient(HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null)
+    private readonly Action<string>? log;
+
+    /// <param name="log">One line per failed call (audit 08 §23): the call, the failure kind, status and request id.</param>
+    public ShelfGlyphClient(
+        HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null, Action<string>? log = null)
     {
+        this.log = log;
         claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, health);
         optionsAccessor = options;
     }
@@ -58,12 +63,9 @@ public sealed class ShelfGlyphClient : IShelfGlyphClient
                 ClaudeRequest.Plain(options.FastModel, 400, Instruction, $"Shelf name: {shelfName}"), cancellationToken);
             return GlyphPath.Extract(reply.Text);
         }
-        catch (HttpRequestException)
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            return null;
-        }
-        catch (TaskCanceledException)
-        {
+            log?.Invoke(ClaudeCallLine.Failed("shelf-glyph", e));
             return null;
         }
     }

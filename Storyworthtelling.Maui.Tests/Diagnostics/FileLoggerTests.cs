@@ -37,7 +37,7 @@ public sealed class FileLoggerTests : IDisposable
 
         logger.CreateLogger("Index.Infrastructure.Refresh").LogWarning("Refresh failed for {Count} accounts", 2);
 
-        Assert.Equal("[2026-11-01 09:30:15] WARN Refresh — Refresh failed for 2 accounts\n", File.ReadAllText(logger.LivePath));
+        Assert.Equal("[2026-11-01T09:30:15.000+00:00] WARN Refresh — Refresh failed for 2 accounts\n", File.ReadAllText(logger.LivePath));
         Assert.EndsWith("refresh.log", logger.LivePath, StringComparison.Ordinal);
     }
 

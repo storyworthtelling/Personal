@@ -339,12 +339,12 @@ public sealed class PlaidClient : IPlaidClient
 
         if (!response.IsSuccessStatusCode)
         {
-            var (code, message) = ParseError(body);
+            var (code, message, requestId) = ParseError(body);
             // Only a rejection of the client_id/secret flags the Plaid credentials; an item/token problem
             // or a throttle is not the shared credentials' fault and is left for the per-institution path.
             if (PlaidFailure.IsCredentialRejection(code))
                 healthSink?.MarkFailing(CredentialIds.Plaid, code ?? ((int)response.StatusCode).ToString());
-            throw ToException(response.StatusCode, code, message);
+            throw ToException(response.StatusCode, code, message, path, requestId);
         }
 
         // A successful call means the client_id/secret authenticated — clear any prior credentials failure.
@@ -355,26 +355,28 @@ public sealed class PlaidClient : IPlaidClient
     // Plaid returns HTTP 429 with error_code RATE_LIMIT_EXCEEDED when throttled; classify it as a
     // transient rate-limit so the worker reschedules. Everything else is a descriptive hard failure
     // that preserves Plaid's error_code/error_message body for diagnosis.
-    private static Exception ToException(HttpStatusCode status, string? code, string? message)
+    // Each names the endpoint and Plaid's request id, which is the first thing Plaid's support asks for (audit 08 §26).
+    private static Exception ToException(HttpStatusCode status, string? code, string? message, string path, string? requestId)
     {
+        var request = string.IsNullOrEmpty(requestId) ? string.Empty : $" (request {requestId})";
         if (status == HttpStatusCode.TooManyRequests || code == "RATE_LIMIT_EXCEEDED")
-            return new RateLimitException($"Plaid rate limited: {(int)status} ({code}): {message}");
+            return new RateLimitException($"Plaid rate limited on {path}: {(int)status} ({code}): {message}{request}");
 
         return new HttpRequestException(
-            $"Plaid request failed: {(int)status} ({code}): {message}", inner: null, status);
+            $"Plaid request failed on {path}: {(int)status} ({code}): {message}{request}", inner: null, status);
     }
 
-    private static (string? Code, string? Message) ParseError(string body)
+    private static (string? Code, string? Message, string? RequestId) ParseError(string body)
     {
         try
         {
             using var document = JsonDocument.Parse(body);
             var root = document.RootElement;
-            return (OptionalString(root, "error_code"), OptionalString(root, "error_message"));
+            return (OptionalString(root, "error_code"), OptionalString(root, "error_message"), OptionalString(root, "request_id"));
         }
         catch (JsonException)
         {
-            return (null, body);
+            return (null, body, null);
         }
     }
 

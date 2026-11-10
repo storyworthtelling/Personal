@@ -51,7 +51,9 @@ internal sealed class PlaybackSessionWatcher
         }
         catch (Java.Lang.SecurityException)
         {
-            // Listener access not granted yet (pre-provisioning); nothing to read.
+            // Listener access not granted yet (pre-provisioning); nothing to read. Said once: without it Pulp never
+            // receives a session and its watched evidence never lands (audit 08 §30).
+            HeadLog.Denied("notification listener (media sessions)");
         }
     }
 

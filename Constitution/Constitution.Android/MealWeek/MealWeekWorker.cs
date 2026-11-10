@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Codex.Ui;
 using Android.Content;
 using Android.Runtime;
@@ -32,6 +33,9 @@ public class MealWeekWorker : Worker
     {
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(MealWeekWorker), StopReason);
+
     public override Result DoWork() => HeadDiagnostics.Worker(nameof(MealWeekWorker), Work);
 
     private Result Work()
@@ -48,7 +52,7 @@ public class MealWeekWorker : Worker
         {
             // The type name is the whole report; the next hour tries again on its own.
             new MealsLog(context).Outcome($"meal week worker failed: {e.GetType().Name}");
-            HeadDiagnostics.Current?.Quiet("Worker", "MealWeekWorker failed", e);
+            HeadDiagnostics.Current?.Quiet(LogSources.Worker, "MealWeekWorker failed", e);
             return Result.InvokeFailure();
         }
     }
@@ -100,7 +104,7 @@ public class MealWeekWorker : Worker
             catch (Exception e)
             {
                 new MealsLog(application).Outcome($"meal week worker failed: {e.GetType().Name}");
-                HeadDiagnostics.Current?.Quiet("Worker", "MealWeekWorker failed", e);
+                HeadDiagnostics.Current?.Quiet(LogSources.Worker, "MealWeekWorker failed", e);
             }
         });
     }

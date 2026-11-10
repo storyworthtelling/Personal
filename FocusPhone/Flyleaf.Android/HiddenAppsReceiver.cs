@@ -28,7 +28,7 @@ public class HiddenAppsReceiver : BroadcastReceiver
         }
 
         var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
-        HeadLog.Info("Flyleaf", ContractBroadcast.ReceiptLine("hidden-apps", version));
+        HeadLog.Info(LogSources.Contract("hidden-apps"), ContractBroadcast.ReceiptLine("hidden-apps", version));
         if (!ContractBroadcast.Accepts(version))
         {
             return; // a newer Pulp may mean something else by the list; the stored set is unchanged

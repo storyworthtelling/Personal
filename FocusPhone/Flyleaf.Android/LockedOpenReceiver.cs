@@ -34,7 +34,7 @@ public class LockedOpenReceiver : BroadcastReceiver
         }
 
         var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
-        HeadLog.Info("Flyleaf", ContractBroadcast.ReceiptLine("locked-open", version));
+        HeadLog.Info(LogSources.Contract("locked-open"), ContractBroadcast.ReceiptLine("locked-open", version));
         if (!ContractBroadcast.Accepts(version))
         {
             Answer(LockedOpenHandoff.ResultRefused); // Pulp falls back to the plain hand-off

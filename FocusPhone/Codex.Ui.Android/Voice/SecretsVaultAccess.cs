@@ -1,3 +1,4 @@
+using Storyworthtelling.Diagnostics;
 using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
@@ -37,13 +38,13 @@ public sealed class SecretsVaultAccess
         var store = new DriveSecretsVaultStore(new DriveTextFile(
             driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
         // Every restore and publish reaches the head's log (audit 08 §6): they were swallowed at each call site.
-        Service = new SecretsVaultService(store, () => VaultPassphraseStore.Passphrase, Codex.Ui.HeadLog.Trail("Vault"));
+        Service = new SecretsVaultService(store, () => VaultPassphraseStore.Passphrase, Codex.Ui.HeadLog.Trail(LogSources.Vault));
 
         Personal = new PersonalVaultAccess(
             new DrivePersonalVaultStore(new DriveTextFile(
                 driveFactory, DrivePersonalVaultStore.FileName, SharedDriveFileIds.Store)),
             () => VaultPassphraseStore.Passphrase,
-            Codex.Ui.HeadLog.Trail("Vault"));
+            Codex.Ui.HeadLog.Trail(LogSources.Vault));
     }
 
     /// <summary>

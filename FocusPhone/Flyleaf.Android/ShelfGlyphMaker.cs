@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Codex.Domain.Apps;
 using Codex.Infrastructure.Apps;
 using Codex.Ui.Voice;
@@ -26,7 +27,7 @@ public sealed class ShelfGlyphMaker(Func<Task<string>> accessToken)
             var options = Codex.Ui.Voice.VoiceOptionsAccess.ForHead(accessToken, "Flyleaf");
             await options.RefreshAsync(cancellationToken);
             var http = HeadHttp.WithTimeout(TimeSpan.FromSeconds(30));
-            var path = await new ShelfGlyphClient(http, options, HeadCredentialHealth.Store()).GenerateAsync(shelfName, cancellationToken);
+            var path = await new ShelfGlyphClient(http, options, HeadCredentialHealth.Store(), line => HeadLog.Warn("Shelves", line)).GenerateAsync(shelfName, cancellationToken);
             return path is not null && SvgGlyph.Parse(path) is not null ? "path:" + path : null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

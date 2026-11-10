@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Codex.Domain.Credentials;
 using Android.Content;
 using Codex.Domain.Post;
@@ -122,7 +123,16 @@ public static class PostSync
             {
                 return null; // no key in the vault, or the vault is locked: rules only
             }
-            return new MailReadingClient(MailAccess.Shared, options, HeadCredentialHealth.Store());
+            // One line per sync, not per email: a refused key fails every message the same way (audit 08 §23).
+            var said = false;
+            return new MailReadingClient(MailAccess.Shared, options, HeadCredentialHealth.Store(), line =>
+            {
+                if (!said)
+                {
+                    said = true;
+                    HeadLog.Warn("MailSorting", line);
+                }
+            });
         }
         catch (Exception e)
         {

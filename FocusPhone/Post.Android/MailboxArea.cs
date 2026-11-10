@@ -399,7 +399,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         catch (Java.Lang.SecurityException)
         {
-            // READ_CALL_LOG not granted yet; show what we have.
+            // READ_CALL_LOG not granted yet; show what we have, and say so once (audit 08 §24).
+            HeadLog.Denied("READ_CALL_LOG");
         }
         try
         {
@@ -410,7 +411,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         catch (Java.Lang.SecurityException)
         {
-            // READ_SMS not granted yet; show what we have.
+            // READ_SMS not granted yet; show what we have, and say so once (audit 08 §24).
+            HeadLog.Denied("READ_SMS");
         }
         return live;
     }
@@ -1075,6 +1077,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             }
             catch (Java.Lang.SecurityException)
             {
+                HeadLog.Denied("READ_CALL_LOG");
             }
             try
             {
@@ -1085,6 +1088,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             }
             catch (Java.Lang.SecurityException)
             {
+                HeadLog.Denied("READ_SMS");
             }
 
             ContactThread? thread = null;

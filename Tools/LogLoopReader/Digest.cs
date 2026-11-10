@@ -134,6 +134,15 @@ public static partial class Digest
             }
             builder.AppendLine();
         }
+        if (health.Unfinished.Count > 0)
+        {
+            builder.AppendLine("## Runs that started and never ended").AppendLine();
+            foreach (var run in health.Unfinished)
+            {
+                builder.Append(CultureInfo.InvariantCulture, $"- {run.App} ({run.Phone}) {run.Worker}: {run.Count}").AppendLine();
+            }
+            builder.AppendLine();
+        }
         if (health.MissedWorkers.Count > 0)
         {
             builder.AppendLine("## Workers that did not run").AppendLine();

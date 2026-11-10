@@ -33,7 +33,14 @@ public sealed class PodcastSearchClient : IPodcastSearch
 
     private readonly HttpClient httpClient;
 
-    public PodcastSearchClient(HttpClient httpClient) => this.httpClient = httpClient;
+    private readonly Action<string>? log;
+
+    /// <param name="log">One line per failed search (audit 08 §23): the failure's types, never the words searched for.</param>
+    public PodcastSearchClient(HttpClient httpClient, Action<string>? log = null)
+    {
+        this.httpClient = httpClient;
+        this.log = log;
+    }
 
     public async Task<IReadOnlyList<PodcastSearchResult>> SearchAsync(
         string query, CancellationToken cancellationToken)
@@ -59,6 +66,7 @@ public sealed class PodcastSearchClient : IPodcastSearch
         }
         catch (Exception e) when (e is HttpRequestException or JsonException)
         {
+            log?.Invoke($"PODCAST search failed: {Storyworthtelling.Diagnostics.ExceptionShape.TypeChain(e)}");
             return [];
         }
     }

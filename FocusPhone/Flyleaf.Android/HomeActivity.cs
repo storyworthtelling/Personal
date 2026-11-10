@@ -602,7 +602,7 @@ public class HomeActivity : Activity
         {
             // Best-effort; admin mode always re-enters the token manually.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet("Vault", "Update token restore did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Update token restore did not complete", e);
         }
     });
 

@@ -48,7 +48,7 @@ public sealed class DiscoverArea : ScoreArea
     private readonly MusicLibrary library;
     private readonly FridayPicksStore picksStore;
     private readonly IPodcastSearch search = new PodcastSearchClient(
-        HeadHttp.Shared);
+        HeadHttp.Shared, line => HeadLog.Warn("Podcasts", line));
     private readonly SubscriptionStore subscriptionStore;
 
     // The dealer's note. One line per record, composed in the owner's voice and kept

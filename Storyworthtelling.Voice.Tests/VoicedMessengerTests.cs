@@ -81,4 +81,24 @@ public class VoicedMessengerTests
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             Messenger().ComposeAsync(new MessageRequest("welcome"), "Welcome.", CancellationToken.None));
     }
+
+    [Fact]
+    public async Task AFailedSeatWarnsOnceADayNotEveryPaint()
+    {
+        // A rejected key on every voiced seat in every app was logged at Debug, which nothing keeps (audit 08 §22).
+        var warnings = new List<string>();
+        store.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Learned);
+        client.Setup(c => c.ComposeAsync(Learned, It.IsAny<MessageRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Storyworthtelling.Voice.Claude.ClaudeRequestException(
+                Storyworthtelling.Voice.Claude.ClaudeFailure.KeyRejected, "invalid x-api-key", System.Net.HttpStatusCode.Unauthorized));
+        var messenger = new VoicedMessenger(store.Object, client.Object, warn: warnings.Add);
+        var seat = "seat-" + Guid.NewGuid().ToString("N");
+
+        await messenger.ComposeAsync(new MessageRequest(seat), "Welcome.", CancellationToken.None);
+        await messenger.ComposeAsync(new MessageRequest(seat), "Welcome.", CancellationToken.None);
+        await messenger.ComposeAsync(new MessageRequest(seat + "-other"), "Welcome.", CancellationToken.None);
+
+        Assert.Equal(2, warnings.Count);
+        Assert.Equal($"CLAUDE voice {seat} failed: KeyRejected 401", warnings[0]);
+    }
 }
