@@ -163,6 +163,12 @@ public sealed class HeadDiagnostics
     /// Runs a worker's body on the worker trail (plan §4.3): start, end, result and duration, or what it threw
     /// — rethrown, so WorkManager sees exactly what it saw before. A process with no head installed just runs it.
     /// </summary>
+    /// <summary>WorkManager stopped a run before it returned: the cap, a lost constraint, a cancel (audit 08 §20).</summary>
+    public static void Stopped(string name, int reason) => Current?.Warn("Worker", WorkerTrail.StoppedLine(name, reason));
+
+    /// <summary>A run that had nothing to do, and why (audit 08 §37).</summary>
+    public static void Skipped(string name, string why) => Current?.Info("Worker", WorkerTrail.SkippedLine(name, why));
+
     public static T Worker<T>(string name, Func<T> body)
     {
         var head = Current;

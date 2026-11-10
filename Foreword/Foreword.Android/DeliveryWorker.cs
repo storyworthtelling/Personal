@@ -36,17 +36,27 @@ public class DeliveryWorker : Worker
 
     private bool retrying;
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => MauiLogLoop.Stopped(nameof(DeliveryWorker), StopReason);
+
     public override Result DoWork() => MauiLogLoop.Worker(nameof(DeliveryWorker), () =>
     {
         retrying = false;
-        var result = Work();
-        // Queue tomorrow from the wall clock now, unless this run is going round again. Doing it
-        // here rather than relying on a periodic request is the fix for mornings drifting to the
-        // afternoon: a periodic request re-anchors to when each run finished.
-        if (!retrying)
-            Enqueue(ApplicationContext, ExistingWorkPolicy.AppendOrReplace);
-        UploadLogs();
-        return result;
+        try
+        {
+            var result = Work();
+            // Queue tomorrow from the wall clock now, unless this run is going round again. Doing it
+            // here rather than relying on a periodic request is the fix for mornings drifting to the
+            // afternoon: a periodic request re-anchors to when each run finished.
+            if (!retrying)
+                Enqueue(ApplicationContext, ExistingWorkPolicy.AppendOrReplace);
+            return result;
+        }
+        finally
+        {
+            // In a finally: when the work throws, the logs that would explain it are the ones that must go (audit 08 §21).
+            UploadLogs();
+        }
     });
 
     // The log loop's upload rides this worker (LOG-LOOP-PLAN.md §3.3): it acts only inside the Saturday window,

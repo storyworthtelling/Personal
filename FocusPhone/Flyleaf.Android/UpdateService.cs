@@ -276,6 +276,9 @@ public class UpdateWorker : Worker
     {
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(UpdateWorker), StopReason);
+
     public override Result DoWork() => HeadDiagnostics.Worker(nameof(UpdateWorker), Check);
 
     private Result Check()

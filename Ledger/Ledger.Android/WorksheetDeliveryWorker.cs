@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Diagnostics;
 using global::Android.Content;
 using AndroidX.Work;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,21 +36,27 @@ public class WorksheetDeliveryWorker : Worker
     {
     }
 
-    public override Result DoWork()
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => MauiLogLoop.Stopped(nameof(WorksheetDeliveryWorker), StopReason);
+
+    // In the worker trail like every other worker (audit 08 §18): it had none, so a run that never happened was invisible.
+    public override Result DoWork() => MauiLogLoop.Worker(nameof(WorksheetDeliveryWorker), Work);
+
+    private Result Work()
     {
         using var scope = IPlatformApplication.Current!.Services.CreateScope();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<WorksheetDeliveryWorker>>();
 
         if (!InstallRoleGate.MayRunPlaidWork(SettingsStore.CachedInstallRole ?? InstallRole.Owner))
         {
-            logger.LogInformation("Worksheet delivery skipped: this install reads the household snapshot and never talks to Plaid.");
+            MauiLogLoop.Skipped(nameof(WorksheetDeliveryWorker), "this install reads the household snapshot");
             return Result.InvokeSuccess();
         }
 
         if (!SettingsStore.IsConfigured)
         {
             // No Plaid credentials yet means no income/Snowball data to build a worksheet from.
-            logger.LogInformation("Worksheet delivery skipped: Plaid credentials are not configured yet.");
+            MauiLogLoop.Skipped(nameof(WorksheetDeliveryWorker), "Plaid credentials are not configured yet");
             return Result.InvokeSuccess();
         }
 

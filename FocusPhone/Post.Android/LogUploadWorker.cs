@@ -36,12 +36,17 @@ public class LogUploadWorker : Worker
             WorkName, ExistingPeriodicWorkPolicy.Keep!, (PeriodicWorkRequest)request);
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(LogUploadWorker), StopReason);
+
     public override Result DoWork() => PostDiagnostics.Worker(nameof(LogUploadWorker), Upload);
 
     private Result Upload()
     {
         if (!UploadWindow.Due(PostLogUpload.History(ApplicationContext).LastConfirmed, DateTimeOffset.Now))
         {
+            // Said, so a day with nothing due does not read as an upload that ran (audit 08 §37).
+            HeadDiagnostics.Skipped(nameof(LogUploadWorker), "outside the upload window or already sent this week");
             return Result.InvokeSuccess();
         }
         // The worker bridges to the async upload at the true sync/async boundary, as EmailSyncWorker does.

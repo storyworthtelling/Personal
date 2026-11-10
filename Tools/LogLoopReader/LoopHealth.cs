@@ -6,6 +6,9 @@ namespace LogLoopReader;
 /// <summary>A worker that should have run on a phone and did not, over a stretch of the week's logs.</summary>
 public sealed record MissedWorker(string App, string Phone, string Worker, int MissedRuns, DateTimeOffset From, DateTimeOffset To);
 
+/// <summary>Runs of a worker that started and never said how they ended: killed at the cap, or the process died.</summary>
+public sealed record UnfinishedRuns(string App, string Phone, string Worker, int Count);
+
 /// <summary>A <c>DROPPED</c> line: segments the phone's outbox let go before they could be uploaded.</summary>
 public sealed record DroppedSegments(string App, string Phone, string Line);
 
@@ -19,6 +22,9 @@ public sealed partial record LoopHealth(
     IReadOnlyList<(string App, string Phone)> Silent,
     IReadOnlyList<MissedWorker> MissedWorkers)
 {
+    /// <summary>Starts with no finish, threw or stopped line before the worker's next start or the end of the week.</summary>
+    public IReadOnlyList<UnfinishedRuns> Unfinished { get; init; } = [];
+
     /// <summary>
     /// Which apps each phone runs. The locked FocusPhone heads and Folio run on the owner's phone only; Index,
     /// Constitution, Pulp and Foreword run on both. Roles, never device ids, so nothing here names a phone.
@@ -52,7 +58,7 @@ public sealed partial record LoopHealth(
                 ("WorkoutWeekWorker", TimeSpan.FromDays(1)), ("MealWeekWorker", TimeSpan.FromHours(1)),
                 ("DigestWorker", TimeSpan.FromHours(1)), ("LoopUploadWorker", TimeSpan.FromDays(1)),
             ],
-            ["index"] = [("RefreshWorker", TimeSpan.FromDays(1))],
+            ["index"] = [("RefreshWorker", TimeSpan.FromDays(1)), ("WorksheetDeliveryWorker", TimeSpan.FromDays(1))],
             ["folio"] = [("PipelineWorker", TimeSpan.FromMinutes(15))],
             ["foreword"] = [("DeliveryWorker", TimeSpan.FromDays(1))],
         };
@@ -62,6 +68,8 @@ public sealed partial record LoopHealth(
         var dropped = new List<DroppedSegments>();
         var runs = new Dictionary<(string App, string Phone, string Worker), List<DateTimeOffset>>();
         var spans = new Dictionary<(string App, string Phone), (DateTimeOffset First, DateTimeOffset Last)>();
+        var open = new Dictionary<(string App, string Phone, string Worker), bool>();
+        var unfinished = new Dictionary<(string App, string Phone, string Worker), int>();
 
         foreach (var batch in batches)
         {
@@ -79,15 +87,25 @@ public sealed partial record LoopHealth(
                     {
                         dropped.Add(new DroppedSegments(header.App, header.Phone, entry.Message));
                     }
-                    else if (entry.Source == "Worker" && Started().Match(entry.Message) is { Success: true } started
-                        && EntryTime.Read(entry.Stamp, header) is { } when)
+                    else if (entry.Source == "Worker" && WorkerLine().Match(entry.Message) is { Success: true } line)
                     {
-                        var key = (header.App, header.Phone, started.Groups["worker"].Value);
-                        if (!runs.TryGetValue(key, out var list))
+                        var key = (header.App, header.Phone, line.Groups["worker"].Value);
+                        var started = line.Groups["what"].Value == "started";
+                        if (started && EntryTime.Read(entry.Stamp, header) is { } when)
                         {
-                            runs[key] = list = [];
+                            if (!runs.TryGetValue(key, out var list))
+                            {
+                                runs[key] = list = [];
+                            }
+                            list.Add(when);
                         }
-                        list.Add(when);
+                        // A start opens a run; a finish, throw, stop or skip closes it. A start while one is open
+                        // means the open one never ended.
+                        if (open.TryGetValue(key, out var isOpen) && isOpen && started)
+                        {
+                            unfinished[key] = unfinished.GetValueOrDefault(key) + 1;
+                        }
+                        open[key] = started;
                     }
                 }
             }
@@ -118,13 +136,19 @@ public sealed partial record LoopHealth(
             }
         }
 
-        return new LoopHealth(dropped, silent, missed);
+        // A run still open at the end of the week's lines may simply not have finished before the upload, so it is not
+        // counted; only a start followed by another start is.
+        var cut = unfinished
+            .OrderBy(u => u.Key.App, StringComparer.Ordinal).ThenBy(u => u.Key.Phone, StringComparer.Ordinal).ThenBy(u => u.Key.Worker, StringComparer.Ordinal)
+            .Select(u => new UnfinishedRuns(u.Key.App, u.Key.Phone, u.Key.Worker, u.Value))
+            .ToList();
+        return new LoopHealth(dropped, silent, missed) { Unfinished = cut };
     }
 
     private static DateTimeOffset Min(DateTimeOffset a, DateTimeOffset b) => a < b ? a : b;
 
     private static DateTimeOffset Max(DateTimeOffset a, DateTimeOffset b) => a > b ? a : b;
 
-    [GeneratedRegex(@"^WORKER (?<worker>\S+) started$")]
-    private static partial Regex Started();
+    [GeneratedRegex(@"^WORKER (?<worker>\S+) (?<what>started|finished|threw|stopped|skipped)\b")]
+    private static partial Regex WorkerLine();
 }

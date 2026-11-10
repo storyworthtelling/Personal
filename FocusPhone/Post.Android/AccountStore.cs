@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Content;
 using AndroidX.Work;
 using Codex.Infrastructure.Email;
@@ -112,6 +113,9 @@ public class EmailSyncWorker : Worker
         WorkManager.GetInstance(context).EnqueueUniqueWork(
             "focusphone-email-sync-once", ExistingWorkPolicy.Replace!, (OneTimeWorkRequest)request);
     }
+
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(EmailSyncWorker), StopReason);
 
     public override Result DoWork() => PostDiagnostics.Worker(nameof(EmailSyncWorker), Sync);
 

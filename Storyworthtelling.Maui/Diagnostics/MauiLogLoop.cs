@@ -82,6 +82,14 @@ public static class MauiLogLoop
         }
     }
 
+    /// <summary>WorkManager stopped a run before it returned: the cap, a lost constraint, a cancel (audit 08 §20).</summary>
+    public static void Stopped(string name, int reason) =>
+        MauiLog.Current?.Write("Worker", LogLevel.Warning, WorkerTrail.StoppedLine(name, reason), null);
+
+    /// <summary>A run that had nothing to do, and why (audit 08 §37).</summary>
+    public static void Skipped(string name, string why) =>
+        MauiLog.Current?.Write("Worker", LogLevel.Information, WorkerTrail.SkippedLine(name, why), null);
+
     /// <summary>From the head's worker: uploads only inside the Saturday window, until a run is confirmed.</summary>
     public static async Task UploadIfDueAsync(CancellationToken cancellationToken)
     {

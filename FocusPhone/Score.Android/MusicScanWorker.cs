@@ -121,6 +121,9 @@ public class MusicScanWorker : Worker
         base.OnStopped();
     }
 
+    // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
+    public override void OnStopped() => HeadDiagnostics.Stopped(nameof(MusicScanWorker), StopReason);
+
     public override Result DoWork() => HeadDiagnostics.Worker(nameof(MusicScanWorker), Work);
 
 
