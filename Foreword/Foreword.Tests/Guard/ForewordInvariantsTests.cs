@@ -25,6 +25,20 @@ public class ForewordInvariantsTests
     /// device-owner update channel installs by package id. The name says DailyLoader and
     /// always will: it is the identity of the installed app, not a description of it.
     /// </summary>
+    /// <summary>
+    /// The morning waits for a network and backs off from five minutes (audit 11 §7). Without the constraint it ran on
+    /// the alarm whatever the Wi-Fi was doing and spent its retries in three and a half minutes.
+    /// </summary>
+    [Fact]
+    public void TheMorningWaitsForANetworkAndBacksOff()
+    {
+        var worker = ComponentSource("DeliveryWorker");
+
+        Assert.Contains("SetRequiredNetworkType(NetworkType.Connected", worker, StringComparison.Ordinal);
+        Assert.Contains("DeliverySchedule.RetryBackoff", worker, StringComparison.Ordinal);
+        Assert.Contains("Morning.Deliver(", worker, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void ApplicationIdIsFrozen()
     {

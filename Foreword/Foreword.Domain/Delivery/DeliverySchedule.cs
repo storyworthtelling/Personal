@@ -37,8 +37,15 @@ public static class DeliverySchedule
     /// </summary>
     public static string Stamp(int hour, int minute) => $"{hour:D2}:{minute:D2} chained";
 
-    /// <summary>How many times a failed morning is retried before it is given up on.</summary>
-    public const int MaxRetries = 3;
+    /// <summary>
+    /// How many times a morning with a document still missing is retried before it is given up on. With
+    /// <see cref="RetryBackoff"/> doubling from five minutes that is about two and a half hours, so Wi-Fi coming up late
+    /// no longer loses the morning (audit 11 §7); it was three retries on WorkManager's default 30 seconds.
+    /// </summary>
+    public const int MaxRetries = 6;
+
+    /// <summary>The first retry's wait, doubled by WorkManager for each one after it. The worker also waits for a network.</summary>
+    public static readonly TimeSpan RetryBackoff = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Whether a failed run should be retried. Bounded because each morning is queued behind the

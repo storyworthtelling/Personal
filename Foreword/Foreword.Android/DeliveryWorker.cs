@@ -6,7 +6,6 @@ using Foreword.Domain.Calendar;
 using Foreword.Domain.Delivery;
 using Foreword.Domain.Identity;
 using Foreword.Infrastructure.Delivery;
-using Foreword.Infrastructure.Prayer;
 
 namespace Foreword.Android;
 
@@ -81,47 +80,19 @@ public class DeliveryWorker : Worker
         try
         {
             using var scope = IPlatformApplication.Current!.Services.CreateScope();
-            var delivery = scope.ServiceProvider.GetRequiredService<CrosswordDeliveryService>();
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var outcome = Morning.Deliver(scope.ServiceProvider, DateOnly.FromDateTime(DateTime.Today)).GetAwaiter().GetResult();
 
-            var newsStatus = delivery.DeliverDailyPuzzle(today).GetAwaiter().GetResult();
-
-            if (CrosswordDeliveryService.IsFirstSundayOfMonth(today))
-                delivery.DeliverBonusPuzzle(today).GetAwaiter().GetResult();
-
-            if (CredentialStore.IsGoogleConfigured)
-            {
-                var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
-                daily.EnsureColumnCalendars().GetAwaiter().GetResult();
-                var unreadable = daily.DeliverDailyDocuments(today).GetAwaiter().GetResult();
-                CredentialStore.UnreadableCalendars = UnreadableCalendarNotice.Store(unreadable);
-
-                // The third document, in its own try. Prayer is the one part of the morning that
-                // must not be able to take the other two down with it: it reads a file the other
-                // two do not, behind a passphrase the other two do not need, so its failures are
-                // its own — and a morning with no prayer sheet is a smaller loss than a morning
-                // with no day and no paper.
-                try
-                {
-                    scope.ServiceProvider.GetRequiredService<PrayerDeliveryService>()
-                        .Deliver(today).GetAwaiter().GetResult();
-                    CredentialStore.LastPrayerOutcome = "Delivered";
-                }
-                catch (Exception ex)
-                {
-                    CredentialStore.LastPrayerOutcome = $"Failed: {ex.Message}";
-                }
-            }
-
-            CredentialStore.LastDeliveryOutcome = $"Delivered ({newsStatus})";
-            CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
-            return Result.InvokeSuccess();
+            // A document still missing goes round again — only it, since what landed is marked for the day — until the
+            // retries run out. Bounded: tomorrow is queued behind this run.
+            if (!outcome.AnyFailed || !DeliverySchedule.ShouldRetry(RunAttemptCount))
+                return Result.InvokeSuccess();
+            retrying = true;
+            return Result.InvokeRetry();
         }
         catch (Exception ex)
         {
-            CredentialStore.LastDeliveryOutcome = $"Failed: {ex.Message}";
+            CredentialStore.LastDeliveryOutcome = $"Failed: {MorningRun.Reason(ex)}";
             CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
-            // Bounded: tomorrow is queued behind this run, so it cannot retry forever.
             if (!DeliverySchedule.ShouldRetry(RunAttemptCount))
                 return Result.InvokeSuccess();
             retrying = true;
@@ -162,8 +133,15 @@ public class DeliveryWorker : Worker
     // hour is recomputed every day instead of inherited from whenever the last run finished.
     private static void Enqueue(Context context, ExistingWorkPolicy policy)
     {
+        // It waits for a network and backs off from five minutes, so Wi-Fi coming up late does not lose the morning
+        // (audit 11 §7). The morning is due at 6:30 whatever the network does; the constraint only holds it until there is one.
+        var constraints = new Constraints.Builder()
+            .SetRequiredNetworkType(NetworkType.Connected!)!
+            .Build();
         var request = (OneTimeWorkRequest) new OneTimeWorkRequest.Builder(Java.Lang.Class.FromType(typeof(DeliveryWorker)))
             .SetInitialDelay(DelayUntilNext(DeliveryHour, DeliveryMinute), Java.Util.Concurrent.TimeUnit.Milliseconds!)
+            .SetConstraints(constraints)
+            .SetBackoffCriteria(BackoffPolicy.Exponential!, (long)DeliverySchedule.RetryBackoff.TotalMilliseconds, Java.Util.Concurrent.TimeUnit.Milliseconds!)
             .AddTag(WorkName)
             .Build();
 

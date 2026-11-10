@@ -521,6 +521,15 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             return;
         }
 
+        // Over the tablet's limit is refused before a byte is read or sent (Folio's pre-check, audit 11 §21): trying
+        // again changes nothing, so the sentence says why and offers no retry.
+        if (Storyworthtelling.Remarkable.RemarkableLimits.TooLarge(pdf.Length) is { } tooLarge)
+        {
+            Delivered(delivering, ScanDestination.Remarkable, false, "too large for the reMarkable");
+            ShowStatus(ScanSendWords.NotSent(ScanSendProblem.TooLarge, tooLarge.Sentence));
+            return;
+        }
+
         // §8: loading is a status sentence, not a spinner.
         ShowStatus("Sending to the reMarkable…");
         try
@@ -534,11 +543,17 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         }
         catch (Exception e)
         {
-            HeadLog.Warn("Plate", "The reMarkable refused a scan", e);
-            Delivered(delivering, ScanDestination.Remarkable, false, $"{e.GetType().Name}: {e.Message}");
-            // The PDF is already filed under Documents, so nothing is lost — which is what
-            // makes it safe to say plainly what went wrong instead of retrying blind.
-            ShowStatus($"Saved to Documents, but the reMarkable refused it: {e.Message}");
+            // The PDF is already filed under Documents, so nothing is lost — which is what makes it safe to say plainly
+            // what went wrong. No network is not the tablet's fault (audit 11 §21), and a raw message is not a sentence.
+            var problem = e switch
+            {
+                _ when Storyworthtelling.Voice.Health.NetworkFailure.IsOffline(e) => ScanSendProblem.NoNetwork,
+                Storyworthtelling.Remarkable.RemarkableRefusedException => ScanSendProblem.TabletRefused,
+                _ => ScanSendProblem.Failed,
+            };
+            HeadLog.Warn("Plate", $"A scan did not reach the reMarkable ({problem})", e);
+            Delivered(delivering, ScanDestination.Remarkable, false, problem.ToString());
+            ShowStatus(ScanSendWords.NotSent(problem, (e as Storyworthtelling.Remarkable.RemarkableRefusedException)?.Sentence));
         }
     }
 

@@ -186,6 +186,13 @@ public static class CredentialStore
     /// </summary>
     // The calendars the last morning could not read, one name per line (UnreadableCalendarNotice). Empty
     // when the last morning read every calendar, which withdraws the notice.
+    /// <summary>Which of the morning's documents reached the tablet today (<see cref="Foreword.Domain.Delivery.MorningLedger"/>).</summary>
+    public static string DeliveredToday
+    {
+        get => Preferences.Get(PreferenceKeys.DeliveredToday, string.Empty);
+        set => Preferences.Set(PreferenceKeys.DeliveredToday, value);
+    }
+
     public static string UnreadableCalendars
     {
         get => Preferences.Get(PreferenceKeys.UnreadableCalendars, string.Empty);
