@@ -37,7 +37,7 @@ public sealed class FileLoggerTests : IDisposable
 
         logger.CreateLogger("Index.Infrastructure.Refresh").LogWarning("Refresh failed for {Count} accounts", 2);
 
-        Assert.Equal("[2026-11-01 09:30:15] [WARN] Refresh: Refresh failed for 2 accounts\n", File.ReadAllText(logger.LivePath));
+        Assert.Equal("[2026-11-01 09:30:15] WARN Refresh — Refresh failed for 2 accounts\n", File.ReadAllText(logger.LivePath));
         Assert.EndsWith("refresh.log", logger.LivePath, StringComparison.Ordinal);
     }
 
@@ -178,7 +178,7 @@ public sealed class FileLoggerTests : IDisposable
         logger.Write("Unhandled", LogLevel.Critical, "The app is going down", new InvalidOperationException("boom"));
 
         var text = File.ReadAllText(logger.LivePath);
-        Assert.Contains("[CRIT] Unhandled: The app is going down", text, StringComparison.Ordinal);
+        Assert.Contains("CRIT Unhandled — The app is going down", text, StringComparison.Ordinal);
         Assert.Contains("InvalidOperationException: boom", text, StringComparison.Ordinal);
     }
 

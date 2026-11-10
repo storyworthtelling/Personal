@@ -73,7 +73,9 @@ public class LogLoopReaderTests
         Assert.Equal(2, group.Count);
         Assert.Equal("exception", group.Kind);
         Assert.Equal(new DateTimeOffset(2026, 10, 24, 8, 0, 0, TimeSpan.Zero), group.FirstSeen);
-        Assert.Equal(new DateTimeOffset(2026, 10, 30, 20, 0, 0, TimeSpan.Zero), group.LastSeen);
+        // The entry's own stamp where it falls inside its batch (audit 08 §3); the day-24 batch's entry is stamped
+        // Oct 30, outside it, so that one keeps the batch's start.
+        Assert.Equal(new DateTimeOffset(2026, 10, 30, 9, 15, 0, TimeSpan.Zero), group.LastSeen);
         Assert.Contains("System.InvalidOperationException", group.Key);
         Assert.Contains("Post.MailboxArea.LoadOpenThread", group.Key);
         Assert.DoesNotContain("4471", group.Key);

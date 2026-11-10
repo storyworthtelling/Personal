@@ -62,8 +62,13 @@ dotnet run --project Tools/LogLoopReader -- digest          # → $TMPDIR/log-lo
 
 Read `digest.md` first. It groups every line by fingerprint (an exception's type and top three own
 frames; a tap verdict's screen, control and verdict; a sign-in's flow kind and diagnosis; otherwise a
-message template), with counts, phones and first/last seen. Open raw lines under `$TMPDIR/log-loop/plain/`
-only for the groups you triage.
+message template), with counts, phones, first/last seen and the builds (version codes) each group was seen on, so
+"still present after the fix" and "new since the merge" read straight off it. Its first sections are about the loop
+itself and come before any app: **DROPPED** segments the phone lost before upload, apps a phone **sent nothing** for
+(expected per role in `LoopHealth.ExpectedApps`), and **workers that did not run** against their cadence
+(`LoopHealth.ExpectedWorkers`). Within an app, groups run crashes, exceptions, exits, taps, sign-ins, worker failures,
+warnings, then routine INFO folded to one line each. Open raw lines under `$TMPDIR/log-loop/plain/` only for the groups
+you triage.
 
 ## 3. Last week first
 

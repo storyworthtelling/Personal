@@ -2,8 +2,11 @@ using System.Text.RegularExpressions;
 
 namespace LogLoopReader;
 
-/// <summary>One entry as DiagnosticLogFormatter writes it: <c>[stamp] LEVEL Source — Message</c>, then detail lines.</summary>
-public sealed record LogEntry(string Level, string Source, string Message, string Detail);
+/// <summary>
+/// One entry as <c>Storyworthtelling.Diagnostics.LogLine</c> writes it: <c>[stamp] LEVEL Source — Message</c>, then detail
+/// lines. <see cref="Stamp"/> is the bracketed text as written (empty for an unshaped line); <see cref="EntryTime"/> reads it.
+/// </summary>
+public sealed record LogEntry(string Level, string Source, string Message, string Detail, string Stamp = "");
 
 /// <summary>
 /// Splits a log segment into entries. DiagnosticLog separates entries with a blank line and starts each
@@ -29,7 +32,7 @@ public static partial class LogEntries
 
         foreach (var line in lines)
         {
-            if (Header().IsMatch(line) || line.StartsWith("DROPPED ", StringComparison.Ordinal))
+            if (Header().IsMatch(line) || OldMauiHeader().IsMatch(line) || line.StartsWith("DROPPED ", StringComparison.Ordinal))
             {
                 Flush();
                 current = [line];
@@ -60,12 +63,22 @@ public static partial class LogEntries
         var match = Header().Match(first);
         if (!match.Success)
         {
+            match = OldMauiHeader().Match(first);
+        }
+        if (!match.Success)
+        {
             var word = first.Split(' ', 2)[0];
             return new LogEntry(word == "DROPPED" ? "DROPPED" : "TEXT", string.Empty, first, detail);
         }
-        return new LogEntry(match.Groups["level"].Value, match.Groups["source"].Value, match.Groups["message"].Value, detail);
+        return new LogEntry(
+            match.Groups["level"].Value, match.Groups["source"].Value, match.Groups["message"].Value, detail, match.Groups["stamp"].Value);
     }
 
-    [GeneratedRegex(@"^\[[^\]]+\] (?<level>[A-Z]+) (?<source>\S+) — (?<message>.*)$")]
+    [GeneratedRegex(@"^\[(?<stamp>[^\]]+)\] (?<level>[A-Z]+) (?<source>\S+) — (?<message>.*)$")]
     private static partial Regex Header();
+
+    // The MAUI file logger's shape until audit 08 §1: [stamp] [LEVEL] Source: message. Still read, because segments
+    // sealed on a phone before the update are uploaded after it.
+    [GeneratedRegex(@"^\[(?<stamp>[^\]]+)\] \[(?<level>[A-Z]+)\] (?<source>[^\s:]+): (?<message>.*)$")]
+    private static partial Regex OldMauiHeader();
 }
