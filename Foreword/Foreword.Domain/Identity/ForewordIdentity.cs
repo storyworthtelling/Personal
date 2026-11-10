@@ -95,6 +95,9 @@ public static class PreferenceKeys
     // rest of the morning does not need — and folding it in would make one sentence say two things.
     public const string LastPrayerOutcome = "LastPrayerOutcome";
 
+    // Which of the morning's documents reached the tablet today (MorningLedger), so a retry never sends one twice.
+    public const string DeliveredToday = "DeliveredToday";
+
     /// <summary>
     /// The nine keys a phone was <b>already storing</b> before the rename. These are what may never
     /// move: the guard freezes this list exactly, in order.
@@ -122,6 +125,6 @@ public static class PreferenceKeys
             .. Frozen, WorkScheduleJson, SeenCalendarIds, ScheduledDeliveryTime,
             MapsApiKey, HomeAddress, HomeLatitude, HomeLongitude, TasksJson, AwayJson,
             FeedsJson, NewsCount, OpinionCount, SeenComic, TasteJson, LastPrayerOutcome,
-            HouseholdAccount, UnreadableCalendars,
+            HouseholdAccount, UnreadableCalendars, DeliveredToday,
         ];
 }

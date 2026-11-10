@@ -34,9 +34,14 @@ public class DailyDeliveryService(
 {
     private const int OutlookDays = 6; // today + 6 = a seven-day window
 
-    // Returns the calendars that could not be read this morning, so the caller can tell the owner what
-    // was skipped. Empty when every calendar was read.
-    public async Task<IReadOnlyList<UnreadableCalendar>> DeliverDailyDocuments(DateOnly date)
+    /// <summary>
+    /// Whether The Day reached the tablet, the failure if it did not, and the calendars that could not be read this
+    /// morning so the caller can say what was skipped. A failed upload used to be swallowed here and the morning recorded
+    /// as delivered (audit 11 §6); now the caller is told and can retry.
+    /// </summary>
+    public sealed record DayResult(bool Uploaded, Exception? Failure, IReadOnlyList<UnreadableCalendar> UnreadableCalendars);
+
+    public async Task<DayResult> DeliverDailyDocuments(DateOnly date)
     {
         var (carryovers, yesterdayDocIds) = await ReadBackYesterday(date);
 
@@ -57,12 +62,13 @@ public class DailyDeliveryService(
             Columns = columnMapper.Layout.Printed,
         };
 
-        if (await TryUpload(DayTitles.Document(date), dayComposer.Compose(document)))
+        var failure = await TryUpload(DayTitles.Document(date), dayComposer.Compose(document));
+        if (failure is null)
             await TrashDocs(yesterdayDocIds);
         else
             logger.LogWarning("Skipping trash of yesterday's documents because the upload failed for {Date}", date);
 
-        return agenda.UnreadableCalendars;
+        return new DayResult(failure is null, failure, agenda.UnreadableCalendars);
     }
 
     // Gives each column whose person has no Google account of their own a calendar to be filled
@@ -216,18 +222,19 @@ public class DailyDeliveryService(
         return printed.Contains(named) ? printed.First(c => c == named) : null;
     }
 
-    private async Task<bool> TryUpload(string title, byte[] pdf)
+    // Null when the upload landed; the failure otherwise, for the caller to report and retry on.
+    private async Task<Exception?> TryUpload(string title, byte[] pdf)
     {
         try
         {
             await delivery.DeliverToRemarkableRoot(title, pdf);
             logger.LogInformation("Uploaded {Title}", title);
-            return true;
+            return null;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Upload failed for {Title}", title);
-            return false;
+            return ex;
         }
     }
 

@@ -140,27 +140,21 @@ public partial class MainPage : BinderPage
 
         try
         {
-            await Task.Run(async () =>
+            // The same run the morning makes: only what has not reached the tablet today is sent, so a second press
+            // never puts a second brief on it (audit 11 §7).
+            var outcome = await Task.Run(async () =>
             {
                 using var scope = IPlatformApplication.Current!.Services.CreateScope();
-                var delivery = scope.ServiceProvider.GetRequiredService<CrosswordDeliveryService>();
-                var today = DateOnly.FromDateTime(DateTime.Today);
-                var newsStatus = await delivery.DeliverDailyPuzzle(today);
-
-                if (CrosswordDeliveryService.IsFirstSundayOfMonth(today))
-                    await delivery.DeliverBonusPuzzle(today);
-
-                if (CredentialStore.IsGoogleConfigured)
-                {
-                    var daily = scope.ServiceProvider.GetRequiredService<DailyDeliveryService>();
-                    await daily.EnsureColumnCalendars();
-                    var unreadable = await daily.DeliverDailyDocuments(today);
-                    CredentialStore.UnreadableCalendars = UnreadableCalendarNotice.Store(unreadable);
-                }
-
-                CredentialStore.LastDeliveryOutcome = $"Delivered ({newsStatus})";
-                CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
+                return await Morning.Deliver(scope.ServiceProvider, DateOnly.FromDateTime(DateTime.Today));
             });
+
+            if (outcome.AnyFailed)
+            {
+                delivering.Failed(outcome.Summary());
+                StatusLabel.Text = CredentialStore.LastDeliverySummary;
+                DeliveryLogButton.IsVisible = true;
+                return;
+            }
 
             // Success is the state change: the status line is the record.
             delivering.Succeeded();

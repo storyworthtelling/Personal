@@ -303,9 +303,12 @@ public class DailyDeliveryServiceTests
         remarkable.Setup(r => r.Upload("The Day 2026-06-02", It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("boom"));
 
-        await CreateService().DeliverDailyDocuments(Date);
+        var result = await CreateService().DeliverDailyDocuments(Date);
 
         remarkable.Verify(r => r.MoveToTrash(It.IsAny<string>()), Times.Never);
+        // The run is told, so it can say The Day did not arrive and try again (audit 11 §6).
+        Assert.False(result.Uploaded);
+        Assert.IsType<HttpRequestException>(result.Failure);
     }
 
     [Fact]

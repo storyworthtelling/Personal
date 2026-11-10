@@ -20,6 +20,12 @@ public enum HouseholdSyncState
 
     /// <summary>The file is not visible to this account yet — the owner has not shared it. Nothing is created in its place.</summary>
     WaitingForShare,
+
+    /// <summary>Google turned this phone's sign-in away (audit 11 §20): edits wait on the phone until it signs in again.</summary>
+    SignInNeeded,
+
+    /// <summary>The pass failed for a reason that is neither the network nor the sign-in; it is tried again later.</summary>
+    Retrying,
 }
 
 /// <summary>
@@ -64,6 +70,9 @@ public static class HouseholdSyncText
             HouseholdSyncState.Synced => "Synced with Drive.",
             HouseholdSyncState.Offline => "Drive couldn't be reached. Changes are kept on this phone and go up when it can.",
             HouseholdSyncState.WaitingForShare => "Waiting for the owner to share the household with this account.",
+            HouseholdSyncState.SignInNeeded => "Google turned this phone's sign-in away. Changes are kept on this phone; sign in again in Settings.",
+            HouseholdSyncState.Retrying when !string.IsNullOrWhiteSpace(status.Reason) => status.Reason,
+            HouseholdSyncState.Retrying => "The household didn't sync this time. Changes are kept on this phone, and Pulp tries again later.",
             _ => status.Reason,
         };
     }
@@ -100,6 +109,12 @@ public sealed record HouseholdSyncStatus(
 
     /// <summary>The same phone, now unable to reach Drive; when it last landed is kept.</summary>
     public HouseholdSyncStatus WentOffline(string reason) => Offline(LastSynced, reason);
+
+    /// <summary>The same phone, its Google sign-in refused; when it last landed is kept.</summary>
+    public HouseholdSyncStatus SignInRefused() => new(HouseholdSyncState.SignInNeeded, LastSynced, string.Empty);
+
+    /// <summary>The same phone, a pass that failed for another reason; <paramref name="reason"/> is a sentence, never an exception's message.</summary>
+    public HouseholdSyncStatus PassFailed(string? reason = null) => new(HouseholdSyncState.Retrying, LastSynced, reason ?? string.Empty);
 
     /// <summary>The dog-ear notice this status raises, if any.</summary>
     public WaitingNotice? Notice(DateTimeOffset at) => State != HouseholdSyncState.Unreadable

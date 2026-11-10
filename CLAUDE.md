@@ -445,6 +445,7 @@ surfacing anything that cannot be built as drawn rather than substituting:
   this account, and the extra consent screen.
 - **A `CollectionDefinition` on a test class makes xUnit discover nothing at all**, silently — the
   marker has to be its own class. The only sign was a suite going from 75 tests to 74.
+- **The morning is one run with a mark per document (audit 11 §6–7).** `Foreword.Android/Morning` builds the brief, the first-Sunday bonus, The Day and prayer as `MorningStep`s for `MorningRun`, which the worker and Deliver now both use: each in its own try, each that lands marked in the day's `MorningLedger` (preference `DeliveredToday`) at once, so a retry or a second press sends only what is missing and the tablet never gets a second brief. `DailyDeliveryService.DeliverDailyDocuments` returns a `DayResult` rather than swallowing a failed upload, and the status line is `MorningOutcome.Summary()` ("The Day did not arrive (no network). Delivered: the brief (…)"), with `MorningRun.Reason` naming no network and the tablet's own refusals. The worker waits for a network and backs off from five minutes (`DeliverySchedule.RetryBackoff`, six retries ≈ 2.5 h) while anything is missing.
 - **Prayer delivers in its own `try` inside `DeliveryWorker`**, with its own outcome preference
   (`LastPrayerOutcome`), because it reads a file the rest of the morning does not behind a passphrase
   the rest of the morning does not need — a morning with no prayer sheet is a smaller loss than a

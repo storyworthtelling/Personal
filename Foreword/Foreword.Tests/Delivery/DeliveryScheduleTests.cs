@@ -171,4 +171,18 @@ public class DeliveryDelayTests
 
         Assert.Equal(TimeSpan.FromDays(1), DeliverySchedule.DelayUntilNext(now, 6, 30));
     }
+
+    /// <summary>
+    /// A morning waits for a network and backs off long enough to outlast Wi-Fi coming up late (audit 11 §7): three
+    /// retries on WorkManager's default 30 seconds lost the morning if the network was more than three and a half minutes
+    /// late. From five minutes doubling, six retries cover about two and a half hours.
+    /// </summary>
+    [Fact]
+    public void RetriesBackOffFromFiveMinutesForAboutTwoAndAHalfHours()
+    {
+        Assert.Equal(TimeSpan.FromMinutes(5), DeliverySchedule.RetryBackoff);
+        Assert.Equal(6, DeliverySchedule.MaxRetries);
+        var waited = Enumerable.Range(0, DeliverySchedule.MaxRetries).Sum(i => DeliverySchedule.RetryBackoff.TotalMinutes * Math.Pow(2, i));
+        Assert.InRange(waited, 120, 330);
+    }
 }

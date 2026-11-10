@@ -644,7 +644,7 @@ public sealed class PulpServices
                 HouseholdPublishOutcome.NotYetShared => HouseholdSyncStatus.WaitingForShare(
                     SyncStatus.LastSynced,
                     $"No household file is shared with this account yet. The owner shares '{PulpIdentity.HouseholdFileName}' from their Drive; until then this phone keeps its household to itself."),
-                _ => SyncStatus.WentOffline("The other phone was saving at the same moment; this phone's changes are kept and go up on the next pass."),
+                _ => SyncStatus.PassFailed("The other phone was saving at the same moment; this phone's changes are kept and go up on the next pass."),
             };
 
             // A screen re-reads when records came home (SyncRefresh), so the pass says whether any did.
@@ -663,11 +663,20 @@ public sealed class PulpServices
         }
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
-            // Drive unreachable, a token refused, a timeout (a TaskCanceledException is one): the edits wait on the phone and the pass is retried.
-            Diagnostics.Warn("household", "Drive could not be reached for the household; this phone keeps working from its own copy and tries again later.", exception);
+            // The edits wait on the phone and the pass is retried, whatever went wrong. What the screen says depends on what
+            // it was (audit 11 §20): only a phone with no network, or a timeout, is "offline"; a token Google refused asks
+            // for a sign-in; anything else is a plain retry. Never the exception's own message.
+            Diagnostics.Warn("household", "The household pass failed; this phone keeps working from its own copy and tries again later.", exception);
             syncLoop.Update(schedule => schedule.Failed(DateTimeOffset.UtcNow));
 
-            SetStatus(SyncStatus.WentOffline(exception.Message));
+            SetStatus(exception switch
+            {
+                _ when Storyworthtelling.Voice.Health.NetworkFailure.IsOffline(exception) || exception is TaskCanceledException
+                    => SyncStatus.WentOffline("no network"),
+                Google.GoogleApiException google when Storyworthtelling.Voice.Health.AuthFailure.IsHttpCredentialRejection((int)google.HttpStatusCode, google.Message)
+                    => SyncStatus.SignInRefused(),
+                _ => SyncStatus.PassFailed(),
+            });
         }
         finally
         {
