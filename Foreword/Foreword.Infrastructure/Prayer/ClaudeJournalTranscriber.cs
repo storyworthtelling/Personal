@@ -1,3 +1,5 @@
+using Foreword.Infrastructure.Pdf;
+using Storyworthtelling.Paper;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Claude;
 using System.Globalization;
@@ -34,9 +36,9 @@ namespace Foreword.Infrastructure.Prayer;
 /// </summary>
 public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReader
 {
-    // US Letter portrait, which is what the prayer document is composed at.
-    private const float PageWidth = 612f;
-    private const float PageHeight = 792f;
+    // The prayer pages are drawn on Letter's board and printed on the tablet's page (ForewordSheet), so the regions are
+    // painted from the board and told to the model in the page's own points.
+    private static readonly TabletSheet Sheet = ForewordSheet.Portrait;
 
     private readonly PageReader reader;
     private readonly ILogger<ClaudeJournalTranscriber> logger;
@@ -78,7 +80,9 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
     /// </summary>
     private static string Instruction()
     {
-        var regions = JournalRegions.For(PageWidth, PageHeight);
+        var regions = JournalRegions.For(Sheet.DesignWidth, Sheet.DesignHeight)
+            .Select(region => Sheet.ToPage(new SheetRect(region.Left, region.Top, region.Width, region.Height)))
+            .ToList();
         var free = regions[0];
         var adding = regions[1];
 
@@ -86,7 +90,7 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
             "You are reading one page of a printed journal that has been hand-written on with a "
             + "stylus. Ignore all printed text and the printed rules. Transcribe ONLY the "
             + "hand-written ink, and split it by where it sits on the page. The page is "
-            + $"{(int)PageWidth} by {(int)PageHeight} points, measured from the top-left. "
+            + $"{(int)Sheet.PageWidth} by {(int)Sheet.PageHeight} points, measured from the top-left. "
             + $"The '{JournalRegions.Journalling}' region runs from y={(int)free.Top} to "
             + $"y={(int)(free.Top + free.Height)}. The '{JournalRegions.Adding}' region, headed "
             + $"\"Add to the list\", runs from y={(int)adding.Top} to "

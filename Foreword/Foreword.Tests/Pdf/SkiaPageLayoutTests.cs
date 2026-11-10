@@ -88,10 +88,31 @@ public class SkiaPageLayoutTests
         using var portrait = new SkiaPageLayout();
         using var landscape = new SkiaPageLayout(landscape: true);
 
-        Assert.Equal(612, portrait.PageWidth);
-        Assert.Equal(792, portrait.PageHeight);
-        Assert.Equal(792, landscape.PageWidth);
-        Assert.Equal(612, landscape.PageHeight);
+        Assert.Equal(portrait.PageWidth, landscape.PageHeight, 3);
+        Assert.Equal(portrait.PageHeight, landscape.PageWidth, 3);
+    }
+
+    /// <summary>
+    /// The sheets are the tablet's own page (audit 01 §12), drawn in Letter's points and scaled once, so the type is
+    /// the size it always looked on the glass and the board grows into the room the tablet used to leave blank.
+    /// </summary>
+    [Fact]
+    public void ThePdfIsTheTabletsPageAndTheBoardIsAtLeastLetter()
+    {
+        using var portrait = new SkiaPageLayout();
+        using var landscape = new SkiaPageLayout(landscape: true);
+        portrait.DrawText("portrait", SkiaPageLayout.Sans(12), 54, 54, 200, 20, TextAlign.TopLeft);
+        landscape.DrawText("landscape", SkiaPageLayout.Sans(12), 54, 54, 200, 20, TextAlign.TopLeft);
+
+        Assert.Equal(612, portrait.PageWidth, 3);
+        Assert.True(portrait.PageHeight >= 792);
+        Assert.Equal(612, landscape.PageHeight, 3);
+        Assert.True(landscape.PageWidth >= 792);
+
+        using var tall = PdfDocument.Open(new MemoryStream(portrait.ToPdf()));
+        using var wide = PdfDocument.Open(new MemoryStream(landscape.ToPdf()));
+        Assert.Equal((445d, 594d), (Math.Round(tall.GetPage(1).Width), Math.Round(tall.GetPage(1).Height)));
+        Assert.Equal((594d, 445d), (Math.Round(wide.GetPage(1).Width), Math.Round(wide.GetPage(1).Height)));
     }
 
     [Fact]

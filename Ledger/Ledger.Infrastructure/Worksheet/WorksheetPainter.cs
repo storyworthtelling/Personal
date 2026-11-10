@@ -33,14 +33,14 @@ public static class WorksheetPainter
         var split = layout.Split;
 
         var page1Categories = plan.Categories.Take(split.CategoryRowsOnPageOne).ToList();
-        var canvas = sink.BeginPage(WorksheetRegions.PageWidth, WorksheetRegions.PageHeight);
+        var canvas = sink.BeginPage(IndexSheet.Page);
         DrawPageOne(canvas, ink, plan, page1Categories, layout);
         sink.EndPage();
 
         if (split.NeedsSecondPage)
         {
             var page2Categories = plan.Categories.Skip(split.CategoryRowsOnPageOne).ToList();
-            var canvas2 = sink.BeginPage(WorksheetRegions.PageWidth, WorksheetRegions.PageHeight);
+            var canvas2 = sink.BeginPage(IndexSheet.Page);
             DrawPageTwo(canvas2, ink, plan, page2Categories, layout);
             sink.EndPage();
         }

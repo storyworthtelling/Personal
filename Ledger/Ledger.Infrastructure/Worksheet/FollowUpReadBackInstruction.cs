@@ -29,8 +29,8 @@ public static class FollowUpReadBackInstruction
         var sb = new StringBuilder();
         sb.Append(
             "You are reading a follow-up budget page that was printed and then hand-written on with a ")
-            .Append("stylus. It is exactly ").Append(FollowUpRegions.PageWidth.ToString("0.0", CultureInfo.InvariantCulture))
-            .Append(" by ").Append(FollowUpRegions.PageHeight.ToString("0.0", CultureInfo.InvariantCulture))
+            .Append("stylus. It is exactly ").Append(IndexSheet.Page.PageWidth.ToString("0.0", CultureInfo.InvariantCulture))
+            .Append(" by ").Append(IndexSheet.Page.PageHeight.ToString("0.0", CultureInfo.InvariantCulture))
             .Append(" points, measured in points from the page's top-left corner. Ignore all printed/typed text ")
             .Append("except where it names a printed line next to a box. Look ONLY at the hand-written ink inside ")
             .Append("the boxes listed below; every box is a small rounded rectangle drawn in ink, most with a ")
@@ -80,6 +80,10 @@ public static class FollowUpReadBackInstruction
         return sb.ToString();
     }
 
-    private static string Coords(WorksheetBox box) => string.Create(CultureInfo.InvariantCulture,
-        $"{box.Left:0.0}, {box.Top:0.0}, {box.Width:0.0}, {box.Height:0.0}");
+    // Drawn on the A4 board, told in the tablet page's own points (IndexSheet).
+    private static string Coords(WorksheetBox board)
+    {
+        var box = IndexSheet.Box(board);
+        return string.Create(CultureInfo.InvariantCulture, $"{box.Left:0.0}, {box.Top:0.0}, {box.Width:0.0}, {box.Height:0.0}");
+    }
 }

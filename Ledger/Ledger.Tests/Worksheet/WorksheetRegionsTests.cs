@@ -40,7 +40,8 @@ public class WorksheetRegionsTests
 
         var instruction = WorksheetReadBackInstruction.Build(categoryIds);
 
-        foreach (var box in boxes)
+        // In the tablet page's own points, which is the page the model is handed.
+        foreach (var box in boxes.Select(PdfProbe.OnPage))
         {
             Assert.Contains($"\"{box.Name}\"", instruction);
             Assert.Contains(box.Left.ToString("0.0"), instruction);

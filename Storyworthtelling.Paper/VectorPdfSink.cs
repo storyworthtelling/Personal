@@ -61,6 +61,18 @@ public sealed class VectorPdfSink : IDisposable
         return document.BeginPage(widthPoints, heightPoints);
     }
 
+    /// <summary>
+    /// Begins a page at the tablet's own size and sets the canvas so the caller keeps drawing in its own points
+    /// (<see cref="TabletSheet"/>). Links and destinations drawn on it are moved by the same scale.
+    /// </summary>
+    public SKCanvas BeginPage(TabletSheet sheet)
+    {
+        var canvas = BeginPage(sheet.PageWidth, sheet.PageHeight);
+        canvas.Translate(sheet.OffsetX, sheet.OffsetY);
+        canvas.Scale(sheet.Scale);
+        return canvas;
+    }
+
     public void EndPage()
     {
         ThrowIfClosed();

@@ -8,8 +8,8 @@ internal enum TextAlign { TopLeft, TopCenter, TopRight, Center }
 
 // The bespoke Skia layout engine for Foreword's documents.
 //
-// It draws in POINT units, which is what a PDF's user space already is — so the composers' measurements and
-// font sizes are the same numbers they have always been, and nothing here scales. Pages go straight to the
+// It draws in US Letter POINT units, so the composers' measurements and font sizes are the same numbers they have
+// always been; the page itself is the tablet's 445 × 594 (ForewordSheet), reached by one scale. Pages go straight to the
 // shared VectorPdfSink, so the text in a delivered document IS text: selectable, searchable, and rendered by
 // the tablet at whatever its panel actually is.
 //
@@ -38,6 +38,8 @@ internal sealed class SkiaPageLayout : IDisposable
 
     private readonly VectorPdfSink sink = new();
 
+    private readonly TabletSheet sheet;
+
     private SKCanvas canvas = null!;
 
     public double PageWidth { get; }
@@ -48,8 +50,10 @@ internal sealed class SkiaPageLayout : IDisposable
 
     public SkiaPageLayout(bool landscape = false)
     {
-        PageWidth = landscape ? 792 : 612;   // US Letter in points
-        PageHeight = landscape ? 612 : 792;
+        // Letter's points, on the tablet's own page: the board is at least Letter and the PDF is 445 × 594 (ForewordSheet).
+        sheet = landscape ? ForewordSheet.Landscape : ForewordSheet.Portrait;
+        PageWidth = sheet.DesignWidth;
+        PageHeight = sheet.DesignHeight;
         StartPage();
     }
 
@@ -334,9 +338,8 @@ internal sealed class SkiaPageLayout : IDisposable
     // ---- internals ----
     private void StartPage()
     {
-        // No scale: a PDF's user space is already 1/72 inch, which is the unit every measurement in
-        // the composers is written in. The raster path only scaled because a bitmap has pixels.
-        canvas = sink.BeginPage((float)PageWidth, (float)PageHeight);
+        // One scale, set by the sheet: the composers keep writing Letter points and the page is the tablet's glass.
+        canvas = sink.BeginPage(sheet);
         canvas.Clear(Ground);
         Y = Margin;
     }

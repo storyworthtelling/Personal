@@ -16,7 +16,10 @@ public class PrayerPagesTests
 {
     private static readonly DateOnly Day = new(2026, 9, 6);
 
-    private const float PageWidth = 612f;
+    // The tablet's own page, in the PDF's points; the board it is drawn on is Letter's width (ForewordSheet).
+    private static readonly Storyworthtelling.Paper.TabletSheet Sheet = Foreword.Infrastructure.Pdf.ForewordSheet.Portrait;
+
+    private static readonly float PageWidth = Sheet.PageWidth;
 
     private sealed class Reader : IPrayerReader
     {
@@ -138,8 +141,8 @@ public class PrayerPagesTests
     {
         using var document = PdfDocument.Open(new MemoryStream(Composed()));
 
-        var stripLeft = PageWidth - Foreword.Domain.Document.SectionTabs.TabWidth
-            - Foreword.Domain.Document.SectionTabs.Hairline;
+        var stripLeft = (Sheet.DesignWidth - Foreword.Domain.Document.SectionTabs.TabWidth
+            - Foreword.Domain.Document.SectionTabs.Hairline) * Sheet.Scale;
 
         var offenders = new List<string>();
 

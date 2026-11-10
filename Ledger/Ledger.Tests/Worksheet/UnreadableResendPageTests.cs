@@ -117,7 +117,7 @@ public class UnreadableResendPageTests
     }
 
     private static Rect ToTopLeft(UglyToad.PdfPig.Core.PdfRectangle r) =>
-        new((float)r.Left, FollowUpRegions.PageHeight - (float)r.Top, (float)r.Right, FollowUpRegions.PageHeight - (float)r.Bottom);
+        new(PdfProbe.BoardX((float)r.Left), PdfProbe.BoardY((float)r.Top), PdfProbe.BoardX((float)r.Right), PdfProbe.BoardY((float)r.Bottom));
 
     private static Rect Of(WorksheetBox b) => new(b.Left, b.Top, b.Left + b.Width, b.Top + b.Height);
 

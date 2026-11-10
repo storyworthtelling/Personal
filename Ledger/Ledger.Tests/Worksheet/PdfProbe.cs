@@ -15,10 +15,31 @@ internal static class PdfProbe
         public float Y => (Top + Bottom) / 2f;
     }
 
+    /// <summary>The PDF is the tablet's page; every drift test measures on the A4 board it was drawn on.</summary>
+    public static readonly TabletSheet Sheet = Index.Infrastructure.Worksheet.IndexSheet.Page;
+
     public static float PageHeight(Page page) => (float)page.Height;
 
+    /// <summary>A PDF rectangle (bottom-left, page points) as top-left board points.</summary>
     public static (float Left, float Top, float Right, float Bottom) Box(Page page, UglyToad.PdfPig.Core.PdfRectangle r) =>
-        ((float)r.Left, PageHeight(page) - (float)r.Top, (float)r.Right, PageHeight(page) - (float)r.Bottom);
+        (BoardX((float)r.Left), BoardY(page, (float)r.Top), BoardX((float)r.Right), BoardY(page, (float)r.Bottom));
+
+    public static float BoardX(float pageX) => (pageX - Sheet.OffsetX) / Sheet.Scale;
+
+    public static float BoardY(Page page, float pdfY) => BoardY(pdfY, PageHeight(page));
+
+    /// <summary>A PDF y (from the bottom) as a board y (from the top); every page is the tablet's height.</summary>
+    public static float BoardY(float pdfY, float pageHeight = RemarkablePage.Height) => (pageHeight - pdfY - Sheet.OffsetY) / Sheet.Scale;
+
+    /// <summary>A length on the page (a font size, a line width) as board points.</summary>
+    public static float Board(double pageLength) => (float)(pageLength / Sheet.Scale);
+
+    /// <summary>A box on the board as the read-back is told it: in the page's own points.</summary>
+    public static Index.Domain.Worksheet.WorksheetBox OnPage(Index.Domain.Worksheet.WorksheetBox box)
+    {
+        var page = Sheet.ToPage(new SheetRect(box.Left, box.Top, box.Width, box.Height));
+        return box with { Left = page.Left, Top = page.Top, Width = page.Width, Height = page.Height };
+    }
 
     public static (double R, double G, double B) Rgb(string hex)
     {

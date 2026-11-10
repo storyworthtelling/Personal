@@ -29,7 +29,8 @@ public class DayPageBoundsTests
 
     // The strip's left edge, in PDF coordinates: the active tab reaches one hairline further in
     // than the rest, and nothing but the tabs themselves may cross it.
-    private const double TabStripLeft = 792 - SectionTabs.TabWidth - SectionTabs.Hairline;
+    private static readonly double TabStripLeft =
+        (ForewordSheet.Landscape.DesignWidth - SectionTabs.TabWidth - SectionTabs.Hairline) * ForewordSheet.Landscape.Scale;
 
     [Fact]
     public void NoTextRunsOffThePage()

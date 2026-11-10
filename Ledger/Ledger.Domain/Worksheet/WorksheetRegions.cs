@@ -8,7 +8,7 @@ public readonly record struct WorksheetBox(string Name, float Left, float Top, f
 
 /// <summary>
 /// Where every writable box on the monthly worksheet sits (mockup 12, Release F), in points, on the
-/// suite's A4 page (595 &#215; 842, margins 52.8/48/62.4 — Index's own copy of these numbers, matching
+/// A4 board the mockups are measured in (595 &#215; 842, placed on the tablet's page by <c>IndexSheet</c>; margins 52.8/48/62.4 — Index's own copy of these numbers, matching
 /// <c>Storyboarder/Folio.Domain/Report/PageGeometry.cs</c> exactly rather than referencing a different
 /// app's type, per this task's brief).
 ///
