@@ -15,8 +15,6 @@ public class TabletDocumentsWearTheFrameTests
     /// </summary>
     private static readonly HashSet<string> NotYetFramed = new(StringComparer.Ordinal)
     {
-        "Ledger/Ledger.Infrastructure/Worksheet/FollowUpPainter.cs",          // step 2, Index
-        "Ledger/Ledger.Infrastructure/Worksheet/WorksheetPainter.cs",         // step 2, Index
         "Constitution/Constitution.Infrastructure/Documents/ConstitutionPageSink.cs", // step 3, Constitution
         "Storyboarder/Folio.Infrastructure/Imaging/PageWriter.cs",            // step 4, Folio
     };

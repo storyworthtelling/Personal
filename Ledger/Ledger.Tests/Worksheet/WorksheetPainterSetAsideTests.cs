@@ -99,8 +99,13 @@ public class WorksheetPainterSetAsideTests
 
         using var document = PdfDocument.Open(new MemoryStream(pdfBytes));
         var text = document.GetPage(1).Text;
+        // Words, not raw text: PdfPig joins a wrapped line to the next with no space.
+        // Horizontal letters only: the tab's label runs down the edge and would interleave with the line it sits beside.
+        var words = string.Join(" ", document.GetPage(1).GetWords()
+            .Where(w => w.Letters.All(l => Math.Abs(l.EndBaseLine.Y - l.StartBaseLine.Y) < 0.01))
+            .Select(w => w.Text));
 
         Assert.DoesNotContain("SET ASIDE", text, StringComparison.Ordinal);
-        Assert.Contains("Add a category on a blank line at the foot", text, StringComparison.Ordinal);
+        Assert.True(words.Contains("Add a category on a blank line at the foot", StringComparison.Ordinal), words);
     }
 }

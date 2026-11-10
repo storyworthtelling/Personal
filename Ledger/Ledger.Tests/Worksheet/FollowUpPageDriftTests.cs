@@ -134,15 +134,17 @@ public class FollowUpPageDriftTests
     // ---- title, kicker, the previous month ----
 
     [Fact]
-    public void TheTitleIsSetAtTheDisplayRung_AndClearsTheHeaderRule()
+    public void TheHeadlineIsTheFramesTitle_AndClearsTheHeaderRule()
     {
         using var document = Open(OverPlan());
         var page = document.GetPage(1);
-        var title = page.Letters.Where(l => PdfProbe.Board(l.PointSize) > 20).ToList();
+        var rule = PdfProbe.Bars(page).Single(b => PdfProbe.SameColor(b.Color, PdfProbe.Rgb(AppIdentityTokens.IndexMarkHex)));
+        var title = page.Letters
+            .Where(l => !PdfProbe.IsSignature(l) && PdfProbe.Box(page, l.GlyphRectangle).Bottom < rule.Top + 1f)
+            .ToList();
 
         Assert.NotEmpty(title);
-        Assert.All(title, l => Assert.Equal(PaperTypeScale.Display, PdfProbe.Board(l.PointSize), 0.3f));
-        var rule = PdfProbe.HorizontalRules(page).First(r => Math.Abs(r.Width - 1.5) < 0.01 && r.Length > 400);
+        Assert.All(title, l => Assert.Equal(PaperTypeScale.Title, PdfProbe.Board(l.PointSize), 0.3f));
         Assert.True(title.Max(l => PdfProbe.Box(page, l.GlyphRectangle).Bottom) < rule.Top);
     }
 
@@ -209,7 +211,7 @@ public class FollowUpPageDriftTests
     // ---- the footer ----
 
     [Fact]
-    public void TheFooterDateIsMono_RightAligned_AndInvariant()
+    public void TheFolioDateIsRightAligned_AndInvariant()
     {
         var previous = CultureInfo.CurrentCulture;
         try
@@ -226,7 +228,6 @@ public class FollowUpPageDriftTests
 
             Assert.Equal(3, date.Count);
             Assert.Equal(WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth, PdfProbe.BoardX((float)date.Single(w => w.Text == "2").BoundingBox.Right), Tolerance);
-            Assert.All(date, w => Assert.Contains("Cascadia", w.Letters[0].FontName ?? string.Empty, StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain("oct.", page.Text, StringComparison.Ordinal);
         }
         finally
@@ -245,8 +246,8 @@ public class FollowUpPageDriftTests
         var rules = PdfProbe.HorizontalRules(document.GetPage(1));
         var full = WorksheetRegions.BodyWidth - 2;
 
-        var identity = rules.Where(r => PdfProbe.SameColor(r.Color, PdfProbe.Rgb(PaperColorTokens.PositiveDoc)) && r.Length > full).ToList();
-        Assert.Equal(1.5, Assert.Single(identity).Width, 0.01);
+        // The identity rule is the shared frame's bar, in Index's mark.
+        Assert.Single(PdfProbe.Bars(document.GetPage(1)), b => PdfProbe.SameColor(b.Color, PdfProbe.Rgb(AppIdentityTokens.IndexMarkHex)));
 
         // LINE header, EVERYTHING ELSE, CHANGE ANOTHER LINE.
         var heavy = rules.Where(r => PdfProbe.IsInk(r) && Math.Abs(r.Width - 1.5) < 0.01 && r.Length > full).ToList();

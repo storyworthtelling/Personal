@@ -68,6 +68,21 @@ public static class AppIdentityTokens
     public const string ConstitutionClothHex = "#82ACC1";
     public const string ConstitutionDocumentHex = "#476F83";
 
+    // Index: identity green, OKLCH hue 129° (DESIGN.md §3's one departure: it sits on the Positive role's hue, so no Index
+    // page draws Positive). The same five tiers as Tools/IconStudio's IndexFillHex.. ladder; the shared tablet frame
+    // signs Index's pages with the mark and cuts its tab from the ground.
+    public const string IndexFillHex = "#B6C3A9";
+    public const string IndexGroundHex = "#839372";
+    public const string IndexMarkHex = "#596C45";
+    public const string IndexTextHex = "#475735";
+    public const string IndexDeepHex = "#2F3C21";
+
+    public static SKColor IndexFill { get; } = SKColor.Parse(IndexFillHex);
+    public static SKColor IndexGround { get; } = SKColor.Parse(IndexGroundHex);
+    public static SKColor IndexMark { get; } = SKColor.Parse(IndexMarkHex);
+    public static SKColor IndexText { get; } = SKColor.Parse(IndexTextHex);
+    public static SKColor IndexDeep { get; } = SKColor.Parse(IndexDeepHex);
+
     public static SKColor ForewordFill { get; } = SKColor.Parse(ForewordFillHex);
     public static SKColor ForewordGround { get; } = SKColor.Parse(ForewordGroundHex);
     public static SKColor ForewordSunrise { get; } = SKColor.Parse(ForewordSunriseHex);

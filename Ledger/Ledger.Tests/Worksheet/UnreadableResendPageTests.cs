@@ -137,7 +137,8 @@ public class UnreadableResendPageTests
         using var document = PdfDocument.Open(new MemoryStream(FollowUpPainter.Paint(plan)));
         var page = document.GetPage(1);
         var letters = page.Letters
-            .Where(l => !string.IsNullOrWhiteSpace(l.Value))
+            .Where(l => !string.IsNullOrWhiteSpace(l.Value) && !PdfProbe.IsSignature(l))
+            .Where(l => Math.Abs(l.EndBaseLine.Y - l.StartBaseLine.Y) < 0.01) // a tab's label runs down it, out past the margin
             .Select(l => (Letter: l, Rect: ToTopLeft(l.GlyphRectangle)))
             .Where(x => !(x.Letter.Value == "$" && boxes.Any(b => Of(b).Intersects(x.Rect))))
             .ToList();
@@ -203,7 +204,7 @@ public class UnreadableResendPageTests
 
         var heading = FollowUpPainter.Heading(plan.TargetYearMonth);
 
-        Assert.Equal("INDEX · OCTOBER 2026 · FOLLOW-UP", heading);
+        Assert.Equal("Index · October 2026 follow-up", heading);
         Assert.Contains(heading, instruction, StringComparison.Ordinal);
         Assert.Contains("respond with []", instruction, StringComparison.Ordinal);
         Assert.Contains(heading, Text(plan), StringComparison.Ordinal);

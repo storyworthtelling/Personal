@@ -2,6 +2,7 @@ using SkiaSharp;
 using Index.Domain.Model;
 using Index.Domain.Worksheet;
 using Storyworthtelling.Paper;
+using Storyworthtelling.Paper.Binder;
 
 namespace Index.Infrastructure.Worksheet;
 
@@ -19,6 +20,7 @@ public static class FollowUpPainter
     {
         using var sink = new VectorPdfSink();
         var canvas = sink.BeginPage(IndexSheet.Page);
+        SheetFrame.Clear(canvas);
         Draw(canvas, plan);
         sink.EndPage();
         return sink.Close();
@@ -37,16 +39,14 @@ public static class FollowUpPainter
         var previousMonth = WorksheetDates.PreviousMonthWord(plan.TargetYearMonth);
         var directionWord = plan.IsOver ? "over" : "to place";
 
-        // ---- header ----
-        canvas.DrawText(Heading(plan.TargetYearMonth), left, FollowUpRegions.MarginTop + PaperTypeScale.Label, labelFont, mutedPaint);
+        // ---- the shared tablet frame: the headline signed "Index", the page's own tab, the folio with the mark ----
         var headline = plan.IsResendOnly
             ? $"{monthWord}, {ResendCountPhrase(plan.ResendLines.Count)} to write again"
             : $"{monthWord}, {PlanMoney.Whole(plan.DifferenceWholeDollars)} {directionWord}";
-        canvas.DrawText(
-            headline,
-            left, FollowUpRegions.MarginTop + PaperTypeScale.Label + PaperTypeScale.Display + TitleDrop, titleFont, inkPaint);
+        SheetFrame.Header(canvas, IndexSheet.Page, headline, IndexSheet.Signature);
+        SheetFrame.Binder(canvas, IndexSheet.Page, IndexSheet.FollowUpTabs, 0);
+        SheetFrame.Folio(canvas, IndexSheet.Page, Heading(plan.TargetYearMonth), $"printed {WorksheetDates.PrintedOn(plan.PrintedOn)}");
         var ruleY = FollowUpRegions.MarginTop + FollowUpRegions.HeaderHeight - 8f;
-        PageInk.Rule(canvas, ink.IdentityRule, left, right, ruleY);
 
         // ---- intro (mockup 13(b)/(c)'s own worked sentences) ----
         var introY = ruleY + 16f;
@@ -211,15 +211,7 @@ public static class FollowUpPainter
                 : $"If the final figures still don't come to {PlanMoney.Whole(plan.TargetWholeDollars)}, another page like this comes tomorrow.";
         canvas.DrawText(footerSentence, left, layout.FooterSentenceBaseline, secondaryFont, softPaint);
 
-        // ---- footer ----
-        var footerY = FollowUpRegions.PageHeight - FollowUpRegions.MarginBottom + 18f;
-        canvas.DrawText($"Index · {monthYear} follow-up", left, footerY, secondaryFont, mutedPaint);
-        // .folio .r — the date is mono, against the right margin, and always English.
-        canvas.DrawText($"printed {WorksheetDates.PrintedOn(plan.PrintedOn)}", right, footerY, SKTextAlign.Right, monoFont, mutedPaint);
     }
-
-    /// <summary>Gap from the title line's size to its baseline, as on the worksheet.</summary>
-    private const float TitleDrop = 5f;
 
     /// <summary>From a reference line's baseline to its hairline (<c>.fu-rest div</c>'s 19px line).</summary>
     private const float ReferenceRuleDrop = 5.5f;
@@ -234,9 +226,9 @@ public static class FollowUpPainter
     private static void DrawBox(SKCanvas canvas, SKPaint paint, WorksheetBox box) =>
         canvas.DrawRoundRect(new SKRect(box.Left, box.Top, box.Left + box.Width, box.Top + box.Height), 3f, 3f, paint);
 
-    /// <summary>The small heading at the top of the page. One source for the painter and for the read-back
-    /// instruction, which tells the reader to refuse a page whose heading names another month.</summary>
-    public static string Heading(string yearMonth) => $"INDEX · {WorksheetDates.MonthYear(yearMonth).ToUpperInvariant()} · FOLLOW-UP";
+    /// <summary>The page's name in its folio, at the foot beside the maker's mark. One source for the painter and for the
+    /// read-back instruction, which tells the reader to refuse a page whose folio names another month.</summary>
+    public static string Heading(string yearMonth) => $"Index · {WorksheetDates.MonthYear(yearMonth)} follow-up";
 
     /// <summary>What the "wrote" column says for a limit that was never read (see the row drawing).</summary>
     internal const string UnreadMark = "not read";

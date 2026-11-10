@@ -2,6 +2,7 @@ using SkiaSharp;
 using Index.Domain.Model;
 using Index.Domain.Worksheet;
 using Storyworthtelling.Paper;
+using Storyworthtelling.Paper.Binder;
 
 namespace Index.Infrastructure.Worksheet;
 
@@ -33,14 +34,15 @@ public static class WorksheetPainter
         var split = layout.Split;
 
         var page1Categories = plan.Categories.Take(split.CategoryRowsOnPageOne).ToList();
-        var canvas = sink.BeginPage(IndexSheet.Page);
+        var tabs = IndexSheet.WorksheetTabs(layout.PageCount);
+        var canvas = BeginFramedPage(sink, tabs, 0, plan);
         DrawPageOne(canvas, ink, plan, page1Categories, layout);
         sink.EndPage();
 
         if (split.NeedsSecondPage)
         {
             var page2Categories = plan.Categories.Skip(split.CategoryRowsOnPageOne).ToList();
-            var canvas2 = sink.BeginPage(IndexSheet.Page);
+            var canvas2 = BeginFramedPage(sink, tabs, 1, plan);
             DrawPageTwo(canvas2, ink, plan, page2Categories, layout);
             sink.EndPage();
         }
@@ -59,7 +61,7 @@ public static class WorksheetPainter
         var monthWord = WorksheetDates.MonthWord(plan.TargetYearMonth);
         var previousMonth = WorksheetDates.PreviousMonthWord(plan.TargetYearMonth);
 
-        var ruleY = DrawHeader(canvas, ink, "INDEX · HOUSEHOLD BUDGET", monthYear);
+        var ruleY = WorksheetRegions.MarginTop + WorksheetRegions.HeaderHeight - 8f;
 
         // ---- intro (D100/D155: states the zero-based target when this plan carries a Set aside
         // section, matching mockup 13(a)'s own wording; Release F's plain intro otherwise) ----
@@ -120,7 +122,6 @@ public static class WorksheetPainter
             canvas.DrawText("Continued on the next sheet…", left, continuedY, ink.Secondary, ink.Muted);
         }
 
-        DrawFooter(canvas, ink, monthYear, plan.PrintedOn, left, right);
     }
 
     private static void DrawPageTwo(
@@ -131,7 +132,6 @@ public static class WorksheetPainter
         var right = left + WorksheetRegions.BodyWidth;
         var monthYear = WorksheetDates.MonthYear(plan.TargetYearMonth);
 
-        DrawHeader(canvas, ink, "INDEX · HOUSEHOLD BUDGET · CONTINUED", monthYear);
 
         // A continuation sheet that carries no categories (they all fitted on page one; only the
         // set-aside unit moved) has nothing to introduce and no table to head — an empty CATEGORY /
@@ -150,24 +150,23 @@ public static class WorksheetPainter
 
         DrawSetAsideAndWriteIns(canvas, ink, plan.SetAsideLinesOrEmpty, layout);
 
-        DrawFooter(canvas, ink, monthYear, plan.PrintedOn, left, right);
     }
 
-    /// <summary>The kicker, the title at <see cref="PaperTypeScale.Display"/> and the 1.5pt identity rule
-    /// under them (<c>.rp-lab</c>, <c>.rp-title</c>, <c>.rp-rule</c>). Returns the rule's y.</summary>
-    private static float DrawHeader(SKCanvas canvas, PageInk ink, string kicker, string title)
+    /// <summary>
+    /// A sheet in the shared tablet frame: the ground, the header ("October 2026 budget", signed "Index" over the
+    /// identity rule), every tab with this sheet's open, and the folio led by the maker's mark.
+    /// </summary>
+    private static SKCanvas BeginFramedPage(VectorPdfSink sink, IReadOnlyList<BinderTab> tabs, int page, Domain.Worksheet.WorksheetPlan plan)
     {
-        var left = WorksheetRegions.MarginLeft;
-        canvas.DrawText(kicker, left, WorksheetRegions.MarginTop + PaperTypeScale.Label, ink.Label, ink.Muted);
-        canvas.DrawText(title, left, WorksheetRegions.MarginTop + PaperTypeScale.Label + PaperTypeScale.Display + TitleDrop, ink.Title, ink.Ink);
-        var ruleY = WorksheetRegions.MarginTop + WorksheetRegions.HeaderHeight - 8f;
-        PageInk.Rule(canvas, ink.IdentityRule, left, left + WorksheetRegions.BodyWidth, ruleY);
-        return ruleY;
+        var canvas = sink.BeginPage(IndexSheet.Page);
+        var monthYear = WorksheetDates.MonthYear(plan.TargetYearMonth);
+        SheetFrame.Clear(canvas);
+        SheetFrame.Header(canvas, IndexSheet.Page, page == 0 ? $"{monthYear} budget" : $"{monthYear} budget, continued", IndexSheet.Signature);
+        SheetFrame.Binder(canvas, IndexSheet.Page, tabs, page);
+        SheetFrame.Folio(canvas, IndexSheet.Page, $"Index · {monthYear} budget", $"printed {WorksheetDates.PrintedOn(plan.PrintedOn)}");
+        return canvas;
     }
 
-    /// <summary>Gap from the label's baseline plus the title's size to the title's baseline: the title's
-    /// line box (33pt at 1.06) sits 4pt under the label's, and its baseline falls near the box's foot.</summary>
-    private const float TitleDrop = 5f;
 
     /// <summary>From the header rule to the first intro baseline (14pt margin + the line's own ascent) and
     /// the paragraph's line height (<c>.rp-b</c>: 12px at 1.4).</summary>
@@ -264,14 +263,6 @@ public static class WorksheetPainter
         PageInk.Rule(
             canvas, ink.InkRule, WorksheetRegions.MarginLeft, WorksheetRegions.MarginLeft + WorksheetRegions.BodyWidth,
             top + WorksheetRegions.SectionHeaderHeight - PageInk.HeavyRule / 2);
-    }
-
-    private static void DrawFooter(SKCanvas canvas, PageInk ink, string monthYear, DateOnly printedOn, float left, float right)
-    {
-        var footerY = WorksheetRegions.PageHeight - WorksheetRegions.MarginBottom + 18f;
-        canvas.DrawText($"Index · {monthYear} budget", left, footerY, ink.Secondary, ink.Muted);
-        // .folio .r — the date is mono and sits against the right margin.
-        canvas.DrawText($"printed {WorksheetDates.PrintedOn(printedOn)}", right, footerY, SKTextAlign.Right, ink.Mono, ink.Muted);
     }
 
     private static void DrawCalcRow(

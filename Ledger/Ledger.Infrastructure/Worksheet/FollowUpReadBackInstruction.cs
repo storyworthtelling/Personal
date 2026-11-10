@@ -38,7 +38,7 @@ public static class FollowUpReadBackInstruction
 
         if (targetYearMonth is not null)
         {
-            sb.Append("First check the small heading at the top-left of the page: it must read \"")
+            sb.Append("First check the small line at the foot of the page, left, beside the drawn mark: it must read \"")
                 .Append(FollowUpPainter.Heading(targetYearMonth))
                 .Append("\". If it names a different month, this is an old page left on the tablet and not the one ")
                 .Append("being read: respond with [] and nothing else. ");
