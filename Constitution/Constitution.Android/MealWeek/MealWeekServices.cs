@@ -93,7 +93,7 @@ public static class MealWeekServices
         if (prepared is MealWeekPreparation.Stop stop)
         {
             // The run never started, so it wrote no line of its own.
-            new BodyMealLog(new BodyLog(appContext)).Outcome(MealWeekTrail.LogPhrase(stop.Outcome));
+            new MealsLog(appContext).Outcome(MealWeekTrail.LogPhrase(stop.Outcome));
             return stop.Outcome;
         }
 
@@ -122,7 +122,7 @@ public static class MealWeekServices
             new FileMealPassStamps(Path.Combine(folder, StampFile)),
             token => TryRunAsync(appContext, token),
             token => TryDecideAsync(appContext, token),
-            new BodyMealLog(new BodyLog(appContext)),
+            new MealsLog(appContext),
             new FileDeliveredMealDocuments(Path.Combine(folder, DeliveredFile)),
             prepared is null ? null : MealRecipeHour.TabletPerson(prepared.Inputs.Rules, prepared.Inputs.DeliverFor),
             token => TryRecipesAsync(appContext, token),
@@ -148,7 +148,7 @@ public static class MealWeekServices
         cancellation.ThrowIfCancellationRequested();
 
         var appContext = context.ApplicationContext ?? context;
-        var log = new BodyMealLog(new BodyLog(appContext));
+        var log = new MealsLog(appContext);
         if (Prepare(appContext) is not MealWeekPreparation.Ready ready)
         {
             // No household setup: no rules and no tablet to name. A typed stop, tried again once the setup reads.
@@ -197,7 +197,7 @@ public static class MealWeekServices
         {
             // A kept week and no household setup: the rules (and so the zone) are unknown, so nothing is decided. A typed stop, tried again once the setup reads.
             var stopped = new MealDeadlineOutcome.Stopped(MealDeadlineStoppedBecause.NotConfigured, stop.Outcome.Sentence);
-            new BodyMealLog(new BodyLog(appContext)).Outcome(MealDeadlineTrail.LogPhrase(stopped));
+            new MealsLog(appContext).Outcome(MealDeadlineTrail.LogPhrase(stopped));
             return stopped;
         }
 
@@ -265,7 +265,7 @@ public static class MealWeekServices
 
         var household = ConstitutionHousehold.For(appContext);
         var folder = FolderOf(appContext);
-        var log = new BodyMealLog(new BodyLog(appContext));
+        var log = new MealsLog(appContext);
         var documents = AssembleDocuments(appContext);
         return new MealWeekSeams(
             household.Planning.OpenTheWeekAsync,
@@ -308,7 +308,7 @@ public static class MealWeekServices
             new HouseholdMealPantry(household.Service),
             new FileMonthlyBudgets(Path.Combine(NoBackupRoot(appContext), FileMonthlyBudgets.FileName)),
             new UnavailableHolidayCalendar(),
-            new BodyMealLog(new BodyLog(appContext)));
+            new MealsLog(appContext));
     }
 
     /// <summary>The record of decided weeks, a small file beside the kept weeks: the deadline step writes it, and the sheet and the Meals tab's share read the denied evenings' shopping lines from it (D112).</summary>
@@ -339,7 +339,7 @@ public static class MealWeekServices
             new HouseholdTemplateLibrary(household.Service),
             new HouseholdTasteNotes(household.Service),
             TasteJudgeServices.JudgeOf(appContext, new HouseholdRecipeBox(household.Service)),
-            new BodyMealLog(new BodyLog(appContext)),
+            new MealsLog(appContext),
             new MealDeadlineCalendar(calendar.CalendarWriter, calendar.EventEditor, calendar.WrittenKeys));
     }
 
@@ -349,9 +349,4 @@ public static class MealWeekServices
         context.NoBackupFilesDir?.AbsolutePath
             ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly meal run's records in.");
 
-    // The Body trail takes the run's value-free phrases as they are.
-    private sealed class BodyMealLog(BodyLog log) : IWorkoutWeekLog
-    {
-        public void Outcome(string phrase) => log.Outcome(phrase);
-    }
 }

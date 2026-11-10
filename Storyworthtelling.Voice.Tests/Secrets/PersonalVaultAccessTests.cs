@@ -147,13 +147,14 @@ public class PersonalVaultAccessTests
     /// An exception out of here would take a launch down over a backup.
     /// </summary>
     [Fact]
-    public async Task ADriveThatWillNotAnswerReadsAsEmptyRatherThanThrowing()
+    public async Task ADriveThatWillNotAnswerReadsAsUnreachableRatherThanThrowing()
     {
         var (access, drive) = Build();
         drive.Throws = true;
 
+        // Unreachable, not Empty: "no backup" and "Drive refused" are different answers (audit 08 §8).
         Assert.Equal(
-            PersonalVaultStatus.Empty,
+            PersonalVaultStatus.Unreachable,
             (await access.LoadAsync(CancellationToken.None)).Status);
 
         Assert.False(await access.PublishAsync(
@@ -193,5 +194,31 @@ public class PersonalVaultAccessTests
 
         Assert.NotNull(drive.Content);
         Assert.DoesNotContain("the-refresh-token", drive.Content!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AVaultThatCannotBeReachedSaysSoRatherThanEmpty()
+    {
+        // Score's TIDAL restore could not tell "no backup" from "Drive refused" (audit 08 §8).
+        var lines = new List<(bool Problem, string Line)>();
+        var drive = new InMemoryDrive { Throws = true };
+        var access = new PersonalVaultAccess(new DrivePersonalVaultStore(drive), () => Passphrase, (p, l) => lines.Add((p, l)));
+
+        var result = await access.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(PersonalVaultStatus.Unreachable, result.Status);
+        Assert.Equal([(true, "VAULT personal restore: Unreachable (System.Net.Http.HttpRequestException)")], lines);
+    }
+
+    [Fact]
+    public async Task APublishThatFailsIsTrailed()
+    {
+        var lines = new List<(bool Problem, string Line)>();
+        var drive = new InMemoryDrive { Throws = true };
+        var access = new PersonalVaultAccess(new DrivePersonalVaultStore(drive), () => Passphrase, (p, l) => lines.Add((p, l)));
+
+        Assert.False(await access.PublishAsync(v => v, CancellationToken.None));
+
+        Assert.Equal([(true, "VAULT personal publish: WriteFailed (System.Net.Http.HttpRequestException)")], lines);
     }
 }

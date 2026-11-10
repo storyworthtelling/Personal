@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Android.Runtime;
 using Java.Interop;
 
@@ -316,7 +317,7 @@ internal static class TidalKotlinBridge
                 var resultRef = JniEnvironment.StaticMethods.CallStaticObjectMethod(type, method);
                 if (!resultRef.IsValid)
                 {
-                    Android.Util.Log.Warn(LogTag, $"\"{className}.{methodName}\" returned null (not necessarily " +
+                    HeadLog.Warn(LogTag, $"\"{className}.{methodName}\" returned null (not necessarily " +
                         "wrong — check whether null is a valid result for this specific method).");
                     return null;
                 }

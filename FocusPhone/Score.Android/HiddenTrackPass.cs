@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Claude;
 using Storyworthtelling.Google.Android;
 using global::Google.Apis.Auth.OAuth2;
 using global::Google.Apis.Drive.v3;
@@ -79,7 +80,8 @@ public sealed class HiddenTrackPass
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            // Unnamed rather than unsplit.
+            // Unnamed rather than unsplit, but the failed call is kept (audit 08 §12).
+            AudioDiagnostics.LogWarning("HiddenTrack", ClaudeCallLine.Failed("hidden-track-name", e));
         }
 
         return HiddenTrackSplit.Apply(track, segments, hiddenTitle);

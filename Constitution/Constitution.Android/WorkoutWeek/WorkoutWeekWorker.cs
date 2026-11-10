@@ -48,6 +48,7 @@ public class WorkoutWeekWorker : Worker
         {
             // The type name is the whole report; the next morning tries again on its own.
             new BodyLog(context).Outcome($"workout week worker failed: {e.GetType().Name}");
+            HeadDiagnostics.Current?.Quiet("Worker", "WorkoutWeekWorker failed", e);
             return Result.InvokeFailure();
         }
     }
@@ -95,6 +96,7 @@ public class WorkoutWeekWorker : Worker
             catch (Exception e)
             {
                 new BodyLog(application).Outcome($"workout week worker failed: {e.GetType().Name}");
+                HeadDiagnostics.Current?.Quiet("Worker", "WorkoutWeekWorker failed", e);
             }
         });
     }

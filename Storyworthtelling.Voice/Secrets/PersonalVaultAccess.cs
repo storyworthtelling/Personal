@@ -1,3 +1,5 @@
+using Storyworthtelling.Diagnostics;
+
 namespace Storyworthtelling.Voice.Secrets;
 
 /// <summary>
@@ -23,29 +25,39 @@ public sealed class PersonalVaultAccess
 {
     private readonly DrivePersonalVaultStore store;
     private readonly Func<string?> passphrase;
+    private readonly Action<bool, string>? trail;
 
-    public PersonalVaultAccess(DrivePersonalVaultStore store, Func<string?> passphrase)
+    /// <param name="trail">Told every restore and publish outcome as one <see cref="VaultTrail"/> line.</param>
+    public PersonalVaultAccess(DrivePersonalVaultStore store, Func<string?> passphrase, Action<bool, string>? trail = null)
     {
         this.store = store;
         this.passphrase = passphrase;
+        this.trail = trail;
     }
+
+    private void Tell((bool Problem, string Line) line) => trail?.Invoke(line.Problem, line.Line);
 
     public async Task<PersonalVaultLoadResult> LoadAsync(CancellationToken cancellationToken)
     {
         var pass = passphrase();
         if (string.IsNullOrEmpty(pass))
         {
+            Tell(VaultTrail.Restored(VaultTrail.Personal, "NoPassphrase"));
             return PersonalVaultLoadResult.Empty;
         }
 
         try
         {
-            return await store.LoadAsync(pass, cancellationToken);
+            var result = await store.LoadAsync(pass, cancellationToken);
+            Tell(VaultTrail.Restored(VaultTrail.Personal, result.Status.ToString()));
+            return result;
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            // No Drive scope, no network. The head keeps its local copy either way.
-            return PersonalVaultLoadResult.Empty;
+            // No Drive scope, no network. The head keeps its local copy either way, and is told it was not reached
+            // rather than that there was nothing there.
+            Tell(VaultTrail.Restored(VaultTrail.Personal, "Unreachable", e));
+            return PersonalVaultLoadResult.Unreachable;
         }
     }
 
@@ -60,6 +72,7 @@ public sealed class PersonalVaultAccess
         var pass = passphrase();
         if (string.IsNullOrEmpty(pass))
         {
+            Tell(VaultTrail.Published(VaultTrail.Personal, "NoPassphrase"));
             return false;
         }
 
@@ -71,10 +84,12 @@ public sealed class PersonalVaultAccess
                 var loaded = await store.LoadAsync(pass, cancellationToken);
                 if (loaded.Status is PersonalVaultStatus.WrongPassphrase or PersonalVaultStatus.Corrupt)
                 {
+                    Tell(VaultTrail.Published(VaultTrail.Personal, "VaultUnreadable"));
                     return false;
                 }
 
                 await store.SaveAsync(merge(loaded.Vault), pass, loaded, cancellationToken);
+                Tell(VaultTrail.Published(VaultTrail.Personal, "Published"));
                 return true;
             }
             catch (VaultWriteException e) when (e.IsConflict && attempt < SecretsVaultService.MaxConflictRetries)
@@ -82,6 +97,7 @@ public sealed class PersonalVaultAccess
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
+                Tell(VaultTrail.Published(VaultTrail.Personal, "WriteFailed", e));
                 return false;
             }
         }

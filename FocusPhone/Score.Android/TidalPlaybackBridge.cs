@@ -1,3 +1,4 @@
+using Codex.Ui;
 using Com.Tidal.Sdk.Player;
 using Com.Tidal.Sdk.Player.Common.Model;
 using Com.Tidal.Sdk.Player.Playbackengine.Model;
@@ -139,7 +140,7 @@ public sealed class TidalPlaybackBridge : Java.Lang.Object, IFlowCollector
         // IEvent interface first (implemented by both branches) sidesteps that.
         if (value is not IEvent evt)
         {
-            Android.Util.Log.Warn(LogTag, $"Emitted value is not an IEvent: {value}");
+            HeadLog.Warn(LogTag, $"Emitted value is not an IEvent: {value?.GetType().Name ?? "null"}");
             return;
         }
 
@@ -167,7 +168,7 @@ public sealed class TidalPlaybackBridge : Java.Lang.Object, IFlowCollector
         public ICoroutineContext Context => Kotlin.Coroutines.EmptyCoroutineContext.Instance!;
 
         public void ResumeWith(Java.Lang.Object result) =>
-            Android.Util.Log.Warn(logTag, $"Events.Collect's root continuation resumed with {result} — " +
+            HeadLog.Warn(logTag, $"Events.Collect's root continuation resumed with {result} — " +
                 "the events flow ended or was cancelled, which should not happen while the Player is alive.");
     }
 }

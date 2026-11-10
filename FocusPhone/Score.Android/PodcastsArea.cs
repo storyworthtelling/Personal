@@ -1048,6 +1048,9 @@ public sealed class PodcastsArea : ScoreArea
             var host = Uri.TryCreate(subscription.FeedUrl, UriKind.Absolute, out var uri)
                 ? uri.Host
                 : subscription.FeedUrl;
+            // A feed dead for weeks was a toast and nothing else (audit 08 §27). Host and type only: a feed address can
+            // carry a private token, so one that does not even parse is not written at all.
+            HeadLog.Info("Podcasts", $"feed {(uri is null ? "with an unreadable address" : uri.Host)} not refreshed: {e.GetType().Name}");
             return new FeedFetchResult(subscription, null, host);
         }
     }

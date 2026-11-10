@@ -123,6 +123,22 @@ public sealed class HeadDiagnostics
 
     public void Info(string source, string message) => Write(DiagnosticLevel.Info, source, message, null);
 
+    /// <summary>
+    /// A failure from code that may hold values (Body readings, meals): WARN with the type chain and frames, never the
+    /// exception's message (<see cref="ExceptionShape"/>, audit 08 §9).
+    /// </summary>
+    public void Quiet(string source, string message, Exception exception)
+    {
+        try
+        {
+            Log.Append(new DiagnosticEntry(DateTimeOffset.Now, DiagnosticLevel.Warning, source, message, ExceptionShape.Describe(exception)));
+        }
+        catch
+        {
+            // Diagnostics must never throw and mask the caller's own flow.
+        }
+    }
+
     /// <summary>A tap-watch verdict: the problem line with the last taps as its context (plan §4.1).</summary>
     public void Tap(TapVerdict verdict) => Write(DiagnosticLevel.Warning, "Tap", verdict.ToLogText(), null);
 
@@ -352,6 +368,26 @@ public static class HeadLog
         Android.Util.Log.Info(tag, message);
         HeadDiagnostics.Current?.Info(tag, message);
     }
+
+    /// <summary>A failure near secrets or values: WARN with types and frames, no message (audit 08 §9).</summary>
+    public static void Quiet(string tag, string message, Exception exception)
+    {
+        Android.Util.Log.Warn(tag, $"{message}: {ExceptionShape.TypeChain(exception)}");
+        HeadDiagnostics.Current?.Quiet(tag, message, exception);
+    }
+
+    /// <summary>A trail for a shared library that reports a problem flag and its words (the vault's, say).</summary>
+    public static Action<bool, string> Trail(string tag) => (problem, message) =>
+    {
+        if (problem)
+        {
+            Warn(tag, message);
+        }
+        else
+        {
+            Info(tag, message);
+        }
+    };
 }
 
 /// <summary>Turns a device-account sign-in that never came back into a NoReturn on the next screen resume.</summary>

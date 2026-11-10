@@ -469,9 +469,11 @@ public sealed class MusicLibrary(
                 });
             }
         }
-        catch
+        catch (Exception e)
         {
             // Ignore: restore is a convenience; the folder picker is always available.
+            // Kept by its shape, never its message (audit 08 §6, §28).
+            HeadLog.Quiet("Vault", "Music folder restore did not complete", e);
         }
     });
 
@@ -655,9 +657,11 @@ public sealed class MusicLibrary(
             await access.Service.PublishAsync(
                 v => v with { Music = new MusicSecrets(folderId) }, CancellationToken.None);
         }
-        catch
+        catch (Exception e)
         {
             // Best-effort: the vault picks the folder up on the next successful publish.
+            // Kept by its shape, never its message (audit 08 §6, §28).
+            HeadLog.Quiet("Vault", "Music folder backup did not complete", e);
         }
     }
 }

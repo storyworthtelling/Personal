@@ -48,6 +48,7 @@ public class ReadBackWorker : Worker
         {
             // The type name is the whole report; the next morning tries again on its own.
             log.Outcome($"ink read back worker failed: {e.GetType().Name}");
+            HeadDiagnostics.Current?.Quiet("Worker", "ReadBackWorker failed", e);
             return Result.InvokeFailure();
         }
     }
