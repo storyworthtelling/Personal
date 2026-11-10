@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper.Binder;
 using Foreword.Domain.Document;
 using Foreword.Infrastructure.Pdf;
 using UglyToad.PdfPig;
@@ -27,10 +28,10 @@ public class DayTabLinksTests
             }
 
             layout.Anchor(SectionTabs.Destination(section));
-            foreach (var tab in SectionTabs.Layout((float)layout.PageWidth, section))
+            foreach (var tab in BinderStrip.Layout((float)layout.PageWidth, 4, (int)section, SectionTabs.FirstTabTop))
             {
                 layout.LinkTo(tab.Left, tab.Top, tab.Width, tab.Height,
-                    SectionTabs.Destination(tab.Section));
+                    SectionTabs.Destination((DaySection)tab.Index));
             }
         }
 
@@ -82,7 +83,7 @@ public class DayTabLinksTests
 
         var page = document.GetPage(1);
         var sheet = ForewordSheet.Landscape;
-        var expected = SectionTabs.Layout(sheet.DesignWidth, DaySection.Day)
+        var expected = BinderStrip.Layout(sheet.DesignWidth, 4, (int)DaySection.Day, SectionTabs.FirstTabTop)
             .Select(tab => sheet.ToPage(new Storyworthtelling.Paper.SheetRect(tab.Left, tab.Top, tab.Width, tab.Height)))
             .ToList();
         var links = page.GetAnnotations()

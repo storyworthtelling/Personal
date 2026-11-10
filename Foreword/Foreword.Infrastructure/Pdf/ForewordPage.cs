@@ -2,6 +2,7 @@ using SkiaSharp;
 using Foreword.Domain.Brief;
 using Storyworthtelling.Time;
 using Storyworthtelling.Paper;
+using Storyworthtelling.Paper.Binder;
 
 namespace Foreword.Infrastructure.Pdf;
 
@@ -18,7 +19,7 @@ namespace Foreword.Infrastructure.Pdf;
 /// </summary>
 internal static class ForewordPage
 {
-    private const double MarkSize = 96;
+    private const double MarkSize = SheetFrame.ColophonMarkSize;
     private const double RuleHeight = 2;
 
     private static readonly SKColor Identity = AppIdentityTokens.ForewordSunrise;
@@ -160,18 +161,7 @@ internal static class ForewordPage
     /// </summary>
     private static void DrawMakersMark(SkiaPageLayout layout, bool hasContents)
     {
-        var markFont = SkiaPageLayout.Sans(PaperTypeScale.Label, bold: true);
-        var bottom = layout.BottomY;
-
-        var left = SkiaPageLayout.Margin + (layout.ContentWidth - MarkSize) / 2;
-        var top = bottom - MarkSize - 14;
-        layout.DrawOwnersMark(left, top, MarkSize,
-            SkiaPageLayout.Ground, SkiaPageLayout.Ink, SkiaPageLayout.Ink);
-
-        layout.DrawText("SET AND DELIVERED BY FOREWORD", markFont,
-            SkiaPageLayout.Margin, bottom - 12, layout.ContentWidth, 12,
-            TextAlign.TopCenter, SkiaPageLayout.InkMuted);
-
+        SheetFrame.Colophon(layout.Canvas, layout.Sheet, PageFurniture.Signature, (float)layout.BottomY, (float)layout.ContentWidth);
         _ = hasContents;
     }
 }

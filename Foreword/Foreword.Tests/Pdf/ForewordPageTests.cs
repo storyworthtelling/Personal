@@ -82,10 +82,11 @@ public class ForewordPageTests
     {
         var pdf = Path.Combine(Root(), "Foreword.Infrastructure", "Pdf");
         var page = File.ReadAllText(Path.Combine(pdf, "ForewordPage.cs"));
-        var layout = File.ReadAllText(Path.Combine(pdf, "SkiaPageLayout.cs"));
+        var frame = File.ReadAllText(Path.Combine(Root(), "..", "Storyworthtelling.Paper", "Binder", "SheetFrame.cs"));
 
-        Assert.Contains("DrawOwnersMark(", page, StringComparison.Ordinal);
-        Assert.Contains("OwnersMark.Draw(", layout, StringComparison.Ordinal);
+        // The cover's colophon is the shared one, which draws Folio's mark.
+        Assert.Contains("SheetFrame.Colophon(", page, StringComparison.Ordinal);
+        Assert.Contains("OwnersMark.Draw(", frame, StringComparison.Ordinal);
         Assert.DoesNotContain("Medallion", page, StringComparison.Ordinal);
     }
 

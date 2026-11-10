@@ -119,11 +119,7 @@ public class PdfComposer : IPdfComposer
             // to — the folio names the STORY's position, and a page two of a story is not a second
             // story. Skia closes a page and it is gone, so there is no stamping one on afterwards.
             var folio = $"{section} · {seen[section]} of {sections[section]}";
-            layout.Footer = page => page.DrawText(
-                folio, SkiaPageLayout.Sans(PaperTypeScale.Label),
-                SkiaPageLayout.Margin, page.BottomY, page.ContentWidth,
-                SkiaPageLayout.LineHeight(SkiaPageLayout.Sans(PaperTypeScale.Label)),
-                TextAlign.TopLeft, SkiaPageLayout.InkMuted);
+            layout.Footer = PageFurniture.Folio(folio, null);
 
             DrawArticle(layout, article);
         }

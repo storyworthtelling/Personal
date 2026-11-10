@@ -21,14 +21,11 @@ internal static class ComicPage
         var kickerFont = SkiaPageLayout.Sans(PaperTypeScale.Label, bold: true);
         var titleFont = SkiaPageLayout.Serif(PaperTypeScale.Heading);
         var altFont = SkiaPageLayout.Serif(PaperTypeScale.Body);
-        var folioFont = SkiaPageLayout.Sans(PaperTypeScale.Label);
 
         // The folio says what comes next, because a comic is the last thing before the puzzle and a
         // reader who has just finished the news wants to know whether there is more paper coming.
         var folio = crosswordFollows ? "xkcd · then the crossword" : "xkcd";
-        layout.Footer = page => page.DrawText(folio, folioFont,
-            SkiaPageLayout.Margin, page.BottomY, page.ContentWidth,
-            SkiaPageLayout.LineHeight(folioFont), TextAlign.TopLeft, SkiaPageLayout.InkMuted);
+        layout.Footer = PageFurniture.Folio(folio, null);
 
         layout.DrawWrapped($"XKCD · NO. {strip.Number}", kickerFont);
         layout.Advance(4);

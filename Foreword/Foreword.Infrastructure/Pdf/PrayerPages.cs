@@ -3,6 +3,7 @@ using Foreword.Domain.Document;
 using Foreword.Domain.Interfaces;
 using Foreword.Domain.Prayer;
 using Storyworthtelling.Paper;
+using Storyworthtelling.Paper.Binder;
 
 namespace Foreword.Infrastructure.Pdf;
 
@@ -263,24 +264,12 @@ public sealed class PrayerPages : IPrayerPdfComposer, IPrayerReader
     /// Both tabs on both pages, each page anchored, so the two are a tap apart on the tablet — the
     /// same grammar as The Day's four, through the same arithmetic.
     /// </summary>
-    private static void DrawTabs(SkiaPageLayout layout, PrayerSection active)
-    {
-        layout.Anchor(PrayerTabs.Destination(active));
+    private static void DrawTabs(SkiaPageLayout layout, PrayerSection active) =>
+        PageFurniture.DrawBinder(layout, Tabs, (int)active, PrayerTabs.FirstTabTop);
 
-        PageFurniture.DrawBinderEdge(layout, SectionTabs.BinderEdgeInset, SectionTabs.Hairline);
-
-        foreach (var tab in PrayerTabs.Layout((float)layout.PageWidth, active))
-        {
-            PageFurniture.DrawTab(
-                layout, tab.Left, tab.Top, tab.Width, tab.Height, tab.Active,
-                PrayerTabs.Label(tab.Section),
-                PrayerTabs.Destination(tab.Section),
-                Cloth(tab.Section),
-                Ink(tab.Section),
-                SectionTabs.Radius,
-                SectionTabs.Hairline);
-        }
-    }
+    private static readonly IReadOnlyList<BinderTab> Tabs = Enum.GetValues<PrayerSection>()
+        .Select(section => new BinderTab(PrayerTabs.Label(section), PrayerTabs.Destination(section), Cloth(section), Ink(section)))
+        .ToList();
 
     /// <summary>
     /// The list takes the identity, because it is the document's own page; the journal takes the
@@ -299,19 +288,6 @@ public sealed class PrayerPages : IPrayerPdfComposer, IPrayerReader
         _ => PaperPalette.ResolveRole(ColorRole.Resolved, ColorTier.Text, UiColorProfile.DocumentColor),
     };
 
-    private static Action<SkiaPageLayout> Folio(string name, int number) => page =>
-    {
-        var font = SkiaPageLayout.Sans(PaperTypeScale.Label);
-        var width = PageFurniture.ContentWidth(page);
-        var height = SkiaPageLayout.LineHeight(font);
-
-        page.DrawLine(SkiaPageLayout.Margin, page.BottomY - height - 6,
-            SkiaPageLayout.Margin + width, page.BottomY - height - 6, SkiaPageLayout.Hairline, 0.5f);
-
-        page.DrawText(name, font, SkiaPageLayout.Margin, page.BottomY - height, width, height,
-            TextAlign.TopLeft, SkiaPageLayout.InkMuted);
-        page.DrawText(number.ToString(System.Globalization.CultureInfo.InvariantCulture), font,
-            SkiaPageLayout.Margin, page.BottomY - height, width, height,
-            TextAlign.TopRight, SkiaPageLayout.InkMuted);
-    };
+    private static Action<SkiaPageLayout> Folio(string name, int number) =>
+        PageFurniture.Folio(name, number.ToString(System.Globalization.CultureInfo.InvariantCulture));
 }

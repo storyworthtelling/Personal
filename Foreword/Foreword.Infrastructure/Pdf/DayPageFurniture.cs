@@ -1,6 +1,7 @@
 using SkiaSharp;
 using Foreword.Domain.Document;
 using Storyworthtelling.Paper;
+using Storyworthtelling.Paper.Binder;
 
 namespace Foreword.Infrastructure.Pdf;
 
@@ -26,38 +27,22 @@ internal static class DayPageFurniture
     public static double ContentWidth(SkiaPageLayout layout) => PageFurniture.ContentWidth(layout);
 
     /// <summary>
-    /// Draws the header, the rule and the tab strip, anchors the page, and leaves the cursor under
-    /// the rule ready for the page's own content.
+    /// Draws the header, the rule and the tab strip, anchors the page, sets its folio, and leaves the cursor under the
+    /// rule ready for the page's own content.
     /// </summary>
     public static void Draw(SkiaPageLayout layout, DaySection section, string title)
     {
         PageFurniture.DrawHeader(layout, title);
-        DrawTabs(layout, section);
+        PageFurniture.DrawBinder(layout, Tabs, (int)section, SectionTabs.FirstTabTop);
+        layout.Footer = PageFurniture.Folio(
+            section == DaySection.Day ? "The Day · today" : $"The Day · {SectionTabs.Label(section).ToLowerInvariant()}",
+            ((int)section + 1).ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
-    /// <summary>
-    /// The binder strip. Every page draws all four tabs and anchors itself, so the strip is the same
-    /// on every sheet and the three it is not on are a tap away.
-    /// </summary>
-    private static void DrawTabs(SkiaPageLayout layout, DaySection active)
-    {
-        // The page's own name, so the other three pages' links land here.
-        layout.Anchor(SectionTabs.Destination(active));
-
-        PageFurniture.DrawBinderEdge(layout, SectionTabs.BinderEdgeInset, SectionTabs.Hairline);
-
-        foreach (var tab in SectionTabs.Layout((float)layout.PageWidth, active))
-        {
-            PageFurniture.DrawTab(
-                layout, tab.Left, tab.Top, tab.Width, tab.Height, tab.Active,
-                SectionTabs.Label(tab.Section),
-                SectionTabs.Destination(tab.Section),
-                Cloth(tab.Section),
-                Ink(tab.Section),
-                SectionTabs.Radius,
-                SectionTabs.Hairline);
-        }
-    }
+    /// <summary>All four tabs, in bound order: every page draws the whole strip, so the three it is not on are a tap away.</summary>
+    private static readonly IReadOnlyList<BinderTab> Tabs = Enum.GetValues<DaySection>()
+        .Select(section => new BinderTab(SectionTabs.Label(section), SectionTabs.Destination(section), Cloth(section), Ink(section)))
+        .ToList();
 
     /// <summary>
     /// The cloth an inactive tab is cut from (§9: tabs are colour-coded per area). Day takes the
