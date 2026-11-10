@@ -61,10 +61,16 @@ public sealed class AnalysisDocumentRenderer
         var draft = review ?? DraftReview.FirstDraft;
 
         IReadOnlyList<(string Title, int Page)> relative;
+        IReadOnlyList<ReportSection> sections;
+        IReadOnlyList<int> readers;
         using (var probe = new PageWriter(foot))
         {
-            RenderContent(analysis, titled, scenes, draft, probe, manuscript, chapters);
+            RenderContent(analysis, titled, scenes, draft, probe, manuscript, chapters, readerFolios: null);
             relative = probe.TocEntries.ToList();
+            // The parts that printed get a binder tab each; the folio each reader started on goes to the readers'
+            // contents, so a reader whose pros and cons ran onto a second sheet does not shift every pointer after it.
+            sections = probe.SectionsBegun.ToList();
+            readers = probe.ReaderFolios.ToList();
             probe.Finish();
         }
 
@@ -79,17 +85,18 @@ public sealed class AnalysisDocumentRenderer
 
         var entries = relative.Select(entry => (entry.Title, entry.Page + frontMatter)).ToList();
 
-        using var document = new PageWriter(foot);
+        using var document = new PageWriter(foot, sections);
         covers.AnalysisCover(document, titled);
         covers.AnalysisToc(document, entries);
         document.NewPage();
-        RenderContent(analysis, titled, scenes, draft, document, manuscript, chapters);
+        RenderContent(analysis, titled, scenes, draft, document, manuscript, chapters,
+            readerFolios: [.. readers.Select(folio => folio + frontMatter)]);
         return new AnalysisRenderResult(document.Finish(), frontMatter, entries);
     }
 
     private static void RenderContent(
         BookAnalysisResult analysis, ReportCover cover, IReadOnlyList<SceneEvidence> scenes, DraftReview review,
-        PageWriter writer, string? manuscript, IReadOnlyList<ChapterSpan>? chapters)
+        PageWriter writer, string? manuscript, IReadOnlyList<ChapterSpan>? chapters, IReadOnlyList<int>? readerFolios)
     {
         using var body = ReportType.Body();
         using var bodyBold = ReportType.BodyBold();
@@ -98,6 +105,7 @@ public sealed class AnalysisDocumentRenderer
         using var h2 = ReportType.Section();
         using var h3 = ReportType.Heading();
 
+        writer.BeginSection(FolioSheet.Frame);
         writer.Heading("The frame", h1, Ink, ruled: true);
         writer.Paragraph("Revision report — a candid second read to help you revise toward publication.", bodyItalic, Muted);
 
@@ -180,7 +188,7 @@ public sealed class AnalysisDocumentRenderer
 
         RenderMarkedManuscript(writer, text, marked.Marks, scenes, bodyItalic, h2);
 
-        RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3);
+        RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3, readerFolios);
 
         // What to do next: the revision plan, grouped by impact tier.
         RenderRevisionPlan(writer, analysis.RevisionPlan, body, h2, h3);
@@ -206,6 +214,7 @@ public sealed class AnalysisDocumentRenderer
         // a scene's block is a reading too, so a book with scenes and no marks still prints.
         if (!string.IsNullOrWhiteSpace(manuscript) && (marks.Count > 0 || scenes.Count > 0))
         {
+            writer.BeginSection(FolioSheet.Manuscript);
             writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
             writer.Paragraph(
                 "Your pages with the findings on them. A caret is something missing, a struck line is "
@@ -217,9 +226,9 @@ public sealed class AnalysisDocumentRenderer
 
             MarkedManuscript.Render(writer, manuscript, marks, scenes);
 
-            // Whatever follows starts on its own sheet. After a hundred and forty pages of marked
-            // prose, a section heading four lines under the last one reads as part of the book.
-            writer.NewPage();
+            // Whatever follows starts on its own sheet: after a hundred and forty pages of marked prose, a heading four
+            // lines under the last one reads as part of the book. Every part after it (readers, plan, verdict) turns its
+            // own sheet, so turning one here as well left a blank page between them.
             return;
         }
 
@@ -228,6 +237,7 @@ public sealed class AnalysisDocumentRenderer
         if (scenes.Count == 0)
             return;
 
+        writer.BeginSection(FolioSheet.Manuscript);
         writer.Heading("Scenes", h2, Ink, ruled: true);
         foreach (var scene in scenes)
             MarkedManuscript.DrawSceneBlock(writer, scene);
@@ -316,6 +326,7 @@ public sealed class AnalysisDocumentRenderer
         if (blocks.Count == 0)
             return;
 
+        writer.BeginSection(FolioSheet.Notes);
         writer.Heading("Whole-book notes", h2, Ink, ruled: true);
         writer.Paragraph(
             "What the book is doing as a whole. Anything tied to a line — a plot hole, a line edit, a "
@@ -419,12 +430,12 @@ public sealed class AnalysisDocumentRenderer
     /// </summary>
     private static void RenderReviews(
         PageWriter writer, IReadOnlyList<Review> reviews, SKFont body, SKFont bodyBold, SKFont bodyItalic,
-        SKFont h2, SKFont h3)
+        SKFont h2, SKFont h3, IReadOnlyList<int>? readerFolios)
     {
         if (reviews is not { Count: > 0 })
             return;
 
-        RenderReadersContents(writer, reviews, body);
+        RenderReadersContents(writer, reviews, body, readerFolios);
 
         for (var i = 0; i < reviews.Count; i++)
         {
@@ -441,9 +452,10 @@ public sealed class AnalysisDocumentRenderer
     /// kind of summary that teaches an author to stop believing the document.</para>
     /// </summary>
     private static void RenderReadersContents(
-        PageWriter writer, IReadOnlyList<Review> reviews, SKFont body)
+        PageWriter writer, IReadOnlyList<Review> reviews, SKFont body, IReadOnlyList<int>? readerFolios)
     {
         writer.NewPage();
+        writer.BeginSection(FolioSheet.Readers);
         writer.PageLabel($"{Spell(reviews.Count)} readers");
         writer.Paragraph(
             $"{Capitalize(Spell(reviews.Count))} full reviews follow, one to a page. Each read the whole book in "
@@ -460,7 +472,7 @@ public sealed class AnalysisDocumentRenderer
             var review = reviews[i];
             writer.ContentsRow(
                 i + 1, PersonaName(review.PersonaId), Lens(review.PersonaId), review.Verdict,
-                firstReaderFolio + i);
+                readerFolios is { } measured && i < measured.Count ? measured[i] : firstReaderFolio + i);
             if (i < reviews.Count - 1)
                 writer.Hairline();
         }
@@ -485,6 +497,7 @@ public sealed class AnalysisDocumentRenderer
         PageWriter writer, Review review, int index, int of, SKFont body, SKFont h3)
     {
         writer.NewPage();
+        writer.BeginReader();
         writer.PageLabel($"Reader {index} of {Spell(of)}", Lens(review.PersonaId));
 
         writer.Heading(PersonaName(review.PersonaId), h3, Ink);
@@ -499,7 +512,8 @@ public sealed class AnalysisDocumentRenderer
             writer.Hairline();
             writer.ProsAndCons(
                 "What works, for me", review.Strengths ?? [],
-                "What does not", review.Weaknesses ?? []);
+                "What does not", review.Weaknesses ?? [],
+                reserve: string.IsNullOrWhiteSpace(review.Condition) ? 0f : writer.FooterHeight("Would need", review.Condition, body));
         }
 
         if (!string.IsNullOrWhiteSpace(review.Condition))
@@ -559,6 +573,7 @@ public sealed class AnalysisDocumentRenderer
             return;
 
         writer.NewPage();
+        writer.BeginSection(FolioSheet.Plan);
         writer.PageLabel("What to do about it");
 
         writer.Tally(
@@ -637,6 +652,7 @@ public sealed class AnalysisDocumentRenderer
             return;
 
         writer.NewPage();
+        writer.BeginSection(FolioSheet.Verdict);
         writer.PageLabel("Verdict");
 
         if (!string.IsNullOrWhiteSpace(verdict.Standing))

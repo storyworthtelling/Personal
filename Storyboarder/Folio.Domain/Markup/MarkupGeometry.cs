@@ -19,7 +19,7 @@ public static class MarkupGeometry
 {
     /// <summary>
     /// The report's content box — <see cref="PageGeometry"/>'s, not a second copy of it. The drawn
-    /// page measures 489 × 732 because that is what 595 × 842 comes to inside the report's margins.
+    /// box is whatever the tablet page leaves inside the shared frame's margins.
     /// </summary>
     public const double ContentWidth = PageGeometry.ContentWidth;
 
@@ -29,14 +29,14 @@ public static class MarkupGeometry
     public const double TextWidth = 316;
 
     /// <summary>The note column.</summary>
-    public const double MarginWidth = 143;
+    public const double MarginWidth = ContentWidth - TextWidth - Gutter;
 
     /// <summary>
     /// Air between the prose and the notes about it, where the leaders run. Whatever the box has
     /// left, so the three always tile it exactly and a rounded margin cannot push the notes off the
     /// sheet.
     /// </summary>
-    public const double Gutter = ContentWidth - TextWidth - MarginWidth;
+    public const double Gutter = 30.4;
 
     /// <summary>Where the note column starts, measured from the content box's left edge.</summary>
     public const double MarginLeft = TextWidth + Gutter;

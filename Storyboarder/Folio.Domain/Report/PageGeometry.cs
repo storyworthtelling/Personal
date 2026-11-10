@@ -9,25 +9,30 @@ namespace Folio.Domain.Report;
 /// page's own unit. Nothing here is converted at draw time; these <i>are</i> the numbers the canvas
 /// takes.</para>
 ///
-/// <para>The margins are the drawn ones (52.8 / 48 / 62.4), which leave a 489.4 × 731.6 content
-/// column — the measure the report's type ladder was set against. The folio sits 30pt off the foot,
-/// below the content box rather than inside it, so a page that fills its column cannot run into its
-/// own page number.</para>
+/// <para>The page is the tablet's own and wears the frame every tablet document shares (owner's decision): the board
+/// is A4's height, as wide as the 445 × 594 glass is at A4's scale (630.8 points), so the binder tabs sit at the glass's
+/// edge. The margins are the frame's — 54 at the left and foot, the 38-point tab gutter at the right — and the content
+/// starts under the frame's header, which signs every page. The folio sits in the bottom margin, below the content box,
+/// so a page that fills its column cannot run into its own page number.</para>
 /// </summary>
 public static class PageGeometry
 {
-    public const float PageWidth = 595f;    // A4
     public const float PageHeight = 842f;
+    public const float PageWidth = PageHeight * 445f / 594f;
 
-    public const float SideMargin = 52.8f;
-    public const float TopMargin = 48f;
-    public const float BottomMargin = 62.4f;
+    /// <summary>The shared frame's left margin (<c>SheetFrame.Margin</c>).</summary>
+    public const float SideMargin = 54f;
 
-    /// <summary>Baseline of the running foot, measured up from the foot of the sheet.</summary>
-    public const float FolioBaseline = 30f;
+    /// <summary>The shared frame's tab gutter (<c>BinderStrip.Gutter</c>): the content stops clear of the tabs.</summary>
+    public const float RightMargin = 38f;
+
+    /// <summary>Under the frame's header (the book's title, "Folio" in the owner's hand, the rule) and its clear space.</summary>
+    public const float TopMargin = 98f;
+
+    public const float BottomMargin = 54f;
 
     public const float ContentLeft = SideMargin;
-    public const float ContentRight = PageWidth - SideMargin;
+    public const float ContentRight = PageWidth - RightMargin;
     public const float ContentWidth = ContentRight - ContentLeft;
     public const float ContentTop = TopMargin;
     public const float ContentBottom = PageHeight - BottomMargin;

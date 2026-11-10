@@ -110,6 +110,54 @@ public class ReaderPagesTests
         Assert.DoesNotContain(pages, page => page.Contains("READERS", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    /// The owner's report: the pros and cons under a long read ran off the foot of the page and were cut off. A reader
+    /// whose review nearly fills the sheet, with long lists, must print every item above the foot — the block continues
+    /// on the next sheet with its labels again — and the readers' contents must still send the author to each reader's
+    /// own first page.
+    /// </summary>
+    [Fact]
+    public void ALongReadsProsAndConsAreNeverCutOffAtTheFoot()
+    {
+        var long_ = string.Join("\n\n", Enumerable.Range(1, 9).Select(i =>
+            $"Paragraph {i} of a long read. It goes on for several sentences, because a reader in character takes the room "
+            + "the book gives them, and the page has to hold whatever they wrote rather than the length a test expected."));
+        IReadOnlyList<string> Many(string what) =>
+            [.. Enumerable.Range(1, 8).Select(i => $"{what} {i}: a point made at length, so the column wraps onto two lines or three.")];
+        var reads = Reads().Select((read, i) => i == 1 ? read with { Assessment = long_, Strengths = Many("Works"), Weaknesses = Many("Fails") } : read).ToList();
+
+        var pdf = Render(reads);
+        using var document = PdfDocument.Open(new MemoryStream(pdf));
+        var all = string.Join(" ", document.GetPages().SelectMany(page => page.GetWords()).Select(word => word.Text));
+        for (var i = 1; i <= 8; i++)
+        {
+            Assert.Contains($"Works {i}:", all, StringComparison.Ordinal);
+            Assert.Contains($"Fails {i}:", all, StringComparison.Ordinal);
+        }
+
+        // Every pro and con sits above the content box's foot, on the sheet: none is drawn into the folio or off the page.
+        var footInPdf = (float)document.GetPage(1).Height - Folio.Domain.Report.PageGeometry.ContentBottom * Folio.Infrastructure.Imaging.FolioSheet.Page.Scale;
+        foreach (var page in document.GetPages())
+        {
+            var past = page.GetWords()
+                .Where(word => word.Text is "Works" or "Fails" or "point" or "wraps" or "lines" or "three.")
+                .Where(word => word.BoundingBox.Bottom < footInPdf - 0.5)
+                .ToList();
+            Assert.True(past.Count == 0, $"page {page.Number}: '{string.Join(" ", past.Select(w => w.Text))}' runs past the foot");
+        }
+
+        var pages = PagesOf(pdf);
+        var folios = FoliosOf(pdf);
+        var contents = pages.FindIndex(page => page.Contains("READERS", StringComparison.OrdinalIgnoreCase)
+            && page.Contains(BookLines.Spell(PersonaCatalogue.Readers.Count), StringComparison.OrdinalIgnoreCase));
+        foreach (var persona in PersonaCatalogue.Readers)
+        {
+            var turned = folios.IndexOf(Pointer(pages[contents], persona.Name));
+            Assert.True(turned >= 0);
+            Assert.Contains(persona.Name, pages[turned], StringComparison.Ordinal);
+        }
+    }
+
     private static byte[] Render(IReadOnlyList<Review> reviews) =>
         new AnalysisDocumentRenderer().Render(
             SampleAnalysis.Of() with { Reviews = reviews }, Cover, Array.Empty<SceneEvidence>());

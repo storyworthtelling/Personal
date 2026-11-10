@@ -15,7 +15,6 @@ public class TabletDocumentsWearTheFrameTests
     /// </summary>
     private static readonly HashSet<string> NotYetFramed = new(StringComparer.Ordinal)
     {
-        "Storyboarder/Folio.Infrastructure/Imaging/PageWriter.cs",            // step 4, Folio
     };
 
     /// <summary>The one place a page begins: the sink itself, and Foreword's layout, whose callers draw the frame.</summary>
