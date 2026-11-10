@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper.Binder;
 using Foreword.Domain.Prayer;
 using Foreword.Infrastructure.Pdf;
 using UglyToad.PdfPig;
@@ -141,8 +142,8 @@ public class PrayerPagesTests
     {
         using var document = PdfDocument.Open(new MemoryStream(Composed()));
 
-        var stripLeft = (Sheet.DesignWidth - Foreword.Domain.Document.SectionTabs.TabWidth
-            - Foreword.Domain.Document.SectionTabs.Hairline) * Sheet.Scale;
+        var stripLeft = (Sheet.DesignWidth - BinderStrip.TabWidth
+            - BinderStrip.Hairline) * Sheet.Scale;
 
         var offenders = new List<string>();
 

@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper.Binder;
 using Foreword.Domain.Calendar;
 using Foreword.Domain.Document;
 using Foreword.Domain.Models;
@@ -30,7 +31,7 @@ public class DayPageBoundsTests
     // The strip's left edge, in PDF coordinates: the active tab reaches one hairline further in
     // than the rest, and nothing but the tabs themselves may cross it.
     private static readonly double TabStripLeft =
-        (ForewordSheet.Landscape.DesignWidth - SectionTabs.TabWidth - SectionTabs.Hairline) * ForewordSheet.Landscape.Scale;
+        (ForewordSheet.Landscape.DesignWidth - BinderStrip.TabWidth - BinderStrip.Hairline) * ForewordSheet.Landscape.Scale;
 
     [Fact]
     public void NoTextRunsOffThePage()

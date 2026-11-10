@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper.Binder;
 using Foreword.Domain.Prayer;
 using Xunit;
 
@@ -67,7 +68,7 @@ public class JournalRegionsTests
         {
             Assert.True(region.Left >= 0);
             Assert.True(region.Top >= 0);
-            Assert.True(region.Left + region.Width <= Width - Domain.Document.SectionTabs.TabWidth);
+            Assert.True(region.Left + region.Width <= Width - BinderStrip.TabWidth);
             Assert.True(region.Top + region.Height <= Height);
             Assert.True(region.Height > 0);
         }

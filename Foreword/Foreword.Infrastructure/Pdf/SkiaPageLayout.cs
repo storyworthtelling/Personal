@@ -1,5 +1,6 @@
 using SkiaSharp;
 using Storyworthtelling.Paper;
+using Storyworthtelling.Paper.Binder;
 
 namespace Foreword.Infrastructure.Pdf;
 
@@ -19,28 +20,34 @@ internal enum TextAlign { TopLeft, TopCenter, TopRight, Center }
 // different. Ground stays white (the newspaper look).
 internal sealed class SkiaPageLayout : IDisposable
 {
-    public const double Margin = 54; // 0.75 inch in points
+    public const double Margin = SheetFrame.Margin; // 0.75 inch in points, the frame every tablet document shares
 
     // The sheets go to the owner's reMarkable Paper Pro. Ink, the muted ink and the hairline come
     // from the shared palette at that profile rather than from Skia's named colours: the bible's ink
     // is a warm near-black and its hairline a paper cream, and the pure black on pure grey the
     // composers used is a colder document that merely looks plausible.
-    public static readonly SKColor Ink = PaperPalette.Resolve(PaperRole.Ink, DeviceColorProfile.PaperPro);
-    public static readonly SKColor InkMuted = PaperPalette.Resolve(PaperRole.InkMuted, DeviceColorProfile.PaperPro);
-    public static readonly SKColor InkSoft = PaperPalette.Resolve(PaperRole.InkSoft, DeviceColorProfile.PaperPro);
-    public static readonly SKColor Hairline = PaperPalette.Resolve(PaperRole.Hairline, DeviceColorProfile.PaperPro);
+    public static readonly SKColor Ink = SheetFrame.Ink;
+    public static readonly SKColor InkMuted = SheetFrame.InkMuted;
+    public static readonly SKColor InkSoft = SheetFrame.InkSoft;
+    public static readonly SKColor Hairline = SheetFrame.Hairline;
 
     // The sheet itself. It was white — the newspaper look, decided rather than inherited — and the
     // owner has since chosen the device's own warm ground instead, so a page in the hand and the
     // same page on the tablet are the same colour rather than two shades of nearly-white lying
     // next to each other.
-    public static readonly SKColor Ground = PaperPalette.Resolve(PaperRole.Ground, DeviceColorProfile.PaperPro);
+    public static readonly SKColor Ground = SheetFrame.Ground;
 
     private readonly VectorPdfSink sink = new();
 
     private readonly TabletSheet sheet;
 
     private SKCanvas canvas = null!;
+
+    /// <summary>The open page's canvas, for the shared frame (<see cref="SheetFrame"/>) to draw on.</summary>
+    internal SKCanvas Canvas => canvas;
+
+    /// <summary>The sheet this layout's pages are placed on.</summary>
+    internal TabletSheet Sheet => sheet;
 
     public double PageWidth { get; }
     public double PageHeight { get; }
@@ -223,56 +230,6 @@ internal sealed class SkiaPageLayout : IDisposable
             canvas.DrawRect(rect, strokePaint);
         }
     }
-
-    /// <summary>
-    /// A rectangle with rounded corners on <b>one side only</b>, which is the binder-tab shape
-    /// (§10): square on the page side so the seam closes, rounded on the outer side.
-    /// </summary>
-    public void DrawTabRect(double x, double y, double w, double h,
-        float radius, bool roundRight, SKColor fill, SKColor stroke, float strokeWidth)
-    {
-        var rect = Rect(x, y, w, h);
-        var zero = new SKPoint(0, 0);
-        var round = new SKPoint(radius, radius);
-
-        // Clockwise from the top left, as SKRoundRect takes them.
-        var corners = roundRight
-            ? new[] { zero, round, round, zero }
-            : new[] { round, zero, zero, round };
-
-        using var shape = new SKRoundRect();
-        shape.SetRectRadii(rect, corners);
-
-        using var fillPaint = new SKPaint { Color = fill, IsAntialias = true, Style = SKPaintStyle.Fill };
-        canvas.DrawRoundRect(shape, fillPaint);
-
-        using var strokePaint = new SKPaint
-        {
-            Color = stroke, StrokeWidth = strokeWidth, IsAntialias = true, Style = SKPaintStyle.Stroke,
-        };
-        canvas.DrawRoundRect(shape, strokePaint);
-    }
-
-    /// <summary>
-    /// Draws <paramref name="draw"/> rotated about a point, with the origin moved there — for a
-    /// label that runs down a tab. The canvas state is saved and restored, so a caller cannot leave
-    /// the page rotated for everything after it.
-    /// </summary>
-    public void Rotated(double x, double y, float degrees, Action draw)
-    {
-        canvas.Save();
-        canvas.Translate((float)x, (float)y);
-        canvas.RotateDegrees(degrees);
-        draw();
-        canvas.Restore();
-    }
-
-    /// <summary>
-    /// The owner's drawn mark (§13) — the canted oval pierced by an M, the same mark Folio's report
-    /// covers carry — in a <paramref name="size"/>-point box.
-    /// </summary>
-    public void DrawOwnersMark(double x, double y, double size, SKColor ground, SKColor line, SKColor ink) =>
-        OwnersMark.Draw(canvas, Rect(x, y, size, size), ground, line, ink);
 
     public void DrawImage(byte[] png, double x, double y, double w, double h)
     {
