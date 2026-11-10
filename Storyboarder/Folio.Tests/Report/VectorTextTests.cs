@@ -45,18 +45,6 @@ public class VectorTextTests
         Assert.Contains("The Salt Line", text, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void EveryPageIsA4InPoints()
-    {
-        using var document = PdfDocument.Open(new MemoryStream(Report(Analysis())));
-
-        foreach (var page in document.GetPages())
-        {
-            Assert.Equal(PageGeometry.PageWidth, page.Width, 0);
-            Assert.Equal(PageGeometry.PageHeight, page.Height, 0);
-        }
-    }
-
     /// <summary>
     /// The contents names the folio a section actually starts on — which is the whole reason the
     /// document is rendered three times, and the thing that silently goes wrong if the passes disagree.

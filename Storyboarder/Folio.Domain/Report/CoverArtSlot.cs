@@ -38,7 +38,8 @@ public static class CoverArtSlot
     /// </summary>
     public static SlotRect Place(float top)
     {
-        var left = PageGeometry.PageWidth / 2f - Width / 2f;
+        // Centred in the content column, which the tab gutter makes narrower at the right than at the left.
+        var left = (PageGeometry.ContentLeft + PageGeometry.ContentRight) / 2f - Width / 2f;
         return new SlotRect(left, top, left + Width, top + Height);
     }
 

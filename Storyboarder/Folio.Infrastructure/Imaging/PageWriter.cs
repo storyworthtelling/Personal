@@ -34,7 +34,6 @@ internal sealed class PageWriter : IDisposable
     /// <summary>The grain tile was sized for a 150-DPI page; this keeps it the same size on paper.</summary>
     private const float GrainScale = 72f / 150f;
 
-    private readonly string runningFoot;
     // The report's pictures are evidence, drawn a few inches wide on an e-ink page. Written losslessly,
     // 67 scene illustrations made a 173 MB file; as JPEG at this quality the whole report is a few tens.
     private const int PictureQuality = 80;
@@ -42,16 +41,54 @@ internal sealed class PageWriter : IDisposable
     private readonly VectorPdfSink sink = new(PictureQuality);
     private readonly List<(string Title, int Page)> tocEntries = [];
 
+    private readonly string header;
+    private readonly IReadOnlyList<ReportSection> tabSections;
+    private readonly IReadOnlyList<Storyworthtelling.Paper.Binder.BinderTab> tabs;
+    private readonly List<ReportSection> begun = [];
+    private readonly List<int> readerFolios = [];
+
     private SKCanvas canvas = null!;
+    private ReportSection? pageSection;
+    private ReportSection? currentSection;
     private bool folioSuppressed;
     private int finishedPages;
     private float y;
 
-    public PageWriter(string runningFoot)
+    /// <param name="runningFoot">The book's title and draft: the header every page after the cover is signed under.</param>
+    /// <param name="sections">The report's parts that have a tab, in order (a measuring pass passes none).</param>
+    public PageWriter(string runningFoot, IReadOnlyList<ReportSection>? sections = null)
     {
-        this.runningFoot = runningFoot;
+        header = runningFoot;
+        tabSections = sections ?? [];
+        tabs = FolioSheet.Tabs(tabSections);
         StartPage();
     }
+
+    /// <summary>The parts of the report this writer has begun, in order — what a measuring pass hands the final one.</summary>
+    public IReadOnlyList<ReportSection> SectionsBegun => begun;
+
+    /// <summary>The folio each reader's page began on, in order — what a measuring pass hands the readers' contents.</summary>
+    public IReadOnlyList<int> ReaderFolios => readerFolios;
+
+    /// <summary>
+    /// Opens a part of the report: anchors its tab's link on this page, and the page's tab shows it open. Called just
+    /// before the part's first heading, and only when the part prints.
+    /// </summary>
+    public void BeginSection(ReportSection section)
+    {
+        begun.Add(section);
+        // A part that starts at the top of a sheet is that sheet's open tab; one that starts lower down opens from the
+        // next sheet, so a page shows the part it begins with.
+        currentSection = section;
+        if (OnFreshPage || pageSection is null)
+        {
+            pageSection = section;
+        }
+        canvas.DrawNamedDestinationAnnotation(new SKPoint(0, 0), section.Destination);
+    }
+
+    /// <summary>Records that a reader's page starts on this sheet.</summary>
+    public void BeginReader() => readerFolios.Add(Folio);
 
     /// <summary>H2 sections and the folio they begin on.</summary>
     public IReadOnlyList<(string Title, int Page)> TocEntries => tocEntries;
@@ -624,31 +661,61 @@ internal sealed class PageWriter : IDisposable
     /// not the book's severity tiers, so a mark that says "this one liked it" is a fact about the
     /// reader rather than a rating of the book.</para>
     /// </summary>
+    /// <param name="reserve">Room kept at the foot of every sheet the block uses — the reader's "Would need", so it
+    /// follows the last item rather than landing on a sheet of its own.</param>
     public void ProsAndCons(
-        string leftLabel, IReadOnlyList<string> left, string rightLabel, IReadOnlyList<string> right)
+        string leftLabel, IReadOnlyList<string> left, string rightLabel, IReadOnlyList<string> right, float reserve = 0f)
     {
+        var limit = ContentBottom - reserve;
         using var small = ReportType.Small();
         var gutter = 22f;
         var column = (ContentWidth - gutter) / 2f;
         var rightLeft = ContentLeft + column + gutter;
+        var line = small.Size * PageGeometry.LineSpacing;
 
-        var baseline = y + PaperTypeScale.Label;
-        Label(leftLabel, ContentLeft, baseline, ReportPalette.Great);
-        Label(rightLabel, rightLeft, baseline, ReportPalette.MustFix);
-        y = baseline + 8f;
+        // The two columns go down the sheet item by item, and an item that would cross the foot goes to the next sheet,
+        // under the labels again. They used to be drawn with no foot at all, so under a long read the lists ran off the
+        // bottom of the page and were cut off (the owner's report).
+        var nextLeft = 0;
+        var nextRight = 0;
+        var first = true;
+        while (first || nextLeft < left.Count || nextRight < right.Count)
+        {
+            if (y + PaperTypeScale.Label + 8f + line > limit)
+            {
+                NewPage();
+            }
 
-        var top = y;
-        var leftBottom = Marked(left, ContentLeft, top, column, small, ReportPalette.Great, tick: true);
-        var rightBottom = Marked(right, rightLeft, top, column, small, ReportPalette.MustFix, tick: false);
-        y = Math.Max(leftBottom, rightBottom);
+            var baseline = y + PaperTypeScale.Label;
+            var suffix = first ? string.Empty : " (continued)";
+            Label(leftLabel + suffix, ContentLeft, baseline, ReportPalette.Great);
+            Label(rightLabel + suffix, rightLeft, baseline, ReportPalette.MustFix);
+            y = baseline + 8f;
+
+            var top = y;
+            var leftBottom = Marked(left, ref nextLeft, ContentLeft, top, column, limit, small, ReportPalette.Great, tick: true);
+            var rightBottom = Marked(right, ref nextRight, rightLeft, top, column, limit, small, ReportPalette.MustFix, tick: false);
+            y = Math.Max(leftBottom, rightBottom);
+            first = false;
+
+            if (nextLeft < left.Count || nextRight < right.Count)
+            {
+                NewPage();
+            }
+        }
     }
 
-    // One column of marked items; returns the y it finished at, so the pair can end level.
+    /// <summary>
+    /// One column of marked items from <paramref name="next"/> on, each whole, until the next would cross the foot;
+    /// returns the y it finished at, so the pair can end level. An item taller than a fresh sheet is drawn anyway rather
+    /// than held back for ever.
+    /// </summary>
     private float Marked(
-        IReadOnlyList<string> items, float left, float top, float width, SKFont font, SKColor mark, bool tick)
+        IReadOnlyList<string> items, ref int next, float left, float top, float width, float limit, SKFont font, SKColor mark, bool tick)
     {
         var indent = 14f;
         var cursor = top;
+        var lineHeight = font.Size * PageGeometry.LineSpacing;
         using var paint = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true };
         using var stroke = new SKPaint
         {
@@ -656,18 +723,26 @@ internal sealed class PageWriter : IDisposable
             StrokeWidth = 1.4f, StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round,
         };
 
-        foreach (var item in items)
+        while (next < items.Count)
         {
-            foreach (var (line, i) in SkiaText.Wrap(font, item, width - indent).Select((line, i) => (line, i)))
+            var lines = SkiaText.Wrap(font, items[next], width - indent);
+            var height = lines.Count * lineHeight;
+            if (cursor + height > limit && cursor > top)
+            {
+                break;
+            }
+
+            foreach (var (text, i) in lines.Select((text, i) => (text, i)))
             {
                 if (i == 0)
                 {
                     DrawMark(left, cursor + 3f, stroke, tick);
                 }
-                canvas.DrawText(line, left + indent, cursor + font.Size, font, paint);
-                cursor += font.Size * PageGeometry.LineSpacing;
+                canvas.DrawText(text, left + indent, cursor + font.Size, font, paint);
+                cursor += lineHeight;
             }
             cursor += 4f;
+            next++;
         }
 
         return cursor;
@@ -818,11 +893,12 @@ internal sealed class PageWriter : IDisposable
     /// </summary>
     public void Footer(string? label, string text, SKFont font, SKColor color)
     {
-        var height = (PageGeometry.HairlineGap * 2) + PageGeometry.HairlineHeight
-            + Measure(text, font) + FootSlack;
-        if (!string.IsNullOrWhiteSpace(label))
-            height += PaperTypeScale.Label + 5f;
+        var height = FooterHeight(label, text, font);
 
+        if (height > Remaining && !OnFreshPage)
+        {
+            NewPage();
+        }
         ToFoot(height);
         Hairline();
         if (!string.IsNullOrWhiteSpace(label))
@@ -831,6 +907,15 @@ internal sealed class PageWriter : IDisposable
             y += PaperTypeScale.Label + 5f;
         }
         Paragraph(text, font, color);
+    }
+
+    /// <summary>How tall <see cref="Footer"/> will be for this label and text, so a block above it can leave the room.</summary>
+    public float FooterHeight(string? label, string text, SKFont font)
+    {
+        var height = (PageGeometry.HairlineGap * 2) + PageGeometry.HairlineHeight + Measure(text, font) + FootSlack;
+        if (!string.IsNullOrWhiteSpace(label))
+            height += PaperTypeScale.Label + 5f;
+        return height;
     }
 
     /// <summary>
@@ -897,35 +982,30 @@ internal sealed class PageWriter : IDisposable
 
     private void StartPage()
     {
-        canvas = sink.BeginPage(PageGeometry.PageWidth, PageGeometry.PageHeight);
-        canvas.Clear(ReportPalette.Ground);
+        canvas = sink.BeginPage(FolioSheet.Page);
+        pageSection = currentSection;
+        Storyworthtelling.Paper.Binder.SheetFrame.Clear(canvas);
         PaperGrain.Draw(canvas, PageGeometry.PageWidth, PageGeometry.PageHeight, GrainScale);
         y = ContentTop;
     }
 
     private void FinishPage()
     {
+        // The shared tablet frame: every tab on every page, this page's part open; the header and the folio on every
+        // page but the cover, which keeps its own label and jacket.
+        if (tabs.Count > 0)
+        {
+            var active = pageSection is null ? -1 : tabSections.ToList().IndexOf(pageSection);
+            Storyworthtelling.Paper.Binder.SheetFrame.Binder(canvas, FolioSheet.Page, tabs, active, anchor: false);
+        }
         if (!folioSuppressed)
         {
-            DrawFooter();
+            Storyworthtelling.Paper.Binder.SheetFrame.Header(canvas, FolioSheet.Page, header, FolioSheet.Signature);
+            Storyworthtelling.Paper.Binder.SheetFrame.Folio(
+                canvas, FolioSheet.Page, pageSection?.Name ?? "Contents", Folio.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
         folioSuppressed = false;
         finishedPages++;
         sink.EndPage();
-    }
-
-    private void DrawFooter()
-    {
-        using var running = ReportType.Running();
-        using var folio = ReportType.Folio();
-        var baseline = PageGeometry.PageHeight - PageGeometry.FolioBaseline;
-
-        using var titlePaint = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
-        canvas.DrawText(runningFoot, ContentLeft, baseline, running, titlePaint);
-
-        var number = (FirstFolio + finishedPages).ToString();
-        using var numberPaint = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
-        canvas.DrawText(number, PageGeometry.ContentRight - folio.MeasureText(number),
-            baseline, folio, numberPaint);
     }
 }

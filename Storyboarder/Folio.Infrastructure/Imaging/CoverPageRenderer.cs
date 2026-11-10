@@ -142,6 +142,6 @@ internal sealed class CoverPageRenderer
     private static void Centred(SKCanvas canvas, string text, SKFont font, SKColor color, float baseline)
     {
         using var paint = new SKPaint { Color = color, IsAntialias = true };
-        canvas.DrawText(text, PageGeometry.PageWidth / 2f - font.MeasureText(text) / 2f, baseline, font, paint);
+        canvas.DrawText(text, (PageGeometry.ContentLeft + PageGeometry.ContentRight) / 2f - font.MeasureText(text) / 2f, baseline, font, paint);
     }
 }
