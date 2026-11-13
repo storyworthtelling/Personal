@@ -40,7 +40,7 @@ public class MainActivity : MauiAppCompatActivity
         try
         {
             var sync = IPlatformApplication.Current!.Services.GetRequiredService<VaultSync>();
-            sync.RestoreAsync(CancellationToken.None).GetAwaiter().GetResult();
+            sync.RestoreAtLaunchAsync(CancellationToken.None).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {

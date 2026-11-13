@@ -42,13 +42,13 @@ public sealed class MusicTasteService
         // The shared Claude key now lives in the encrypted secrets vault (single source of truth, in place of
         // the old plaintext voice config); VaultVoiceConfigStore reads it back with this head's passphrase.
         var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(
-            driveFactory, DriveSecretsVaultStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store));
+            driveFactory, DriveSecretsVaultStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         options = new DriveVoiceOptions(
             new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = HeadHttp.WithTimeout(TimeSpan.FromMinutes(2));
         var client = new TasteProfileClient(http, options, HeadCredentialHealth.Store());
         store = new DriveTasteProfileStore(new DriveTextFile(
-            driveFactory, DriveTasteProfileStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store));
+            driveFactory, DriveTasteProfileStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         refresher = new TasteProfileRefresher(client, store, options, line => HeadLog.Warn("Taste", line));
         discovery = new DiscoveryClient(http, options, HeadCredentialHealth.Store());
     }

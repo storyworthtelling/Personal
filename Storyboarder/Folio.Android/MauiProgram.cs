@@ -175,7 +175,7 @@ public static class MauiProgram
         });
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
             DriveVoiceProfileStore.Sealed(
-                name => new DriveTextFile(DriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>()),
+                name => new DriveTextFile(DriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared),
                 () => SettingsStore.VaultPassphrase));
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
@@ -184,7 +184,7 @@ public static class MauiProgram
         // (VaultVoiceConfigStore) so there is a single source of truth in place of the old plaintext config.
         builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
             new DriveSecretsVaultStore(new DriveTextFile(
-                DriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
+                DriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared)));
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => SettingsStore.VaultPassphrase, MauiLog.Trail(LogSources.Vault)));
         builder.Services.AddSingleton<VaultSync>();

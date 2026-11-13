@@ -27,16 +27,24 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
     // Optional: told, by count and ownership only, when a name search was not clear-cut (DriveFileChooser).
     private readonly ILogger? logger;
 
+    // Optional: what a file held at a revision, so an unchanged file is not downloaded again (efficiency §3).
+    private readonly DriveReadCache? readCache;
+
+    // Every question about the file is asked in one request: exists, owner, revision.
+    private const string ProbeFields = "id,trashed,ownedByMe,headRevisionId";
+
     public DriveTextFile(
         Func<CancellationToken, Task<DriveService>> serviceFactory,
         string fileName,
         IDriveFileIdStore? fileIdStore = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        DriveReadCache? readCache = null)
     {
         this.serviceFactory = serviceFactory;
         this.fileName = fileName;
         this.fileIdStore = fileIdStore;
         this.logger = logger;
+        this.readCache = readCache;
     }
 
     // A remembered id is this install having found the file before. Emptied when the file is trashed from here.
@@ -45,9 +53,13 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
     public async Task<string?> ReadAsync(CancellationToken cancellationToken)
     {
         using var service = await serviceFactory(cancellationToken);
-        var id = await FindId(service, cancellationToken);
-        if (id is null)
+        var found = await Probe(service, cancellationToken);
+        if (found is null)
             return null;
+
+        var id = found.Id;
+        if (readCache is not null && readCache.TryGet(id, found.HeadRevisionId, out var kept))
+            return kept;
 
         // The downloader does not throw on a 401/403/429/5xx or a dropped connection; it reports the
         // failure in the progress it returns. Ignoring it turned every failed read into "", which a vault
@@ -58,7 +70,9 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
         {
             throw new IOException($"Drive could not read {fileName}.", progress.Exception);
         }
-        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        var content = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        readCache?.Keep(id, found.HeadRevisionId, content);
+        return content;
     }
 
     // Whether the file this account resolves to is its own or was shared with it. Resolved the same way
@@ -66,13 +80,10 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
     public async Task<DriveFileOwnership> OwnershipAsync(CancellationToken cancellationToken)
     {
         using var service = await serviceFactory(cancellationToken);
-        var id = await FindId(service, cancellationToken);
-        if (id is null)
+        var file = await Probe(service, cancellationToken);
+        if (file is null)
             return DriveFileOwnership.None;
 
-        var get = service.Files.Get(id);
-        get.Fields = "id,ownedByMe";
-        var file = await get.ExecuteAsync(cancellationToken);
         return file.OwnedByMe == true ? DriveFileOwnership.Owned : DriveFileOwnership.Shared;
     }
 
@@ -81,14 +92,8 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
     public async Task<string?> RevisionAsync(CancellationToken cancellationToken)
     {
         using var service = await serviceFactory(cancellationToken);
-        var id = await FindId(service, cancellationToken);
-        if (id is null)
-            return null;
-
-        var get = service.Files.Get(id);
-        get.Fields = "id,headRevisionId";
-        var file = await get.ExecuteAsync(cancellationToken);
-        return file.HeadRevisionId;
+        var file = await Probe(service, cancellationToken);
+        return file?.HeadRevisionId;
     }
 
     // Moves the file to Drive's trash. Only a file this account owns: a shared file is someone else's, and
@@ -96,13 +101,12 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
     public async Task TrashAsync(CancellationToken cancellationToken)
     {
         using var service = await serviceFactory(cancellationToken);
-        var id = await FindId(service, cancellationToken);
-        if (id is null)
+        var file = await Probe(service, cancellationToken);
+        if (file is null)
             return;
 
-        var get = service.Files.Get(id);
-        get.Fields = "id,ownedByMe";
-        if ((await get.ExecuteAsync(cancellationToken)).OwnedByMe != true)
+        var id = file.Id;
+        if (file.OwnedByMe != true)
             throw new InvalidOperationException($"{fileName} is shared with this account, not owned by it, so it is not trashed from here.");
 
         await service.Files.Update(new DriveData.File { Trashed = true }, id).ExecuteAsync(cancellationToken);
@@ -149,6 +153,22 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
             throw updated.Exception;
     }
 
+    // The file this account resolves to, with its owner and revision, or null when there is none. A remembered id
+    // costs one request; a name search costs the search and one more for the metadata.
+    private async Task<DriveData.File?> Probe(DriveService service, CancellationToken cancellationToken)
+    {
+        var remembered = fileIdStore?.Get(fileName);
+        if (!string.IsNullOrEmpty(remembered) && await Describe(service, remembered, cancellationToken) is { } known)
+            return known;
+
+        var id = (await SearchByName(service, cancellationToken)).Id;
+        if (id is null)
+            return null;
+
+        fileIdStore?.Set(fileName, id);
+        return await Describe(service, id, cancellationToken);
+    }
+
     private async Task<string?> FindId(DriveService service, CancellationToken cancellationToken)
     {
         // 1) Prefer a remembered id, so a file the owner moved is still found where it now lives.
@@ -184,18 +204,22 @@ public sealed class DriveTextFile : IDriveTextFile, IDriveFileOwnership, IDriveF
 
     // A remembered id is only usable if the file still exists and isn't trashed; otherwise the caller
     // re-resolves by name (self-healing). A 404 means the id is gone — treat it as "resolve by name".
-    private static async Task<bool> StillExists(DriveService service, string id, CancellationToken cancellationToken)
+    private static async Task<bool> StillExists(DriveService service, string id, CancellationToken cancellationToken) =>
+        await Describe(service, id, cancellationToken) is not null;
+
+    // The file's metadata when it exists and is not trashed, else null.
+    private static async Task<DriveData.File?> Describe(DriveService service, string id, CancellationToken cancellationToken)
     {
         try
         {
             var get = service.Files.Get(id);
-            get.Fields = "id,trashed";
+            get.Fields = ProbeFields;
             var file = await get.ExecuteAsync(cancellationToken);
-            return file is not null && file.Trashed != true;
+            return file is not null && file.Trashed != true ? file : null;
         }
         catch (GoogleApiException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            return false;
+            return null;
         }
     }
 }

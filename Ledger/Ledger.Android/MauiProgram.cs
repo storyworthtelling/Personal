@@ -129,7 +129,7 @@ public static class MauiProgram
         });
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
             DriveVoiceProfileStore.Sealed(
-                name => new DriveTextFile(DriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>()),
+                name => new DriveTextFile(DriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared),
                 () => SettingsStore.VaultPassphrase));
 
         // Release I (D10, finding §3): the household snapshot the owner's install publishes and hers
@@ -137,7 +137,7 @@ public static class MauiProgram
         // IDriveTextFile instance because the publisher and the reader address the exact same file.
         builder.Services.AddSingleton<IDriveTextFile>(sp =>
             new DriveTextFile(
-                DriveFactory(sp), HouseholdSnapshotReader.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>()));
+                DriveFactory(sp), HouseholdSnapshotReader.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared));
         builder.Services.AddScoped<HouseholdSnapshotPublisher>();
         builder.Services.AddScoped<HouseholdSnapshotReader>();
 
@@ -165,7 +165,7 @@ public static class MauiProgram
             new SnowballHistoryImport(
                 new DriveSnowballHistorySource(
                     new DriveTextFile(
-                        DriveFactory(sp), DriveSnowballHistorySource.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())),
+                        DriveFactory(sp), DriveSnowballHistorySource.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared)),
                 () => SettingsStore.VaultPassphrase,
                 () => sp.GetRequiredService<InstallRoleService>().Current,
                 sp.GetRequiredService<ISnowballHistoryImportMemory>()));
@@ -176,7 +176,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp =>
             new DrivePulpUsageSource(
                 new DriveTextFile(
-                    DriveFactory(sp), DrivePulpUsageSource.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>()),
+                    DriveFactory(sp), DrivePulpUsageSource.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared),
                 sp.GetService<ILogger<DrivePulpUsageSource>>()));
         builder.Services.AddSingleton<PulpUsageSync>();
 
@@ -186,7 +186,7 @@ public static class MauiProgram
         // vault is the single place secrets live (in place of the old plaintext voice config).
         builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
             new DriveSecretsVaultStore(new DriveTextFile(
-                DriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
+                DriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared)));
         // Whether this install may write the vault is decided by the vault file's Drive ownership, read by the
         // store on every load: the admin's install owns the file, the other install has it shared with it.
         // Her blank Plaid section therefore cannot replace the owner's. Guarded by HouseholdGateSourceTests (R-G1).

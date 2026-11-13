@@ -89,7 +89,10 @@ internal static class MailIntelligence
         }
 
         AgeOutTrivia(database, now);
-        NoteWhatTheDeferredWorkNeeds(context, database);
+        if (FieldNotesStore.FirstTimeToday(context, DateOnly.FromDateTime(now.LocalDateTime)))
+        {
+            NoteWhatTheDeferredWorkNeeds(context, database);
+        }
     }
 
     // Returns the whole reading, not just the kind. The first version of this took the kind
@@ -192,17 +195,17 @@ internal static class MailIntelligence
         }
     }
 
-    // The observations the deferred work cannot be designed without, taken once per sync
-    // rather than per message: how large the ghost archive actually grows (is plaintext
+    // The observations the deferred work cannot be designed without, taken once a day
+    // rather than per message or per sync: how large the ghost archive actually grows (is plaintext
     // JSON to Drive on every change sane at this volume?), what the attachments look like,
     // and how many contacts have no photo (which IS the Rolodex pass's justification).
     private static void NoteWhatTheDeferredWorkNeeds(Context context, TimelineDatabase database)
     {
         try
         {
-            var ghosts = database.Filing.LoadArchive().All;
-            var bytes = ghosts.Sum(ghost => EstimateBytes(ghost.Item));
-            FieldNotesStore.Record(context, notes => notes.WithArchive(ghosts.Count, bytes));
+            // Measured by SQLite: the stored JSON is a fair size for the Drive backup, and no ghost is loaded.
+            var archive = database.Filing.MeasureArchive();
+            FieldNotesStore.Record(context, notes => notes.WithArchive(archive.Count, archive.Bytes));
 
             foreach (var item in database.Cache.LoadRecent(limit: 100))
             {
@@ -225,11 +228,6 @@ internal static class MailIntelligence
             PostDiagnostics.LogWarning("FieldNotes", "Could not take the periodic observations", e);
         }
     }
-
-    // Close enough to size a Drive backup: the ghost is stored as serialized JSON, and what
-    // is wanted is an order of magnitude rather than a byte count.
-    private static long EstimateBytes(TimelineItem item) =>
-        (item.Subject?.Length ?? 0) + (item.Body?.Length ?? 0) + (item.Snippet?.Length ?? 0) + 200;
 
     // Aged-out trivia is GONE, not filed. Filing is for things the owner dealt with, and a
     // marketing email nobody opened was never dealt with — putting it in the archive would

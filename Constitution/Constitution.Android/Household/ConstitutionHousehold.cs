@@ -53,7 +53,7 @@ public sealed class ConstitutionHousehold
         remembered = install.Load().Role;
 
         var shared = new DriveHouseholdStore(
-            new DriveTextFile(ConstitutionVaults.DriveFactory(account), ConstitutionIdentity.HouseholdFileName, SharedDriveFileIds.Store),
+            new DriveTextFile(ConstitutionVaults.DriveFactory(account), ConstitutionIdentity.HouseholdFileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared),
             ConstitutionIdentity.HouseholdFileName,
             () => VaultPassphraseStore.Passphrase,
             () => HouseholdSync.MayCreateFile(Role));
@@ -141,7 +141,7 @@ public sealed class ConstitutionHousehold
         try
         {
             var store = new DriveSecretsVaultStore(new DriveTextFile(
-                ConstitutionVaults.DriveFactory(account), DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
+                ConstitutionVaults.DriveFactory(account), DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
             var read = await HouseholdRoleReader.ReadAsync(store, VaultPassphraseStore.Passphrase, VoiceGoogleAccount.Email, cancellationToken);
             if (read.Role == HouseholdFileRole.Unknown)
             {

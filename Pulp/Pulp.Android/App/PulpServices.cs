@@ -152,13 +152,13 @@ public sealed class PulpServices
             () => DateTimeOffset.Now);
 
         sharedHousehold = new DriveHouseholdStore(
-            new DriveTextFile(DriveFactory(account), PulpIdentity.HouseholdFileName, SharedDriveFileIds.Store),
+            new DriveTextFile(DriveFactory(account), PulpIdentity.HouseholdFileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared),
             PulpIdentity.HouseholdFileName,
             () => VaultPassphraseStore.Passphrase,
             () => SharedHouseholdSync.MayCreateFile(HouseholdFileRole));
         usageFile = new IndexUsageFilePublisher(
             new DriveIndexUsageStore(
-                new DriveTextFile(DriveFactory(account), IndexUsageFile.FileName, SharedDriveFileIds.Store),
+                new DriveTextFile(DriveFactory(account), IndexUsageFile.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared),
                 () => VaultPassphraseStore.Passphrase,
                 ServiceCatalogue.Public,
                 () => SharedHouseholdSync.MayCreateFile(HouseholdFileRole)),

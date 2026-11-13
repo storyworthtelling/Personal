@@ -48,7 +48,7 @@ public sealed class HiddenTrackPass
         };
 
         var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(
-            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
+            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = HeadHttp.Shared;
         namer = new HiddenTrackNamer(http, options, HeadCredentialHealth.Store());

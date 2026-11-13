@@ -54,11 +54,11 @@ internal static class BodySeats
         var driveFactory = GoogleDrive.Factory(account.GetAccessToken, ApplicationName);
 
         // The Claude key is read from the shared vault with this head's passphrase; with none, the options stay empty and the seat is plain.
-        var vault = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
+        var vault = new DriveSecretsVaultStore(new DriveTextFile(driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         var options = new DriveVoiceOptions(new VaultVoiceConfigStore(vault, () => VaultPassphraseStore.Passphrase));
         var http = HeadHttp.WithTimeout(TimeSpan.FromMinutes(2));
         var messenger = new VoicedMessenger(
-            DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
+            DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared), () => VaultPassphraseStore.Passphrase),
             new VoiceClient(http, options, HeadCredentialHealth.Store()),
             warn: line => HeadLog.Warn("Voice", line));
 

@@ -156,7 +156,7 @@ public class PlaybackService : MediaLibraryService
             return;
         }
 
-        var credentialsProvider = new TidalCredentialsProvider(() => tokenProvider.RefreshAsync(CancellationToken.None));
+        var credentialsProvider = new TidalCredentialsProvider(() => tokenProvider.RefreshAsync(CancellationToken.None, fresh: true));
         var tidalPlayer = TidalPlayerFactory.Create(Application!, credentialsProvider, appVersion: "1.0.0");
         if (tidalPlayer is null)
         {

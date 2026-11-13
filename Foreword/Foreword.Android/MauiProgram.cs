@@ -240,7 +240,7 @@ public static class MauiProgram
         });
         builder.Services.AddSingleton<IVoiceProfileStore>(sp =>
             DriveVoiceProfileStore.Sealed(
-                name => new DriveTextFile(VoiceDriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>()),
+                name => new DriveTextFile(VoiceDriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared),
                 () => CredentialStore.VaultPassphrase));
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
@@ -249,7 +249,7 @@ public static class MauiProgram
         // (in place of the old plaintext voice config).
         builder.Services.AddSingleton<ISecretsVaultStore>(sp =>
             new DriveSecretsVaultStore(new DriveTextFile(
-                VoiceDriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())));
+                VoiceDriveFactory(sp), DriveSecretsVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared)));
         builder.Services.AddSingleton(sp =>
             new SecretsVaultService(sp.GetRequiredService<ISecretsVaultStore>(), () => CredentialStore.VaultPassphrase, MauiLog.Trail(LogSources.Vault)));
         // This account's own vault, in its own Drive: the calendar choices live here because they
@@ -257,7 +257,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(sp =>
             new PersonalVaultAccess(
                 new DrivePersonalVaultStore(new DriveTextFile(
-                    VoiceDriveFactory(sp), DrivePersonalVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>())),
+                    VoiceDriveFactory(sp), DrivePersonalVaultStore.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared)),
                 () => CredentialStore.VaultPassphrase,
                 MauiLog.Trail(LogSources.Vault)));
         builder.Services.AddSingleton<VaultSync>();
@@ -268,7 +268,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPrayerArchive>(sp =>
             new DrivePrayerArchive(new DriveTextFile(
                 VoiceDriveFactory(sp), DrivePrayerArchive.FileName,
-                sp.GetRequiredService<InMemoryDriveFileIdStore>())));
+                sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared)));
         builder.Services.AddTransient<PrayerSettings>();
         builder.Services.AddTransient<PrayerDeliveryService>(sp => new PrayerDeliveryService(
             sp.GetRequiredService<IPrayerArchive>(),

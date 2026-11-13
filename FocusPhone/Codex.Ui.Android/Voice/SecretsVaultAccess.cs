@@ -36,13 +36,13 @@ public sealed class SecretsVaultAccess
         var driveFactory = DriveFactory(accessToken, applicationName);
 
         var store = new DriveSecretsVaultStore(new DriveTextFile(
-            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
+            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         // Every restore and publish reaches the head's log (audit 08 §6): they were swallowed at each call site.
         Service = new SecretsVaultService(store, () => VaultPassphraseStore.Passphrase, Codex.Ui.HeadLog.Trail(LogSources.Vault));
 
         Personal = new PersonalVaultAccess(
             new DrivePersonalVaultStore(new DriveTextFile(
-                driveFactory, DrivePersonalVaultStore.FileName, SharedDriveFileIds.Store)),
+                driveFactory, DrivePersonalVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared)),
             () => VaultPassphraseStore.Passphrase,
             Codex.Ui.HeadLog.Trail(LogSources.Vault));
     }

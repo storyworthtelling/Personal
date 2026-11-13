@@ -157,10 +157,14 @@ public sealed class HouseholdFileService
         await passGate.WaitAsync(cancellationToken);
         try
         {
+            // A beat that is due is written first, so the pass carries it up with everything else (efficiency audit
+            // §12: it used to take a second whole pass). Only when the file is readable and this phone's copy is
+            // known; otherwise the pass goes first and the beat follows it as before.
+            var beatFirst = Standing is not { IsUnreadable: true } && await TryBeatFirstAsync(cancellationToken);
             var settled = await PassAsync(cancellationToken);
             Set(settled);
             PassSettled?.Invoke(settled);
-            if (settled.State == HouseholdFileState.Synced && await BeatIfDueAsync(cancellationToken))
+            if (!beatFirst && settled.State == HouseholdFileState.Synced && await BeatIfDueAsync(cancellationToken))
             {
                 // A heartbeat nobody else can see is no heartbeat (D148): the pass that wrote it sends it up, since a worker has no loop to do it later.
                 settled = await PassAsync(cancellationToken);
@@ -259,6 +263,19 @@ public sealed class HouseholdFileService
     }
 
     // The heartbeat is the lease's: written for a known role only (the lease has no unknown role to write), when it is due.
+    // A copy that will not open is the pass's to report, with its own sentence; the beat waits for a readable one.
+    private async Task<bool> TryBeatFirstAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await BeatIfDueAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is HouseholdFormatException or HouseholdUnreadableException)
+        {
+            return false;
+        }
+    }
+
     private async Task<bool> BeatIfDueAsync(CancellationToken cancellationToken)
     {
         var role = seams.Role();

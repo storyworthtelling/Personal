@@ -61,3 +61,29 @@ public class SecretsCryptoTests
         Assert.Throws<ArgumentException>(() => SecretsCrypto.Encrypt("x", "", TestIterations));
     }
 }
+
+// Efficiency audit §3: each read ran PBKDF2 at 210,000 iterations. A key is now derived once per passphrase and
+// salt, so a reopened file, and a file read back after it was written, cost no second derivation.
+public class SecretsCryptoKeyCacheTests
+{
+    [Fact]
+    public void AFileWrittenThenReadBackDerivesItsKeyOnce()
+    {
+        var before = SecretsCrypto.DerivationsOnThisThread;
+
+        var envelope = SecretsCrypto.Encrypt("invented text", "invented passphrase key cache");
+        SecretsCrypto.Decrypt(envelope, "invented passphrase key cache");
+        SecretsCrypto.Decrypt(envelope, "invented passphrase key cache");
+
+        Assert.Equal(before + 1, SecretsCrypto.DerivationsOnThisThread);
+    }
+
+    [Fact]
+    public void AWrongPassphraseIsStillRefusedAfterTheRightOneWasCached()
+    {
+        var envelope = SecretsCrypto.Encrypt("invented text", "invented right passphrase");
+        SecretsCrypto.Decrypt(envelope, "invented right passphrase");
+
+        Assert.Throws<WrongPassphraseException>(() => SecretsCrypto.Decrypt(envelope, "invented wrong passphrase"));
+    }
+}

@@ -135,4 +135,98 @@ public class ArchiveBackupSyncTests : IDisposable
         Assert.Equal(ArchiveSyncOutcome.Unchanged, result.Outcome);
         Assert.Equal(first, sealedDrive.Content);
     }
+
+    // Efficiency audit §1: every sync downloaded and deserialized the whole backup only to find it unchanged. A
+    // marker of what was last confirmed (the phone's archive and Drive's revision) now skips both.
+    private readonly MemoryMarker marker = new();
+
+    private ArchiveBackupSync Marked(string? passphrase = Pass) => new(sealedDrive, legacyDrive, () => passphrase, marker);
+
+    [Fact]
+    public async Task AnUnchangedArchiveIsNotDownloadedAgain()
+    {
+        filing.SaveGhost(Filed("m1"));
+        await Marked().SyncAsync(filing, Now, default);
+        var sealedReads = sealedDrive.Reads;
+        var legacyReads = legacyDrive.Reads;
+
+        var result = await Marked().SyncAsync(filing, Now.AddMinutes(30), default);
+
+        Assert.Equal(ArchiveSyncOutcome.Unchanged, result.Outcome);
+        Assert.Equal(sealedReads, sealedDrive.Reads);
+        Assert.Equal(legacyReads, legacyDrive.Reads);
+    }
+
+    [Fact]
+    public async Task ANewFilingIsBackedUpDespiteTheMarker()
+    {
+        filing.SaveGhost(Filed("m1"));
+        await Marked().SyncAsync(filing, Now, default);
+
+        filing.SaveGhost(Filed("m2"));
+        var result = await Marked().SyncAsync(filing, Now.AddMinutes(30), default);
+
+        Assert.Equal(ArchiveSyncOutcome.Synced, result.Outcome);
+        Assert.Equal(2, SealedSnapshot().Ghosts.Count);
+    }
+
+    [Fact]
+    public async Task AnUnfilingIsBackedUpDespiteTheMarker()
+    {
+        filing.SaveGhost(Filed("m1"));
+        filing.SaveGhost(Filed("m2"));
+        await Marked().SyncAsync(filing, Now, default);
+
+        filing.RemoveGhost("m1", Now);
+        var result = await Marked().SyncAsync(filing, Now.AddMinutes(30), default);
+
+        Assert.Equal(ArchiveSyncOutcome.Synced, result.Outcome);
+        Assert.Equal(["m2"], SealedSnapshot().Ghosts.Select(g => g.Item.SourceId));
+    }
+
+    [Fact]
+    public async Task ABackupWrittenElsewhereIsReadBecauseItsRevisionMoved()
+    {
+        filing.SaveGhost(Filed("m1"));
+        await Marked().SyncAsync(filing, Now, default);
+
+        await sealedDrive.WriteAsync(VaultEnvelope.Write(ArchiveSnapshotCodec.Encode(new ArchiveSnapshot([Filed("m1"), Filed("m7")], Now)), Pass), default);
+        var result = await Marked().SyncAsync(filing, Now.AddMinutes(30), default);
+
+        Assert.Equal(1, result.Restored);
+        Assert.Equal(["m1", "m7"], LocalIds());
+    }
+
+    [Fact]
+    public async Task NothingIsSkippedWhileThePlaintextBackupIsStillThere()
+    {
+        legacyDrive.Content = ArchiveSnapshotCodec.Encode(new ArchiveSnapshot([Filed("m1")], Now));
+        await Marked(passphrase: null).SyncAsync(filing, Now, default);
+        var legacyReads = legacyDrive.Reads;
+
+        await Marked(passphrase: null).SyncAsync(filing, Now.AddMinutes(30), default);
+
+        Assert.Equal(legacyReads + 1, legacyDrive.Reads);
+    }
+
+    [Fact]
+    public void TheArchiveIsMeasuredWithoutReadingAnyGhost()
+    {
+        filing.SaveGhost(Filed("m1"));
+        filing.SaveGhost(Filed("m2"));
+
+        var size = filing.MeasureArchive();
+
+        Assert.Equal(2, size.Count);
+        Assert.True(size.Bytes > 0);
+    }
+
+    private sealed class MemoryMarker : IArchiveBackupMarker
+    {
+        private string? value;
+
+        public string? Read() => value;
+
+        public void Write(string marker) => value = marker;
+    }
 }

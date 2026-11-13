@@ -28,12 +28,12 @@ public sealed class VoiceGreeting
         // place of the old plaintext voice config). VaultVoiceConfigStore reads it back given this head's
         // passphrase; with no passphrase or no key it yields VoiceConfig.Empty and the greeting stays neutral.
         var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(
-            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
+            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         options = new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
         var http = HeadHttp.WithTimeout(TimeSpan.FromMinutes(2));
         var client = new VoiceClient(http, options, HeadCredentialHealth.Store());
         messenger = new VoicedMessenger(
-            DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store), () => VaultPassphraseStore.Passphrase),
+            DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared), () => VaultPassphraseStore.Passphrase),
             client,
             warn: line => HeadLog.Warn("Voice", line));
     }

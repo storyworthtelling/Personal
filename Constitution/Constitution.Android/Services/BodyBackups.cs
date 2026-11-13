@@ -121,7 +121,7 @@ public static class BodyBackups
     {
         var driveFactory = GoogleDrive.Factory(account.GetAccessToken, ApplicationName);
 
-        return new DriveTextFile(driveFactory, BodyBackup.FileName, SharedDriveFileIds.Store);
+        return new DriveTextFile(driveFactory, BodyBackup.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared);
     }
 
 }
