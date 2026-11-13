@@ -491,6 +491,7 @@ public sealed class SettingsArea(Activity host)
             firstEntry = PaperUi.MonoField(Host, "One-time code");
             secondEntry = null;
             block.AddView(firstEntry, Spaced(DesignTokens.Space.X2));
+            KeyConsoleLink.AddTo(block, Storyworthtelling.Voice.Health.SharedCredentialIds.Remarkable);
             return;
         }
 

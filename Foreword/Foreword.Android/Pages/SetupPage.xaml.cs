@@ -9,6 +9,7 @@ using Foreword.Infrastructure.Maps;
 using Foreword.Domain.Health;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
+using Storyworthtelling.Maui.Views;
 
 namespace Foreword.Android.Pages;
 
@@ -80,6 +81,8 @@ public partial class SetupPage : BinderPage
             ? "None set up yet — nothing will print"
             : $"{count} set up";
 
+        KeyConsoleLink.Fill(MapsConsoleLink, CredentialIds.Maps);
+        KeyConsoleLink.Fill(RemarkableConsoleLink, Storyworthtelling.Remarkable.RemarkableCredentialId.Value);
         RenderMaps();
         _ = LocateHomeAsync();
         RenderSources();
@@ -388,7 +391,7 @@ public partial class SetupPage : BinderPage
                 "Log into nytimes.com, open DevTools → Application → Cookies, copy the NYT-S value.",
                 () => CredentialStore.NytSessionCookie, v => { CredentialStore.NytSessionCookie = v; MarkChanged(ForewordVaultSection.NytCookie); }),
             (CredentialIds.NytApiKey, "New York Times — API key",
-                "From developer.nytimes.com. Used to fetch the top stories list.",
+                "Used to fetch the top stories list.",
                 () => CredentialStore.NytApiKey, v => { CredentialStore.NytApiKey = v; MarkChanged(ForewordVaultSection.NytApiKey); }),
             // No Claude row: the key is the shared vault's, entered once in Folio, like every other app's.
         };
@@ -411,7 +414,7 @@ public partial class SetupPage : BinderPage
                 });
             }
 
-            NeedsYouRows.Add(BuildNeedsYouRow(title, state.StatusText, hint, read(), write));
+            NeedsYouRows.Add(BuildNeedsYouRow(id, title, state.StatusText, hint, read(), write));
             shown++;
         }
 
@@ -420,7 +423,7 @@ public partial class SetupPage : BinderPage
     }
 
     private View BuildNeedsYouRow(
-        string title, string status, string hint, string current, Action<string> write)
+        string id, string title, string status, string hint, string current, Action<string> write)
     {
         var entry = new Entry
         {
@@ -435,7 +438,7 @@ public partial class SetupPage : BinderPage
         entry.TextChanged += (_, e) => write(e.NewTextValue?.Trim() ?? string.Empty);
         entry.Unfocused += async (_, _) => await PublishToVaultAsync();
 
-        return new VerticalStackLayout
+        var row = new VerticalStackLayout
         {
             Padding = new Thickness(16, 12),
             Spacing = 8,
@@ -447,6 +450,13 @@ public partial class SetupPage : BinderPage
                 new Label { Text = hint, Style = LookupStyle("CardRowDescription") },
             },
         };
+        // Where the key is made, when it is made in a provider's console (the session cookie is not).
+        if (KeyConsoleLink.For(id) is { } link)
+        {
+            row.Children.Add(link);
+        }
+
+        return row;
     }
 
     private static CredentialHealthReport CredentialHealth() =>

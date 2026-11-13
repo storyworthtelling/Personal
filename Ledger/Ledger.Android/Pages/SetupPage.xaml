@@ -47,6 +47,7 @@
                         <Entry x:Name="SecretEntry" Placeholder="••••••••" IsPassword="True" Style="{StaticResource MonoEntry}"
                                BackgroundColor="Transparent" VerticalOptions="Center" />
                     </Border>
+                    <ContentView x:Name="PlaidConsoleLink" />
                 </VerticalStackLayout>
             </VerticalStackLayout>
 

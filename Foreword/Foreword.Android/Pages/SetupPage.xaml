@@ -147,6 +147,7 @@
                                IsPassword="True" Style="{StaticResource MonoEntry}" />
                         <Label Text="Enable Routes, Weather, Pollen, Air Quality and Geocoding on the same project."
                                Style="{StaticResource CardRowDescription}" />
+                        <ContentView x:Name="MapsConsoleLink" />
                     </VerticalStackLayout>
 
                     <Grid x:Name="MapsKeyWorkingRow" Padding="16,12" ColumnDefinitions="*,Auto"
@@ -201,6 +202,7 @@
                                Style="{StaticResource MonoEntry}" />
                         <Label Text="Visit my.remarkable.com/device/mobile/connect for a one-time code, then tap Register."
                                Style="{StaticResource SecondaryLabel}" />
+                        <ContentView x:Name="RemarkableConsoleLink" />
                         <Button Text="Register reMarkable device" Style="{StaticResource SecondaryButton}"
                                 Clicked="OnRegisterRemarkableClicked" />
                     </VerticalStackLayout>

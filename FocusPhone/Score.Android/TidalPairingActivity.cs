@@ -167,6 +167,14 @@ public class TidalPairingActivity : Activity
             "Signing in opens TIDAL's own page in a browser. It is the only sign-in TIDAL " +
             "offers an app like this one."));
         body.AddView(PaperUi.PrimaryButton(this, "Sign in to TIDAL", () => _ = StartSignInAsync()));
+
+        // The app's client id and secret are made on TIDAL's developer dashboard; once they are
+        // missing or refused, that is where the owner goes.
+        if (HeadCredentialHealth.Store().Load().Get(CredentialIds.Tidal).Status == CredentialStatus.Failing
+            && KeyConsoleLink.For(this, CredentialIds.Tidal) is { } console)
+        {
+            body.AddView(console);
+        }
     }
 
     private void SignOut()
