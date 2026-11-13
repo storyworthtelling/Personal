@@ -167,7 +167,7 @@ public partial class MainPage : BinderPage
         {
             delivering.Failed($"{ex.GetType().Name}: {ex.Message}");
             var fullMessage = FlattenException(ex);
-            CredentialStore.LastDeliveryOutcome = $"Failed: {ex.Message}";
+            CredentialStore.LastDeliveryOutcome = $"Failed: {Storyworthtelling.Diagnostics.PlainError.Describe(ex)}";
             CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
             StatusLabel.Text = CredentialStore.LastDeliverySummary;
             DeliveryLogButton.IsVisible = true;

@@ -84,3 +84,40 @@ public class CalendarErrorsTests
         Assert.Equal("Google sign-in is needed to read calendars.", reason);
     }
 }
+
+/// <summary>
+/// Audit 11 §19: Google answers a rate limit or an exhausted quota with 403 too, and every 403 was told as "refused
+/// access; it may not be shared" — the wrong thing to go and fix. The reason code tells them apart, as Pulp reads it.
+/// </summary>
+public class CalendarForbiddenReasonTests
+{
+    private static GoogleApiException Forbidden(string reason) =>
+        new("Calendar", "The text Google gave.")
+        {
+            HttpStatusCode = HttpStatusCode.Forbidden,
+            Error = new global::Google.Apis.Requests.RequestError
+            {
+                Code = 403,
+                Errors = [new global::Google.Apis.Requests.SingleError { Reason = reason }],
+            },
+        };
+
+    [Theory]
+    [InlineData("rateLimitExceeded")]
+    [InlineData("userRateLimitExceeded")]
+    [InlineData("quotaExceeded")]
+    [InlineData("dailyLimitExceeded")]
+    [InlineData("calendarUsageLimitsExceeded")]
+    public void ALimitIsToldAsALimit(string reason)
+    {
+        Assert.True(CalendarErrors.TryDescribe(Forbidden(reason), CancellationToken.None, out var sentence));
+        Assert.Equal("Google asked Constitution to slow down.", sentence);
+    }
+
+    [Fact]
+    public void ARealRefusalIsStillARefusal()
+    {
+        Assert.True(CalendarErrors.TryDescribe(Forbidden("forbidden"), CancellationToken.None, out var sentence));
+        Assert.Equal("Google refused access to a calendar; it may not be shared.", sentence);
+    }
+}

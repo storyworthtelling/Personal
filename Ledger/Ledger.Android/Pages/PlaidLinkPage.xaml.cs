@@ -421,7 +421,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
         {
             logger.LogError(ex, "Connect: failed to start Plaid Link.");
             Trail(t => t.LinkTokenFailed(DateTimeOffset.Now, ex.GetType().Name));
-            ShowProblem($"Couldn’t start Plaid Link: {ex.Message}");
+            ShowProblem($"Couldn’t start Plaid Link: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Plaid")}");
             return false;
         }
     }
@@ -452,7 +452,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
         {
             logger.LogError(ex, "Connect: failed to open Chrome for Plaid Link.");
             Trail(t => t.ChromeFailed(DateTimeOffset.Now, ex.GetType().Name));
-            ShowProblem($"Couldn’t open Chrome: {ex.Message}");
+            ShowProblem($"Couldn’t open Chrome: {Storyworthtelling.Diagnostics.PlainError.Describe(ex)}");
         }
     }
 
@@ -547,7 +547,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             logger.LogError(ex, "Connect: failed to finish connecting.");
             finishing = false;
             ShowFinishingUp();
-            ShowProblem($"Couldn’t finish connecting: {ex.Message}");
+            ShowProblem($"Couldn’t finish connecting: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Plaid")}");
         }
     }
 

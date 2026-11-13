@@ -213,6 +213,13 @@ public abstract class FolioBinderPage : ContentPage
     /// letting it close is the confirmation — given afterwards, by doing nothing, instead of
     /// beforehand by answering a question.</para>
     /// </summary>
+    /// <summary>States, or withdraws, one notice behind this page's fold (DESIGN.md §13).</summary>
+    protected void SetNotice(string key, DogEarNotice? notice)
+    {
+        folds.SetNotice(key, notice);
+        corner?.Refresh();
+    }
+
     protected void OfferUndo(string hint, Action reverse)
     {
         folds.BeginUndo(hint, reverse, DateTimeOffset.Now, FoldTiming.UndoWindow);

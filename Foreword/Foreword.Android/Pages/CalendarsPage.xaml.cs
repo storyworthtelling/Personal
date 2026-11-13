@@ -65,7 +65,7 @@ public partial class CalendarsPage : BinderPage
         catch (Exception ex)
         {
             calendars = new Dictionary<string, string>();
-            StatusLabel.Text = $"Could not read your calendars — {ex.Message}";
+            StatusLabel.Text = $"Could not read your calendars — {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Calendar")}";
         }
     }
 

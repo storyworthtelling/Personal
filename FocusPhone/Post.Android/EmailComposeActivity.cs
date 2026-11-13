@@ -192,7 +192,7 @@ public class EmailComposeActivity : Activity
             }
             catch (Exception e)
             {
-                RunOnUiThread(() => Toast.MakeText(this, $"Send failed: {e.Message}", ToastLength.Long)!.Show());
+                RunOnUiThread(() => Toast.MakeText(this, $"Send failed: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "Gmail")}", ToastLength.Long)!.Show());
             }
         });
     }

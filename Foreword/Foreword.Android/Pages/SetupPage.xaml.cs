@@ -553,7 +553,7 @@ public partial class SetupPage : BinderPage
         {
             pairing.Failed(ex.GetType().Name);
             PairingTrail.Failed(pairingTrail, ex);
-            RemarkableStatusLabel.Text = $"Pairing failed — {ex.Message}";
+            RemarkableStatusLabel.Text = $"Pairing failed — {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "reMarkable")}";
         }
     }
 
@@ -625,7 +625,7 @@ public partial class SetupPage : BinderPage
         catch (Exception ex)
         {
             TestPageButton.Text = "Send";
-            LastDeliveryCaption.Text = $"Test page failed — {ex.Message}";
+            LastDeliveryCaption.Text = $"Test page failed — {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "reMarkable")}";
         }
     }
 

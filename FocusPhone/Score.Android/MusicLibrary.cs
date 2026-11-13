@@ -306,7 +306,7 @@ public sealed class MusicLibrary(
         }
         catch (Exception e)
         {
-            Toast.MakeText(host, e.Message, ToastLength.Long)!.Show();
+            Toast.MakeText(host, Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google"), ToastLength.Long)!.Show();
         }
     }
 
@@ -319,7 +319,7 @@ public sealed class MusicLibrary(
         }
         catch (Exception e)
         {
-            Toast.MakeText(host, e.Message, ToastLength.Long)!.Show();
+            Toast.MakeText(host, Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google Drive"), ToastLength.Long)!.Show();
         }
     }
 

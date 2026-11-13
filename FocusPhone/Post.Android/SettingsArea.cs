@@ -203,7 +203,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         }
         catch (Exception ex)
         {
-            status.Text = $"Sign-in didn't complete. {ex.Message}";
+            status.Text = $"Sign-in didn't complete. {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google")}";
             signingIn.Failed($"{ex.GetType().Name}: {ex.Message}");
         }
     }

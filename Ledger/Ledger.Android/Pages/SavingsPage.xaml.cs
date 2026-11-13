@@ -630,7 +630,17 @@ public partial class SavingsPage : LedgerBinderPage
 
     // D112/D160: undo-first — the account stays, only the goal row goes. The same shape
     // MainPage.RemoveManualAccount and BudgetPage's recategorize both already use.
+    // Audit 11 §15: a handler's failure folds into the dog-ear in plain words rather than crashing the app.
     private async void RemoveGoal(Guid accountId, string accountName)
+    {
+        await Storyworthtelling.Maui.State.GuardedWork.Run(
+            dogEarState, "remove-goal", $"Could not remove the goal for {accountName}",
+            () => RemoveGoalAsync(accountId, accountName),
+            failure => logger.LogError(failure, "Could not remove the savings goal for account {AccountId}.", accountId));
+        dogEar.Refresh();
+    }
+
+    private async Task RemoveGoalAsync(Guid accountId, string accountName)
     {
         var captured = await savings.FindGoalAsync(accountId, CancellationToken.None);
         if (captured is null)

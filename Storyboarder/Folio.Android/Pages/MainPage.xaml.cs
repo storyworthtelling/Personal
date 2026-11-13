@@ -1,3 +1,4 @@
+using Storyworthtelling.Folds;
 using Folio.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
 using System.Collections.ObjectModel;
@@ -93,12 +94,21 @@ public partial class MainPage : FolioBinderPage
                 rows.Add(row);
 
             Redraw();
+            SetNotice(DeskUnreadableKey, null);
             await ShowVoicedLinesAsync(list);
             LastRunLabel.Text = SettingsStore.LastRunSummary;
         }
-        catch
+        catch (Exception failure)
         {
-            // A transient read failure shouldn't crash the page; the next tick retries.
+            // A read failure must not crash the page, and the next tick retries; but a desk that stopped refreshing
+            // (a failed migration, say) used to look current with no sign of it (audit 11 §24). It is said behind the
+            // fold, and logged.
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write(
+                "Desk", Microsoft.Extensions.Logging.LogLevel.Warning, "The desk could not be refreshed", failure);
+            SetNotice(DeskUnreadableKey, new DogEarNotice(
+                "The desk could not be refreshed",
+                $"What is shown may be out of date: {Storyworthtelling.Diagnostics.PlainError.Describe(failure)}. Folio tries again shortly.",
+                DogEarHue.Caution, At: DateTimeOffset.Now));
         }
     }
 
@@ -358,7 +368,7 @@ public partial class MainPage : FolioBinderPage
         catch (Exception ex)
         {
             // A jacket is never the point of the app: say so quietly and leave the book as it was.
-            LastRunLabel.Text = "Couldn't paint a jacket: " + ex.Message;
+            LastRunLabel.Text = "Couldn't paint a jacket: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Gemini");
             return;
         }
 
@@ -565,6 +575,7 @@ public partial class MainPage : FolioBinderPage
         }
     }
 
+    private const string DeskUnreadableKey = "desk-unreadable";
     private const string ShelveAction = "Put on the shelf";
     private const string ReplaceCoverAction = "Replace cover…";
     private const string RepaintCoverAction = "Repaint the cover";

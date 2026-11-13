@@ -294,7 +294,7 @@ public partial class SetupPage : LedgerBinderPage
         }
         catch (Exception ex)
         {
-            VoiceStatusLabel.Text = $"Sign-in didn\u2019t complete. {ex.Message}";
+            VoiceStatusLabel.Text = $"Sign-in didn\u2019t complete. {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google")}";
         }
     }
 
@@ -687,7 +687,7 @@ public partial class SetupPage : LedgerBinderPage
         }
         catch (Exception ex)
         {
-            DiagnosticsStatusLabel.Text = "Couldn\u2019t export diagnostics: " + ex.Message;
+            DiagnosticsStatusLabel.Text = "Couldn\u2019t export diagnostics: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex);
         }
     }
 

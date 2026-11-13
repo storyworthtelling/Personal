@@ -1328,7 +1328,7 @@ public sealed class ReviewProcessor : IPipelineStep
                     "was delivered to the tablet, continuing (the report remains available elsewhere)",
                     novel.Id, novel.StageAttempts);
                 var attempts = novel.StageAttempts;
-                var cause = PlainError.Describe(ex.Message);
+                var cause = Storyworthtelling.Diagnostics.PlainError.Describe(ex.Message, "Claude");
                 return await SettleWithoutTablet(db, novel, analysis,
                     $"It did not reach the reMarkable after {attempts} tries" +
                     (cause.Length == 0 ? "." : $": {cause}."), cancellationToken);

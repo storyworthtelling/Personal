@@ -96,7 +96,7 @@ public class WorksheetDeliveryWorker : Worker
             // day's wakeup simply tries again (today's "IsDueToday" gate will already have passed by
             // then on the day it matters, since it only fires once a month).
             logger.LogError(ex, "Worksheet delivery cycle threw.");
-            SettingsStore.LastWorksheetOutcome = $"Failed: {ex.Message}";
+            SettingsStore.LastWorksheetOutcome = $"Failed: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "reMarkable")}";
             SettingsStore.LastWorksheetAtUtc = DateTime.UtcNow;
             return Result.InvokeSuccess();
         }

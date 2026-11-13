@@ -140,7 +140,7 @@ public partial class SetupPage : FolioBinderPage
         }
         catch (Exception ex)
         {
-            BackupStatusLabel.Text = "Backup failed: " + ex.Message;
+            BackupStatusLabel.Text = "Backup failed: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex);
         }
     }
 
@@ -187,7 +187,7 @@ public partial class SetupPage : FolioBinderPage
         {
             // A failed restore leaves the project as it was (ProjectBackupService swaps only once the new
             // one is complete), so the message says so.
-            BackupStatusLabel.Text = "Restore failed, and your project is as it was: " + ex.Message;
+            BackupStatusLabel.Text = "Restore failed, and your project is as it was: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex);
         }
         finally
         {
@@ -230,7 +230,7 @@ public partial class SetupPage : FolioBinderPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Status snapshot", "Couldn't build the snapshot: " + ex.Message, "OK");
+            await DisplayAlert("Status snapshot", "Couldn't build the snapshot: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), "OK");
             return;
         }
 
@@ -263,7 +263,7 @@ public partial class SetupPage : FolioBinderPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Export diagnostics", "Couldn't export: " + ex.Message, "OK");
+            await DisplayAlert("Export diagnostics", "Couldn't export: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), "OK");
         }
     }
 
@@ -363,7 +363,7 @@ public partial class SetupPage : FolioBinderPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert("Google sign-in failed (copied to clipboard)", ex.Message, "OK");
+            await DisplayAlert("Google sign-in failed (copied to clipboard)", Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google"), "OK");
         }
     }
 
@@ -469,7 +469,7 @@ public partial class SetupPage : FolioBinderPage
         catch (Exception ex)
         {
             PairingTrail.Failed(pairing, ex);
-            await DisplayAlert("Registration failed", ex.Message, "OK");
+            await DisplayAlert("Registration failed", Storyworthtelling.Diagnostics.PlainError.Describe(ex, "reMarkable"), "OK");
         }
     }
 

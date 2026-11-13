@@ -171,17 +171,27 @@ public partial class TaskEditPage : BinderPage
 
     private async void OnDeleteClicked(object sender, EventArgs e)
     {
-        var result = await IPlatformApplication.Current!.Services
-            .GetRequiredService<TaskEditor>().Delete(task);
-
-        if (!result.Saved)
+        // Audit 11 §15: an async void with no try crashed the app on a failure; it is said on the page instead.
+        try
         {
-            StatusLabel.IsVisible = true;
-            StatusLabel.Text = result.Message;
-            return;
-        }
+            var result = await IPlatformApplication.Current!.Services
+                .GetRequiredService<TaskEditor>().Delete(task);
 
-        await Navigation.PopAsync();
+            if (!result.Saved)
+            {
+                StatusLabel.IsVisible = true;
+                StatusLabel.Text = result.Message;
+                return;
+            }
+
+            await Navigation.PopAsync();
+        }
+        catch (Exception failure)
+        {
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write("Tasks", Microsoft.Extensions.Logging.LogLevel.Warning, "The task could not be deleted", failure);
+            StatusLabel.IsVisible = true;
+            StatusLabel.Text = "Could not delete the task: " + Storyworthtelling.Diagnostics.PlainError.Describe(failure, "Google Tasks") + ".";
+        }
     }
 
     private async void OnRetypeClicked(object sender, EventArgs e) =>

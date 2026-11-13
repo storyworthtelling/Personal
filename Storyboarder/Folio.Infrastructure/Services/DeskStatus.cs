@@ -81,7 +81,7 @@ public static class DeskStatus
         if (s.Stage == "Completed")
             return string.IsNullOrWhiteSpace(s.DeliveryNote) ? null : s.DeliveryNote;
 
-        var plain = PlainError.Describe(s.LastError);
+        var plain = Storyworthtelling.Diagnostics.PlainError.Describe(s.LastError, "Claude");
         if (plain.Length == 0 || s.Stage is "Cancelled")
             return null;
 

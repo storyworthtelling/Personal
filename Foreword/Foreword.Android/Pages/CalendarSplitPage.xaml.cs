@@ -195,7 +195,7 @@ public partial class CalendarSplitPage : BinderPage
         }
         catch (Exception ex)
         {
-            PreviewCaption.Text = $"Could not read today's events — {ex.Message}";
+            PreviewCaption.Text = $"Could not read today's events — {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Calendar")}";
             return;
         }
 

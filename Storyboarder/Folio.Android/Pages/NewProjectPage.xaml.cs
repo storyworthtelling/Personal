@@ -87,7 +87,7 @@ public partial class NewProjectPage : FolioBinderPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert("Sign-in failed (copied to clipboard)", ex.Message, "OK");
+            await DisplayAlert("Sign-in failed (copied to clipboard)", Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google"), "OK");
         }
     }
 
@@ -132,7 +132,7 @@ public partial class NewProjectPage : FolioBinderPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert("Could not list Drive (copied to clipboard)", ex.Message, "OK");
+            await DisplayAlert("Could not list Drive (copied to clipboard)", Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Drive"), "OK");
         }
         finally
         {
@@ -221,7 +221,7 @@ public partial class NewProjectPage : FolioBinderPage
                 bookMode ? "Could not add book (copied to clipboard)"
                     : draftMode ? "Could not add draft (copied to clipboard)"
                     : "Could not create project (copied to clipboard)",
-                ex.Message, "OK");
+                Storyworthtelling.Diagnostics.PlainError.Describe(ex), "OK");
         }
         finally
         {

@@ -749,7 +749,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         {
             opening?.Failed($"{e.GetType().Name}: {e.Message}");
             HeadLog.Warn("Plate", message, e);
-            area.Host.RunOnUiThread(() => area.ShowStatus($"{message}: {e.Message}"));
+            area.Host.RunOnUiThread(() => area.ShowStatus($"{message}: {Storyworthtelling.Diagnostics.PlainError.Describe(e)}"));
         }
     }
 }
