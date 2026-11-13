@@ -131,6 +131,13 @@ public sealed class VaultSync
             CredentialStore.HomeLatitude = vaultData.Maps.HomeLatitude;
             CredentialStore.HomeLongitude = vaultData.Maps.HomeLongitude;
         }
+
+        // Verdicts on the shared keys, both ways (audit 11 §13). Foreword reads the Claude key from the vault and keeps
+        // its own copy of the reMarkable token.
+        await vault.SyncKeyHealthAsync(
+            Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
+            id => id == Storyworthtelling.Remarkable.RemarkableCredentialId.Value ? CredentialStore.RemarkableDeviceToken : null,
+            cancellationToken);
     }
 
     // Whose phone this is is inferred from the account that owns the shared vault, so every read of

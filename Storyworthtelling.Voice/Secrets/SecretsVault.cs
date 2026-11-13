@@ -86,6 +86,12 @@ public sealed record SecretsVault
     public string OwnerAccount { get; init; } = string.Empty;
 
     /// <summary>The vault layout this build writes. A file with a higher number is refused, never written over.</summary>
+    /// <summary>
+    /// The last verdict on each shared credential (Claude, Gemini, reMarkable), so a refusal one app saw reaches the
+    /// others (audit 11 §13). Each entry names the value it was about by fingerprint; see <see cref="VaultKeyHealth"/>.
+    /// </summary>
+    public IReadOnlyDictionary<string, SharedKeyHealth> KeyHealth { get; init; } = new Dictionary<string, SharedKeyHealth>();
+
     public const int CurrentSchema = 1;
 
     /// <summary>The layout the file was written in; absent in files from before there was one, which read as 1.</summary>
@@ -301,5 +307,13 @@ public sealed record ConstitutionSecrets(
     string SleepNumberPassword = "")
 {
     [JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtensionData { get; init; }
+}
+
+/// <summary>One shared credential's last verdict, and a fingerprint of the value it was about (never the value).</summary>
+public sealed record SharedKeyHealth(
+    Storyworthtelling.Voice.Health.CredentialStatus Status, string Message, DateTimeOffset CheckedAtUtc, string Fingerprint)
+{
+    [System.Text.Json.Serialization.JsonExtensionData]
     public Dictionary<string, JsonElement>? ExtensionData { get; init; }
 }

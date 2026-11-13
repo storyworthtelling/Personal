@@ -33,6 +33,9 @@ public sealed class CredentialHealthStore(ICredentialHealthStorage storage, Func
     public void MarkFailing(string credentialId, string message) =>
         Update(report => report.MarkFailing(credentialId, message, now()));
 
+    /// <summary>Applies <paramref name="change"/> to the stored report under the store's lock.</summary>
+    public void Change(Func<CredentialHealthReport, CredentialHealthReport> change) => Update(change);
+
     /// <summary>Back to Unknown, for a credential just replaced (see <see cref="CredentialHealthReport.Forget"/>).</summary>
     public void Forget(string credentialId) => Update(report => report.Forget(credentialId));
 

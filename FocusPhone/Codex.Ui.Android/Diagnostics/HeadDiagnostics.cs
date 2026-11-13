@@ -22,6 +22,10 @@ namespace Codex.Ui;
 /// <param name="Directory">Where the logs live; null is FilesDir (Constitution keeps its in NoBackupFilesDir).</param>
 /// <param name="ExtraLogs">The head's other trails, each its own file and cap, all sealed and uploaded.</param>
 /// <param name="ScheduleUpload">False for Post, whose own upload worker shipped first under its own frozen name.</param>
+/// <param name="LocalKeyValue">
+/// The head's own copy of a shared credential (Claude, Gemini, reMarkable), for the launch-time exchange of key verdicts
+/// through the vault (audit 11 §13); null, or a null answer, when the head uses the vault's value.
+/// </param>
 public sealed record HeadSetup(
     string Label,
     string LoopApp,
@@ -31,7 +35,8 @@ public sealed record HeadSetup(
     string? Phone = LogPhone.Owner,
     string? Directory = null,
     IReadOnlyList<(string FileName, long MaxBytes)>? ExtraLogs = null,
-    bool ScheduleUpload = true);
+    bool ScheduleUpload = true,
+    Func<string, string?>? LocalKeyValue = null);
 
 /// <summary>
 /// The log loop on a native head, once (LOG-LOOP-PLAN.md §3, §4.1–4.4). Installed first thing from the head's
@@ -115,7 +120,28 @@ public sealed class HeadDiagnostics
         {
             LoopUploadWorker.Schedule(application);
         }
+        _ = Task.Run(head.SyncKeyHealthAsync);
         return head;
+    }
+
+    // Audit 11 §13: a refused shared key seen here reaches the other apps, and theirs reach this one's settings.
+    private async Task SyncKeyHealthAsync()
+    {
+        try
+        {
+            if (!setup.SignedIn() || !VaultPassphraseStore.IsSet)
+            {
+                return;
+            }
+
+            await new SecretsVaultAccess(setup.DriveToken, setup.Label).Service.SyncKeyHealthAsync(
+                HeadCredentialHealth.Store(), setup.LocalKeyValue ?? (_ => null), CancellationToken.None);
+        }
+        catch (Exception e)
+        {
+            // Kept by its shape, never its message (audit 08 §6, §28).
+            Quiet(LogSources.Vault, "Shared key verdicts did not sync", e);
+        }
     }
 
     public void Warn(string source, string message, Exception? exception = null) =>

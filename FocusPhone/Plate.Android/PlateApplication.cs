@@ -27,6 +27,8 @@ public class PlateApplication : Application
         // Plate kept no file log before (G3).
         HeadDiagnostics.Install(this, new HeadSetup(
             "Plate", "plate", PlateKeyActions.SendLogsNow,
-            new VoiceGoogleAccount().GetAccessToken, () => VoiceGoogleAccount.IsSignedIn));
+            new VoiceGoogleAccount().GetAccessToken, () => VoiceGoogleAccount.IsSignedIn,
+            // Plate keeps its own copy of the reMarkable token; the Claude key it reads from the vault.
+            LocalKeyValue: id => id == Storyworthtelling.Voice.Health.SharedCredentialIds.Remarkable ? PlateRemarkable.DeviceToken : null));
     }
 }

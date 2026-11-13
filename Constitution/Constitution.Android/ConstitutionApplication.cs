@@ -44,6 +44,20 @@ public class ConstitutionApplication : Application
                 (WorkoutsLog.FileName, WorkoutsLog.MaxBytes),
                 (BudgetTrail.FileName, BudgetTrail.MaxBytes),
                 (WeeklyMeals.MealsLog.FileName, WeeklyMeals.MealsLog.MaxBytes),
-            ]));
+            ],
+            // Constitution keeps its own copies of the shared credentials (audit 11 §13).
+            LocalKeyValue: ConstitutionKeyValue));
+    }
+
+    private string? ConstitutionKeyValue(string id)
+    {
+        var connections = new Services.ConstitutionConnections(this);
+        return id switch
+        {
+            Storyworthtelling.Voice.Health.SharedCredentialIds.Claude => connections.ClaudeApiKey,
+            Storyworthtelling.Voice.Health.SharedCredentialIds.Gemini => connections.GeminiApiKey,
+            Storyworthtelling.Voice.Health.SharedCredentialIds.Remarkable => connections.RemarkableDeviceToken,
+            _ => null,
+        };
     }
 }
