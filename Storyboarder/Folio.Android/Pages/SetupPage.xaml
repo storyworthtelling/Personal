@@ -57,7 +57,7 @@
             <Label Text="Google account" Style="{StaticResource TitleLabel}" />
             <Label Text="Sign in with the Google account on this phone to pick a Doc to convert. Grant the documents and Drive read permissions when prompted."
                    Style="{StaticResource SecondaryLabel}" />
-            <Button Text="Sign in with Google"
+            <Button x:Name="GoogleSignInButton" Text="Sign in with Google"
                     Clicked="OnGoogleSignInClicked" Style="{StaticResource SecondaryButton}" />
             <Label x:Name="GoogleStatusLabel" Style="{StaticResource SecondaryLabel}" />
 

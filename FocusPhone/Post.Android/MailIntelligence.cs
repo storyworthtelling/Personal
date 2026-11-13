@@ -30,6 +30,7 @@ internal static class MailIntelligence
         var asked = 0;
         var placed = 0;
         var remembered = 0;
+        var stoppedAfterFailure = false;
 
         foreach (var item in database.Cache.LoadRecent(limit: 300))
         {
@@ -51,11 +52,14 @@ internal static class MailIntelligence
                     continue;
                 }
 
-                var (reading, byClaude) = await ReadAsync(item, promotions, reader);
+                // After a failed call the rest of the pass is rules only: a refused key, a rate limit or an empty
+                // balance would refuse every message the same way, and each refusal is a request (audit 11 §10).
+                var (reading, byClaude) = await ReadAsync(item, promotions, stoppedAfterFailure ? null : reader);
                 if (byClaude)
                 {
                     asked++;
                     placed += reading.Kind is null ? 0 : 1;
+                    stoppedAfterFailure = reading.CallFailed;
                 }
                 OfferAnyDetectedDate(context, item, reading.Event, now);
 
@@ -80,7 +84,8 @@ internal static class MailIntelligence
         // since the reader returns "no idea" for every failure rather than throwing.
         if (asked > 0)
         {
-            PostDiagnostics.LogInfo("Mail", $"MAIL SORTING asked Claude about {asked}, it placed {placed}; {remembered} re-fetched judged from memory");
+            PostDiagnostics.LogInfo("Mail", $"MAIL SORTING asked Claude about {asked}, it placed {placed}; {remembered} re-fetched judged from memory"
+                + (stoppedAfterFailure ? "; stopped asking after a failed call" : string.Empty));
         }
 
         AgeOutTrivia(database, now);

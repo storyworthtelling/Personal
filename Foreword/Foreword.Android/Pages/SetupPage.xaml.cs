@@ -41,6 +41,8 @@ public partial class SetupPage : BinderPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // A sign-in Google turned away says so on the button (audit 11 §4).
+        GoogleSignInButton.Text = Storyworthtelling.Maui.Health.GoogleSignInHealth.ButtonLabel("Sign in");
 
         // Read from the worker's own constants, so the screen cannot state a delivery time the
         // schedule does not use.
@@ -53,12 +55,13 @@ public partial class SetupPage : BinderPage
 
         LastDeliveryCaption.Text = CredentialStore.LastDeliverySummary;
 
-        RemarkableStatusLabel.Text = string.IsNullOrEmpty(CredentialStore.RemarkableDeviceToken)
-            ? "Not paired — documents are built and held until it is"
-            : "Paired";
-        RemarkableReplaceButton.Text = string.IsNullOrEmpty(CredentialStore.RemarkableDeviceToken)
-            ? "Pair"
-            : "Re-pair";
+        // The pairing's health, not the token's presence: a revoked pairing used to read "Paired" (audit 11 §11).
+        var pairing = Storyworthtelling.Remarkable.RemarkablePairingStatus.Describe(
+            !string.IsNullOrEmpty(CredentialStore.RemarkableDeviceToken),
+            Storyworthtelling.Maui.Health.MauiCredentialHealth.Store().Load().Get(Storyworthtelling.Remarkable.RemarkableCredentialId.Value),
+            "Not paired — documents are built and held until it is");
+        RemarkableStatusLabel.Text = pairing.Line;
+        RemarkableReplaceButton.Text = pairing.Button;
 
         GoogleStatusLabel.Text = CredentialStore.IsGoogleConfigured
             ? CredentialStore.GoogleAccountEmail

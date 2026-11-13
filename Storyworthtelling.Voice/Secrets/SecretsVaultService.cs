@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Diagnostics;
 
 namespace Storyworthtelling.Voice.Secrets;
@@ -117,6 +118,33 @@ public sealed class SecretsVaultService
                 return (SecretsVaultPublishResult.WriteFailed(ex.Message), ex);
             }
         }
+    }
+
+    /// <summary>
+    /// Carries the verdicts on the shared credentials both ways (audit 11 §13; see <see cref="VaultKeyHealth"/>): the
+    /// vault's newer ones into <paramref name="health"/>, then this app's newer ones into the vault — only when there is
+    /// something new, and never from a phone that may only read the vault. Never throws for an unreadable vault or a
+    /// failed write; those are trailed by <see cref="LoadAsync"/> and <see cref="PublishAsync"/>.
+    /// </summary>
+    /// <param name="localValue">This app's own copy of a shared credential, or null when it uses the vault's value.</param>
+    public async Task SyncKeyHealthAsync(
+        CredentialHealthStore health, Func<string, string?> localValue, CancellationToken cancellationToken)
+    {
+        var loaded = await LoadAsync(cancellationToken);
+        if (loaded.Status != SecretsVaultStatus.Loaded)
+        {
+            return;
+        }
+
+        health.Change(report => VaultKeyHealth.Pull(loaded.Vault, report, localValue));
+        if (VaultKeyHealth.Push(loaded.Vault, health.Load(), localValue) is null
+            || !VaultOwnership.Decide(loaded.FileOwnership).CanWrite())
+        {
+            return;
+        }
+
+        var report = health.Load();
+        await PublishAsync(vault => VaultKeyHealth.Push(vault, report, localValue) ?? vault, cancellationToken);
     }
 
     /// <summary>How many times a publish reads again after finding the vault changed under it.</summary>

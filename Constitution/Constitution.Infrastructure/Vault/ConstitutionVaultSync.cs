@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Health;
 using Constitution.Domain.Health;
 using Storyworthtelling.Voice.Secrets;
 
@@ -33,12 +34,14 @@ public sealed class ConstitutionVaultSync
     /// <param name="signedInAccount">The Google account this install is bound to, or null before sign-in. It decides who may write the shared vault.</param>
     /// <param name="connections">This install's local copy of the connections.</param>
     /// <param name="log">Where outcome phrases go.</param>
+    /// <param name="health">This install's credential health: a refused reMarkable pairing yields to the vault's (audit 11 §13).</param>
     public ConstitutionVaultSync(
         ISecretsVaultStore sharedStore,
         DrivePersonalVaultStore personalStore,
         Func<string?> signedInAccount,
         IConstitutionConnections connections,
-        IConstitutionVaultLog log)
+        IConstitutionVaultLog log,
+        CredentialHealthStore? health = null)
     {
         ArgumentNullException.ThrowIfNull(sharedStore);
         ArgumentNullException.ThrowIfNull(personalStore);
@@ -50,7 +53,10 @@ public sealed class ConstitutionVaultSync
         this.signedInAccount = signedInAccount;
         this.connections = connections;
         this.log = log;
+        this.health = health;
     }
+
+    private readonly CredentialHealthStore? health;
 
     /// <summary>
     /// Fills every connection this install is missing from the vaults. Reads both, writes neither.
@@ -70,7 +76,15 @@ public sealed class ConstitutionVaultSync
         {
             Fill(VaultField.SleepNumberLogin, connections.SleepNumberLogin, shared.Vault.Constitution.SleepNumberLogin, value => connections.SleepNumberLogin = value, filled);
             Fill(VaultField.SleepNumberPassword, connections.SleepNumberPassword, shared.Vault.Constitution.SleepNumberPassword, value => connections.SleepNumberPassword = value, filled);
-            Fill(VaultField.RemarkableDeviceToken, connections.RemarkableDeviceToken, shared.Vault.Remarkable.DeviceToken, value => connections.RemarkableDeviceToken = value, filled);
+            if (health is null)
+            {
+                Fill(VaultField.RemarkableDeviceToken, connections.RemarkableDeviceToken, shared.Vault.Remarkable.DeviceToken, value => connections.RemarkableDeviceToken = value, filled);
+            }
+            else if (VaultRestore.Apply(connections.RemarkableDeviceToken, shared.Vault.Remarkable.DeviceToken, SharedCredentialIds.Remarkable, health,
+                value => connections.RemarkableDeviceToken = value))
+            {
+                filled.Add(VaultField.RemarkableDeviceToken);
+            }
             Refresh(VaultField.ClaudeApiKey, connections.ClaudeApiKey, shared.Vault.Claude.ApiKey, value => connections.ClaudeApiKey = value, filled);
             Refresh(VaultField.GeminiApiKey, connections.GeminiApiKey, shared.Vault.Gemini.ApiKey, value => connections.GeminiApiKey = value, filled);
         }

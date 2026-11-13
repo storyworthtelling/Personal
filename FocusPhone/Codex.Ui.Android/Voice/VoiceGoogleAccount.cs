@@ -3,6 +3,7 @@ using global::Android.Accounts;
 using global::Android.App;
 using global::Android.Content;
 using Storyworthtelling.Diagnostics;
+using Storyworthtelling.Voice.Health;
 
 namespace Codex.Ui.Voice;
 
@@ -61,7 +62,12 @@ public sealed class VoiceGoogleAccount
     }
 
     public Task<string> GetAccessToken() =>
-        (tokens ??= new DeviceAccountTokens(() => Email, tokenScope, "Sign in with Google first.")).GetAccessToken();
+        Tokens().GetAccessToken();
+
+    // A refused sign-in is reported to the head's own credential health, which the Settings row and the dog-ear
+    // read (audit 11 §4).
+    private DeviceAccountTokens Tokens() => tokens ??= new DeviceAccountTokens(
+        () => Email, tokenScope, "Sign in with Google first.", GoogleAccountNotice.Reporter(HeadCredentialHealth.Store()));
 
     // The sign-in under way and where its trail goes once it ends (LOG-LOOP-PLAN.md §4.2). Static, like
     // pendingChoice, because the picker's answer arrives through the activity, not through this instance.
@@ -107,6 +113,8 @@ public sealed class VoiceGoogleAccount
             }
             Finish(t => t.TokenReceived(DateTimeOffset.Now, scopes, DateTimeOffset.Now.AddMinutes(45), "oauth2 (AccountManager)"));
             SetEmail(email);
+            // The consent screen answered: whatever the background fetch was refused, it is settled (audit 11 §4).
+            HeadCredentialHealth.Store().MarkOk(SharedCredentialIds.GoogleAccount);
             return email;
         }
         catch (global::Android.Accounts.OperationCanceledException e)

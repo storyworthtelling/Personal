@@ -1,3 +1,4 @@
+using Codex.Ui.Voice;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
@@ -216,6 +217,8 @@ public abstract class ConstitutionActivity : Activity
 
         household.Resumed();
         NoticePoster.AskIfNeeded(this);
+        // Google turned the background sign-in away: say so behind the fold (audit 11 §4).
+        GoogleSignInHealth.ShowNotice(this, overlay);
 
         // Where background reads are not granted the app's own opening is the refresh (R5); off the UI thread.
         BodyServices.RefreshAtOpen(this);

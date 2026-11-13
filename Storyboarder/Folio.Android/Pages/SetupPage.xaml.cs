@@ -29,6 +29,8 @@ public partial class SetupPage : FolioBinderPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        // A sign-in Google turned away says so on the button (audit 11 §4).
+        GoogleSignInButton.Text = Storyworthtelling.Maui.Health.GoogleSignInHealth.ButtonLabel("Sign in with Google");
         // Pre-fill the (usually hidden) entries so a save never wipes a stored key; ApplyCredentialFields
         // then decides which fields to actually show based on each key's last-known health.
         ClaudeKeyEntry.Text = SettingsStore.ClaudeApiKey;
@@ -476,7 +478,11 @@ public partial class SetupPage : FolioBinderPage
     private void UpdateRemarkableStatus()
     {
         var paired = !string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken);
-        RemarkableStatusLabel.Text = paired ? "Registered ✓" : "Not registered yet.";
+        // The pairing's health, not the token's presence: a revoked pairing used to read "Registered ✓" (audit 11 §11).
+        RemarkableStatusLabel.Text = Storyworthtelling.Remarkable.RemarkablePairingStatus.Describe(
+            paired,
+            Storyworthtelling.Maui.Health.MauiCredentialHealth.Store().Load().Get(Storyworthtelling.Remarkable.RemarkableCredentialId.Value),
+            "Not registered yet.").Line;
         RemarkableSwitch.IsEnabled = paired;
         if (!paired && RemarkableSwitch.IsToggled)
         {

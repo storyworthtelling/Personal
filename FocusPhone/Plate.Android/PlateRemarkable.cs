@@ -8,6 +8,7 @@ using Storyworthtelling.Paper;
 using Storyworthtelling.Remarkable;
 using Storyworthtelling.Voice.Secrets;
 using Codex.Ui.Http;
+using Storyworthtelling.Voice.Health;
 
 namespace Plate;
 
@@ -86,7 +87,8 @@ public sealed class PlateRemarkable(VoiceGoogleAccount account)
     {
         try
         {
-            if (IsPaired || !VaultPassphraseStore.IsSet || !VoiceGoogleAccount.IsSignedIn)
+            var refused = HeadCredentialHealth.Store().Load().Get(RemarkableCredentialId.Value).Status == CredentialStatus.Failing;
+            if ((IsPaired && !refused) || !VaultPassphraseStore.IsSet || !VoiceGoogleAccount.IsSignedIn)
             {
                 return;
             }
@@ -99,10 +101,9 @@ public sealed class PlateRemarkable(VoiceGoogleAccount account)
             }
 
             SharedDriveFileIds.SeedFrom(result.Vault.DriveFileIds);
-            if (!string.IsNullOrEmpty(result.Vault.Remarkable.DeviceToken))
-            {
-                DeviceToken = result.Vault.Remarkable.DeviceToken;
-            }
+            // A pairing the tablet refused yields to the vault's newer one (audit 11 §13).
+            VaultRestore.Apply(DeviceToken, result.Vault.Remarkable.DeviceToken, RemarkableCredentialId.Value,
+                HeadCredentialHealth.Store(), value => DeviceToken = value);
         }
         catch (Exception e)
         {

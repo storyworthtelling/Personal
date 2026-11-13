@@ -109,7 +109,11 @@ public sealed class VaultSync
 
         FillIfEmpty(CredentialStore.NytSessionCookie, vaultData.Nyt.SessionCookie, v => CredentialStore.NytSessionCookie = v);
         FillIfEmpty(CredentialStore.NytApiKey, vaultData.Nyt.ApiKey, v => CredentialStore.NytApiKey = v);
-        FillIfEmpty(CredentialStore.RemarkableDeviceToken, vaultData.Remarkable.DeviceToken, v => CredentialStore.RemarkableDeviceToken = v);
+        // A pairing the tablet refused yields to the vault's newer one (audit 11 §13).
+        Storyworthtelling.Voice.Secrets.VaultRestore.Apply(
+            CredentialStore.RemarkableDeviceToken, vaultData.Remarkable.DeviceToken,
+            Storyworthtelling.Remarkable.RemarkableCredentialId.Value, Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
+            v => CredentialStore.RemarkableDeviceToken = v);
         FillIfEmpty(CredentialStore.AnthropicApiKey, vaultData.Foreword.AnthropicApiKey, v => CredentialStore.AnthropicApiKey = v);
         // The shared vault's mapping is the one the first install wrote before the choices became per
         // account. Only that account takes it: another account restoring it would print somebody else's
@@ -127,6 +131,13 @@ public sealed class VaultSync
             CredentialStore.HomeLatitude = vaultData.Maps.HomeLatitude;
             CredentialStore.HomeLongitude = vaultData.Maps.HomeLongitude;
         }
+
+        // Verdicts on the shared keys, both ways (audit 11 §13). Foreword reads the Claude key from the vault and keeps
+        // its own copy of the reMarkable token.
+        await vault.SyncKeyHealthAsync(
+            Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
+            id => id == Storyworthtelling.Remarkable.RemarkableCredentialId.Value ? CredentialStore.RemarkableDeviceToken : null,
+            cancellationToken);
     }
 
     // Whose phone this is is inferred from the account that owns the shared vault, so every read of

@@ -56,6 +56,14 @@ public sealed class CredentialHealthReport
     public CredentialHealthReport MarkFailing(string id, string message, DateTimeOffset checkedAtUtc) =>
         With(id, CredentialHealth.Failing(message, checkedAtUtc));
 
+    /// <summary>Back to Unknown: a new value arrived, so the old one's refusal no longer describes it.</summary>
+    public CredentialHealthReport Forget(string id)
+    {
+        var next = new Dictionary<string, CredentialHealth>(entries);
+        next.Remove(id);
+        return new CredentialHealthReport(next);
+    }
+
     public CredentialHealthReport With(string id, CredentialHealth health)
     {
         var next = new Dictionary<string, CredentialHealth>(entries) { [id] = health };

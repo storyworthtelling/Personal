@@ -116,10 +116,16 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
             _ => "No mail account yet.",
         }), Spaced(DesignTokens.Space.X6, 0));
 
+        // The Gmail API's own refusal is recorded under gmail-account, which this screen never read (audit 11 §12).
+        var gmailRefused = HeadCredentialHealth.Store().Load().Get(CredentialIds.GmailAccount).Status == CredentialStatus.Failing;
         var voiceStatus = PaperUi.Secondary(Host, VoiceGoogleAccount.IsSignedIn
-            ? $"Signed in as {VoiceGoogleAccount.Email}."
+            ? GoogleSignInHealth.NeedsSignIn()
+                ? $"Google turned the sign-in for {VoiceGoogleAccount.Email} away. Sign in again."
+                : gmailRefused
+                    ? $"Gmail refused {VoiceGoogleAccount.Email}, so mail is waiting. Sign in again to grant mail access."
+                    : $"Signed in as {VoiceGoogleAccount.Email}."
             : "Sign in with Google to move mail to the Gmail API and back up your credentials to your encrypted vault.");
-        var voiceSignIn = PaperUi.SecondaryButton(Host, "Sign in with Google", () => _ = SignInAsync(voiceStatus));
+        var voiceSignIn = PaperUi.SecondaryButton(Host, gmailRefused ? GoogleSignInHealth.SignInAgain : GoogleSignInHealth.ButtonLabel("Sign in with Google"), () => _ = SignInAsync(voiceStatus));
         layout.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));
         layout.AddView(voiceStatus, Spaced(DesignTokens.Space.X2, 0));
 

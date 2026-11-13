@@ -580,13 +580,13 @@ public class LauncherSettingsActivity : Activity
 
         // The AI glyph reads the shared Claude key from the encrypted vault on Drive, which needs a Google
         // sign-in. Without it there was no path to sign in, so the glyph stayed a monogram (P5-27).
-        if (VoiceGoogleAccount.IsSignedIn)
+        if (VoiceGoogleAccount.IsSignedIn && !GoogleSignInHealth.NeedsSignIn())
         {
             AddCardCaption($"Signed in with Google as {VoiceGoogleAccount.Email} — AI glyphs enabled.");
         }
         else
         {
-            var signIn = PaperUi.SecondaryButton(this, "Sign in with Google (for AI shelf glyphs)", SignInWithGoogle);
+            var signIn = PaperUi.SecondaryButton(this, GoogleSignInHealth.ButtonLabel("Sign in with Google (for AI shelf glyphs)"), SignInWithGoogle);
             var lp = MatchWrap();
             lp.TopMargin = Dp(DesignTokens.Space.X2);
             content!.AddView(signIn, lp);

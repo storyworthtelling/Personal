@@ -131,10 +131,12 @@ public sealed class SettingsArea(Activity host)
         column.AddView(Spaced(PaperUi.Label(Host, "Vault passphrase"), DesignTokens.Space.X6, DesignTokens.Space.X1));
         column.AddView(BuildPassphrase(model.Passphrase), Spaced(DesignTokens.Space.X1));
         column.AddView(PaperUi.Secondary(Host, model.Passphrase.Helper), Spaced(DesignTokens.Space.X1));
-        if (!VoiceGoogleAccount.IsSignedIn)
+        if (!VoiceGoogleAccount.IsSignedIn || GoogleSignInHealth.NeedsSignIn())
         {
-            column.AddView(PaperUi.Secondary(Host, signInStatus ?? "The vault needs a Google sign-in."), Spaced(DesignTokens.Space.X3));
-            column.AddView(PaperUi.SecondaryButton(Host, "Sign in with Google", () => _ = SignInAsync()), Spaced(DesignTokens.Space.X1));
+            column.AddView(PaperUi.Secondary(Host, signInStatus ?? (VoiceGoogleAccount.IsSignedIn
+                ? "Google turned this phone's sign-in away, so the vault and the household file are waiting."
+                : "The vault needs a Google sign-in.")), Spaced(DesignTokens.Space.X3));
+            column.AddView(PaperUi.SecondaryButton(Host, GoogleSignInHealth.ButtonLabel("Sign in with Google"), () => _ = SignInAsync()), Spaced(DesignTokens.Space.X1));
         }
 
         column.AddView(PaperUi.QuietButton(Host, exportStatus is null ? model.ExportLabel : "Export diagnostics again", ExportDiagnostics),

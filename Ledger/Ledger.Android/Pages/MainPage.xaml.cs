@@ -1569,6 +1569,9 @@ public partial class MainPage : LedgerBinderPage
         }
         lastNoticeKeys = newKeys;
 
+        // Google turned the background sign-in away: the vault and the snapshot are waiting (audit 11 §4).
+        Storyworthtelling.Maui.Health.GoogleSignInHealth.Apply(dogEarState);
+
         dogEar.Refresh();
     }
 

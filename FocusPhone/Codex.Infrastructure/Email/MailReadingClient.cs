@@ -84,7 +84,7 @@ public sealed class MailReadingClient
             // Deliberately broad. Anything at all going wrong here means "no idea", never
             // a failed sync — mail arriving matters more than mail being sorted. It is said, though.
             log?.Invoke(ClaudeCallLine.Failed("mail-reading", e));
-            return MailReading.Nothing;
+            return MailReading.Failed;
         }
     }
 

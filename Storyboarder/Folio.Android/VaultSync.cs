@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Claude;
 using Storyworthtelling.Voice;
 using Folio.Infrastructure.Vault;
@@ -51,7 +52,23 @@ public sealed class VaultSync
         SettingsStore.GeminiApiKey = ClaudeKeySource.Choose(result.Vault.Gemini.ApiKey, SettingsStore.GeminiApiKey);
         // The reMarkable token may have been paired in a sibling app (e.g. Foreword) — restore it so
         // Folio delivers without a separate pairing.
-        if (string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken) && !string.IsNullOrEmpty(result.Vault.Remarkable.DeviceToken))
-            SettingsStore.RemarkableDeviceToken = result.Vault.Remarkable.DeviceToken;
+        // A pairing the tablet refused yields to the vault's newer one (audit 11 §13).
+        VaultRestore.Apply(
+            SettingsStore.RemarkableDeviceToken, result.Vault.Remarkable.DeviceToken,
+            Storyworthtelling.Remarkable.RemarkableCredentialId.Value, Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
+            value => SettingsStore.RemarkableDeviceToken = value);
+
+        // Verdicts on the shared keys, both ways (audit 11 §13): a 401 Post or Plate saw now reaches Folio's Claude
+        // field, and Folio's reach them. Folio keeps its own copies of all three.
+        await vault.SyncKeyHealthAsync(
+            Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
+            id => id switch
+            {
+                SharedCredentialIds.Claude => SettingsStore.ClaudeApiKey,
+                SharedCredentialIds.Gemini => SettingsStore.GeminiApiKey,
+                SharedCredentialIds.Remarkable => SettingsStore.RemarkableDeviceToken,
+                _ => null,
+            },
+            cancellationToken);
     }
 }

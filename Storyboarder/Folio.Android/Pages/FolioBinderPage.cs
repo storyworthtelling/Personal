@@ -117,6 +117,14 @@ public abstract class FolioBinderPage : ContentPage
         }
     }
 
+    // Every binder page carries the sign-in notice when Google turned the background sign-in away (audit 11 §4).
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        Storyworthtelling.Maui.Health.GoogleSignInHealth.Apply(folds);
+        corner?.Refresh();
+    }
+
     /// <summary>
     /// Puts something behind the header <b>and</b> the content, rather than behind the content
     /// alone.

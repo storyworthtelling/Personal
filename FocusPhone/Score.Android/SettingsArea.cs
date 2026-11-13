@@ -109,7 +109,8 @@ public sealed class SettingsArea : ScoreArea
     {
         if (MusicSettingsStore.GoogleAccountEmail is { Length: > 0 } email)
         {
-            return Settled($"Signed in as {email}", "Sign in again", () => _ = library.SignInAsync());
+            return Settled(GoogleSignInHealth.NeedsSignIn() ? $"Google turned the sign-in for {email} away" : $"Signed in as {email}",
+                "Sign in again", () => _ = library.SignInAsync());
         }
 
         return PaperUi.PrimaryButton(Host, "Sign in with Google", () => _ = library.SignInAsync());

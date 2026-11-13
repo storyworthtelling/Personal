@@ -35,6 +35,8 @@ public static class DeviceAccountSignIn
             await EnsureConsent(activity, email);
             Finish(t => t.TokenReceived(DateTimeOffset.Now, [DeviceAccountTokenProvider.TokenScope], null, "oauth2 (AccountManager)"));
             MusicSettingsStore.GoogleAccountEmail = email;
+            // The consent screen answered: whatever the background fetch was refused, it is settled (audit 11 §4).
+            Codex.Ui.Voice.HeadCredentialHealth.Store().MarkOk(Storyworthtelling.Voice.Health.SharedCredentialIds.GoogleAccount);
             return email;
         }
         catch (global::Android.Accounts.OperationCanceledException e)

@@ -48,10 +48,12 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         // The Google account, which is here for the vault and nothing else.
         column.AddView(Label("Google account", gap));
         column.AddView(PaperUi.Body(Host, VoiceGoogleAccount.IsSignedIn
-            ? VoiceGoogleAccount.Email
+            ? GoogleSignInHealth.NeedsSignIn()
+                ? $"{VoiceGoogleAccount.Email} — Google turned the sign-in away"
+                : VoiceGoogleAccount.Email
             : "Not signed in."));
         column.AddView(PaperUi.SecondaryButton(Host,
-            VoiceGoogleAccount.IsSignedIn ? "Use another account" : "Sign in", SignIn));
+            VoiceGoogleAccount.IsSignedIn ? GoogleSignInHealth.ButtonLabel("Use another account") : "Sign in", SignIn));
         column.AddView(PaperUi.Secondary(Host,
             "Only to read the shared vault. Plate keeps no account of its own, and nothing it "
             + "captures goes to Drive by this route."));
@@ -68,21 +70,30 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
 
         // The tablet.
         column.AddView(Label("reMarkable", gap));
-        if (PlateRemarkable.IsPaired)
+        // The pairing's health, not the token's presence (audit 11 §11): a revoked pairing opens the code field.
+        var pairing = Storyworthtelling.Remarkable.RemarkablePairingStatus.Describe(
+            PlateRemarkable.IsPaired,
+            HeadCredentialHealth.Store().Load().Get(Storyworthtelling.Remarkable.RemarkableCredentialId.Value),
+            "Not paired.");
+        if (!pairing.NeedsPairing)
         {
             // §3: a working credential is a done state, not a field to keep on screen.
-            column.AddView(PaperUi.Body(Host, "Paired ✓"));
+            column.AddView(PaperUi.Body(Host, pairing.Line));
             column.AddView(PaperUi.Secondary(Host,
                 "Scans sent here land at the root of the tablet."));
             column.AddView(PaperUi.SecondaryButton(Host, "Pair again", ShowPairingField));
         }
         else
         {
+            if (PlateRemarkable.IsPaired)
+            {
+                column.AddView(PaperUi.Body(Host, pairing.Line));
+            }
             column.AddView(PaperUi.Secondary(Host,
                 "Open my.remarkable.com, choose to connect a device, and type the one-time code."));
             pairingCode = PaperUi.MonoField(Host, "one-time code");
             column.AddView(pairingCode);
-            column.AddView(PaperUi.SecondaryButton(Host, "Pair", Pair));
+            column.AddView(PaperUi.SecondaryButton(Host, pairing.Button, Pair));
         }
 
         status = PaperUi.Secondary(Host, "");

@@ -62,3 +62,48 @@ public class CachedAccessTokenTests
     public void ATokenTypeIsOauth2AndTheScopesInOrder() =>
         Assert.Equal("oauth2:" + GoogleScopes.Calendar + " " + GoogleScopes.Drive, GoogleScopes.ToTokenType(GoogleScopes.Drive, GoogleScopes.Calendar));
 }
+
+/// <summary>
+/// A token Google rejected is forgotten at once (audit 11 §4): it used to be handed out for the rest of its 45 minutes,
+/// so every Drive call in that time failed the same way. A different token — one fetched since — is left alone.
+/// </summary>
+public class RejectedTokenTests
+{
+    private DateTimeOffset now = new(2026, 11, 9, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task ARejectedTokenIsForgottenAndTheNextCallFetchesAFreshOneHandingTheOldOneBack()
+    {
+        var cache = new CachedAccessToken(TimeSpan.FromMinutes(45), () => now);
+        await cache.GetAsync(_ => "rejected");
+
+        Assert.True(cache.Forget("rejected"));
+        Assert.False(cache.Forget("rejected"));
+        string? stale = null;
+        var fresh = await cache.GetAsync(previous => { stale = previous; return "fresh"; });
+
+        Assert.Equal("fresh", fresh);
+        Assert.Equal("rejected", stale);
+    }
+
+    [Fact]
+    public async Task ForgettingAnOlderTokenLeavesTheCurrentOneInPlace()
+    {
+        var cache = new CachedAccessToken(TimeSpan.FromMinutes(45), () => now);
+        await cache.GetAsync(_ => "current");
+
+        Assert.False(cache.Forget("older"));
+        var again = await cache.GetAsync(_ => "fetched");
+
+        Assert.Equal("current", again);
+    }
+
+    [Fact]
+    public void ASignInGoogleTurnedAwayIsItsOwnKindOfFailureThatOldCatchesStillHold()
+    {
+        var refused = new GoogleSignInRequiredException("Google turned the sign-in away.");
+
+        Assert.IsAssignableFrom<InvalidOperationException>(refused);
+        Assert.Null(refused.Recovery);
+    }
+}

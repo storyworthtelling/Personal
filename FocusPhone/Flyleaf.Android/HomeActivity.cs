@@ -1,3 +1,4 @@
+using Codex.Ui.Voice;
 using Storyworthtelling.Diagnostics;
 using Codex.Domain.Diagnostics;
 using Android.App;
@@ -206,6 +207,8 @@ public class HomeActivity : Activity
         LockedSessionController.OnHome(this);
         ReloadScene();
         UpdateClock();
+        // Google turned the background sign-in away: say so behind the fold (audit 11 §4).
+        GoogleSignInHealth.ShowNotice(this, root!);
         UpdateSetDefaultLauncherButton();
         UpdateSetDefaultBrowserButton();
         UpdateCallBar();
