@@ -137,7 +137,7 @@ public class RefreshWorker : Worker
         catch (Exception ex)
         {
             logger.LogError(ex, "Refresh cycle threw and will be retried.");
-            SettingsStore.LastRunOutcome = $"Failed: {ex.Message}";
+            SettingsStore.LastRunOutcome = $"Failed: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Plaid")}";
             SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return Result.InvokeRetry();
         }

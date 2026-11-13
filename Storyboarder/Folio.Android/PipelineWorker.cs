@@ -123,7 +123,7 @@ public class PipelineWorker : Worker
         catch (Exception ex)
         {
             logger.LogError(ex, "Pipeline cycle threw and will be retried.");
-            SettingsStore.LastRunOutcome = $"Failed: {ex.Message}";
+            SettingsStore.LastRunOutcome = $"Failed: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Claude")}";
             SettingsStore.LastRunAtUtc = DateTime.UtcNow;
             return Result.InvokeRetry();
         }

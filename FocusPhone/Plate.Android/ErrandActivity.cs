@@ -313,7 +313,7 @@ public class ErrandActivity : AppCompatActivity
         {
             // The caller is blocked, so it hears either a picture or a plain cancel — never
             // a half-written file it would then try to read.
-            ShowStatus($"That one did not save: {e.Message}");
+            ShowStatus($"That one did not save: {Storyworthtelling.Diagnostics.PlainError.Describe(e)}");
         }
         finally
         {
@@ -609,7 +609,7 @@ public class ErrandActivity : AppCompatActivity
             host.RunOnUiThread(() =>
             {
                 host.DiscardFrame(file);
-                host.ShowStatus($"Could not read that: {e.Message}");
+                host.ShowStatus($"Could not read that: {Storyworthtelling.Diagnostics.PlainError.Describe(e)}");
             });
     }
 }

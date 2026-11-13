@@ -145,7 +145,16 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
     {
         if (shell.Camera.Capture is not { } capture)
         {
-            ShowStatus("The camera is not ready yet.");
+            // A refused permission is not "not ready": say which it is, and ask again while the phone still will
+            // (audit 11 §23).
+            var access = CameraWords.Access(
+                Host.CheckSelfPermission(Android.Manifest.Permission.Camera) == Android.Content.PM.Permission.Granted,
+                PlateActivity.CameraRefusedForGood);
+            ShowStatus(CameraWords.ForShutter(access));
+            if (CameraWords.ShouldAsk(access))
+            {
+                Host.RequestPermissions([Android.Manifest.Permission.Camera], 0);
+            }
             return;
         }
 

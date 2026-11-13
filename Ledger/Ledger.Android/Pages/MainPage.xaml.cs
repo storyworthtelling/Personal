@@ -1358,7 +1358,18 @@ public partial class MainPage : LedgerBinderPage
         return new VerticalStackLayout { Spacing = 4, Children = { labelRow, control } };
     }
 
-    private async void RemoveManualAccount(Account account)
+    // Audit 11 §15: a handler's failure folds into the dog-ear in plain words rather than crashing the app.
+    private async Task Guarded(string key, string headline, Func<Task> work)
+    {
+        await Storyworthtelling.Maui.State.GuardedWork.Run(
+            dogEarState, key, headline, work, failure => logger.LogError(failure, "{Headline}", headline));
+        dogEar.Refresh();
+    }
+
+    private async void RemoveManualAccount(Account account) =>
+        await Guarded("remove-account", $"Could not remove {account.Name}", () => RemoveManualAccountAsync(account));
+
+    private async Task RemoveManualAccountAsync(Account account)
     {
         var captured = await accounts.FindAccountAsync(account.Id, CancellationToken.None);
         if (captured is null)
@@ -1478,11 +1489,12 @@ public partial class MainPage : LedgerBinderPage
 
     private void DismissOverlay() => HideOverlay();
 
-    private async void MoveInstitution(Guid institutionId, Func<Guid, CancellationToken, Task> move)
-    {
-        await move(institutionId, CancellationToken.None);
-        await ReloadAsync();
-    }
+    private async void MoveInstitution(Guid institutionId, Func<Guid, CancellationToken, Task> move) =>
+        await Guarded("move-institution", "Could not move the bank", async () =>
+        {
+            await move(institutionId, CancellationToken.None);
+            await ReloadAsync();
+        });
 
     // Undo-first (DESIGN.md §7/§13): a disconnect removes the institution right away and folds the
     // dog-ear's corner with a reverse action, rather than a confirm dialog. The institution AND every
@@ -1490,7 +1502,10 @@ public partial class MainPage : LedgerBinderPage
     // the reverse puts that snapshot back under its original ids — so a hand-entered bank (no Plaid
     // credentials to restore from) and a Plaid bank's Savings override, order, colour and history all come
     // back (Guard R-G11).
-    private async void DisconnectInstitution(Institution institution)
+    private async void DisconnectInstitution(Institution institution) =>
+        await Guarded("disconnect", $"Could not disconnect {institution.Name}", () => DisconnectInstitutionAsync(institution));
+
+    private async Task DisconnectInstitutionAsync(Institution institution)
     {
         // Only one undo window is ever in flight (the dog-ear holds one): a previous disconnect whose window
         // is still open has had its undo replaced, so it closes now and its Item is released at Plaid —

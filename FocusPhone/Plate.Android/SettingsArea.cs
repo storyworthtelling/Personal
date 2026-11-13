@@ -153,7 +153,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         }
         catch (Exception e)
         {
-            ShowStatus($"Could not sign in: {e.Message}. Package: {AppSigningInfo.PackageName}, "
+            ShowStatus($"Could not sign in: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google")}. Package: {AppSigningInfo.PackageName}, "
                 + $"SHA-1: {AppSigningInfo.Sha1Fingerprint()} — register these as an OAuth client "
                 + "if they aren't already.");
         }
@@ -185,7 +185,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         }
         catch (Exception e)
         {
-            ShowStatus($"That code was refused: {e.Message}");
+            ShowStatus($"That code was refused: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "reMarkable")}");
         }
     }
 

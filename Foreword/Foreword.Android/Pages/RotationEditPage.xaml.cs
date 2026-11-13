@@ -193,15 +193,23 @@ public partial class RotationEditPage : BinderPage
 
     private async void OnDeleteClicked(object sender, EventArgs e)
     {
-        if (isNew && rotation.Members.Count == 0 && string.IsNullOrWhiteSpace(rotation.Name))
+        // Audit 11 §15: an async void with no try crashed the app on a navigation failure; it is caught here.
+        try
         {
-            await Navigation.PopAsync();
-            return;
-        }
+            if (isNew && rotation.Members.Count == 0 && string.IsNullOrWhiteSpace(rotation.Name))
+            {
+                await Navigation.PopAsync();
+                return;
+            }
 
-        if (await Save(settings.Rotations.Where(kept => kept.Id != rotation.Id).ToList()))
+            if (await Save(settings.Rotations.Where(kept => kept.Id != rotation.Id).ToList()))
+            {
+                await Navigation.PopAsync();
+            }
+        }
+        catch (Exception failure)
         {
-            await Navigation.PopAsync();
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write("Foreword.Android.Pages.RotationEditPage", Microsoft.Extensions.Logging.LogLevel.Warning, "The list could not be deleted", failure);
         }
     }
 
@@ -234,10 +242,12 @@ public partial class RotationEditPage : BinderPage
 
     private async Task<bool> Save(IReadOnlyList<PrayerRotation> kept)
     {
-        var saved = await settings.Save(kept);
+        var result = await settings.Save(kept);
+        var saved = result.Outcome == Foreword.Infrastructure.Prayer.PrayerSaveOutcome.Saved;
 
+        // Each failure says its own reason: no network, a refusal to write over, a wrong passphrase (audit 11 §25).
         StatusLabel.IsVisible = !saved;
-        StatusLabel.Text = settings.Sentence();
+        StatusLabel.Text = saved ? settings.Sentence() : result.Sentence();
 
         return saved;
     }

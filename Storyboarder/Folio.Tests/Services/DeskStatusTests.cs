@@ -63,7 +63,7 @@ public class DeskStatusTests
         Assert.Equal("Reading now", line.Heading);
         Assert.False(line.Stuck);
         Assert.Equal(
-            "The connection dropped part-way through the reply — 2 of 6 tries used; trying again.",
+            "The connection dropped part-way through — 2 of 6 tries used; trying again.",
             line.Problem);
     }
 

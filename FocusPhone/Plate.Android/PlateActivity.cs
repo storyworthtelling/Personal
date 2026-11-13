@@ -517,10 +517,20 @@ public class PlateActivity : AppCompatActivity
         base.OnBackPressed();
     }
 
+    /// <summary>Whether the last camera request came back refused without a dialog (audit 11 §23).</summary>
+    public static bool CameraRefusedForGood { get; private set; }
+
     public override void OnRequestPermissionsResult(int requestCode, string[] permissions,
         Android.Content.PM.Permission[] grantResults)
     {
         base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+        // Denied with no reason to show means Android no longer asks: only the phone's settings can turn it on.
+        var camera = Array.IndexOf(permissions, Android.Manifest.Permission.Camera);
+        if (camera >= 0 && camera < grantResults.Length)
+        {
+            CameraRefusedForGood = grantResults[camera] != Android.Content.PM.Permission.Granted
+                && !ShouldShowRequestPermissionRationale(Android.Manifest.Permission.Camera);
+        }
         foreach (var area in areas)
         {
             area.OnPermissionsResult();

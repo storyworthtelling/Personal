@@ -23,6 +23,16 @@ public static class CalendarErrors
         _ => "Google answered with an error.",
     };
 
+    // Google answers a rate limit or an exhausted quota with 403 as well as a real refusal; the reason code tells them
+    // apart (audit 11 §19, the codes Pulp's calendar client reads).
+    private static readonly HashSet<string> LimitReasons = new(StringComparer.Ordinal)
+    {
+        "rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded", "dailyLimitExceeded", "calendarUsageLimitsExceeded",
+    };
+
+    private static bool IsLimit(GoogleApiException google) =>
+        google.Error?.Errors?.Any(error => error.Reason is { } code && LimitReasons.Contains(code)) == true;
+
     /// <summary>
     /// Whether the failure is one the calendar can be expected to give, and if so its sentence. False for anything else, including a
     /// cancellation <paramref name="cancellation"/> asked for: the caller rethrows it.
@@ -36,7 +46,9 @@ public static class CalendarErrors
                 reason = access.Message;
                 return true;
             case GoogleApiException google:
-                reason = Reason(google.HttpStatusCode);
+                reason = google.HttpStatusCode == HttpStatusCode.Forbidden && IsLimit(google)
+                    ? Reason(HttpStatusCode.TooManyRequests)
+                    : Reason(google.HttpStatusCode);
                 return true;
             case HttpRequestException:
                 reason = "A calendar could not be reached.";

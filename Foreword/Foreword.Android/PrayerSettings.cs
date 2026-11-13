@@ -31,35 +31,18 @@ public sealed class PrayerSettings(IPrayerArchive archive)
     }
 
     /// <summary>
-    /// Replaces the rotation list, leaving everything else in the archive exactly as it was found.
-    /// Returns false when the archive would not open — the screen says so rather than appearing to
-    /// have saved.
+    /// Replaces the rotation list, leaving everything else in the archive exactly as it was found, and says which
+    /// way it went (audit 11 §25) — the screen says so rather than appearing to have saved.
     /// </summary>
-    public async Task<bool> Save(IReadOnlyList<PrayerRotation> rotations)
+    public async Task<Foreword.Infrastructure.Prayer.PrayerListSave> Save(IReadOnlyList<PrayerRotation> rotations)
     {
-        var key = CredentialStore.VaultPassphrase;
-
-        var opened = await archive.LoadAsync(key, CancellationToken.None);
-        Status = opened.Status;
-
-        if (opened.Status is PrayerArchiveStatus.WrongPassphrase or PrayerArchiveStatus.Corrupt)
+        var result = await Foreword.Infrastructure.Prayer.PrayerListSave.Run(archive, CredentialStore.VaultPassphrase, rotations);
+        Status = result.Status;
+        if (result.Outcome == Foreword.Infrastructure.Prayer.PrayerSaveOutcome.Saved)
         {
-            return false;
+            Rotations = rotations;
         }
-
-        try
-        {
-            await archive.SaveAsync(
-                opened.Archive with { Rotations = rotations }, key, CancellationToken.None);
-        }
-        catch (Exception)
-        {
-            // Including the archive refusing to be overwritten, which is not a bug to route around.
-            return false;
-        }
-
-        Rotations = rotations;
-        return true;
+        return result;
     }
 
     /// <summary>
