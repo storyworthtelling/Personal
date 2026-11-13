@@ -99,9 +99,10 @@ public sealed class VaultSync
 
         // Release F: restore the shared reMarkable device token if this install doesn't already hold
         // one — pairing once in Foreword lets Index's own worksheet delivery use it too.
-        if (string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken) && !string.IsNullOrEmpty(result.Vault.Remarkable.DeviceToken))
-        {
-            SettingsStore.RemarkableDeviceToken = result.Vault.Remarkable.DeviceToken;
-        }
+        // A pairing the tablet refused yields to the vault's newer one (audit 11 §13).
+        Storyworthtelling.Voice.Secrets.VaultRestore.Apply(
+            SettingsStore.RemarkableDeviceToken, result.Vault.Remarkable.DeviceToken,
+            Storyworthtelling.Remarkable.RemarkableCredentialId.Value, Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
+            value => SettingsStore.RemarkableDeviceToken = value);
     }
 }

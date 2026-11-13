@@ -45,4 +45,23 @@ public sealed class CachedAccessToken(TimeSpan? lifetime = null, Func<DateTimeOf
             return fresh;
         });
     }
+
+    /// <summary>
+    /// Forgets <paramref name="rejected"/> if it is the token held, so the next call fetches a fresh one and hands this one
+    /// back to be forgotten by the platform too (audit 11 §4). A token Google rejected was otherwise handed out for the
+    /// rest of its 45 minutes. A different token — one fetched since — is left alone.
+    /// </summary>
+    /// <returns>Whether this cache held <paramref name="rejected"/> and so forgot it.</returns>
+    public bool Forget(string rejected)
+    {
+        lock (gate)
+        {
+            if (token != rejected || expires == DateTimeOffset.MinValue)
+            {
+                return false;
+            }
+            expires = DateTimeOffset.MinValue;
+            return true;
+        }
+    }
 }

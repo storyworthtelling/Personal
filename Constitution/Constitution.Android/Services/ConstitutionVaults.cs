@@ -62,7 +62,7 @@ public static class ConstitutionVaults
         var personal = new DrivePersonalVaultStore(new DriveTextFile(
             driveFactory, DrivePersonalVaultStore.FileName, SharedDriveFileIds.Store));
         return new ConstitutionVaultSync(
-            shared, personal, () => VoiceGoogleAccount.Email, new ConstitutionConnections(context), log);
+            shared, personal, () => VoiceGoogleAccount.Email, new ConstitutionConnections(context), log, HeadCredentialHealth.Store());
     }
 
 }

@@ -33,6 +33,9 @@ public sealed class CredentialHealthStore(ICredentialHealthStorage storage, Func
     public void MarkFailing(string credentialId, string message) =>
         Update(report => report.MarkFailing(credentialId, message, now()));
 
+    /// <summary>Back to Unknown, for a credential just replaced (see <see cref="CredentialHealthReport.Forget"/>).</summary>
+    public void Forget(string credentialId) => Update(report => report.Forget(credentialId));
+
     private void Update(Func<CredentialHealthReport, CredentialHealthReport> change)
     {
         lock (Gate)
@@ -57,4 +60,7 @@ public static class SharedCredentialIds
     public const string Remarkable = "remarkable";
 
     public const string GitHubUpdateToken = "github-update-token";
+
+    /// <summary>The phone's Google sign-in, which every app's Drive access rides on (audit 11 §4).</summary>
+    public const string GoogleAccount = "google-account";
 }

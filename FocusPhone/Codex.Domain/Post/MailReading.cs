@@ -6,9 +6,13 @@ namespace Codex.Domain.Post;
 public sealed record ProposedEvent(string Title, DateOnly StartsOn, TimeOnly? StartsAt);
 
 /// <summary>What one reading of a message concluded. Either half may be absent.</summary>
-public sealed record MailReading(MailClass? Kind, ProposedEvent? Event)
+/// <param name="CallFailed">The call itself failed (a refused key, a rate limit, an outage), as opposed to a reply
+/// that placed nothing. The sorter stops asking at the first one rather than asking for every message (audit 11 §10).</param>
+public sealed record MailReading(MailClass? Kind, ProposedEvent? Event, bool CallFailed = false)
 {
     public static MailReading Nothing { get; } = new(null, null);
+
+    public static MailReading Failed { get; } = new(null, null, CallFailed: true);
 
     /// <summary>
     /// Reads a model's reply. Nothing here throws: this runs inside the sync, and a sync

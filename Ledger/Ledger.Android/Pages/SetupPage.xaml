@@ -145,6 +145,13 @@
 
             <BoxView x:Name="GoogleAccountDivider" HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
 
+            <!-- ==================== reMarkable ====================
+                 Index has no pairing of its own: the token comes through the vault from Foreword or Folio. The line
+                 says whether the tablet still takes it (audit 11 §11). -->
+            <Label Text="reMarkable" Style="{StaticResource TitleLabel}" />
+            <Label x:Name="RemarkableStatusLabel" Style="{StaticResource StatusLine}" />
+            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+
             <!-- ==================== Budget ====================
                  Not on mockup 11's own list of what survives on her install (D36's own words: "no
                  budget categories, tracking switch or diagnostics"). -->

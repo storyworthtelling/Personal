@@ -207,8 +207,19 @@ public partial class SetupPage : LedgerBinderPage
         SignedInBlock.IsVisible = isHers && signedIn;
         SignedInHeadingLabel.Text = SettingsCopy.SignedInHeading;
         SignedInLineLabel.Text = signedIn ? SettingsCopy.SignedInLine(email) : string.Empty;
-        VoiceSignInButton.IsVisible = SettingsCopy.ShowsSignIn(role, signedIn);
+        // A sign-in Google turned away offers "Sign in again" whatever the role (audit 11 §4).
+        var refused = Storyworthtelling.Maui.Health.GoogleSignInHealth.NeedsSignIn();
+        VoiceSignInButton.IsVisible = SettingsCopy.ShowsSignIn(role, signedIn) || refused;
+        VoiceSignInButton.Text = Storyworthtelling.Maui.Health.GoogleSignInHealth.ButtonLabel("Sign in with Google");
         VoiceStatusLabel.Text = isHers || !signedIn ? string.Empty : $"Signed in as {email}.";
+
+        var pairing = Storyworthtelling.Remarkable.RemarkablePairingStatus.Describe(
+            !string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken),
+            Storyworthtelling.Maui.Health.MauiCredentialHealth.Store().Load().Get(Storyworthtelling.Remarkable.RemarkableCredentialId.Value),
+            "Not paired. Pair the tablet in Foreword or Folio and the vault brings it here.");
+        RemarkableStatusLabel.Text = pairing.NeedsPairing && !string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken)
+            ? pairing.Line + " Pairing is done in Foreword or Folio."
+            : pairing.Line;
     }
 
     // Reads whether the shared Claude key (Storyworthtelling.Voice, entered once in Folio) is present

@@ -253,6 +253,8 @@ public class ConstitutionVaultPassphraseTests
             typeof(IConstitutionConnections),
             typeof(IConstitutionVaultLog),
             typeof(ISecretsVaultStore),
+            // Audit 11 §13: a refused reMarkable pairing yields to the vault's.
+            typeof(Storyworthtelling.Voice.Health.CredentialHealthStore),
         }.OrderBy(type => type.FullName, StringComparer.Ordinal).ToArray();
 
         Assert.Equal(expected, fields);

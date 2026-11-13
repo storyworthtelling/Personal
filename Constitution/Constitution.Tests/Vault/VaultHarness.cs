@@ -229,8 +229,19 @@ internal sealed class TestPhone
             new DrivePersonalVaultStore(PersonalDrive),
             () => Account,
             Local,
-            Log);
+            Log,
+            Health);
     }
+
+    private sealed class MemoryHealth : Storyworthtelling.Voice.Health.ICredentialHealthStorage
+    {
+        private string report = string.Empty;
+        public string Read() => report;
+        public void Write(string value) => report = value;
+    }
+
+    /// <summary>This install's credential health, which a restore reads to replace a refused value.</summary>
+    public Storyworthtelling.Voice.Health.CredentialHealthStore Health { get; } = new(new MemoryHealth());
 
     /// <summary>The Google account this install is bound to; null until it signs in.</summary>
     public string? Account { get; set; }

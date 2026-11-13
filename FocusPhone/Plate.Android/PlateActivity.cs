@@ -82,6 +82,7 @@ public class PlateActivity : AppCompatActivity
 
     private FrameLayout content = null!;
     private FrameLayout bottomBarSlot = null!;
+    private FrameLayout pageOverlay = null!;
     private BinderTabs binder = null!;
     private LinearLayout headerSlot = null!;
 
@@ -407,6 +408,7 @@ public class PlateActivity : AppCompatActivity
         // header, which read as "inside the binder tabs" and partly behind the status bar
         // rather than at the very top of the page the way a folded corner should.
         var pageOverlayHost = PaperUi.WrapForTopInset(this, page);
+        pageOverlay = pageOverlayHost;
         foreach (var area in areas)
         {
             area.Overlay = pageOverlayHost; // dog-ears and action cards overlay the whole page
@@ -468,6 +470,8 @@ public class PlateActivity : AppCompatActivity
     protected override void OnResume()
     {
         base.OnResume();
+        // Google turned the background sign-in away: say so behind the fold (audit 11 §4).
+        GoogleSignInHealth.ShowNotice(this, pageOverlay);
         foreach (var area in areas)
         {
             area.Resume();

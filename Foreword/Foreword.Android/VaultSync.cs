@@ -109,7 +109,11 @@ public sealed class VaultSync
 
         FillIfEmpty(CredentialStore.NytSessionCookie, vaultData.Nyt.SessionCookie, v => CredentialStore.NytSessionCookie = v);
         FillIfEmpty(CredentialStore.NytApiKey, vaultData.Nyt.ApiKey, v => CredentialStore.NytApiKey = v);
-        FillIfEmpty(CredentialStore.RemarkableDeviceToken, vaultData.Remarkable.DeviceToken, v => CredentialStore.RemarkableDeviceToken = v);
+        // A pairing the tablet refused yields to the vault's newer one (audit 11 §13).
+        Storyworthtelling.Voice.Secrets.VaultRestore.Apply(
+            CredentialStore.RemarkableDeviceToken, vaultData.Remarkable.DeviceToken,
+            Storyworthtelling.Remarkable.RemarkableCredentialId.Value, Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
+            v => CredentialStore.RemarkableDeviceToken = v);
         FillIfEmpty(CredentialStore.AnthropicApiKey, vaultData.Foreword.AnthropicApiKey, v => CredentialStore.AnthropicApiKey = v);
         // The shared vault's mapping is the one the first install wrote before the choices became per
         // account. Only that account takes it: another account restoring it would print somebody else's

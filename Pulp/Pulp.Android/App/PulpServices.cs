@@ -673,6 +673,7 @@ public sealed class PulpServices
             {
                 _ when Storyworthtelling.Voice.Health.NetworkFailure.IsOffline(exception) || exception is TaskCanceledException
                     => SyncStatus.WentOffline("no network"),
+                Storyworthtelling.Google.GoogleSignInRequiredException => SyncStatus.SignInRefused(),
                 Google.GoogleApiException google when Storyworthtelling.Voice.Health.AuthFailure.IsHttpCredentialRejection((int)google.HttpStatusCode, google.Message)
                     => SyncStatus.SignInRefused(),
                 _ => SyncStatus.PassFailed(),

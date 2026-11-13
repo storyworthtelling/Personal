@@ -1,3 +1,5 @@
+using Codex.Ui.Voice;
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Google.Android;
 
 namespace Score.Google;
@@ -14,7 +16,8 @@ public class DeviceAccountTokenProvider
 
     // The cache and the AccountManager fetch are the shared kit's (audit 01 §10); this head supplies its scopes,
     // exactly as they were (Android keys a granted consent by the token-type string), and where the email is kept.
-    private readonly DeviceAccountTokens tokens = new(() => MusicSettingsStore.GoogleAccountEmail, TokenScope, "Sign in with Google first.");
+    private readonly DeviceAccountTokens tokens = new(() => MusicSettingsStore.GoogleAccountEmail, TokenScope, "Sign in with Google first.",
+        GoogleAccountNotice.Reporter(HeadCredentialHealth.Store()));
 
     public Task<string> GetAccessToken() => tokens.GetAccessToken();
 }

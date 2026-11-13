@@ -210,7 +210,7 @@
                             <Label Text="Google" Style="{StaticResource CardRowTitle}" />
                             <Label x:Name="GoogleStatusLabel" Style="{StaticResource CardRowDescription}" />
                         </VerticalStackLayout>
-                        <Button Grid.Column="1" Text="Sign in" Style="{StaticResource QuietButton}"
+                        <Button x:Name="GoogleSignInButton" Grid.Column="1" Text="Sign in" Style="{StaticResource QuietButton}"
                                 Clicked="OnGoogleSignInClicked" />
                     </Grid>
                 </VerticalStackLayout>

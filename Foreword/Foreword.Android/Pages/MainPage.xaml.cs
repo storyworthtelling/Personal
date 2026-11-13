@@ -69,7 +69,9 @@ public partial class MainPage : BinderPage
         dogEarState.SetNotice(
             UnreadableCalendarNotice.Key,
             detail is null ? null : new DogEarNotice("A calendar was skipped", detail, DogEarHue.Caution));
-        NoticeCorner.IsVisible = detail is not null;
+        // Google turned the background sign-in away: the calendar, Tasks and the vault are waiting (audit 11 §4).
+        var signIn = Storyworthtelling.Maui.Health.GoogleSignInHealth.Apply(dogEarState);
+        NoticeCorner.IsVisible = detail is not null || signIn;
         dogEar.Refresh();
     }
 

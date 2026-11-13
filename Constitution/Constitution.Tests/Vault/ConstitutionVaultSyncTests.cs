@@ -844,3 +844,40 @@ public class ConstitutionVaultSyncTests
         Assert.Equal(0, cloud.SharedDrive.Writes);
     }
 }
+
+/// <summary>
+/// Audit 11 §13: restore was "local wins", so a pairing the tablet had refused stayed on this phone even after the
+/// owner re-paired in another app. A refused local token now yields to the vault's, and its refusal is forgotten.
+/// </summary>
+public class RefusedPairingRestoreTests
+{
+    [Fact]
+    public async Task ARefusedPairingYieldsToTheVaults()
+    {
+        var cloud = new TestCloud();
+        cloud.SeedShared(Invented.Shared(), Invented.Passphrase);
+        var phone = cloud.NewPhone(Invented.OwnerAccount);
+        phone.Local.RemarkableDeviceToken = "example-revoked-token";
+        phone.Health.MarkFailing(Storyworthtelling.Remarkable.RemarkableCredentialId.Value, "401");
+
+        await phone.Sync.RestoreAsync(Invented.Passphrase, default);
+
+        Assert.Equal(Invented.RemarkableToken, phone.Local.RemarkableDeviceToken);
+        Assert.Equal(Storyworthtelling.Voice.Health.CredentialStatus.Unknown,
+            phone.Health.Load().Get(Storyworthtelling.Remarkable.RemarkableCredentialId.Value).Status);
+    }
+
+    [Fact]
+    public async Task AWorkingPairingStays()
+    {
+        var cloud = new TestCloud();
+        cloud.SeedShared(Invented.Shared(), Invented.Passphrase);
+        var phone = cloud.NewPhone(Invented.OwnerAccount);
+        phone.Local.RemarkableDeviceToken = "example-working-token";
+        phone.Health.MarkOk(Storyworthtelling.Remarkable.RemarkableCredentialId.Value);
+
+        await phone.Sync.RestoreAsync(Invented.Passphrase, default);
+
+        Assert.Equal("example-working-token", phone.Local.RemarkableDeviceToken);
+    }
+}

@@ -1,3 +1,5 @@
+using Storyworthtelling.Maui.Health;
+using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Google.Android;
 using Foreword.Infrastructure.Google;
 
@@ -20,7 +22,8 @@ public class DeviceAccountTokenProvider : IGoogleAccessTokenProvider
 
     // The cache and the AccountManager fetch are the shared kit's (audit 01 §10); this head supplies its scopes,
     // exactly as they were (Android keys a granted consent by the token-type string), and where the email is kept.
-    private readonly DeviceAccountTokens tokens = new(() => CredentialStore.GoogleAccountEmail, TokenScope, "Sign in with Google first.");
+    private readonly DeviceAccountTokens tokens = new(() => CredentialStore.GoogleAccountEmail, TokenScope, "Sign in with Google first.",
+        GoogleAccountNotice.Reporter(MauiCredentialHealth.Store()));
 
     public Task<string> GetAccessToken() => tokens.GetAccessToken();
 }

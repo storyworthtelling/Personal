@@ -1,3 +1,4 @@
+using Codex.Ui.Voice;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -51,6 +52,7 @@ public class ScoreActivity : Activity
 
     private FrameLayout content = null!;
     private FrameLayout bottomBarSlot = null!;
+    private FrameLayout pageOverlay = null!;
     private BinderTabs binder = null!;
     private LinearLayout headerSlot = null!;
     private NowPlayingBar nowPlayingBar = null!;
@@ -214,6 +216,7 @@ public class ScoreActivity : Activity
         // PaperUi.BottomBar's navigation-bar inset padding) — the shared version of the fix this
         // Activity originated; Post and Plate now use it too instead of their own fixed padding.
         var pageOverlayHost = PaperUi.WrapForTopInset(this, page);
+        pageOverlay = pageOverlayHost;
         foreach (var area in areas)
         {
             area.Overlay = pageOverlayHost; // undo bars, notices, and action cards overlay the whole page
@@ -259,6 +262,8 @@ public class ScoreActivity : Activity
     protected override void OnResume()
     {
         base.OnResume();
+        // Google turned the background sign-in away: say so behind the fold (audit 11 §4).
+        GoogleSignInHealth.ShowNotice(this, pageOverlay);
         Google.DeviceAccountSignIn.CheckPending(DateTimeOffset.Now);
         StartTicking();
         foreach (var area in areas)

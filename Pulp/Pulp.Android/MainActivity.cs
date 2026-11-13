@@ -1,3 +1,4 @@
+using Codex.Ui.Voice;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -75,6 +76,7 @@ public class MainActivity : Activity
     private TextView greetingView = null!;
     private FrameLayout content = null!;
     private FrameLayout bottomBarSlot = null!;
+    private FrameLayout pageOverlay = null!;
     private BinderTabs binder = null!;
 
     private PulpAreaPage Active => areas[activeIndex];
@@ -297,6 +299,7 @@ public class MainActivity : Activity
         // The overlay host wraps the whole page, header included, and pads itself below the status
         // bar, so a dog-ear or an action card sits at the very top of the page.
         var pageOverlayHost = PaperUi.WrapForTopInset(this, page);
+        pageOverlay = pageOverlayHost;
         foreach (var area in all)
         {
             area.Overlay = pageOverlayHost;
@@ -420,6 +423,8 @@ public class MainActivity : Activity
     protected override void OnResume()
     {
         base.OnResume();
+        // Google turned the background sign-in away: say so behind the fold (audit 11 §4).
+        GoogleSignInHealth.ShowNotice(this, pageOverlay);
         ReadNames();
         syncWatch.Resume();
 

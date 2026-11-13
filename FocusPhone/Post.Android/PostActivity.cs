@@ -355,6 +355,7 @@ public class PostActivity : Activity
         ApplyPendingReaderAction();
         CheckSmsRole();
         CheckPendingCallNotes();
+        GoogleSignInHealth.ShowNotice(this, overlay);
         // In front is the one time Post takes the Messages session back from another browser.
         GmBridgeClient.Shared(this).TakeOverIfInactive();
     }
