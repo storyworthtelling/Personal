@@ -73,7 +73,7 @@ public class HouseholdGateSourceTests
         var launch = Source("Ledger.Android/Platforms/Android/MainActivity.cs");
 
         Assert.Contains("LaunchPlan.For(role)", launch, StringComparison.Ordinal);
-        Assert.Matches(@"if \(plan\.RestoreFromVault\)\s*\{[^}]*RestoreAsync", launch);
+        Assert.Matches(@"if \(plan\.RestoreFromVault\)\s*\{[^}]*RestoreAtLaunchAsync", launch);
         Assert.Matches(@"if \(plan\.ScheduleRefresh\)\s*RefreshWorker\.Schedule", launch);
         Assert.Matches(@"if \(plan\.RunRefreshNow[^)]*\)\s*RefreshWorker\.RunNow", launch);
         Assert.Matches(@"if \(plan\.ScheduleWorksheet\)\s*WorksheetDeliveryWorker\.Schedule", launch);
@@ -86,7 +86,7 @@ public class HouseholdGateSourceTests
         var sync = Source("Ledger.Android/VaultSync.cs");
 
         AssertGateComesFirst(sync, "public async Task<SecretsVaultPublishResult> PublishAsync", "accounts.GetInstitutionCredentialsAsync");
-        AssertGateComesFirst(sync, "public async Task RestoreAsync", "vault.LoadAsync");
+        AssertGateComesFirst(sync, "public async Task<bool> RestoreAsync", "vault.LoadAsync");
     }
 
     private static void AssertGateComesFirst(string source, string method, string firstRealWork)
