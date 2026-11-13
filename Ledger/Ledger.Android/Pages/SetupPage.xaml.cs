@@ -115,6 +115,7 @@ public partial class SetupPage : LedgerBinderPage
         ClientIdEntry.Text = SettingsStore.PlaidClientId;
         SecretEntry.Text = SettingsStore.PlaidSecret;
         ApplyPlaidCredentialField();
+        Storyworthtelling.Maui.Views.KeyConsoleLink.Fill(PlaidConsoleLink, CredentialIds.Plaid);
         VaultPassphraseEntry.Text = SettingsStore.VaultPassphrase;
 
         if (focusPassphraseOnAppearing)

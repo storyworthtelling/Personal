@@ -12,6 +12,7 @@ using Folio.Infrastructure.Services;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
+using Storyworthtelling.Maui.Views;
 
 namespace Folio.Android.Pages;
 
@@ -36,6 +37,11 @@ public partial class SetupPage : FolioBinderPage
         ClaudeKeyEntry.Text = SettingsStore.ClaudeApiKey;
         GeminiKeyEntry.Text = SettingsStore.GeminiApiKey;
         ApplyCredentialFields();
+        // Where each key is made: the provider's console, from the suite's one table.
+        KeyConsoleLink.Fill(ClaudeConsoleLink, CredentialIds.Claude);
+        KeyConsoleLink.Fill(GeminiConsoleLink, CredentialIds.Gemini);
+        KeyConsoleLink.Fill(GoogleCloudConsoleLink, KeyConsoles.GoogleOAuthClient);
+        KeyConsoleLink.Fill(RemarkableConsoleLink, Storyworthtelling.Remarkable.RemarkableCredentialId.Value);
         VaultPassphraseEntry.Text = SettingsStore.VaultPassphrase;
         ArchiveSwitch.IsToggled = SettingsStore.ArchiveToDrive;
         FreeSpaceSwitch.IsToggled = SettingsStore.FreeLocalCopiesAfterArchive;

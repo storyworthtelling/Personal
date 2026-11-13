@@ -93,6 +93,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
                 "Open my.remarkable.com, choose to connect a device, and type the one-time code."));
             pairingCode = PaperUi.MonoField(Host, "one-time code");
             column.AddView(pairingCode);
+            KeyConsoleLink.AddTo(column, Storyworthtelling.Voice.Health.SharedCredentialIds.Remarkable);
             column.AddView(PaperUi.SecondaryButton(Host, pairing.Button, Pair));
         }
 

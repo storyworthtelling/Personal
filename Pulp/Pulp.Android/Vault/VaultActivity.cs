@@ -179,7 +179,14 @@ public class VaultActivity : Activity
                 line.SetTextColor(PaperTheme.ProblemMark);
             }
 
-            body.AddView(line, Spaced(0, DesignTokens.Space.X4));
+            body.AddView(line, Spaced(0, DesignTokens.Space.X2));
+
+            // Where the key is made: the service's own console, from the suite's one table.
+            if (KeyConsoleLink.For(this, key.CredentialId) is { } link)
+            {
+                body.AddView(link, Spaced(0, DesignTokens.Space.X4));
+            }
+
             return;
         }
 

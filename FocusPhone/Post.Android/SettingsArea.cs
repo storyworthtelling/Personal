@@ -58,13 +58,14 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
 
         // The field object is always created so Save reads its pre-filled value back even
         // while the field itself is hidden.
-        const string passwordHelper = "Create one at myaccount.google.com/apppasswords.";
+        const string passwordHelper = "Make one in your Google Account, then paste it here.";
         var passwordContainer = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         layout.AddView(passwordContainer, Spaced(0, 0));
         void ShowPasswordField(string helper)
         {
             passwordContainer.RemoveAllViews();
             AddFieldGroup(passwordContainer, "App password", password, helper);
+            KeyConsoleLink.AddTo(passwordContainer, CredentialIds.GmailAppPassword);
         }
         void ShowPasswordStatus(string statusText)
         {

@@ -440,6 +440,8 @@ public class UnlockActivity : Activity
         var tokenState = CredentialFieldState.Decide(
             !string.IsNullOrEmpty(input.Text),
             HeadCredentialHealth.Store().Load().Get(CredentialIds.GitHubUpdateToken));
+        // Where the token is made, shown with the field: a fine-grained token with read access to the repository's contents.
+        var tokenConsole = KeyConsoleLink.For(this, CredentialIds.GitHubUpdateToken);
         var tokenStatusRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
         tokenStatusRow.SetGravity(GravityFlags.CenterVertical);
         tokenStatusRow.AddView(PaperUi.Secondary(this, "Update token: " + tokenState.StatusText),
@@ -448,9 +450,19 @@ public class UnlockActivity : Activity
         {
             input.Text = string.Empty;
             input.Visibility = ViewStates.Visible;
+            if (tokenConsole is not null)
+            {
+                tokenConsole.Visibility = ViewStates.Visible;
+            }
+
             tokenStatusRow.Visibility = ViewStates.Gone;
         }));
         input.Visibility = tokenState.ShowEntry ? ViewStates.Visible : ViewStates.Gone;
+        if (tokenConsole is not null)
+        {
+            tokenConsole.Visibility = input.Visibility;
+        }
+
         tokenStatusRow.Visibility = tokenState.ShowEntry ? ViewStates.Gone : ViewStates.Visible;
 
         // The secrets-vault passphrase lives with the other admin secret: it encrypts the shared Drive file
@@ -466,6 +478,11 @@ public class UnlockActivity : Activity
             PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), 0);
         fields.AddView(tokenStatusRow);
         fields.AddView(input);
+        if (tokenConsole is not null)
+        {
+            fields.AddView(tokenConsole);
+        }
+
         fields.AddView(passphrase);
 
         new AlertDialog.Builder(this)
