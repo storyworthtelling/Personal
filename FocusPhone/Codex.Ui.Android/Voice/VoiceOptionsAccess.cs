@@ -23,7 +23,7 @@ public static class VoiceOptionsAccess
         var driveFactory = GoogleDrive.Factory(accessToken, applicationName);
 
         var vaultStore = new DriveSecretsVaultStore(new DriveTextFile(
-            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
+            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         return new DriveVoiceOptions(new VaultVoiceConfigStore(vaultStore, () => VaultPassphraseStore.Passphrase));
     }
 

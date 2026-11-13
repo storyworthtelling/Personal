@@ -58,9 +58,9 @@ public static class ConstitutionVaults
         var driveFactory = DriveFactory(account);
 
         var shared = new DriveSecretsVaultStore(new DriveTextFile(
-            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store));
+            driveFactory, DriveSecretsVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         var personal = new DrivePersonalVaultStore(new DriveTextFile(
-            driveFactory, DrivePersonalVaultStore.FileName, SharedDriveFileIds.Store));
+            driveFactory, DrivePersonalVaultStore.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
         return new ConstitutionVaultSync(
             shared, personal, () => VoiceGoogleAccount.Email, new ConstitutionConnections(context), log, HeadCredentialHealth.Store());
     }

@@ -35,11 +35,12 @@ public sealed class VaultSync
             fileIdStore.Snapshot()), cancellationToken);
 
     // Fills in any key this install is missing from the vault; the shared Claude and Gemini keys follow the vault.
-    public async Task RestoreAsync(CancellationToken cancellationToken)
+    // True when the vault opened.
+    public async Task<bool> RestoreAsync(CancellationToken cancellationToken)
     {
         var result = await vault.LoadAsync(cancellationToken);
         if (result.Status != SecretsVaultStatus.Loaded)
-            return;
+            return false;
 
         // Seed the Drive-by-ID cache from the vault so a reinstalled app resolves its well-known files by
         // their remembered ids (surviving a rename) before falling back to a name search.
@@ -70,5 +71,12 @@ public sealed class VaultSync
                 _ => null,
             },
             cancellationToken);
+        return true;
     }
+
+    /// <summary>The launch restore: at most every six hours, at once when a key is missing or refused (efficiency §24).</summary>
+    public Task RestoreAtLaunchAsync(CancellationToken cancellationToken) =>
+        Storyworthtelling.Maui.Health.LaunchRestore.RunAsync(
+            () => [SettingsStore.ClaudeApiKey, SettingsStore.GeminiApiKey, SettingsStore.RemarkableDeviceToken],
+            RestoreAsync, cancellationToken);
 }

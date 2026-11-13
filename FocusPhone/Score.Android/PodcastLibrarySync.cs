@@ -56,7 +56,7 @@ public sealed class PodcastLibrarySync
         };
 
         store = new DriveAudioLibraryStore(new DriveTextFile(
-            driveFactory, DriveAudioLibraryStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store));
+            driveFactory, DriveAudioLibraryStore.FileName, Codex.Ui.Voice.SharedDriveFileIds.Store, readCache: DriveReadCache.Shared));
     }
 
     /// <summary>The current on-device library, read straight from the stores.</summary>

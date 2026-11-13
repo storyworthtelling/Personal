@@ -196,7 +196,7 @@ public class PostActivity : Activity
             // (error-handling §2). ArchiveBackup merges both ways and is retried on every sync.
             if (VoiceGoogleAccount.IsSignedIn)
             {
-                await new ArchiveBackup(voiceAccount.GetAccessToken, "Post").SyncAsync(this);
+                await new ArchiveBackup(this, voiceAccount.GetAccessToken, "Post").SyncAsync(this);
             }
 
             var account = new AccountStore(this);

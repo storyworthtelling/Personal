@@ -67,16 +67,17 @@ public sealed class VaultSync
 
     // Fills in the Plaid credentials this install is missing and re-creates any bank the database doesn't
     // have. Existing local values win — restore never overwrites credentials or tokens already present here.
-    public async Task RestoreAsync(CancellationToken cancellationToken)
+    // True when the vault opened.
+    public async Task<bool> RestoreAsync(CancellationToken cancellationToken)
     {
         // Restoring copies the owner's Plaid client id/secret and every bank access token onto this
         // device. Her install reads the household snapshot and never talks to Plaid, so it never does.
         if (!InstallRoleGate.MayRunPlaidWork(roles.Current))
-            return;
+            return false;
 
         var result = await vault.LoadAsync(cancellationToken);
         if (result.Status != SecretsVaultStatus.Loaded)
-            return;
+            return false;
 
         // Seed the Drive-by-ID cache so well-known files resolve by remembered id (surviving a rename).
         foreach (var (name, id) in result.Vault.DriveFileIds)
@@ -111,5 +112,12 @@ public sealed class VaultSync
             Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
             id => id == Storyworthtelling.Remarkable.RemarkableCredentialId.Value ? SettingsStore.RemarkableDeviceToken : null,
             cancellationToken);
+        return true;
     }
+
+    /// <summary>The launch restore: at most every six hours, at once when a credential is missing or refused (efficiency §24).</summary>
+    public Task RestoreAtLaunchAsync(CancellationToken cancellationToken) =>
+        Storyworthtelling.Maui.Health.LaunchRestore.RunAsync(
+            () => [SettingsStore.PlaidClientId, SettingsStore.PlaidSecret, SettingsStore.RemarkableDeviceToken],
+            RestoreAsync, cancellationToken);
 }

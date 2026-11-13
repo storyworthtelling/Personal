@@ -181,6 +181,25 @@ public class HouseholdFileServiceTests
         Assert.Equal(RosterRole.Owner, beats[rig.Service.InstallId].Role);
     }
 
+    // Efficiency audit §12: a due heartbeat ran a second whole pass (read, write, read back) after the first. It is now
+    // written before the pass, so the one pass carries it up.
+    [Fact]
+    public async Task ADueHeartbeatGoesUpWithTheSamePass()
+    {
+        using var rig = new HeadRig();
+        await rig.Service.SyncAsync(CancellationToken.None);
+        rig.Now = rig.Now + LeaseTerms.HeartbeatPeriod + TimeSpan.FromMinutes(1);
+        var writes = rig.Drive.Writes;
+        var reads = rig.Drive.Reads;
+
+        await rig.Service.SyncAsync(CancellationToken.None);
+
+        // One read, the write, and its read-back: no second pass.
+        Assert.Equal(writes + 1, rig.Drive.Writes);
+        Assert.Equal(reads + 2, rig.Drive.Reads);
+        Assert.Equal(rig.Now, LeaseView.Read(rig.Opened()).Heartbeats[rig.Service.InstallId].Beat);
+    }
+
     [Fact]
     public async Task AnUnknownRoleWritesNoHeartbeat()
     {

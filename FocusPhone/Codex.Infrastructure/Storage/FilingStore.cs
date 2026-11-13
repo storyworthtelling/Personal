@@ -108,6 +108,36 @@ public class FilingStore
         return entries;
     }
 
+    /// <summary>How many ghosts there are and how many characters they take, read by SQLite without loading any of
+    /// them (efficiency audit §1: the field notes used to deserialize the whole archive once a sync to add this up).</summary>
+    public ArchiveSize MeasureArchive()
+    {
+        using var select = connection.CreateCommand();
+        select.CommandText = "SELECT COUNT(*), COALESCE(SUM(LENGTH(item)), 0) FROM ghosts";
+        using var reader = select.ExecuteReader();
+        reader.Read();
+        return new ArchiveSize(reader.GetInt32(0), reader.GetInt64(1));
+    }
+
+    /// <summary>
+    /// A short string that changes whenever a ghost is filed or unfiled: counts, latest times and total length of
+    /// both tables. The backup sync compares it with the one it last confirmed, so an unchanged archive is not
+    /// downloaded again. Read without loading a ghost.
+    /// </summary>
+    public string Fingerprint()
+    {
+        using var select = connection.CreateCommand();
+        select.CommandText = """
+            SELECT (SELECT COUNT(*) FROM ghosts), (SELECT COALESCE(MAX(filedAtUtc), '') FROM ghosts),
+                   (SELECT COALESCE(SUM(LENGTH(sourceId)), 0) FROM ghosts),
+                   (SELECT COUNT(*) FROM unfiled), (SELECT COALESCE(MAX(unfiledAtUtc), '') FROM unfiled),
+                   (SELECT COALESCE(SUM(LENGTH(sourceId)), 0) FROM unfiled)
+            """;
+        using var reader = select.ExecuteReader();
+        reader.Read();
+        return string.Join('/', Enumerable.Range(0, 6).Select(column => reader.GetValue(column).ToString()));
+    }
+
     public GhostArchive LoadArchive()
     {
         var ghosts = new List<Ghost>();
@@ -231,3 +261,6 @@ public class FilingStore
         return Tombstones.From(tombstones);
     }
 }
+
+/// <summary>The ghost archive's size: how many, and how many characters of stored JSON.</summary>
+public readonly record struct ArchiveSize(int Count, long Bytes);

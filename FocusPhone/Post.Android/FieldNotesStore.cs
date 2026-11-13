@@ -34,6 +34,24 @@ internal static class FieldNotesStore
         }
     }
 
+    /// <summary>
+    /// True the first time it is asked on a given day, so the periodic observations (archive size, attachments,
+    /// contacts without a photo) are taken once a day rather than on every 30-minute sync (efficiency audit §1).
+    /// </summary>
+    public static bool FirstTimeToday(Context context, DateOnly today)
+    {
+        var stamp = today.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var prefs = Prefs(context);
+        if (prefs.GetString(ObservedOnKey, null) == stamp)
+        {
+            return false;
+        }
+        prefs.Edit()!.PutString(ObservedOnKey, stamp)!.Apply();
+        return true;
+    }
+
+    private const string ObservedOnKey = "observedOn";
+
     private static ISharedPreferences Prefs(Context context) =>
         context.GetSharedPreferences(PreferencesName, FileCreationMode.Private)!;
 }

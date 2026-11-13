@@ -88,7 +88,8 @@ public sealed class VaultSync
 
     // Fills in any credential this install is missing from the vault. Existing local values win — restore
     // never overwrites something the owner has already entered here.
-    public async Task RestoreAsync(CancellationToken cancellationToken)
+    // True when the shared vault opened.
+    public async Task<bool> RestoreAsync(CancellationToken cancellationToken)
     {
         // This account's own choices first: they are the ones that belong to it.
         var mine = await personal.LoadAsync(cancellationToken);
@@ -100,7 +101,7 @@ public sealed class VaultSync
 
         var result = await vault.LoadAsync(cancellationToken);
         if (result.Status != SecretsVaultStatus.Loaded)
-            return;
+            return false;
 
         var vaultData = RememberHousehold(result.Vault);
         // Seed the Drive-by-ID cache so well-known files resolve by remembered id (surviving a rename).
@@ -138,7 +139,14 @@ public sealed class VaultSync
             Storyworthtelling.Maui.Health.MauiCredentialHealth.Store(),
             id => id == Storyworthtelling.Remarkable.RemarkableCredentialId.Value ? CredentialStore.RemarkableDeviceToken : null,
             cancellationToken);
+        return true;
     }
+
+    /// <summary>The launch restore: at most every six hours, at once when a credential is missing or refused (efficiency §24).</summary>
+    public Task RestoreAtLaunchAsync(CancellationToken cancellationToken) =>
+        Storyworthtelling.Maui.Health.LaunchRestore.RunAsync(
+            () => [CredentialStore.NytApiKey, CredentialStore.RemarkableDeviceToken, CredentialStore.MapsApiKey],
+            RestoreAsync, cancellationToken);
 
     // Whose phone this is is inferred from the account that owns the shared vault, so every read of
     // the vault refreshes the cached owner. An unowned vault leaves the cache as it was.

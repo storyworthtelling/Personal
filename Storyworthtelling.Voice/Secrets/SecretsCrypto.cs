@@ -72,9 +72,32 @@ public static class SecretsCrypto
         return Encoding.UTF8.GetString(plainBytes);
     }
 
-    private static byte[] DeriveKey(string passphrase, byte[] salt, int iterations) =>
-        Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(passphrase), salt, iterations, HashAlgorithmName.SHA256, KeySize);
+    // Efficiency audit §3: PBKDF2 at 210,000 iterations ran on every read of every sealed file, and again on its
+    // read-back after a write. A key depends only on the passphrase, the file's salt and the iteration count, so it
+    // is kept by those (the passphrase only as a hash) for the life of the process, bounded so it cannot grow.
+    private const int MaxCachedKeys = 32;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> CachedKeys = new(StringComparer.Ordinal);
+
+    [ThreadStatic]
+    private static int derivationsOnThisThread;
+
+    /// <summary>How many keys this thread has actually derived (not taken from the cache). For tests.</summary>
+    public static int DerivationsOnThisThread => derivationsOnThisThread;
+
+    private static byte[] DeriveKey(string passphrase, byte[] salt, int iterations)
+    {
+        var passphraseBytes = Encoding.UTF8.GetBytes(passphrase);
+        var cacheKey = Convert.ToHexString(SHA256.HashData(passphraseBytes)) + ":" + Convert.ToHexString(salt) + ":" + iterations;
+        if (CachedKeys.TryGetValue(cacheKey, out var cached))
+            return cached;
+
+        derivationsOnThisThread++;
+        var key = Rfc2898DeriveBytes.Pbkdf2(passphraseBytes, salt, iterations, HashAlgorithmName.SHA256, KeySize);
+        if (CachedKeys.Count >= MaxCachedKeys)
+            CachedKeys.Clear();
+        CachedKeys[cacheKey] = key;
+        return key;
+    }
 }
 
 // Thrown when the vault can't be decrypted with the supplied passphrase — the passphrase is wrong or the

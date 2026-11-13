@@ -65,7 +65,7 @@ public class MainActivity : MauiAppCompatActivity
                 using var scope = services.CreateScope();
                 var vaultSync = scope.ServiceProvider.GetRequiredService<VaultSync>();
                 services.GetRequiredService<RestoreGate>()
-                    .TryStart(() => vaultSync.RestoreAsync(CancellationToken.None))?.GetAwaiter().GetResult();
+                    .TryStart(() => vaultSync.RestoreAtLaunchAsync(CancellationToken.None))?.GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {

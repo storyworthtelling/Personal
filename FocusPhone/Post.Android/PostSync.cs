@@ -96,10 +96,11 @@ public static class PostSync
 
         // The archive is the one thing here that cannot be rebuilt from a source, so it is
         // the one thing worth carrying off the device. Merged both ways every sync, so a
-        // restore that has not happened yet happens here; written only when it has changed.
+        // restore that has not happened yet happens here; written only when it has changed,
+        // and not even downloaded when neither the phone's archive nor Drive's copy has moved.
         if (VoiceGoogleAccount.IsSignedIn)
         {
-            await new ArchiveBackup(MailAccess.Account().GetAccessToken, "Post").SyncAsync(context);
+            await new ArchiveBackup(context, MailAccess.Account().GetAccessToken, "Post").SyncAsync(context);
         }
         preferences.Edit()!.PutString(LastSyncKey, now.ToString("O"))!.Apply();
     }

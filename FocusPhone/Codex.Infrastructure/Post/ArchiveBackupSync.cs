@@ -26,6 +26,14 @@ public enum ArchiveSyncOutcome
     NotConfirmed,
 }
 
+/// <summary>Where the backup sync keeps what it last confirmed (Post keeps it in its preferences).</summary>
+public interface IArchiveBackupMarker
+{
+    string? Read();
+
+    void Write(string marker);
+}
+
 public sealed record ArchiveSyncResult(ArchiveSyncOutcome Outcome, int Restored, string? Detail = null);
 
 /// <summary>
@@ -51,15 +59,65 @@ public sealed class ArchiveBackupSync
     private readonly SealedDriveFile sealedFile;
     private readonly IDriveTextFile legacyFile;
     private readonly Func<string?> passphrase;
+    private readonly IDriveFileRevision? revision;
+    private readonly IArchiveBackupMarker? marker;
 
-    public ArchiveBackupSync(IDriveTextFile sealedFile, IDriveTextFile legacyFile, Func<string?> passphrase)
+    /// <param name="marker">What the last confirmed sync saw: the phone's archive (<see cref="FilingStore.Fingerprint"/>)
+    /// and the backup's Drive revision. When both still match, the sync stops after one small revision request
+    /// instead of downloading and decrypting the whole backup (efficiency audit §1). Null syncs in full every time.</param>
+    public ArchiveBackupSync(IDriveTextFile sealedFile, IDriveTextFile legacyFile, Func<string?> passphrase, IArchiveBackupMarker? marker = null)
     {
         this.sealedFile = new SealedDriveFile(sealedFile);
+        revision = sealedFile as IDriveFileRevision;
+        this.marker = marker;
         this.legacyFile = legacyFile;
         this.passphrase = passphrase;
     }
 
     public async Task<ArchiveSyncResult> SyncAsync(FilingStore filing, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (marker?.Read() is { } confirmed && revision is not null && !string.IsNullOrEmpty(passphrase()))
+        {
+            try
+            {
+                if (confirmed == Mark(filing.Fingerprint(), await revision.RevisionAsync(cancellationToken)))
+                {
+                    return new ArchiveSyncResult(ArchiveSyncOutcome.Unchanged, 0);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return new ArchiveSyncResult(ArchiveSyncOutcome.Unreachable, 0, $"{ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        var result = await SyncInFullAsync(filing, now, cancellationToken);
+        await RememberAsync(filing, result, cancellationToken);
+        return result;
+    }
+
+    // Kept only after a sync that left both copies equal with the plaintext file gone, so a skipped sync never
+    // skips work that was owed.
+    private async Task RememberAsync(FilingStore filing, ArchiveSyncResult result, CancellationToken cancellationToken)
+    {
+        if (marker is null || revision is null || result.Outcome is not (ArchiveSyncOutcome.Synced or ArchiveSyncOutcome.Unchanged))
+        {
+            return;
+        }
+
+        try
+        {
+            marker.Write(Mark(filing.Fingerprint(), await revision.RevisionAsync(cancellationToken)));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // No marker: the next sync is a full one, which is only what every sync used to be.
+        }
+    }
+
+    private static string Mark(string fingerprint, string? driveRevision) => fingerprint + "|" + driveRevision;
+
+    private async Task<ArchiveSyncResult> SyncInFullAsync(FilingStore filing, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var local = new ArchiveSnapshot(filing.LoadArchive().All, now) { Unfiled = filing.LoadUnfiled() };
 

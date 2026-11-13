@@ -31,7 +31,7 @@ internal sealed class ArchiveBackup
 {
     private readonly ArchiveBackupSync sync;
 
-    public ArchiveBackup(Func<Task<string>> accessToken, string applicationName)
+    public ArchiveBackup(Context context, Func<Task<string>> accessToken, string applicationName)
     {
         Func<CancellationToken, Task<DriveService>> driveFactory = async _ =>
         {
@@ -40,9 +40,23 @@ internal sealed class ArchiveBackup
         };
 
         sync = new ArchiveBackupSync(
-            new DriveTextFile(driveFactory, ArchiveBackupSync.FileName, SharedDriveFileIds.Store),
-            new DriveTextFile(driveFactory, ArchiveBackupSync.LegacyFileName, SharedDriveFileIds.Store),
-            () => VaultPassphraseStore.Passphrase);
+            new DriveTextFile(driveFactory, ArchiveBackupSync.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared),
+            new DriveTextFile(driveFactory, ArchiveBackupSync.LegacyFileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared),
+            () => VaultPassphraseStore.Passphrase,
+            new PreferencesMarker(context));
+    }
+
+    /// <summary>What the last confirmed sync saw, so an unchanged archive is not downloaded again (efficiency audit §1).</summary>
+    private sealed class PreferencesMarker(Context context) : IArchiveBackupMarker
+    {
+        private const string PreferencesName = "archiveBackup";
+        private const string MarkerKey = "confirmed";
+
+        public string? Read() => Prefs().GetString(MarkerKey, null);
+
+        public void Write(string marker) => Prefs().Edit()!.PutString(MarkerKey, marker)!.Apply();
+
+        private ISharedPreferences Prefs() => context.GetSharedPreferences(PreferencesName, FileCreationMode.Private)!;
     }
 
     /// <summary>
