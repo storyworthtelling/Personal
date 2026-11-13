@@ -33,6 +33,11 @@ public class GmailApiClient
     private const int SyncPageSize = 200;
     private const int SearchPageSize = 50;
 
+    // New messages are fetched a few at a time rather than one after another (efficiency audit §2).
+    private const int ParallelFetches = 4;
+
+    private const string WindowLabels = "(in:inbox OR in:sent)";
+
     private readonly string accountAddress;
     private readonly Func<Task<string>> accessToken;
     private readonly HttpClient http;
@@ -67,8 +72,132 @@ public class GmailApiClient
     /// </summary>
     public Task<IReadOnlyList<TimelineItem>> FetchRecentAsync(
         DateTimeOffset since, CancellationToken cancellation = default) =>
-        FetchQueryAsync(
-            $"(in:inbox OR in:sent) after:{since.ToUnixTimeSeconds()}", SyncPageSize, cancellation);
+        FetchQueryAsync(WindowQuery(since), SyncPageSize, cancellation);
+
+    /// <summary>
+    /// The inbox and sent mail newer than <paramref name="since"/>, fetching only messages <paramref name="index"/>
+    /// does not already hold (efficiency audit §2). Gmail's history id is read before the listing, so a message that
+    /// arrives during it is in the history read next time rather than lost between the two.
+    /// </summary>
+    public async Task<GmailMirror> MirrorAsync(DateTimeOffset since, IGmailIdIndex index, CancellationToken cancellation = default)
+    {
+        var historyId = await HistoryIdAsync(cancellation);
+        var ids = await ListIdsAsync(WindowQuery(since), SyncPageSize, cancellation);
+
+        var present = new List<string>();
+        var unknown = new List<string>();
+        foreach (var id in ids)
+        {
+            if (index.SourceIdFor(id) is { } known)
+            {
+                present.Add(known);
+            }
+            else
+            {
+                unknown.Add(id);
+            }
+        }
+
+        var fetched = await FetchNewAsync(unknown, index, cancellation);
+        present.AddRange(fetched.Select(item => item.SourceId));
+        return new GmailMirror(fetched, present.Distinct(StringComparer.Ordinal).ToList(), historyId);
+    }
+
+    /// <summary>
+    /// What was added to the inbox or sent since <paramref name="historyId"/>, from Gmail's history rather than a fresh
+    /// listing, fetching only messages <paramref name="index"/> does not hold. Null when Gmail no longer has history that
+    /// far back (it keeps about a week): the caller lists the window instead.
+    /// </summary>
+    public async Task<GmailChanges?> ChangesSinceAsync(string historyId, IGmailIdIndex index, CancellationToken cancellation = default)
+    {
+        var added = new List<string>();
+        string? latest = null;
+        string? pageToken = null;
+        do
+        {
+            var url = $"{Base}/history?startHistoryId={Uri.EscapeDataString(historyId)}&historyTypes=messageAdded"
+                + (pageToken is null ? string.Empty : $"&pageToken={Uri.EscapeDataString(pageToken)}");
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var document = await SendAsync(request, cancellation, allowNotFound: true);
+            if (document is null)
+            {
+                return null;
+            }
+
+            var root = document.RootElement;
+            latest = root.TryGetProperty("historyId", out var id) ? id.GetString() : latest;
+            pageToken = root.TryGetProperty("nextPageToken", out var next) ? next.GetString() : null;
+            if (root.TryGetProperty("history", out var history))
+            {
+                added.AddRange(AddedToInboxOrSent(history));
+            }
+        }
+        while (!string.IsNullOrEmpty(pageToken));
+
+        var unknown = added.Distinct(StringComparer.Ordinal).Where(id => index.SourceIdFor(id) is null).ToList();
+        return new GmailChanges(await FetchNewAsync(unknown, index, cancellation), latest ?? historyId);
+    }
+
+    private static IEnumerable<string> AddedToInboxOrSent(JsonElement history)
+    {
+        foreach (var entry in history.EnumerateArray())
+        {
+            if (!entry.TryGetProperty("messagesAdded", out var messagesAdded))
+            {
+                continue;
+            }
+            foreach (var added in messagesAdded.EnumerateArray())
+            {
+                var message = added.GetProperty("message");
+                var labels = message.TryGetProperty("labelIds", out var ids)
+                    ? ids.EnumerateArray().Select(label => label.GetString()).ToList()
+                    : [];
+                if ((labels.Contains("INBOX") || labels.Contains("SENT")) && message.GetProperty("id").GetString() is { } id)
+                {
+                    yield return id;
+                }
+            }
+        }
+    }
+
+    private static string WindowQuery(DateTimeOffset since) => $"{WindowLabels} after:{since.ToUnixTimeSeconds()}";
+
+    private async Task<string?> HistoryIdAsync(CancellationToken cancellation)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{Base}/profile");
+        using var document = await SendAsync(request, cancellation);
+        return document.RootElement.TryGetProperty("historyId", out var id) ? id.GetString() : null;
+    }
+
+    // Each message once, a few at a time, in the order Gmail listed them; each remembered as soon as it is mapped.
+    private async Task<IReadOnlyList<TimelineItem>> FetchNewAsync(IReadOnlyList<string> ids, IGmailIdIndex? index, CancellationToken cancellation)
+    {
+        var results = new TimelineItem?[ids.Count];
+        using var gate = new SemaphoreSlim(ParallelFetches);
+        await Task.WhenAll(ids.Select(async (id, position) =>
+        {
+            await gate.WaitAsync(cancellation);
+            try
+            {
+                results[position] = await LoadItemAsync(id, cancellation);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }));
+
+        var items = new List<TimelineItem>();
+        for (var position = 0; position < ids.Count; position++)
+        {
+            if (results[position] is { } item)
+            {
+                index?.Remember(ids[position], item.SourceId);
+                items.Add(item);
+            }
+        }
+        return items;
+    }
 
     /// <summary>
     /// Full-text search, run by Gmail. Takes Gmail's own query syntax, because narrowing
@@ -173,19 +302,23 @@ public class GmailApiClient
     }
 
     private async Task<IReadOnlyList<TimelineItem>> FetchQueryAsync(
-        string query, int pageSize, CancellationToken cancellation)
+        string query, int pageSize, CancellationToken cancellation) =>
+        await FetchNewAsync(await ListIdsAsync(query, pageSize, cancellation), null, cancellation);
+
+    // A message without its attachments' bytes (GmailFullMessage), mapped as before.
+    private async Task<TimelineItem?> LoadItemAsync(string id, CancellationToken cancellation)
     {
-        var items = new List<TimelineItem>();
-        foreach (var id in await ListIdsAsync(query, pageSize, cancellation))
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{Base}/messages/{id}?format=full");
+        using var document = await SendAsync(request, cancellation);
+        if (!document.RootElement.TryGetProperty("payload", out _))
         {
-            if (await LoadRawAsync(id, cancellation) is { } message)
-            {
-                var (hasText, hasHtml) = GmailMessageMapper.BodyShape(message);
-                observeBodyShape?.Invoke(hasText, hasHtml);
-                items.Add(mapper.Map(message));
-            }
+            return null;
         }
-        return items;
+
+        var message = GmailFullMessage.ToMime(document.RootElement);
+        var (hasText, hasHtml) = GmailMessageMapper.BodyShape(message);
+        observeBodyShape?.Invoke(hasText, hasHtml);
+        return mapper.Map(message);
     }
 
     private async Task<IReadOnlyList<string>> ListIdsAsync(
@@ -220,11 +353,19 @@ public class GmailApiClient
         return await MimeMessage.LoadAsync(buffer, cancellation);
     }
 
-    private async Task<JsonDocument> SendAsync(HttpRequestMessage request, CancellationToken cancellation)
+    private async Task<JsonDocument> SendAsync(HttpRequestMessage request, CancellationToken cancellation) =>
+        (await SendAsync(request, cancellation, allowNotFound: false))!;
+
+    // Null only for a 404 the caller allowed (an expired history id).
+    private async Task<JsonDocument?> SendAsync(HttpRequestMessage request, CancellationToken cancellation, bool allowNotFound)
     {
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await accessToken());
         using var response = await http.SendAsync(request, cancellation);
         var body = await response.Content.ReadAsStringAsync(cancellation);
+        if (allowNotFound && response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
 
         if (!response.IsSuccessStatusCode)
         {

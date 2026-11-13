@@ -4,6 +4,7 @@ using Android.Content;
 using Codex.Domain.Post;
 using Codex.Domain.Timeline;
 using Codex.Infrastructure.Email;
+using Codex.Infrastructure.Storage;
 using Codex.Ui.Voice;
 
 namespace Post;
@@ -24,6 +25,9 @@ public static class PostSync
 {
     private const string SyncPreferences = "emailSync";
     private const string LastSyncKey = "lastSyncUtc";
+
+    // Gmail's history id after the last sync, so the next 30-minute run asks what was added since (efficiency §2).
+    private const string HistoryIdKey = "gmailHistoryId";
 
     // How far back a reconcile mirrors. Matches the first-run fetch window;
     // messages older than this are outside the snapshot and left untouched.
@@ -66,11 +70,37 @@ public static class PostSync
             : (DateTimeOffset?)null;
         var since = EmailSyncWindow.Since(reconcile, lastSync, now, ReconcileWindow);
 
-        var items = route == MailTransport.GmailApi
-            ? await MailAccess.Api(context, account).FetchRecentAsync(since)
-            : await FetchWithAppPasswordAsync(account, since);
-
         using var database = TimelineDatabase.Open(context);
+        var learned = new PendingGmailIds(database.GmailIds);
+
+        // On the API only what this phone has not seen is fetched: the 30-minute run asks Gmail's history what was
+        // added, and a reconcile lists the window's ids and names the known ones by id (efficiency audit §2).
+        IReadOnlyList<TimelineItem> items;
+        IReadOnlyCollection<string>? present = null;
+        string? historyId = null;
+        if (route == MailTransport.GmailApi)
+        {
+            var api = MailAccess.Api(context, account);
+            var changes = !reconcile && preferences.GetString(HistoryIdKey, null) is { Length: > 0 } storedHistory
+                ? await api.ChangesSinceAsync(storedHistory, learned)
+                : null;
+            if (changes is not null)
+            {
+                items = changes.Fetched;
+                historyId = changes.HistoryId;
+            }
+            else
+            {
+                var mirror = await api.MirrorAsync(since, learned);
+                items = mirror.Fetched;
+                present = mirror.Present;
+                historyId = mirror.HistoryId;
+            }
+        }
+        else
+        {
+            items = await FetchWithAppPasswordAsync(account, since);
+        }
 
         // The load-bearing line of the whole phase. Reconcile mirrors the source, and a
         // message the owner filed is still AT the source until its delete lands — so
@@ -81,11 +111,20 @@ public static class PostSync
 
         if (reconcile)
         {
-            database.Cache.ReconcileWindow(TimelineItemKind.Email, since, visible);
+            var kept = (present ?? visible.Select(item => item.SourceId).ToList())
+                .Where(sourceId => !tombstones.IsFiled(sourceId)).ToList();
+            database.Cache.ReconcileWindow(TimelineItemKind.Email, since, visible, kept);
         }
         else
         {
             database.Cache.Upsert(visible);
+        }
+
+        // Only now that the messages are cached: an id remembered first would never be fetched again.
+        learned.Commit();
+        if (!string.IsNullOrEmpty(historyId))
+        {
+            preferences.Edit()!.PutString(HistoryIdKey, historyId)!.Apply();
         }
 
         await RetryOwedDeletesAsync(context, database, account, route, tombstones);

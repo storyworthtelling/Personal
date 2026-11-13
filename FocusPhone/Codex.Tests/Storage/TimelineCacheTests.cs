@@ -190,6 +190,25 @@ public class TimelineCacheTests : IDisposable
         Assert.Equal("kept", item.SourceId);
     }
 
+    // Efficiency §2: a reconcile that fetched only what was new says which known messages are still there by id,
+    // without carrying them in full.
+    [Fact]
+    public void ReconcileWindow_KeepsKnownItemsNamedOnlyById()
+    {
+        cache.Upsert(
+        [
+            Item("known", TimelineItemKind.Email, minute: 10),
+            Item("stale", TimelineItemKind.Email, minute: 11),
+        ]);
+
+        cache.ReconcileWindow(TimelineItemKind.Email,
+            new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero),
+            [Item("fresh", TimelineItemKind.Email, minute: 30)],
+            ["known", "fresh"]);
+
+        Assert.Equal(["fresh", "known"], cache.LoadAll().Select(item => item.SourceId).Order(StringComparer.Ordinal));
+    }
+
     [Fact]
     public void ReconcileWindow_UpsertsNewAuthoritativeItems()
     {

@@ -29,6 +29,9 @@ public sealed class TimelineDatabase : IDisposable
     /// <summary>What each email was judged to be, so a re-fetched one is not judged (and billed) again.</summary>
     public MailJudgementStore Judgements { get; }
 
+    /// <summary>The Gmail ids already fetched, so a sync downloads only what is new (efficiency audit §2).</summary>
+    public GmailIdStore GmailIds { get; }
+
     private TimelineDatabase(SqliteConnection connection)
     {
         this.connection = connection;
@@ -38,6 +41,7 @@ public sealed class TimelineDatabase : IDisposable
         ReadState = new ReadStateStore(connection);
         Filing = new FilingStore(connection);
         Judgements = new MailJudgementStore(connection);
+        GmailIds = new GmailIdStore(connection);
     }
 
     public static TimelineDatabase Open(Context context)
