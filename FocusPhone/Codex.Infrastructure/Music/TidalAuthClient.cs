@@ -6,11 +6,6 @@ using Codex.Domain.Music;
 
 namespace Codex.Infrastructure.Music;
 
-/// <summary>The code and link the pairing screen shows the owner.</summary>
-public sealed record TidalDeviceAuthorization(
-    string DeviceCode, string UserCode, string VerificationUri, string VerificationUriComplete,
-    int ExpiresIn, int Interval);
-
 /// <summary>What one poll of the token endpoint came back as.</summary>
 public enum TidalTokenPollStatus
 {
@@ -43,17 +38,14 @@ public sealed record TidalTokenPollResult(
     string? Detail = null);
 
 /// <summary>
-/// TIDAL's device-code sign-in, against <c>auth.tidal.com/v1/</c> directly rather than
-/// through the bound Kotlin auth module: the SDK's suspend functions bind as raw
-/// <c>Kotlin.Coroutines.IContinuation</c> methods with no managed async wrapper, which
-/// makes them exercisable only on a device — the same reasoning that keeps the
-/// catalogue lookup off the binding. Device-code is the flow the locked-down phone can
-/// actually use: the phone shows a code, the owner approves it on another device's
-/// browser, and this polls until that approval lands.
+/// TIDAL's token endpoint, against <c>auth.tidal.com/v1/</c> directly rather than through the bound
+/// Kotlin auth module: the SDK's suspend functions bind as raw <c>Kotlin.Coroutines.IContinuation</c>
+/// methods with no managed async wrapper, which makes them exercisable only on a device. Two grants: the
+/// PKCE sign-in's code exchange and the refresh. The device-code flow it once also ran was superseded by
+/// PKCE and removed (orphan audit §18).
 /// </summary>
-public sealed class TidalDeviceAuthClient(HttpClient httpClient)
+public sealed class TidalAuthClient(HttpClient httpClient)
 {
-    private const string DeviceAuthUrl = "https://auth.tidal.com/v1/oauth2/device_authorization";
     private const string TokenUrl = "https://auth.tidal.com/v1/oauth2/token";
 
     // One list for every grant, decided where the sign-in is (see TidalSignIn.Scope for
@@ -61,61 +53,6 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
     private const string Scope = TidalSignIn.Scope;
 
     private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNameCaseInsensitive = true };
-
-    /// <summary>
-    /// Asks TIDAL for a device code. <paramref name="clientSecret"/> authenticates the
-    /// client, and is required: RFC 8628 section 3.1 says a confidential client MUST
-    /// authenticate at this endpoint as well as at the token endpoint, and Score is
-    /// confidential because it holds a secret. Only a client registered without one
-    /// passes an empty string, and then no header is sent — an empty Basic credential
-    /// is a different wrong request, not a neutral one.
-    /// </summary>
-    public async Task<TidalDeviceAuthorization> RequestDeviceCodeAsync(
-        string clientId, string clientSecret, CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, DeviceAuthUrl)
-        {
-            Content = new FormUrlEncodedContent([
-                new("client_id", clientId),
-                new("scope", Scope),
-            ]),
-        };
-
-        if (!string.IsNullOrEmpty(clientSecret))
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue(
-                "Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}")));
-        }
-
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            // EnsureSuccessStatusCode would drop the body, and the body is the only
-            // part that says WHY. A bare "400" is what sent the last round of this
-            // back with nothing to act on.
-            throw new HttpRequestException(
-                $"TIDAL device_authorization refused the request with {(int)response.StatusCode} " +
-                $"{response.StatusCode}: {Describe(json)}");
-        }
-
-        var reply = JsonSerializer.Deserialize<DeviceAuthReply>(json, SerializerOptions)
-            ?? throw new HttpRequestException("TIDAL device_authorization returned an empty body.");
-
-        return new TidalDeviceAuthorization(
-            reply.DeviceCode, reply.UserCode, reply.VerificationUri, reply.VerificationUriComplete,
-            reply.ExpiresIn, reply.Interval);
-    }
-
-    /// <summary>One poll of the token endpoint for a device code still being approved.</summary>
-    public Task<TidalTokenPollResult> PollAsync(
-        string clientId, string clientSecret, string deviceCode, CancellationToken cancellationToken) =>
-        PostToken(clientId, clientSecret, new FormUrlEncodedContent([
-            new("client_id", clientId),
-            new("device_code", deviceCode),
-            new("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-            new("scope", Scope),
-        ]), cancellationToken);
 
     /// <summary>
     /// Exchanges the authorization code the browser redirect carried for tokens,
@@ -143,66 +80,6 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
             new("grant_type", "refresh_token"),
             new("refresh_token", refreshToken),
         ]), cancellationToken);
-
-    /// <summary>
-    /// Polls until the owner approves, is denied, or the code's window runs out.
-    ///
-    /// <paramref name="delay"/> is injected rather than calling <see cref="Task.Delay(TimeSpan)"/>
-    /// directly so a test can drive the whole wait through instantly; the budget it is
-    /// spent against is the sum of intervals actually awaited, not the wall clock, so
-    /// that same fake delay also governs when the loop gives up.
-    /// </summary>
-    public async Task<TidalTokenPollResult> PollUntilAuthorizedAsync(
-        string clientId, string clientSecret, string deviceCode,
-        int intervalSeconds, int expiresInSeconds,
-        Func<TimeSpan, CancellationToken, Task> delay,
-        CancellationToken cancellationToken)
-    {
-        var result = await PollLoopAsync(clientId, clientSecret, deviceCode, intervalSeconds, expiresInSeconds, delay, cancellationToken);
-        // The trail (LOG-LOOP-PLAN.md §4.2): how the device flow ended, for whoever is listening.
-        Trail?.Invoke(TidalSignInTrails.DevicePoll(
-            TidalSignInTrails.StartDevice(deviceCode, clientId, trailStarted), result, DateTimeOffset.Now));
-        return result;
-    }
-
-    /// <summary>Told how each device-code sign-in ended (plan §4.2). Null when nobody is listening.</summary>
-    public Action<Storyworthtelling.Diagnostics.SignInTrail>? Trail { get; init; }
-
-    private readonly DateTimeOffset trailStarted = DateTimeOffset.Now;
-
-    private async Task<TidalTokenPollResult> PollLoopAsync(
-        string clientId, string clientSecret, string deviceCode,
-        int intervalSeconds, int expiresInSeconds,
-        Func<TimeSpan, CancellationToken, Task> delay,
-        CancellationToken cancellationToken)
-    {
-        var interval = TimeSpan.FromSeconds(intervalSeconds);
-        var budget = TimeSpan.FromSeconds(expiresInSeconds);
-        var elapsed = TimeSpan.Zero;
-
-        while (true)
-        {
-            var result = await PollAsync(clientId, clientSecret, deviceCode, cancellationToken);
-            if (result.Status is TidalTokenPollStatus.Success or TidalTokenPollStatus.Denied)
-            {
-                return result;
-            }
-
-            // RFC 8628: on slow_down, widen the interval by at least 5s before trying again.
-            if (result.Status == TidalTokenPollStatus.SlowDown)
-            {
-                interval += TimeSpan.FromSeconds(5);
-            }
-
-            elapsed += interval;
-            if (elapsed >= budget)
-            {
-                return new TidalTokenPollResult(TidalTokenPollStatus.Expired);
-            }
-
-            await delay(interval, cancellationToken);
-        }
-    }
 
     // OAuth errors are {"error","error_description"}; anything else is quoted whole so
     // an unexpected shape still reaches the person reading the log.
@@ -277,10 +154,6 @@ public sealed class TidalDeviceAuthClient(HttpClient httpClient)
 
         return new TidalTokenPollResult(status, Detail: detail);
     }
-
-    private sealed record DeviceAuthReply(
-        string DeviceCode, string UserCode, string VerificationUri, string VerificationUriComplete,
-        int ExpiresIn, int Interval);
 
     private sealed record TokenReply(
         [property: JsonPropertyName("access_token")] string? AccessToken,

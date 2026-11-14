@@ -214,7 +214,7 @@ public class PersonEditsTests
 
         foreach (var restored in new[] { undone, back })
         {
-            var leagues = HouseholdView.Of(restored).LeaguesAllowedFor(Pip);
+            var leagues = ChildSports.AllowedFor(HouseholdView.Of(restored).ChildLeagueAllowances, Pip);
             Assert.Equal(2, leagues.Count);
             Assert.Contains(PipHarbor.League, leagues);
             Assert.True(PlannerBuilds(restored));
@@ -233,7 +233,7 @@ public class PersonEditsTests
             HouseholdMaps.ChildLeague, new ChildLeagueAllowance(Avery, new LeagueId("harbor-league"), Avery, DateTimeOffset.UnixEpoch), Next(), PhoneA);
 
         Assert.Empty(HouseholdView.Of(viewerOnly).ChildLeagueAllowances);
-        Assert.Empty(HouseholdView.Of(viewerOnly).LeaguesAllowedFor(Avery));
+        Assert.Empty(ChildSports.AllowedFor(HouseholdView.Of(viewerOnly).ChildLeagueAllowances, Avery));
     }
 
     [Fact]

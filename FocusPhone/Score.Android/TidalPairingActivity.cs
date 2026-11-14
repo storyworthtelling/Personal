@@ -298,7 +298,7 @@ public class TidalPairingActivity : Activity
         try
         {
             var http = HeadHttp.Shared;
-            exchanged = await new TidalDeviceAuthClient(http).ExchangeCodeAsync(
+            exchanged = await new TidalAuthClient(http).ExchangeCodeAsync(
                 clientId, clientSecret, code, pkce.Verifier, TidalSignIn.RedirectUri, CancellationToken.None);
         }
         catch (Exception e)

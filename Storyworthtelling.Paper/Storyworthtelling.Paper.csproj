@@ -25,13 +25,6 @@
        TFM and on device, exactly as Folio.Infrastructure embedded them before extraction). -->
   <ItemGroup>
     <EmbeddedResource Include="..\Fonts\*.ttf" Link="Fonts\%(Filename)%(Extension)" />
-
-    <!-- The owner's medallion (DESIGN.md §13), for the same reason the fonts are here: this is the
-         library that prints, and a renderer that cannot load a branding asset draws a blank rather
-         than failing. The owner's drawn mark, /Branding/owners-mark.png (never a photo); the link keeps
-         the resource name EmbeddedBranding looks for. -->
-    <EmbeddedResource Include="..\Branding\owners-mark.png" Link="Branding\owner.png"
-                      Condition="Exists('..\Branding\owners-mark.png')" />
   </ItemGroup>
 
 </Project>

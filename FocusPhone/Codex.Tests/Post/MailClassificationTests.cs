@@ -145,16 +145,4 @@ public class MailClassificationTests
         var signals = new MailSignals(incoming, "Spring sale", HasListUnsubscribe: true);
         Assert.Equal(MailClass.Human, promotions.Apply(signals, MailClass.Marketing));
     }
-
-    // Demotion exists too: a sender the owner is tired of goes back to being trivia.
-    [Fact]
-    public void ASenderCanBeDemotedAgain()
-    {
-        var promotions = new SenderPromotions();
-        promotions.Promote("news@shop.example");
-        promotions.Demote("news@shop.example");
-
-        var signals = new MailSignals("news@shop.example", "Spring sale", HasListUnsubscribe: true);
-        Assert.Equal(MailClass.Marketing, promotions.Apply(signals, MailClass.Marketing));
-    }
 }

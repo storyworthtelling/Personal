@@ -44,23 +44,5 @@ public class PlaybackProgressBook
     public bool IsComplete(string mediaId) =>
         progress.TryGetValue(mediaId, out var entry) && entry.IsComplete;
 
-    /// <summary>
-    /// Migrates the legacy binary listened ids into finished progress entries so
-    /// no listened state is lost when upgrading from the old model.
-    /// </summary>
-    public void ImportListened(IEnumerable<string> listenedIds, DateTimeOffset at)
-    {
-        foreach (var id in listenedIds)
-        {
-            if (!progress.ContainsKey(id))
-            {
-                // A nominal 1s position at a 1s duration reads as complete (position
-                // is past duration - 30s) with a positive, non-zero duration.
-                var marker = TimeSpan.FromSeconds(1);
-                progress[id] = new PlaybackProgress(id, marker, marker, at);
-            }
-        }
-    }
-
     public IReadOnlyCollection<PlaybackProgress> Export() => [.. progress.Values];
 }

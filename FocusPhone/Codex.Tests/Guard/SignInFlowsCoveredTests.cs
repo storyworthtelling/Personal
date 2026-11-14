@@ -69,7 +69,8 @@ public class SignInFlowsCoveredTests
     }
 
     [Fact]
-    public void BothTidalFlowsAreTrailed()
+    // The device-code flow was superseded by PKCE and removed (orphan audit §18); PKCE is the one TIDAL sign-in.
+    public void TheTidalSignInIsTrailed()
     {
         var pairing = LogLoopSource.File(TidalPairing);
 
@@ -77,7 +78,6 @@ public class SignInFlowsCoveredTests
         Assert.Contains("HeadDiagnostics.Current?.SignIn(", pairing, StringComparison.Ordinal);
         Assert.Contains("CheckNoReturn(", pairing, StringComparison.Ordinal);
         Assert.Contains("SignInFlowKinds.TidalPkce", LogLoopSource.File("FocusPhone/Codex.Infrastructure/Music/TidalSignInTrails.cs"), StringComparison.Ordinal);
-        Assert.Contains("SignInFlowKinds.TidalDevice", LogLoopSource.File("FocusPhone/Codex.Infrastructure/Music/TidalSignInTrails.cs"), StringComparison.Ordinal);
     }
 
     [Fact]

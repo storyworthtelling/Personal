@@ -4,7 +4,7 @@ using Storyworthtelling.Diagnostics;
 namespace Codex.Infrastructure.Music;
 
 /// <summary>
-/// The TIDAL sign-in's trail (LOG-LOOP-PLAN.md §4.2): every way the PKCE flow and the device flow end, as a
+/// The TIDAL sign-in's trail (LOG-LOOP-PLAN.md §4.2): every way the PKCE flow ends, as a
 /// <see cref="SignInTrail"/> step, so a sign-in that never comes back — the Error 1002 class, TIDAL's page refusing
 /// before any redirect — leaves a diagnosis instead of nothing. The PKCE flow id is the OAuth state, which also
 /// rides the redirect URL, so Flyleaf's redirect hop and Score's own trail join on it.
@@ -15,9 +15,6 @@ public static class TidalSignInTrails
 
     public static SignInTrail StartPkce(string state, string clientId, DateTimeOffset at) =>
         SignInTrail.Start(SignInFlowKinds.TidalPkce, state, at, clientId, TidalSignIn.RedirectUri, Scopes, SignInBrowserPaths.CustomTab);
-
-    public static SignInTrail StartDevice(string deviceCode, string clientId, DateTimeOffset at) =>
-        SignInTrail.Start(SignInFlowKinds.TidalDevice, deviceCode, at, clientId, null, Scopes, SignInBrowserPaths.None);
 
     /// <summary>What the browser handed back, read against the state this screen started.</summary>
     public static SignInTrail Redirect(SignInTrail trail, string redirect, OAuthRedirectResult result, DateTimeOffset at) => result.Status switch
@@ -45,15 +42,6 @@ public static class TidalSignInTrails
 
     public static SignInTrail ExchangeThrew(SignInTrail trail, Exception exception, DateTimeOffset at) =>
         trail.ExchangeFailed(at, 0, $"{exception.GetType().Name}: {exception.Message}");
-
-    /// <summary>How a device-code poll loop ended.</summary>
-    public static SignInTrail DevicePoll(SignInTrail trail, TidalTokenPollResult result, DateTimeOffset at) => result.Status switch
-    {
-        TidalTokenPollStatus.Success => trail.TokenReceived(at, Scopes, result.ExpiresIn > 0 ? at.AddSeconds(result.ExpiresIn) : null, "refresh token"),
-        TidalTokenPollStatus.Denied => trail.ProviderError(at, "access_denied", result.Detail),
-        TidalTokenPollStatus.Expired => trail.TimedOut(at, "the device code's window closed before it was approved"),
-        _ => trail.ProviderError(at, result.Status.ToString(), result.Detail),
-    };
 
     private static string? StateOf(string redirect)
     {

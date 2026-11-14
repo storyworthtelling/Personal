@@ -8,16 +8,6 @@ using Storyworthtelling.Voice;
 
 namespace Codex.Infrastructure.Plate;
 
-/// <summary>Writes the line that sits over the pictures waiting in the Darkroom.</summary>
-public interface IDarkroomCaptionClient
-{
-    /// <summary>
-    /// One short line in the owner's voice about what is waiting, or null when there is no
-    /// key, no answer, or anything at all goes wrong.
-    /// </summary>
-    Task<string?> CaptionAsync(IReadOnlyList<byte[]> jpegs, CancellationToken cancellationToken);
-}
-
 /// <summary>
 /// The Claude-backed caption. Raw HTTP against the Messages API, like every other Claude
 /// client in this suite — <c>ShelfGlyphClient</c>, <c>TasteProfileClient</c>,
@@ -37,7 +27,7 @@ public interface IDarkroomCaptionClient
 /// people in images, so the line describes what is there rather than who — which is why
 /// recognising a face has to happen on the phone instead.</para>
 /// </summary>
-public sealed class DarkroomCaptionClient : IDarkroomCaptionClient
+public sealed class DarkroomCaptionClient
 {
 
     /// <summary>

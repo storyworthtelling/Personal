@@ -68,6 +68,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
+    <!-- AddHttpClient is called here, not in Infrastructure (orphan audit §49). -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
     <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
     <!-- Pin to resolve a Work.Runtime 2.10.2 transitive conflict under .NET 10 MAUI: AndroidX.Core
          wants Concurrent.Futures >=1.3.0.1 while Concurrent.Futures.Ktx caps it <1.2.1 (NuGet NU1107

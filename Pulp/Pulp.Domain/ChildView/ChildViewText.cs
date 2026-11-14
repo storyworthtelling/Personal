@@ -6,7 +6,6 @@ namespace Pulp.Domain.ChildView;
 /// </summary>
 public static class ChildViewText
 {
-    public const string WatchAsAChild = "Watch as a child";
     public const string BackToMe = "Back to me";
     public const string Favorites = "Favorites";
     public const string WhoIsWatching = "Who's watching?";

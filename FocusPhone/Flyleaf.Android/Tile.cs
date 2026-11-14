@@ -32,7 +32,4 @@ public record Tile(string Name, string IconResourceName, string[] NotificationPa
     /// during development, in which case the tile is inert.
     /// </summary>
     public string LaunchPackage => NotificationPackages[0];
-
-    public Intent? BuildLaunchIntent(Context context) =>
-        context.PackageManager!.GetLaunchIntentForPackage(LaunchPackage);
 }

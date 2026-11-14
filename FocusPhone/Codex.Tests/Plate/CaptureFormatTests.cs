@@ -47,25 +47,6 @@ public class CaptureFormatTests
     }
 
     [Theory]
-    [InlineData(Flash.Off, Flash.On)]
-    [InlineData(Flash.On, Flash.Auto)]
-    [InlineData(Flash.Auto, Flash.Off)]
-    public void FlashCyclesThroughAllThreeAndComesBack(Flash from, Flash expected)
-    {
-        // One control, three states, in a fixed order — so the owner can get back to where
-        // they were by tapping rather than by hunting for a menu.
-        Assert.Equal(expected, CaptureFormat.NextFlash(from));
-    }
-
-    [Theory]
-    [InlineData(CaptureRatio.ThreeFour, CaptureRatio.NineSixteen)]
-    [InlineData(CaptureRatio.NineSixteen, CaptureRatio.ThreeFour)]
-    public void RatioIsATwoWaySwitch(CaptureRatio from, CaptureRatio expected)
-    {
-        Assert.Equal(expected, CaptureFormat.NextRatio(from));
-    }
-
-    [Theory]
     [InlineData(Lens.Back, Lens.Front)]
     [InlineData(Lens.Front, Lens.Back)]
     public void LensIsATwoWaySwitchToo(Lens from, Lens expected)

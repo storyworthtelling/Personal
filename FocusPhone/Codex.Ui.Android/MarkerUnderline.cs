@@ -57,16 +57,6 @@ public class MarkerUnderline : View
         trail.SetStyle(Paint.Style.Stroke);
     }
 
-    /// <summary>Re-ink the stroke — the hue follows the area you are in.</summary>
-    public void SetHue(Color hue)
-    {
-        stroke.Color = hue;
-        stroke.Alpha = 235;
-        trail.Color = hue;
-        trail.Alpha = 105;
-        Invalidate();
-    }
-
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
     {
         SetMeasuredDimension(

@@ -119,7 +119,8 @@ public sealed class DogEarState
         }
     }
 
-    /// <summary>Flattens the notice fold and forgets everything that was waiting.</summary>
+    /// <summary>Flattens the notice fold and forgets everything that was waiting. No MAUI page calls it yet;
+    /// it is kept for parity with the native dog-ear's <c>DogEar.ClearNotices</c>, which Post and Flyleaf use.</summary>
     public void ClearNotices()
     {
         waiting.Clear();

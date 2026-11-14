@@ -126,11 +126,11 @@ public class ChildSportsTests
         var document = HouseholdRecords.Put(WithChildren(Pip), HouseholdMaps.ChildLeague, entry, Next(), PhoneA);
 
         var view = HouseholdView.Of(document);
-        Assert.Equal([Harbor], view.LeaguesAllowedFor(Pip));
-        Assert.Empty(view.LeaguesAllowedFor(Robin));
+        Assert.Equal([Harbor], ChildSports.AllowedFor(view.ChildLeagueAllowances, Pip));
+        Assert.Empty(ChildSports.AllowedFor(view.ChildLeagueAllowances, Robin));
 
         document = HouseholdRecords.Remove(document, HouseholdMaps.ChildLeague, entry, Next(), PhoneA);
-        Assert.Empty(HouseholdView.Of(document).LeaguesAllowedFor(Pip));
+        Assert.Empty(ChildSports.AllowedFor(HouseholdView.Of(document).ChildLeagueAllowances, Pip));
     }
 
     [Fact]

@@ -96,19 +96,4 @@ public class TidalSignInTrailTests
         Assert.Equal(SignInStepKind.ExchangeFailed, trail.Steps[^1].Kind);
         Assert.Contains("HttpRequestException", trail.Steps[^1].Detail);
     }
-
-    [Theory]
-    [InlineData(TidalTokenPollStatus.Success, "Signed in")]
-    [InlineData(TidalTokenPollStatus.Denied, "The provider refused")]
-    [InlineData(TidalTokenPollStatus.Expired, "window closed before it was approved")]
-    public void TheDeviceFlowEndsTheTrailTheSameWay(TidalTokenPollStatus status, string diagnosis)
-    {
-        var started = TidalSignInTrails.StartDevice("device-1", "client-example", T0);
-
-        var trail = TidalSignInTrails.DevicePoll(started, new TidalTokenPollResult(status, RefreshToken: status == TidalTokenPollStatus.Success ? "R" : null), T0.AddMinutes(5));
-
-        Assert.Equal(SignInFlowKinds.TidalDevice, trail.FlowKind);
-        Assert.True(trail.IsFinished);
-        Assert.Contains(diagnosis, SignInDiagnosis.Explain(trail));
-    }
 }

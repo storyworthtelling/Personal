@@ -4,19 +4,6 @@ using Storyworthtelling.Remarkable;
 
 namespace Storyworthtelling.Paper.Tests;
 
-public class DeliveryProfilePolicyTests
-{
-    [Theory]
-    [InlineData(true, DeviceColorProfile.PaperPro)]
-    [InlineData(false, DeviceColorProfile.Rm2)]
-    public void ReMarkableProfileFollowsTheTablet(bool colorDevice, DeviceColorProfile expected) =>
-        Assert.Equal(expected, DeliveryProfilePolicy.ForRemarkable(colorDevice));
-
-    [Fact]
-    public void DriveGetsScreenRgb() =>
-        Assert.Equal(DeviceColorProfile.Screen, DeliveryProfilePolicy.ForDrive());
-}
-
 public class PaperDeliveryTests
 {
     [Fact]

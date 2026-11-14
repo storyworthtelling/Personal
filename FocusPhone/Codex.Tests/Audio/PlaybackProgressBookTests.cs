@@ -95,29 +95,6 @@ public class PlaybackProgressBookTests
     }
 
     [Fact]
-    public void ImportListened_MarksLegacyIdsComplete()
-    {
-        var book = new PlaybackProgressBook();
-
-        book.ImportListened(["old1", "old2"], Now);
-
-        Assert.True(book.IsComplete("old1"));
-        Assert.True(book.IsComplete("old2"));
-        Assert.Null(book.Resume("old1"));
-    }
-
-    [Fact]
-    public void ImportListened_DoesNotOverwriteExistingProgress()
-    {
-        var book = new PlaybackProgressBook();
-        book.Record("ep", TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(40), Now);
-
-        book.ImportListened(["ep"], Now);
-
-        Assert.Equal(TimeSpan.FromMinutes(5), book.Resume("ep"));
-    }
-
-    [Fact]
     public void Progress_SurvivesExportAndRestore()
     {
         var book = new PlaybackProgressBook();

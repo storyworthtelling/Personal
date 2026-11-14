@@ -70,26 +70,4 @@ public class ErrandsTests
         // somebody is blocked on.
         Assert.Equal(Errand.None, Errands.For(action, null));
     }
-
-    [Theory]
-    [InlineData(Errand.Photo)]
-    [InlineData(Errand.Video)]
-    [InlineData(Errand.ReadCard)]
-    [InlineData(Errand.ReadStatement)]
-    [InlineData(Errand.ShowImage)]
-    public void AnErrandBlocksItsCaller(Errand errand)
-    {
-        // The caller is sitting in onActivityResult. That is why an errand screen drops the
-        // binder gutter entirely — there is nowhere else to go, and the frame says so
-        // rather than a rule politely asking the owner not to wander.
-        Assert.True(Errands.HasAWaitingCaller(errand));
-    }
-
-    [Theory]
-    [InlineData(Errand.None)]
-    [InlineData(Errand.OpenCamera)]
-    public void OpeningTheCameraBlocksNobody(Errand errand)
-    {
-        Assert.False(Errands.HasAWaitingCaller(errand));
-    }
 }

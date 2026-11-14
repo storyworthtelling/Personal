@@ -65,7 +65,6 @@ public sealed class ServiceCatalogue
     public StreamingService? BySourceId(string? sourceId) => Find(bySource, sourceId);
 
     /// <summary>The service whose charge carries this merchant name, matched whole and without case.</summary>
-    public StreamingService? ByMerchant(string? merchant) => Find(byMerchant, merchant);
 
     private static StreamingService? Find(Dictionary<string, StreamingService> index, string? key) =>
         string.IsNullOrWhiteSpace(key) ? null : index.GetValueOrDefault(key.Trim());

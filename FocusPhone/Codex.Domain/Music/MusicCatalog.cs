@@ -2,8 +2,7 @@ namespace Codex.Domain.Music;
 
 /// <summary>
 /// The iPod-style hierarchy over the library: Songs, Albums, Artists, Genres —
-/// all derived purely from the track tags, so it is fully unit-testable. The
-/// music analogue of <c>PodcastLibrary</c>. Grouping uses the tracks' Display*
+/// all derived purely from the track tags, so it is fully unit-testable. Grouping uses the tracks' Display*
 /// fallbacks, so untagged files land under Unknown Artist/Album rather than
 /// vanishing, and compilations stay together under their album artist.
 /// </summary>

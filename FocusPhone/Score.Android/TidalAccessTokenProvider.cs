@@ -49,7 +49,7 @@ public sealed class TidalAccessTokenProvider(Context context)
             return new TidalTokenPollResult(TidalTokenPollStatus.Error);
         }
 
-        var result = await new TidalDeviceAuthClient(HeadHttp.Shared).RefreshAsync(
+        var result = await new TidalAuthClient(HeadHttp.Shared).RefreshAsync(
             vaultResult.Vault.Tidal.ClientId, vaultResult.Vault.Tidal.ClientSecret, account.RefreshToken,
             cancellationToken);
 

@@ -36,14 +36,4 @@ public static class ConnectBrowserPolicy
         !chromeInstalled ? AdminModeState.ChromeMissing
         : chromeSuspended ? AdminModeState.Needed
         : AdminModeState.Open;
-
-    /// <summary>
-    /// True only when the resolved default-browser package is FocusPhone's restricted viewer. A null or
-    /// empty package (no resolvable default browser — e.g. package visibility withheld it) is treated as
-    /// "not restricted" on purpose, so a browser-capable phone is never falsely blocked; the guard fires
-    /// only on a positive identification of the viewer that genuinely cannot complete a connection.
-    /// This no longer gates the connect page (see the class remarks) — it only identifies the viewer.
-    /// </summary>
-    public static bool IsRestrictedViewer(string? defaultBrowserPackage) =>
-        string.Equals(defaultBrowserPackage, FocusPhoneRestrictedBrowserPackage, StringComparison.Ordinal);
 }

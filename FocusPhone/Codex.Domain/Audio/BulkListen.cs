@@ -2,9 +2,8 @@ namespace Codex.Domain.Audio;
 
 /// <summary>
 /// Pure selection of which episode ids a bulk "mark played" gesture covers, so the
-/// audio activity's long-press menus mark exactly the right set. Kept separate from
-/// <see cref="PodcastLibrary"/> because the activity holds its listened state as a
-/// raw id set rather than a library instance.
+/// audio activity's long-press menus mark exactly the right set. The activity holds its
+/// listened state as a raw id set.
 /// </summary>
 public static class BulkListen
 {
