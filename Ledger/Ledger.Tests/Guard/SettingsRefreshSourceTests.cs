@@ -275,6 +275,23 @@ public class SettingsRefreshSourceTests
         Assert.DoesNotContain("RunUntilExhaustedAsync", main, StringComparison.Ordinal);
     }
 
+    // Orphan audit §33: MarkAllDueAsync's comment said "used by Refresh now", and nothing called it, so the
+    // refresh on open drained only banks already due — usually none, since each waits a day after a success.
+    // The owner's "refresh now" (OwnerWork) asks for every bank; the one-shot after connecting a bank does not.
+    [Fact]
+    public void RefreshNowAsksTheWorkerToMarkEveryBankDueFirst()
+    {
+        Assert.Contains("RefreshWorker.RunNow(Platform.AppContext, everyBank: true)", Source("Ledger.Android/OwnerWork.cs"), StringComparison.Ordinal);
+
+        var worker = Source("Ledger.Android/RefreshWorker.cs");
+        var work = NoDoubleLinkTests.ExtractMethod(worker, "private Result Work()");
+        var gate = work.IndexOf("CycleGate.Wait(0)", StringComparison.Ordinal);
+        var mark = work.IndexOf("MarkAllDueAsync(", StringComparison.Ordinal);
+        var run = work.IndexOf("RunUntilExhaustedAsync(", StringComparison.Ordinal);
+        Assert.True(gate >= 0 && mark > gate && run > mark, "Every bank is marked due inside the cycle gate, before the drain.");
+        Assert.Contains("EveryBankKey", work, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void TheCachedBalancesArePaintedBeforeTheRefreshIsStarted()
     {

@@ -230,12 +230,42 @@ public class EditorActivity : AppCompatActivity
             $"Saying yes teaches it. Saying nothing changes nothing. (closeness "
                 + $"{match.Closeness:0.00} of {FaceBook.SameFace:0.00})",
             PaperTheme.ProgressMark,
-            "Yes, that is them",
-            () =>
+            "Answer",
+            () => AnswerFace(book, match, face.Descriptor)));
+    }
+
+    // Yes teaches the suggested person; someone else takes the face off them and puts it on whoever the
+    // owner chooses (FaceBook.Correct, orphan audit §26). Both are permanent, and both clear the fold.
+    private void AnswerFace(FaceBook book, FaceMatch match, IReadOnlyList<float> descriptor)
+    {
+        if (overlay is null)
+        {
+            return;
+        }
+
+        ActionCard.Show(this, overlay, $"Is this {match.Name}?", null,
+            new CardAction($"Yes, that is {match.Name}", () =>
             {
-                faces.Save(book.Learn(match.ContactId, match.Name, face.Descriptor));
+                faces.Save(book.Learn(match.ContactId, match.Name, descriptor));
                 DogEar.SetNotice(this, overlay, "face", null);
-            }));
+            }, Lead: true),
+            new CardAction("No, it is someone else", () => ChooseSomeoneElse(book, match, descriptor)));
+    }
+
+    private void ChooseSomeoneElse(FaceBook book, FaceMatch match, IReadOnlyList<float> descriptor)
+    {
+        if (overlay is null)
+        {
+            return;
+        }
+
+        var people = rolodex.People().Select(person => new PickablePerson(person.Id, person.Name)).ToList();
+        FaceNameChooser.Show(this, overlay, people, match.ContactId, chosen =>
+        {
+            faces.Save(book.Correct(chosen.ContactId, chosen.Name, descriptor));
+            HeadLog.Info("Plate", "A suggested face was corrected to someone else.");
+            DogEar.SetNotice(this, overlay, "face", null);
+        });
     }
 
     private void BuildToolRow()

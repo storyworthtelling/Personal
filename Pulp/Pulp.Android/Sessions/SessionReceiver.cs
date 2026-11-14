@@ -61,6 +61,10 @@ public class SessionReceiver : BroadcastReceiver
         Previous.TryGetValue(message.Package, out var before);
         var meaning = SessionReading.Interpret(message, before, DateTimeOffset.Now);
 
+        // Evidence for the mis-landing check (D122): which app is playing what, just after a hand-off.
+        Pulp.HandOffs.Landings.Saw(new Pulp.Domain.HandOffs.PlaybackSession(
+            message.Package, DateTimeOffset.Now, message.Title, message.Position));
+
         // A closed session starts the next one from nothing.
         if (message.State == SessionPlayState.Stopped)
         {

@@ -86,6 +86,19 @@ public class CiHygieneTests
         Assert.Contains("cancel-in-progress: true", guard, StringComparison.Ordinal);
     }
 
+    // Orphan audit §46: the icon generator ran in CI without its tests, and nothing ran the seal's.
+    [Fact]
+    public void EveryToolsTestProjectIsRunByAWorkflow()
+    {
+        var all = string.Join("\n", Workflows().Select(File.ReadAllText));
+        var missing = Directory.EnumerateDirectories(RepoFile("Tools"), "*.Tests")
+            .Select(dir => $"Tools/{Path.GetFileName(dir)}/{Path.GetFileName(dir)}.csproj")
+            .Where(project => File.Exists(RepoFile(project)) && !all.Contains("dotnet test " + project, StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(missing.Count == 0, "A tool's tests that no workflow runs:\n" + string.Join("\n", missing));
+    }
+
     [Fact]
     public void EveryPathFilterCoversEveryProjectItsWorkflowBuilds()
     {

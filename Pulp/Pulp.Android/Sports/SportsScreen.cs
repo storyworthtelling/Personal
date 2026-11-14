@@ -137,7 +137,12 @@ internal sealed class SportsScreen
                 var cached = await services.CachedSportsAsync(viewer, CancellationToken.None);
                 host.RunOnUiThread(() => Show(mine, view, answer, cached));
                 var fresh = await services.SportsAsync(viewer, CancellationToken.None);
-                host.RunOnUiThread(() => Show(mine, view, answer, fresh));
+                var unreachable = services.SportsUnreachable;
+                host.RunOnUiThread(() =>
+                {
+                    Show(mine, view, answer, fresh);
+                    SayWhichFeedsAreDown(unreachable);
+                });
             }
             catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
@@ -152,6 +157,25 @@ internal sealed class SportsScreen
                 });
             }
         });
+    }
+
+    // D208: a league whose feed could not be reached says so behind the fold while its cached games stand,
+    // and the notice leaves once a refresh reaches it (orphan audit §29).
+    private readonly HashSet<string> saidDown = new(StringComparer.Ordinal);
+
+    private void SayWhichFeedsAreDown(IReadOnlyList<(string Id, string Name)> unreachable)
+    {
+        var now = DateTimeOffset.Now;
+        foreach (var (id, name) in unreachable)
+        {
+            PulpNotices.Raise(host, overlay(), WaitingNotices.SportsFeedUnreachable(id, name, now), new PulpNotices.Buttons());
+            saidDown.Add(id);
+        }
+        foreach (var id in saidDown.Except(unreachable.Select(league => league.Id)).ToList())
+        {
+            PulpNotices.Withdraw(host, overlay(), WaitingNotices.SportsFeedUnreachable(id, id, now).Key);
+            saidDown.Remove(id);
+        }
     }
 
     private void Show(int mine, HouseholdView view, ThisPhoneAnswer answer, SportsPage? read)

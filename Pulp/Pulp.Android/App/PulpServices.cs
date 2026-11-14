@@ -981,6 +981,10 @@ public sealed class PulpServices
     /// channel, never a standing or a highlight, which is why only <c>SportsFollowing.Fixtures</c> should touch one;
     /// no screen is handed a feed (<c>SportsScreenGetsOnlySheetsTests</c>).
     /// </summary>
+    /// <summary>The leagues whose last refresh could not reach their feed (D208, orphan audit §29); names only.</summary>
+    public IReadOnlyList<(string Id, string Name)> SportsUnreachable =>
+        sportsFeeds.Unreachable.Select(league => (league.Id.Value, league.Name)).ToList();
+
     internal Task<IReadOnlyList<LeagueFeed>> FollowedFeedsAsync(IReadOnlyCollection<SportsFollow> follows, bool refresh, CancellationToken cancellationToken) =>
         sportsFeeds.FollowedAsync(follows, refresh, cancellationToken);
 

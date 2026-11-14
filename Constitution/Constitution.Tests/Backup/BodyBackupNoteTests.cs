@@ -181,4 +181,25 @@ public class BodyBackupNoteTests
         Assert.Throws<ArgumentNullException>(() => BodyBackupNote.For((BodyBackupResult)null!));
         Assert.Throws<ArgumentNullException>(() => BodyBackupNote.For((BodyBackupRunResult)null!));
     }
+
+    // Orphan audit §41: the sentences were written and reached no screen. Settings shows the last run worth
+    // saying; a run that simply had nothing to do does not wipe what the last real one said.
+    [Theory]
+    [InlineData(BodyBackupRunStatus.NotDue, false)]
+    [InlineData(BodyBackupRunStatus.SyncDidNotRun, false)]
+    [InlineData(BodyBackupRunStatus.AlreadyRestored, false)]
+    [InlineData(BodyBackupRunStatus.NoPassphrase, true)]
+    [InlineData(BodyBackupRunStatus.NotSignedIn, true)]
+    [InlineData(BodyBackupRunStatus.Failed, true)]
+    public void OnlyARunThatDidOrCouldNotDoSomethingReplacesTheLine(BodyBackupRunStatus status, bool worth)
+    {
+        Assert.Equal(worth, BodyBackupNote.WorthShowing(new BodyBackupRunResult(status)));
+    }
+
+    [Fact]
+    public void ARunThatBackedUpOrRestoredIsAlwaysWorthShowing()
+    {
+        Assert.True(BodyBackupNote.WorthShowing(new BodyBackupRunResult(BodyBackupRunStatus.BackupRan, Backup: new BodyBackupResult(BodyBackupOutcome.BackedUp))));
+        Assert.True(BodyBackupNote.WorthShowing(new BodyBackupRunResult(BodyBackupRunStatus.RestoreRan, Restore: new BodyRestoreResult(BodyRestoreOutcome.Restored))));
+    }
 }

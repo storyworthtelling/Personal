@@ -139,6 +139,12 @@ public sealed class SettingsArea(Activity host)
             column.AddView(PaperUi.SecondaryButton(Host, GoogleSignInHealth.ButtonLabel("Sign in with Google"), () => _ = SignInAsync()), Spaced(DesignTokens.Space.X1));
         }
 
+        // What the Body backup last did, in BodyBackupNote's words (orphan audit §41): inline, never a toast.
+        if (Constitution.Services.BodyBackups.LastNote is { } backupNote)
+        {
+            column.AddView(PaperUi.Secondary(Host, backupNote), Spaced(DesignTokens.Space.X3));
+        }
+
         column.AddView(PaperUi.QuietButton(Host, exportStatus is null ? model.ExportLabel : "Export diagnostics again", ExportDiagnostics),
             Spaced(DesignTokens.Space.X6));
         if (exportStatus is not null)

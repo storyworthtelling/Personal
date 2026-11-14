@@ -76,6 +76,7 @@ public static class WorkoutWeekServices
         {
             // The run never started, so it wrote no line of its own.
             new BodyLog(appContext).Outcome(WorkoutWeekTrail.LogPhrase(stop.Outcome));
+            StateTheNotice(stop.Outcome);
             return stop.Outcome;
         }
 
@@ -98,8 +99,14 @@ public static class WorkoutWeekServices
             new FileWorkoutWeekReports(Path.Combine(folder, WorkoutWeekFiles.ReportFile)).Save(record);
         }
 
+        StateTheNotice(outcome);
         return outcome;
     }
+
+    // The Waiting page's "week not planned" (orphan audit §41): raised while a run cannot plan the week, and
+    // taken away by the first that does. Why is the trail's to say; the notice names nothing.
+    private static void StateTheNotice(WorkoutWeekOutcome outcome) =>
+        ConnectionNoticeBoard.With(board => WorkoutWeekNotices.Apply(board, outcome, DateTimeOffset.UtcNow));
 
     /// <summary>The run's seams, a straight copy of the two sides. No forecast or hotel client exists yet; the calendar side says so honestly and the run reads it as "changes nothing".</summary>
     public static WorkoutWeekSeams Assemble(CalendarSideSeams calendar, DeliverySideSeams delivery)

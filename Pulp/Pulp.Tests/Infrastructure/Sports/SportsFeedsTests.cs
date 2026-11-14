@@ -257,6 +257,25 @@ public sealed class SportsFeedsTests : IDisposable
         Assert.Contains(warnings, message => message.Contains("cfl-invented") && message.Contains("Unavailable"));
     }
 
+    // Orphan audit §29: SportsFeedUnreachable (D208) was raised by nothing, so a league whose feed was down
+    // showed last week's games with no word. The feeds now say which leagues the last refresh could not reach.
+    [Fact]
+    public async Task AFailedFetchNamesTheLeagueUnreachableUntilAFetchLands()
+    {
+        Cache().Store(CoastalFeed(), clock.AddDays(-2));
+        source.FailSchedule = true;
+        var feeds = Feeds();
+
+        await feeds.FollowedAsync([Follows(Gulls.Id)], refresh: true, CancellationToken.None);
+        var unreachable = Assert.Single(feeds.Unreachable);
+        Assert.Equal(Coastal, unreachable.Id);
+
+        source.FailSchedule = false;
+        clock = clock.AddDays(1);
+        await feeds.FollowedAsync([Follows(Gulls.Id)], refresh: true, CancellationToken.None);
+        Assert.Empty(feeds.Unreachable);
+    }
+
     [Fact]
     public async Task OnlyTheLeaguesAskedForAreReadAndAnUnaskedOneIsNeverTouched()
     {

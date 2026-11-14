@@ -1,0 +1,47 @@
+name: Test tools
+
+# The committed tools' own tests (orphan audit §46). IconStudio regenerates every launcher icon in the app
+# builds, and IndexHistorySeal seals the owner's snowball history; both ran in CI, or by hand, without
+# their tests. Branch pushes and main both run them: they are quick and publish nothing.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'Tools/IconStudio/**'
+      - 'Tools/IconStudio.Tests/**'
+      - 'Tools/IndexHistorySeal/**'
+      - 'Tools/IndexHistorySeal.Tests/**'
+      # IndexHistorySeal builds on Index's domain and infrastructure (and what they build on).
+      - 'Ledger/Ledger.Domain/**'
+      - 'Ledger/Ledger.Infrastructure/**'
+      - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Diagnostics/**'
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Handwriting/**'
+      - 'Storyworthtelling.Pipeline/**'
+      - 'Storyworthtelling.Paper/**'
+      - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
+      - 'Branding/**'
+      - 'Fonts/**'
+      - '.github/actions/dotnet/**'
+      - '.github/workflows/test-tools.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/dotnet
+
+      - name: Test IconStudio
+        run: dotnet test Tools/IconStudio.Tests/IconStudio.Tests.csproj
+
+      - name: Test IndexHistorySeal
+        run: dotnet test Tools/IndexHistorySeal.Tests/IndexHistorySeal.Tests.csproj

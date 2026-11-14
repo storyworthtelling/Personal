@@ -59,6 +59,15 @@ public class IdentityLinkStore
         command.ExecuteNonQuery();
     }
 
+    /// <summary>The undo of <see cref="Unlink"/>: the pin is lifted, so the address-book card joins the key again.</summary>
+    public void Rejoin(string key)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM identityStandalone WHERE key = $key;";
+        command.Parameters.AddWithValue("$key", key);
+        command.ExecuteNonQuery();
+    }
+
     public IReadOnlyList<(string, string)> LoadLinks()
     {
         using var select = connection.CreateCommand();

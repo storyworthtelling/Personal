@@ -24,6 +24,13 @@ public sealed class SportsFeeds
     private readonly Action<string, Exception?> warn;
     private readonly Func<DateTimeOffset> clock;
     private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<LeagueId, League> unreachable = new();
+
+    /// <summary>
+    /// The leagues whose last refresh could not reach their feed, so the Sports tab can raise D208's
+    /// notice (orphan audit §29) while the cached copy stands. A league leaves once a fetch lands.
+    /// </summary>
+    public IReadOnlyList<League> Unreachable => unreachable.Values.OrderBy(league => league.Name, StringComparer.Ordinal).ToList();
 
     public SportsFeeds(ISportsSource source, SportsSourceTable table, SportsCache cache, Action<string, Exception?> warn, Func<DateTimeOffset> clock)
     {
@@ -115,6 +122,7 @@ public sealed class SportsFeeds
                 catch (Exception exception) when (IsThisLeaguesFault(exception, cancellationToken))
                 {
                     warn($"League {league} could not be refreshed ({exception.GetType().Name}); the cached copy stands.", exception);
+                    unreachable[league] = current.Feed.League;
                 }
             }
 
@@ -195,8 +203,10 @@ public sealed class SportsFeeds
         catch (CatalogueLookupException exception)
         {
             warn($"League {league} could not be refreshed ({exception.Failure}); the cached copy stands.", exception);
+            unreachable[league] = current.Feed.League;
             return current;
         }
+        unreachable.TryRemove(league, out _);
 
         IReadOnlyList<Team> order;
         try

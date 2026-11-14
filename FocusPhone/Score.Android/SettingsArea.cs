@@ -6,6 +6,7 @@ using Codex.Domain.Design;
 using Codex.Domain.Music;
 using Codex.Ui;
 using Codex.Ui.Voice;
+using Storyworthtelling.Time;
 
 namespace Score;
 
@@ -96,6 +97,14 @@ public sealed class SettingsArea : ScoreArea
             "nobody can reach."));
         column.AddView(PaperUi.SecondaryButton(Host, "Recent failures",
             () => Host.StartActivity(new Android.Content.Intent(Host, typeof(AudioDiagnosticsActivity)))));
+
+        // What the last update check did (orphan audit §19). Shown only once one has run: on the
+        // locked phone Flyleaf installs for the suite, and the line says so rather than staying silent.
+        if (UpdateLine() is { } updates)
+        {
+            Group(column, "Updates");
+            column.AddView(PaperUi.Secondary(Host, updates));
+        }
 
         column.AddView(PaperUi.BuildNumber(Host, "Score"), BuildLineParams());
 
@@ -216,6 +225,16 @@ public sealed class SettingsArea : ScoreArea
     }
 
     private const int CountFieldDp = 96;
+
+    private string? UpdateLine()
+    {
+        var status = new ScoreUpdateStatusStore(Host);
+        if (status.LastRunUtc is not { } runUtc || status.LastSummary is not { } summary)
+        {
+            return null;
+        }
+        return $"Last checked {RelativeTime.Format(runUtc.ToLocalTime(), DateTime.Now)}: {summary}";
+    }
 
     // The shape a working thing takes: what is true, and the way to change it.
     private View Settled(string state, string action, Action onAction)
