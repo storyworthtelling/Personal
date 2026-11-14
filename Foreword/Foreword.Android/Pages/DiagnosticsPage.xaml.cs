@@ -107,31 +107,54 @@ public partial class DiagnosticsPage : BinderPage
         });
     }
 
-    private async void OnClearClicked(object sender, EventArgs e)
-    {
-        // Destructive, so it asks — this is the one place §5's undo-first rule cannot apply,
-        // because the thing being deleted is the only record of what went wrong and there is
-        // nowhere to hold it while an undo window runs.
-        var confirmed = await DisplayAlert(
-            "Clear diagnostics?",
-            "The record of what has gone wrong on this phone is deleted. There is no adb after "
-            + "the cutover, so this is the only copy.",
-            "Clear", "Keep");
+    // What a Clear took, held for the undo window (DESIGN.md §7: undo-first, never a confirm). It used
+    // to ask first, on the reasoning that there was nowhere to hold the record while an undo ran — but
+    // the record is two small text files, and memory for ten seconds is somewhere.
+    private Dictionary<string, string>? cleared;
 
-        if (!confirmed)
+    private void OnClearClicked(object sender, EventArgs e)
+    {
+        if (cleared is { } held)
         {
+            // The button reads "Put back" while the window is open.
+            foreach (var (path, text) in held)
+            {
+                System.IO.File.WriteAllText(path, text);
+            }
+
+            cleared = null;
+            ClearButton.Text = "Clear";
+            Render();
             return;
         }
 
+        var taken = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var path in new[] { DeliveryLogPath, CrashLogPath })
         {
             if (System.IO.File.Exists(path))
             {
+                taken[path] = System.IO.File.ReadAllText(path);
                 System.IO.File.Delete(path);
             }
         }
 
+        cleared = taken;
         Render();
+        IntroLabel.Text = "Cleared. Put it back within a few seconds if that was a mistake.";
+        ClearButton.IsVisible = true;
+        ClearButton.Text = "Put back";
+
+        Dispatcher.StartTimer(Storyworthtelling.Folds.FoldTiming.UndoWindow, () =>
+        {
+            if (ReferenceEquals(cleared, taken))
+            {
+                cleared = null;
+                ClearButton.Text = "Clear";
+                Render();
+            }
+
+            return false;
+        });
     }
 
     // LOG-LOOP-PLAN.md §3.3: Send logs now, a declared key action. Success is the status line changing (§7).

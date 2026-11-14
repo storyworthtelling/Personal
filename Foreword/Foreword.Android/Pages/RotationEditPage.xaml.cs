@@ -182,13 +182,14 @@ public partial class RotationEditPage : BinderPage
 
     private async void OnAddNameClicked(object sender, EventArgs e)
     {
-        var typed = await DisplayPromptAsync("Add a name", "Who is on this list?", "Add", "Cancel");
-        if (string.IsNullOrWhiteSpace(typed))
+        var typed = await PaperCards.AskText(this, "Add a name", rotation.Name, "Who is on this list?", null, "Add",
+            text => text.Length == 0 ? "Write the name to add." : null);
+        if (typed is null)
         {
             return;
         }
 
-        Commit(rotation with { Members = [.. rotation.Members, PrayerText.Of(typed.Trim())] });
+        Commit(rotation with { Members = [.. rotation.Members, PrayerText.Of(typed)] });
     }
 
     private async void OnDeleteClicked(object sender, EventArgs e)

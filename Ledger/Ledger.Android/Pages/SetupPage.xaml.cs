@@ -413,8 +413,14 @@ public partial class SetupPage : LedgerBinderPage
         try { result = await vaultSync.PublishAsync(CancellationToken.None); }
         catch (Exception ex) { result = SecretsVaultPublishResult.WriteFailed(ex.Message); }
         if (result.NeedsAttention)
-            await DisplayAlert("Vault backup didn\u2019t complete", result.Message, "OK");
+        {
+            // Behind the fold, not an alert (audit W8.2b): settings still saved here, so this is a thing to know.
+            dogEarState.SetNotice(VaultBackupNotice, new DogEarNotice("The vault backup did not finish.", result.Message, DogEarHue.Problem));
+            dogEar.Refresh();
+        }
     }
+
+    private const string VaultBackupNotice = "vault-backup";
 
     private async Task PublishAfterRestoreAsync(Task restore)
     {
@@ -539,12 +545,11 @@ public partial class SetupPage : LedgerBinderPage
 
     private async void OnAddCategoryClicked(object? sender, EventArgs e)
     {
-        var name = await DisplayPromptAsync("Add a category", "Name");
-        if (string.IsNullOrWhiteSpace(name))
-            return;
-
-        var trimmed = name.Trim();
-        if (categoryRows.Any(c => string.Equals(c.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+        var trimmed = await PaperCards.AskText(this, "Add a category", null, "Name", null, "Add", text =>
+            text.Length == 0 ? "A category needs a name."
+            : categoryRows.Any(c => string.Equals(c.Name, text, StringComparison.OrdinalIgnoreCase)) ? "There is already a category called that."
+            : null);
+        if (trimmed is null)
             return;
 
         await budgetService.AddCategoryAsync(trimmed, CancellationToken.None);
@@ -568,20 +573,19 @@ public partial class SetupPage : LedgerBinderPage
         if (index < categoryRows.Count - 1) options.Add("Move down");
         options.Add("Remove");
 
-        var action = await DisplayActionSheet(categoryName, "Cancel", null, options.ToArray());
+        var action = await PaperCards.Choose(this, categoryName, null, options);
         switch (action)
         {
             case "Rename":
-                var newName = await DisplayPromptAsync("Rename category", "Name", initialValue: categoryName);
-                if (!string.IsNullOrWhiteSpace(newName))
+                var trimmed = await PaperCards.AskText(this, "Rename category", categoryName, "Name", categoryName, "Rename", text =>
+                    text.Length == 0 ? "A category needs a name."
+                    : !string.Equals(text, categoryName, StringComparison.OrdinalIgnoreCase)
+                        && categoryRows.Any(c => string.Equals(c.Name, text, StringComparison.OrdinalIgnoreCase)) ? "There is already a category called that."
+                    : null);
+                if (trimmed is not null && !string.Equals(trimmed, categoryName, StringComparison.Ordinal))
                 {
-                    var trimmed = newName.Trim();
-                    if (!string.Equals(trimmed, categoryName, StringComparison.Ordinal) &&
-                        !categoryRows.Any(c => string.Equals(c.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        await budgetService.RenameCategoryAsync(category.Id, trimmed, CancellationToken.None);
-                        await ReloadCategoriesAsync();
-                    }
+                    await budgetService.RenameCategoryAsync(category.Id, trimmed, CancellationToken.None);
+                    await ReloadCategoriesAsync();
                 }
                 break;
 

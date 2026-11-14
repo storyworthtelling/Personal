@@ -171,8 +171,10 @@ public partial class MainPage : BinderPage
             CredentialStore.LastDeliveryAtUtc = DateTime.UtcNow;
             StatusLabel.Text = CredentialStore.LastDeliverySummary;
             DeliveryLogButton.IsVisible = true;
+            // The status line above already says it did not arrive and why (audit W8.2b: an alert repeated
+            // it); the details still go to the clipboard for the record.
             await Clipboard.SetTextAsync(fullMessage);
-            await DisplayAlert("Delivery Failed (copied to clipboard)", fullMessage, "OK");
+            StatusLabel.Text = CredentialStore.LastDeliverySummary + " The details are copied.";
         }
         finally
         {
@@ -296,65 +298,61 @@ public partial class MainPage : BinderPage
 
     private async void OnDeliveryLogClicked(object sender, EventArgs e)
     {
-        if (!System.IO.File.Exists(DeliveryLogPath))
-        {
-            await DisplayAlert("Delivery Log", "No delivery log found.", "OK");
-            return;
-        }
-
-        var log = System.IO.File.ReadAllText(DeliveryLogPath);
+        var log = System.IO.File.Exists(DeliveryLogPath) ? System.IO.File.ReadAllText(DeliveryLogPath) : string.Empty;
         if (string.IsNullOrWhiteSpace(log))
         {
-            await DisplayAlert("Delivery Log", "Log is empty.", "OK");
+            StatusLabel.Text = "Nothing in the delivery log yet.";
             return;
         }
 
-        var action = await DisplayActionSheet("Delivery Log", "Cancel", null, "View & Copy", "Share");
-        if (action == "View & Copy")
+        // Read on a card, with what to do about it (audit W8.2b: an action sheet, then an alert).
+        var action = await PaperCards.ShowText(this, "Delivery log", Tail(log), "Copy", "Share");
+        if (action == "Copy")
         {
-            var display = log.Length > 3000 ? "(truncated — use Share for full log)\n\n" + log[^3000..] : log;
             await Clipboard.SetTextAsync(log);
-            await DisplayAlert("Delivery Log (copied to clipboard)", display, "OK");
+            StatusLabel.Text = "Delivery log copied.";
         }
         else if (action == "Share")
         {
-            await Share.RequestAsync(new ShareFileRequest
-            {
-                Title = "Foreword Delivery Log",
-                File = new ShareFile(DeliveryLogPath)
-            });
+            await Share.RequestAsync(new ShareFileRequest { Title = "Foreword Delivery Log", File = new ShareFile(DeliveryLogPath) });
         }
     }
 
     private async void OnCrashLogClicked(object sender, EventArgs e)
     {
-        if (!System.IO.File.Exists(CrashLogPath))
+        var log = System.IO.File.Exists(CrashLogPath) ? System.IO.File.ReadAllText(CrashLogPath) : string.Empty;
+        if (string.IsNullOrWhiteSpace(log))
         {
-            await DisplayAlert("Crash Log", "No crash log found.", "OK");
+            CrashLogButton.IsVisible = false;
             return;
         }
 
-        var log = System.IO.File.ReadAllText(CrashLogPath);
-
-        var action = await DisplayActionSheet("Crash Log", "Cancel", null, "View & Copy", "Share", "Clear");
-        if (action == "View & Copy")
+        var action = await PaperCards.ShowText(this, "Crash log", Tail(log), "Clear", "Copy", "Share");
+        if (action == "Copy")
         {
-            var display = log.Length > 3000 ? "(truncated — use Share for full log)\n\n" + log[^3000..] : log;
             await Clipboard.SetTextAsync(log);
-            await DisplayAlert("Crash Log (copied to clipboard)", display, "OK");
+            StatusLabel.Text = "Crash log copied.";
         }
         else if (action == "Share")
         {
-            await Share.RequestAsync(new ShareFileRequest
-            {
-                Title = "Foreword Crash Log",
-                File = new ShareFile(CrashLogPath)
-            });
+            await Share.RequestAsync(new ShareFileRequest { Title = "Foreword Crash Log", File = new ShareFile(CrashLogPath) });
         }
         else if (action == "Clear")
         {
+            // Undo-first (§7): the record is held for the fold's window and written back on undo.
             System.IO.File.Delete(CrashLogPath);
             CrashLogButton.IsVisible = false;
+            dogEarState.BeginUndo("Cleared the crash log.", () =>
+            {
+                System.IO.File.WriteAllText(CrashLogPath, log);
+                CrashLogButton.IsVisible = true;
+            }, DateTimeOffset.Now, FoldTiming.UndoWindow);
+            NoticeCorner.IsVisible = true;
+            dogEar.Refresh();
         }
     }
+
+    // The newest part of a long log; Share sends the whole of it.
+    private static string Tail(string log) =>
+        log.Length > 3000 ? "(the last part — Share sends the whole log)\n\n" + log[^3000..] : log;
 }

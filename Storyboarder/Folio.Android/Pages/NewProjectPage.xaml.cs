@@ -74,7 +74,7 @@ public partial class NewProjectPage : FolioBinderPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            await DisplayAlert("Google", "Could not start sign-in (no active window).", "OK");
+            Problem("Sign-in could not start: Folio has no open window. Try again.");
             return;
         }
 
@@ -87,7 +87,7 @@ public partial class NewProjectPage : FolioBinderPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert("Sign-in failed (copied to clipboard)", Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google"), "OK");
+            Problem("Sign-in did not finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google") + " The details are copied.");
         }
     }
 
@@ -112,7 +112,7 @@ public partial class NewProjectPage : FolioBinderPage
     {
         if (!SettingsStore.IsGoogleConfigured)
         {
-            await DisplayAlert("Google", "Sign in with Google first.", "OK");
+            Problem("Sign in with Google first, so Folio can see your Drive.");
             return;
         }
 
@@ -127,12 +127,12 @@ public partial class NewProjectPage : FolioBinderPage
             var token = await tokens.GetAccessToken();
             var entries = await lister.ListChildrenAsync(token, path[^1].Id, CancellationToken.None);
             DocsList.ItemsSource = entries;
-            StatusLabel.Text = entries.Count == 0 ? "Empty folder." : $"{entries.Count} item(s).";
+            Status(entries.Count == 0 ? "Empty folder." : $"{entries.Count} item(s).");
         }
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert("Could not list Drive (copied to clipboard)", Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Drive"), "OK");
+            Problem("Drive could not be listed: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Drive") + " The details are copied.");
         }
         finally
         {
@@ -155,7 +155,7 @@ public partial class NewProjectPage : FolioBinderPage
         {
             selected = entry;
             CreateButton.IsEnabled = true;
-            StatusLabel.Text = $"Selected: {entry.Name}";
+            Status($"Selected: {entry.Name}");
         }
     }
 
@@ -186,7 +186,7 @@ public partial class NewProjectPage : FolioBinderPage
                         PreviousBookId!.Value, selected.Id, selected.Name, token, null, artStyle, CancellationToken.None);
                     if (bookId is null)
                     {
-                        await DisplayAlert("Next book", "The previous book could no longer be found.", "OK");
+                        Problem("The book this one follows could no longer be found.");
                         return;
                     }
                 }
@@ -196,7 +196,7 @@ public partial class NewProjectPage : FolioBinderPage
                         PreviousDraftId!.Value, selected.Id, selected.Name, token, null, artStyle, CancellationToken.None);
                     if (draftId is null)
                     {
-                        await DisplayAlert("New draft", "The previous draft could no longer be found.", "OK");
+                        Problem("The draft this one replaces could no longer be found.");
                         return;
                     }
                 }
@@ -217,11 +217,8 @@ public partial class NewProjectPage : FolioBinderPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert(
-                bookMode ? "Could not add book (copied to clipboard)"
-                    : draftMode ? "Could not add draft (copied to clipboard)"
-                    : "Could not create project (copied to clipboard)",
-                Storyworthtelling.Diagnostics.PlainError.Describe(ex), "OK");
+            Problem((bookMode ? "The book was not added: " : draftMode ? "The draft was not added: " : "The project was not created: ")
+                + Storyworthtelling.Diagnostics.PlainError.Describe(ex) + " The details are copied.");
         }
         finally
         {
@@ -231,10 +228,23 @@ public partial class NewProjectPage : FolioBinderPage
 
     private void Busy(bool busy, string? message = null)
     {
-        StatusLabel.Text = message ?? string.Empty;
+        Status(message ?? string.Empty);
         SignInButton.IsEnabled = !busy;
         RefreshButton.IsEnabled = !busy;
         UpButton.IsEnabled = !busy && path.Count > 1;
         CreateButton.IsEnabled = !busy && selected is not null;
+    }
+
+    private void Status(string sentence)
+    {
+        StatusLabel.Text = sentence;
+        StatusLabel.TextColor = Storyworthtelling.Maui.PaperResources.Colour("ProgressText");
+    }
+
+    // A refusal said on the page, in the Problem hue, where the status line is (audit W8.2b: alerts).
+    private void Problem(string sentence)
+    {
+        StatusLabel.Text = sentence;
+        StatusLabel.TextColor = Storyworthtelling.Maui.PaperResources.Colour("ProblemText");
     }
 }

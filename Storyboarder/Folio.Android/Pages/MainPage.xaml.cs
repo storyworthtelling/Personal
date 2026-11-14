@@ -659,7 +659,9 @@ public partial class MainPage : FolioBinderPage
 
         if (diff.PreviousDraftId is null)
         {
-            await DisplayAlert("What changed", "This is the first draft — there's nothing to compare against yet.", "OK");
+            // Behind the fold rather than an alert (audit W8.2b): something to know, not to answer.
+            SetNotice("draft-diff", new DogEarNotice("Nothing to compare yet.",
+                $"{status.Title} is on its first draft, so there is no earlier one to set it against.", DogEarHue.Reference));
             return;
         }
 

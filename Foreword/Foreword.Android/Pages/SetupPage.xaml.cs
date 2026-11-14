@@ -505,10 +505,9 @@ public partial class SetupPage : BinderPage
             result = SecretsVaultPublishResult.WriteFailed(ex.Message);
         }
 
-        if (result.NeedsAttention)
-        {
-            await DisplayAlert("Vault backup didn't complete", result.Message, "OK");
-        }
+        // Said under the passphrase, where the backup is set up, not in an alert (audit W8.2b).
+        VaultProblemLabel.Text = result.NeedsAttention ? "The vault backup did not finish: " + result.Message : string.Empty;
+        VaultProblemLabel.IsVisible = result.NeedsAttention;
     }
 
     // ---- Where it goes =====================================================

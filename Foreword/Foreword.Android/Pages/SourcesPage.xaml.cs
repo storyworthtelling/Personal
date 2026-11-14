@@ -1,3 +1,4 @@
+using Storyworthtelling.Maui.Views;
 using Foreword.Domain.Brief;
 using Storyworthtelling.Maui;
 
@@ -184,14 +185,18 @@ public partial class SourcesPage : BinderPage
     /// </summary>
     private async void OnAddFeedClicked(object sender, EventArgs e)
     {
-        var url = await DisplayPromptAsync("Add a feed", "Its address", placeholder: "https://…");
+        var url = await PaperCards.AskText(this, "Add a feed", null, "https://…", null, "Add",
+            text => Uri.TryCreate(text, UriKind.Absolute, out var parsed) && parsed.Scheme is "http" or "https"
+                ? null
+                : "That is not a web address. A feed's address starts with https://.",
+            keyboard: Keyboard.Url);
 
-        if (string.IsNullOrWhiteSpace(url))
+        if (url is null)
         {
             return;
         }
 
-        settings.AddFeed(url.Trim());
+        settings.AddFeed(url);
         Render();
     }
 }

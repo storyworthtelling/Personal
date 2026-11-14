@@ -22,7 +22,7 @@ namespace Folio.Android.Pages;
 ///
 /// <para>There is no navigation bar. The header <em>is</em> the header.</para>
 /// </summary>
-public abstract class FolioBinderPage : ContentPage
+public abstract class FolioBinderPage : ContentPage, ICardHost
 {
     private readonly BinderTabs strip = new();
     private readonly PaperPageHeader header = new();
@@ -122,6 +122,8 @@ public abstract class FolioBinderPage : ContentPage
     {
         base.OnAppearing();
         Storyworthtelling.Maui.Health.GoogleSignInHealth.Apply(folds);
+        // A notice a page raised as it left (a vault backup that did not land on Save) folds in here.
+        CarriedNotices.Shared.DeliverTo(folds);
         corner?.Refresh();
     }
 
@@ -278,6 +280,10 @@ public abstract class FolioBinderPage : ContentPage
         Grid.SetRowSpan(card, 2);
         Grid.SetColumnSpan(card, 2);
     }
+
+    void ICardHost.ShowCard(View card) => Present(card);
+
+    void ICardHost.HideCard() => Dismiss();
 
     /// <summary>Takes the card away. Safe to call when there is none.</summary>
     protected void Dismiss()
