@@ -189,7 +189,7 @@ public class ErrandActivity : AppCompatActivity
             PaperUi.PrimaryButton(this, "Take it", TakePhoto),
             PaperUi.QuietButton(this, "Cancel", Cancel)),
         Errand.Video when camera.IsRecording => PaperUi.BottomBar(this,
-            PaperUi.DestructiveButton(this, "Stop", StopVideo)),
+            PaperUi.SecondaryButton(this, "Stop", StopVideo)),
         Errand.Video => PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Record", StartVideo),
             PaperUi.QuietButton(this, "Cancel", Cancel)),

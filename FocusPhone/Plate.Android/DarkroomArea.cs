@@ -237,7 +237,7 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
             actions.Add(new CardAction("It arrived", () => Clear(scan)));
             actions.Add(new CardAction("Hand it over again", () => shell.RetryScan(scan)));
         }
-        actions.Add(new CardAction("Throw it away", () => Clear(scan), Destructive: true));
+        actions.Add(new CardAction("Throw it away", () => Clear(scan)));
 
         ActionCard.Show(Host, Overlay, scan.Title,
             $"scanned {TimeFormats.Clock12(scan.CapturedAt)}", [.. actions]);
@@ -271,7 +271,7 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
         var chosen = shell.Room.ChosenCount;
         return PaperUi.BottomBar(Host,
             PaperUi.PrimaryButton(Host, chosen == 0 ? "Send all" : $"Send {chosen}", Send),
-            PaperUi.DestructiveButton(Host,
+            PaperUi.SecondaryButton(Host,
                 chosen == 0 ? "Delete" : $"Delete {chosen}", Delete),
             PaperUi.QuietButton(Host, "Done", () =>
             {

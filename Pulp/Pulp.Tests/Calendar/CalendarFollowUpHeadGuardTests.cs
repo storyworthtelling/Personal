@@ -51,7 +51,7 @@ public class CalendarFollowUpHeadGuardTests
         Assert.Contains("Add a plan", area, StringComparison.Ordinal);
         Assert.Contains("CalendarPlans.Check(", area, StringComparison.Ordinal);
         Assert.Contains("HouseholdMaps.Plan", area, StringComparison.Ordinal);
-        Assert.Contains("DatePickerDialog", area, StringComparison.Ordinal);
+        Assert.Contains("\"Which day?\"", area, StringComparison.Ordinal);
         Assert.Contains("DogEar.Show(", area, StringComparison.Ordinal);
         Assert.Contains("RemoveAsync(HouseholdMaps.Plan", area, StringComparison.Ordinal);
         Assert.DoesNotContain("BuildBottomBar", area, StringComparison.Ordinal);

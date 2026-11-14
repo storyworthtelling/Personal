@@ -81,7 +81,7 @@ public static class PersonSheetView
             var label = PersonSheetModel.LabelOf(action);
             var button = action switch
             {
-                PersonSheetAction.Remove => PaperUi.DestructiveButton(context, label, () => act(action)),
+                PersonSheetAction.Remove => PaperUi.SecondaryButton(context, label, () => act(action)),
                 PersonSheetAction.Save => PaperUi.PrimaryButton(context, label, () => act(action)),
                 _ => PaperUi.SecondaryButton(context, label, () => act(action)),
             };

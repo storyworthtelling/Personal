@@ -64,7 +64,7 @@
             <Button x:Name="CrashLogButton"
                     Text="View crash log"
                     Clicked="OnCrashLogClicked"
-                    Style="{StaticResource DestructiveButton}"
+                    Style="{StaticResource SecondaryButton}"
                     IsVisible="False"
                     HorizontalOptions="Fill" />
 

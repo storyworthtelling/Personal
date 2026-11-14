@@ -136,7 +136,7 @@ public class ManageSubscriptionsActivity : Activity
             row.AddView(PaperUi.QuietButton(this, "↓", () => Move(index, index + 1)));
         }
 
-        row.AddView(PaperUi.DestructiveButton(this, "Remove", () => RemoveWithUndo(subscription)));
+        row.AddView(PaperUi.SecondaryButton(this, "Remove", () => RemoveWithUndo(subscription)));
         return row;
     }
 
@@ -165,25 +165,21 @@ public class ManageSubscriptionsActivity : Activity
 
     private void ShowAddFeedDialog()
     {
-        var input = PaperUi.MonoField(this, "RSS feed URL");
-        new AlertDialog.Builder(this)
-            .SetTitle("Subscribe to podcast")!
-            .SetView(input)!
-            .SetPositiveButton("Add", (_, _) =>
+        var field = ActionCard.AskText(this, undoHost, "Subscribe to podcast", null,
+            "RSS feed URL", null, "Add", text =>
             {
-                if (Uri.TryCreate(input.Text, UriKind.Absolute, out _))
+                var url = text.Trim();
+                if (!Uri.TryCreate(url, UriKind.Absolute, out _))
                 {
-                    subscriptions.Add(input.Text!, input.Text!, DateTimeOffset.Now);
-                    Persist();
-                    ReturnToHome(); // land on Home so the new show is visibly there, not a dead-end here
+                    return "That is not a web address. A feed's address starts with https://.";
                 }
-                else
-                {
-                    Toast.MakeText(this, "Not a valid URL.", ToastLength.Short)!.Show();
-                }
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+
+                subscriptions.Add(url, url, DateTimeOffset.Now);
+                Persist();
+                ReturnToHome(); // land on Home so the new show is visibly there, not a dead-end here
+                return null;
+            });
+        field.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationUri;
     }
 
     private void ImportOpml()
@@ -208,7 +204,10 @@ public class ManageSubscriptionsActivity : Activity
             var selection = new OpmlImportSelection(OpmlImportParser.Parse(reader.ReadToEnd()), subscriptions);
             if (selection.Items.Count == 0)
             {
-                Toast.MakeText(this, "No feeds found in that file.", ToastLength.Short)!.Show();
+                DogEar.SetNotice(this, undoHost, OpmlNoticeKey, new DogEar.Notice(
+                    "No feeds in that file.",
+                    "It opened, but it lists no podcasts to follow. An export from another podcast app is an OPML file of feeds.",
+                    DogEar.Hues.Caution));
                 return;
             }
 
@@ -216,7 +215,10 @@ public class ManageSubscriptionsActivity : Activity
         }
         catch (Exception e) when (e is IOException or InvalidOperationException or System.Xml.XmlException)
         {
-            Toast.MakeText(this, "That file couldn't be read as OPML.", ToastLength.Short)!.Show();
+            DogEar.SetNotice(this, undoHost, OpmlNoticeKey, new DogEar.Notice(
+                "That file is not a feed list.",
+                "It could not be read as OPML, the list of feeds podcast apps export. Nothing was added.",
+                DogEar.Hues.Problem));
         }
     }
 
@@ -226,24 +228,20 @@ public class ManageSubscriptionsActivity : Activity
     {
         var labels = selection.Items
             .Select(item => item.AlreadySubscribed ? $"{item.Title} (subscribed)" : item.Title)
-            .ToArray();
-        var checkedState = selection.Items.Select(item => item.Checked).ToArray();
+            .ToList();
 
-        new AlertDialog.Builder(this)
-            .SetTitle("Import subscriptions")!
-            .SetMultiChoiceItems(labels, checkedState, (_, args) => checkedState[args.Which] = args.IsChecked)!
-            .SetPositiveButton("Add selected", (_, _) =>
+        ActionCard.ChooseMany(this, undoHost, "Import subscriptions", $"{labels.Count} in the file",
+            labels, "Add selected", picked =>
             {
-                var chosen = selection.Items
-                    .Where((_, index) => checkedState[index])
-                    .Select(item => item.FeedUrl);
+                var chosen = picked.Select(index => selection.Items[index].FeedUrl);
                 subscriptions = selection.Apply(chosen, DateTimeOffset.Now);
                 Persist();
                 ReturnToHome();
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+            },
+            startPicked: selection.Items.Select(item => item.Checked).ToList());
     }
+
+    private const string OpmlNoticeKey = "opml-import";
 
     // Persisted; PodcastsArea reloads subscriptions and refreshes feeds on resume, so
     // popping back to it shows the shows and their fetching state.

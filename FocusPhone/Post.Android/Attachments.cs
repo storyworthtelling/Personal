@@ -29,7 +29,8 @@ internal static class Attachments
                 attachment.FileName ?? attachment.MimeType,
                 () => Open(host, item, attachment),
                 Detail: Describe(attachment),
-                Destructive: AttachmentPlan.For(attachment) == AttachmentAction.Refuse))
+                // A refused file is a state, not an act: it says so in the Problem hue.
+                Hue: AttachmentPlan.For(attachment) == AttachmentAction.Refuse ? PaperTheme.ProblemMark : null))
             .ToArray();
 
         ActionCard.Show(host, overlay, "Attached", subtitle: null, actions);

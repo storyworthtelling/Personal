@@ -30,6 +30,7 @@ public static class PaperTheme
     public static readonly Color ActionText = Color.ParseColor(DesignTokens.ActionText);
     public static readonly Color ActionDeep = Color.ParseColor(DesignTokens.ActionDeep);
     public static readonly Color ProblemMark = Color.ParseColor(DesignTokens.ProblemMark);
+    public static readonly Color ProblemText = Color.ParseColor(DesignTokens.ProblemText);
     public static readonly Color CautionMark = Color.ParseColor(DesignTokens.CautionMark);
     public static readonly Color ProgressFill = Color.ParseColor(DesignTokens.ProgressFill);
     public static readonly Color ProgressMark = Color.ParseColor(DesignTokens.ProgressMark);

@@ -127,6 +127,11 @@ public sealed class MusicArea : ScoreArea
             VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
             _ = library.SignInAsync();
         }));
+        if (library.Problem is { } problem)
+        {
+            layout.AddView(PaperUi.ProblemLine(Host, problem));
+        }
+
         return WrapScroll(layout);
     }
 
@@ -134,6 +139,15 @@ public sealed class MusicArea : ScoreArea
     {
         if (library.Folders is null)
         {
+            // A listing that failed waits for a tap rather than being asked again on every paint.
+            if (library.Problem is { } problem)
+            {
+                var failed = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+                failed.AddView(PaperUi.ProblemLine(Host, problem));
+                failed.AddView(PaperUi.SecondaryButton(Host, "Try again", () => _ = library.LoadFoldersAsync()));
+                return WrapScroll(failed);
+            }
+
             _ = library.LoadFoldersAsync();
             return PaperUi.EmptyState(Host, "Finding your Drive folders…");
         }
@@ -487,7 +501,7 @@ public sealed class MusicArea : ScoreArea
             actions.Add(new CardAction("Edit rules", () => Edit(playlist)));
         }
 
-        actions.Add(new CardAction("Delete", () => Delete(playlist), Destructive: true));
+        actions.Add(new CardAction("Delete", () => Delete(playlist)));
         ActionCard.Show(Host, Overlay, playlist.Name, playlist.Describe(songs), [.. actions]);
     }
 

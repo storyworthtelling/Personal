@@ -334,14 +334,14 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 ? null
                 : PaperUi.BottomBar(Host,
                     PaperUi.SecondaryButton(Host, "File", FileOpenCorrespondence),
-                    PaperUi.DestructiveButton(Host, "Delete", DeleteOpenCorrespondence));
+                    PaperUi.SecondaryButton(Host, "Delete", DeleteOpenCorrespondence));
         }
 
         return PaperUi.BottomBar(Host,
             PaperUi.QuietButton(Host, "Cancel", EndOpenSelection),
             PaperUi.SecondaryButton(Host,
                 openSelection.Count == 0 ? "File" : $"File {openSelection.Count}", FileSelected),
-            PaperUi.DestructiveButton(Host,
+            PaperUi.SecondaryButton(Host,
                 openSelection.Count == 0 ? "Delete" : $"Delete {openSelection.Count}", DeleteSelected));
     }
 
@@ -610,14 +610,14 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         if (book is not null)
         {
             actions.Add(new CardAction(
-                "Mark as spam", () => MarkSpam(row), Destructive: true,
+                "Mark as spam", () => MarkSpam(row),
                 Detail: "Deletes it, and anything worded like it from this sender."));
         }
         if (row.Items.Any(item => item.IsGroup))
         {
             actions.Add(new CardAction("Name this group", () => AskGroupName(row.ContactKey, row.Title)));
         }
-        actions.Add(new CardAction("Delete this correspondence", () => DeleteCorrespondence(row), Destructive: true));
+        actions.Add(new CardAction("Delete this correspondence", () => DeleteCorrespondence(row)));
 
         ActionCard.Show(Host, Overlay, row.Title, row.Subtitle, [.. actions]);
     }
@@ -668,52 +668,41 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // Google Messages calls the group, else its members.
     private void AskGroupName(string groupKey, string currentTitle)
     {
-        var input = PaperUi.Field(Host, "Group name");
-        input.Text = GroupNameStore.Load(Host).OwnersNameFor(groupKey) ?? string.Empty;
-        new AlertDialog.Builder(Host)
-            .SetTitle("Name this group")!
-            .SetMessage(currentTitle)!
-            .SetView(input)!
-            .SetPositiveButton("Save", (_, _) =>
+        ActionCard.AskText(Host, Overlay, "Name this group", currentTitle, "Group name",
+            GroupNameStore.Load(Host).OwnersNameFor(groupKey), "Save", text =>
             {
-                GroupNameStore.Name(Host, groupKey, input.Text);
+                GroupNameStore.Name(Host, groupKey, text);
                 if (openGroupKey == groupKey)
                 {
                     LoadOpenThread();
                 }
                 ReloadThreads();
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+                return null;
+            });
     }
 
     private void AskNewContactName(ThreadRow row)
     {
-        var input = PaperUi.Field(Host, "Their name");
-        new AlertDialog.Builder(Host)
-            .SetTitle("New contact")!
-            .SetView(input)!
-            .SetPositiveButton("Save", (_, _) =>
+        ActionCard.AskText(Host, Overlay, "New contact", row.Title, "Their name", null, "Save", text =>
+        {
+            var name = text.Trim();
+            if (name.Length == 0)
             {
-                var name = (input.Text ?? string.Empty).Trim();
-                if (name.Length == 0)
-                {
-                    return;
-                }
+                return "A contact needs a name.";
+            }
 
-                try
-                {
-                    ContactPicker.CreateContact(Host, name, row.ContactKey);
-                }
-                catch (Exception e)
-                {
-                    RolodexWriteFailed(e, $"Could not save {name} to the Rolodex.");
-                    return;
-                }
-                ReloadThreads();
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+            try
+            {
+                ContactPicker.CreateContact(Host, name, row.ContactKey);
+            }
+            catch (Exception e)
+            {
+                RolodexWriteFailed(e, $"Could not save {name} to the Rolodex.");
+                return null;
+            }
+            ReloadThreads();
+            return null;
+        });
     }
 
     private void PickExistingContact(ThreadRow row, IReadOnlyList<ContactPicker.Person> book)
@@ -726,11 +715,9 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             return;
         }
 
-        new AlertDialog.Builder(Host)
-            .SetTitle("Add to whom?")!
-            .SetItems(contacts.Select(person => person.Name).ToArray(), (_, args) =>
+        ActionCard.Show(Host, Overlay, "Add to whom?", row.Title,
+            [.. contacts.Select(chosen => new CardAction(chosen.Name, () =>
             {
-                var chosen = contacts[args.Which];
                 try
                 {
                     ContactPicker.AddAddress(Host, chosen.Id, row.ContactKey);
@@ -741,9 +728,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                     return;
                 }
                 ReloadThreads();
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+            }))]);
     }
 
     // A failed save is not a confirmation the owner needs to dismiss: it folds into the
@@ -1542,14 +1527,14 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
 
         actions.Add(new CardAction("File", () => FileWithUndo(item)));
-        actions.Add(new CardAction("Delete", () => DeleteWithUndo(item), Destructive: true));
+        actions.Add(new CardAction("Delete", () => DeleteWithUndo(item)));
         // How Choose actually begins: you see the one you meant first, exactly as a
         // long-press starts Plate's Darkroom cull with that picture already picked.
         actions.Add(new CardAction("Choose", () => BeginChoosingWith(item)));
 
         if (phone is not null && !openIsGroup)
         {
-            actions.Add(new CardAction("Block this number", () => Block(phone), Destructive: true));
+            actions.Add(new CardAction("Block this number", () => Block(phone)));
         }
         if (openGroupKey is { } groupKey)
         {
@@ -1569,23 +1554,19 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // owner already knows why and reads it every time.
     private void WriteCallNote(string number)
     {
-        var input = PaperUi.Field(Host, "A summary, for future reference");
-        new AlertDialog.Builder(Host)
-            .SetTitle("Note on this call")!
-            .SetView(input)!
-            .SetPositiveButton("Keep", (_, _) =>
+        ActionCard.AskText(Host, Overlay, "Note on this call", null,
+            "A summary, for future reference", null, "Keep", input =>
             {
-                var text = (input.Text ?? string.Empty).Trim();
+                var text = input.Trim();
                 if (text.Length == 0)
                 {
-                    return;
+                    return "Write the note first, or tap away to leave it.";
                 }
                 using var database = TimelineDatabase.Open(Host);
                 database.Cache.Upsert([CallNote.For(number, text, DateTimeOffset.UtcNow)]);
                 LoadOpenThread();
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+                return null;
+            }, multiLine: true);
     }
 
     // Blocking is handed to Android's own blocked-numbers list rather than kept here, so
@@ -1909,21 +1890,16 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     private void ComposeText(IReadOnlyList<string> recipients, string? conversationId)
     {
-        var input = new EditText(Host) { Hint = "Message" };
-        new AlertDialog.Builder(Host)
-            .SetTitle("Text")!
-            .SetView(input)!
-            .SetPositiveButton("Send", (_, _) =>
+        ActionCard.AskText(Host, Overlay, "Text", openTitle, "Message", null, "Send", text =>
+        {
+            if (text.Length == 0)
             {
-                var text = input.Text ?? string.Empty;
-                if (text.Length > 0)
-                {
-                    DeliverText(recipients, conversationId, text);
-                }
-            })!
-            .SetNeutralButton("Attach", (_, _) => PickMedia(recipients, conversationId))!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+                return "Write something first, or attach a photo.";
+            }
+
+            DeliverText(recipients, conversationId, text);
+            return null;
+        }, multiLine: true, also: new CardButton("Attach", () => PickMedia(recipients, conversationId)));
     }
 
     private void DeliverText(IReadOnlyList<string> recipients, string? conversationId, string text)
@@ -1987,8 +1963,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private void NotSent(string detail) =>
         DogEar.ShowNotices(Host, Overlay, [new DogEar.Notice("That text did not go out.", detail, PaperTheme.ProblemMark)]);
 
-    // One picker for both photos and videos rather than two buttons — AlertDialog has room
-    // for exactly three, already spent on Send/Attach/Cancel.
+    // One picker for both photos and videos rather than two buttons beside Send.
     private void PickMedia(IReadOnlyList<string> recipients, string? conversationId)
     {
         pendingGroupMediaRecipients = recipients;

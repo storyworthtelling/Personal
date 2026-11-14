@@ -34,6 +34,8 @@ public class EmailComposeActivity : Activity
     private EditText? cc;
     private EditText? body;
     private LinearLayout? attachmentList;
+    private TextView? status;
+    private Button? sendButton;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -47,8 +49,9 @@ public class EmailComposeActivity : Activity
 
         if (!new AccountStore(this).IsConfigured)
         {
-            Toast.MakeText(this, "Set up Gmail in Settings first.", ToastLength.Long)!.Show();
-            Finish();
+            // Said on the page that was asked for, with the way to fix it (audit W8.2: this was a
+            // toast and a screen that closed itself).
+            SetContentView(BuildNotSetUp(name));
             return;
         }
 
@@ -57,6 +60,22 @@ public class EmailComposeActivity : Activity
         // itself — doing both would pad the header down twice.
         SetContentView(BuildLayout(name));
         subject!.Text = Intent?.GetStringExtra(ExtraSubject) ?? "";
+    }
+
+    private View BuildNotSetUp(string name)
+    {
+        var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        var content = new LinearLayout(this) { Orientation = Orientation.Vertical };
+        content.AddView(PaperUi.ProblemLine(this,
+            "Gmail is not set up on this phone yet, so this email cannot be sent."), Row());
+
+        root.AddView(BinderFrame.Wrap(
+            this, $"Email {name}", PostShellAreas.All[PostShellAreas.Mailbox].Hue, content,
+            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea),
+            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        root.AddView(PaperUi.BottomBar(this,
+            PaperUi.PrimaryButton(this, "Set up Gmail", () => SwitchArea(PostShellAreas.Settings))));
+        return root;
     }
 
     private View BuildLayout(string name)
@@ -78,12 +97,17 @@ public class EmailComposeActivity : Activity
         attachmentList = new LinearLayout(this) { Orientation = Orientation.Vertical };
         content.AddView(attachmentList, Row());
 
+        status = PaperUi.StatusLine(this, string.Empty);
+        status.Visibility = ViewStates.Gone;
+        content.AddView(status, Row());
+
         root.AddView(BinderFrame.Wrap(
             this, $"Email {name}", PostShellAreas.All[PostShellAreas.Mailbox].Hue, content,
             PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea),
             new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        root.AddView(PaperUi.BottomBar(this, PaperUi.PrimaryButton(this, "Send", Send)));
+        sendButton = PaperUi.PrimaryButton(this, "Send", Send);
+        root.AddView(PaperUi.BottomBar(this, sendButton));
         return root;
     }
 
@@ -127,7 +151,7 @@ public class EmailComposeActivity : Activity
         var path = CopyToCache(data.Data);
         if (path is null)
         {
-            Toast.MakeText(this, "Couldn't attach that file.", ToastLength.Short)!.Show();
+            attachmentList!.AddView(PaperUi.ProblemLine(this, "That file could not be attached. It may have moved, or the app that holds it would not hand it over."));
             return;
         }
         attachmentPaths.Add(path);
@@ -174,6 +198,10 @@ public class EmailComposeActivity : Activity
         var ccList = ParseAddresses(cc!.Text);
         var paths = attachmentPaths.ToList();
 
+        // §7: in flight, the button disables and a status line says what is happening.
+        sendButton!.Enabled = false;
+        Say("Sending…", problem: false);
+
         System.Threading.Tasks.Task.Run(async () =>
         {
             try
@@ -184,17 +212,25 @@ public class EmailComposeActivity : Activity
                 // next screen-open: a reply that does not appear in the correspondence
                 // reads as a reply that did not send.
                 Syncs.After(this, Codex.Domain.Post.PostAction.Sent);
-                RunOnUiThread(() =>
-                {
-                    Toast.MakeText(this, "Sent.", ToastLength.Short)!.Show();
-                    Finish();
-                });
+                // Success is the email appearing in the correspondence this screen returns to.
+                RunOnUiThread(Finish);
             }
             catch (Exception e)
             {
-                RunOnUiThread(() => Toast.MakeText(this, $"Send failed: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "Gmail")}", ToastLength.Long)!.Show());
+                RunOnUiThread(() =>
+                {
+                    sendButton!.Enabled = true;
+                    Say($"Not sent: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "Gmail")}", problem: true);
+                });
             }
         });
+    }
+
+    private void Say(string sentence, bool problem)
+    {
+        status!.Text = sentence;
+        status.SetTextColor(problem ? PaperTheme.ProblemText : PaperTheme.ProgressText);
+        status.Visibility = ViewStates.Visible;
     }
 
     private static IReadOnlyList<string> ParseAddresses(string? raw) =>

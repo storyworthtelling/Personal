@@ -55,6 +55,8 @@ namespace Flyleaf;
     Theme = "@style/Theme.FocusPhone.Paper")]
 public class LauncherSettingsActivity : Activity
 {
+    private FrameLayout overlay = null!;
+
     private readonly Handler handler = new(Looper.MainLooper!);
 
     // Used only to fetch a Google access token for the AI shelf-glyph (best-effort; degrades to the
@@ -97,7 +99,9 @@ public class LauncherSettingsActivity : Activity
 
         // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
         // (API 35+), so the page isn't drawn partly behind the battery/clock icons.
-        SetContentView(PaperUi.WrapForTopInset(this, root));
+        // The inset frame doubles as the page's overlay, where its cards open (audit W8.2).
+        overlay = PaperUi.WrapForTopInset(this, root);
+        SetContentView(overlay);
     }
 
     protected override void OnResume()
@@ -345,10 +349,9 @@ public class LauncherSettingsActivity : Activity
         }
 
         var labels = apps.Select(resolveInfo => resolveInfo.LoadLabel(PackageManager!).ToString()).ToArray();
-        new AlertDialog.Builder(this)
-            .SetTitle("Force-close which app?")!
-            .SetItems(labels, (_, e) => ForceClose(apps[e.Which].ActivityInfo!.PackageName!, labels[e.Which]))!
-            .Show();
+        ActionCard.Show(this, overlay, "Force-close which app?", null,
+            [.. apps.Select((app, index) => new CardAction(labels[index],
+                () => ForceClose(app.ActivityInfo!.PackageName!, labels[index])))]);
     }
 
     private void ForceClose(string package, string label)
@@ -712,22 +715,19 @@ public class LauncherSettingsActivity : Activity
 
     private void RenameShelf(Category category)
     {
-        var field = new EditText(this) { Text = category.Name };
-        new AlertDialog.Builder(this)
-            .SetTitle($"Rename {category.Name}")!
-            .SetView(field)!
-            .SetPositiveButton("Rename", (_, _) =>
+        ActionCard.AskText(this, overlay, $"Rename {category.Name}", null, "Shelf name", category.Name, "Rename", text =>
+        {
+            var name = text.Trim();
+            if (name.Length == 0)
             {
-                var name = field.Text?.Trim();
-                if (!string.IsNullOrEmpty(name))
-                {
-                    var store = new CategoryStore(this);
-                    store.Save(store.Load().WithRenamed(category.Id, name));
-                    Render();
-                }
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+                return "A shelf needs a name.";
+            }
+
+            var store = new CategoryStore(this);
+            store.Save(store.Load().WithRenamed(category.Id, name));
+            Render();
+            return null;
+        });
     }
 
     private void RemoveShelf(string id)

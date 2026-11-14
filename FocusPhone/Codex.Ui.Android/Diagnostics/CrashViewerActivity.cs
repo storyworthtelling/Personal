@@ -21,6 +21,8 @@ namespace Codex.Ui;
     Theme = "@style/Theme.FocusPhone.Paper")]
 public class CrashViewerActivity : Activity
 {
+    private Button? copyButton;
+
     private string detail = "No crash details were captured.";
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -57,7 +59,8 @@ public class CrashViewerActivity : Activity
         root.AddView(scroll, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        var copy = PaperUi.SecondaryButton(this, "Copy", CopyToClipboard);
+        copyButton = PaperUi.SecondaryButton(this, "Copy", CopyToClipboard);
+        var copy = copyButton;
         var share = PaperUi.SecondaryButton(this, "Share", ShareReport);
         var dismiss = PaperUi.QuietButton(this, "Dismiss", Finish);
         root.AddView(PaperUi.BottomBar(this, copy, share, dismiss));
@@ -70,7 +73,8 @@ public class CrashViewerActivity : Activity
         if (GetSystemService(ClipboardService) is ClipboardManager clipboard)
         {
             clipboard.PrimaryClip = ClipData.NewPlainText("FocusPhone crash report", detail);
-            Toast.MakeText(this, "Copied to clipboard.", ToastLength.Short)!.Show();
+            // Success is the button saying so (§5), not a toast.
+            copyButton!.Text = "Copied";
         }
     }
 

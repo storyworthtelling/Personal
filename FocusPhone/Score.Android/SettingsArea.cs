@@ -122,7 +122,14 @@ public sealed class SettingsArea : ScoreArea
                 "Sign in again", () => _ = library.SignInAsync());
         }
 
-        return PaperUi.PrimaryButton(Host, "Sign in with Google", () => _ = library.SignInAsync());
+        var unset = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        unset.AddView(PaperUi.PrimaryButton(Host, "Sign in with Google", () => _ = library.SignInAsync()));
+        if (library.Problem is { } problem)
+        {
+            unset.AddView(PaperUi.ProblemLine(Host, problem));
+        }
+
+        return unset;
     }
 
     private View FolderRow()

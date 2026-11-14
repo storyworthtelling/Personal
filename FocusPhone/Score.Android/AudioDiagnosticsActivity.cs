@@ -21,6 +21,8 @@ namespace Score;
     Theme = "@style/Theme.FocusPhone.Paper")]
 public class AudioDiagnosticsActivity : Activity
 {
+    private Button? copyButton;
+
     private FrameLayout? undoHost;
     private LinearLayout? contentColumn;
 
@@ -49,7 +51,8 @@ public class AudioDiagnosticsActivity : Activity
         // screen carries the upload, so this one hands over to it rather than keep a second copy.
         var send = PaperUi.PrimaryButton(this, "Send logs now", () => LoopDiagnosticsActivity.Open(this));
         var share = PaperUi.SecondaryButton(this, "Share", ShareReport);
-        var copy = PaperUi.QuietButton(this, "Copy", CopyToClipboard);
+        copyButton = PaperUi.QuietButton(this, "Copy", CopyToClipboard);
+        var copy = copyButton;
         var clear = PaperUi.QuietButton(this, "Clear", ClearLog);
         root.AddView(PaperUi.BottomBar(this, send, share, copy, clear));
 
@@ -95,7 +98,8 @@ public class AudioDiagnosticsActivity : Activity
         {
             clipboard.PrimaryClip = ClipData.NewPlainText(
                 "FocusPhone diagnostics", AudioDiagnostics.BuildExport(this));
-            Toast.MakeText(this, "Copied to clipboard.", ToastLength.Short)!.Show();
+            // Success is the button saying so (§5), not a toast.
+            copyButton!.Text = "Copied";
         }
     }
 

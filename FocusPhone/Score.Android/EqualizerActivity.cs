@@ -263,7 +263,7 @@ public class EqualizerActivity : Activity
                     Rebuild();
                 });
             }
-        }, Destructive: true));
+        }));
     }
 
     private void Rebuild() => SetContentView(BuildLayout());
