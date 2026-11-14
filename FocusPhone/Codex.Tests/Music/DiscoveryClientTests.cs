@@ -147,4 +147,37 @@ public class DiscoveryClientTests
             Profile(), Catalog, new PlaylistRequest("x"), CancellationToken.None);
         Assert.Same(DiscoverySelection.Empty, selection);
     }
+
+    // Efficiency audit §10: the catalog (up to 1,500 tracks) went as uncached user text after the profile, so every
+    // playlist and every weekly crate paid for all of it. It now leads the request as a cached system block that is
+    // byte-identical from one request to the next, and names tracks by short numbers instead of long Drive ids.
+    [Fact]
+    public async Task TheCatalogIsTheSameCachedBlockAtTheFrontOfEveryRequest()
+    {
+        var handler = new QueuedHttpMessageHandler()
+            .EnqueueOk(MessageResponse("""{"title":"One","trackIds":[]}"""))
+            .EnqueueOk(MessageResponse("""{"title":"Two","trackIds":[]}"""));
+
+        await Client(handler).GeneratePlaylistAsync(Profile(), Catalog, new PlaylistRequest("something mellow", 10), CancellationToken.None);
+        await Client(handler).GeneratePlaylistAsync(Profile(), Catalog, new PlaylistRequest("something loud", 10), CancellationToken.None);
+
+        var first = JsonDocument.Parse(handler.RequestBodies[0]).RootElement.GetProperty("system")[0];
+        var second = JsonDocument.Parse(handler.RequestBodies[1]).RootElement.GetProperty("system")[0];
+        Assert.Equal(first.GetProperty("text").GetString(), second.GetProperty("text").GetString());
+        Assert.Contains("Peace Piece", first.GetProperty("text").GetString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("mellow", first.GetProperty("text").GetString(), StringComparison.Ordinal);
+        Assert.True(first.TryGetProperty("cache_control", out _));
+    }
+
+    [Fact]
+    public async Task ChosenNumbersComeBackAsTrackIds()
+    {
+        var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse(
+            """{"title":"Late Night Jazz","trackIds":["2","1"]}"""));
+
+        var selection = await Client(handler).GeneratePlaylistAsync(
+            Profile(), Catalog, new PlaylistRequest("something mellow", 10), CancellationToken.None);
+
+        Assert.Equal(["b", "a"], selection.TrackIds);
+    }
 }

@@ -100,4 +100,37 @@ public class GitHubReleaseClientTests
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetLatestReleaseAsync());
         Assert.Contains("storyworthtelling/Other", ex.Message);
     }
+
+    // Efficiency audit §13: each APK carries a sidecar naming its package and version, read before any APK is
+    // downloaded.
+    [Fact]
+    public async Task EachApksSidecarIsFoundAndRead()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(LatestUrl, """
+            {"tag_name":"apps-latest","assets":[
+              {"id":11,"name":"Flyleaf-Signed.apk"},
+              {"id":12,"name":"Flyleaf-Signed.apk.json"}]}
+            """);
+        handler.Respond("https://api.github.com/repos/storyworthtelling/Personal/releases/assets/12",
+            """{"package":"com.storyworthtelling.focusphone.launcher","versionCode":100321}""");
+        var client = NewClient(handler);
+
+        var release = await client.GetLatestReleaseAsync();
+        var apk = Assert.Single(release.ApkAssets);
+        var candidate = await client.ReadSidecarAsync(release, apk);
+
+        Assert.Equal(new Storyworthtelling.Updates.InstallCandidate("com.storyworthtelling.focusphone.launcher", 100321), candidate);
+    }
+
+    [Fact]
+    public async Task AnApkWithNoSidecarHasNoCandidate()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(LatestUrl, SampleRelease);
+        var client = NewClient(handler);
+        var release = await client.GetLatestReleaseAsync();
+
+        Assert.Null(await client.ReadSidecarAsync(release, release.ApkAssets[0]));
+    }
 }

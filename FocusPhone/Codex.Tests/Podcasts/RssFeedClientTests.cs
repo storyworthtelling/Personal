@@ -1,3 +1,4 @@
+using Codex.Domain.Audio;
 using Codex.Infrastructure.Podcasts;
 using Xunit;
 
@@ -369,5 +370,41 @@ public class RssFeedClientTests
         var episode = Assert.Single(feed.Episodes);
         Assert.Null(episode.Description);
         Assert.Null(episode.ImageUrl);
+    }
+
+    // Efficiency audit §9: every visit to Podcasts downloaded every feed in full, often megabytes each. A feed now
+    // remembers its validators and is asked whether it changed; an unchanged one answers 304 with no body.
+    [Fact]
+    public async Task AFetchRemembersTheFeedsValidators()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(FeedUrl, SampleRss, "application/rss+xml",
+            headers: new Dictionary<string, string> { ["ETag"] = "\"invented-v1\"", ["Last-Modified"] = "Tue, 02 Jun 2026 10:00:00 GMT" });
+        var now = new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero);
+
+        var fetched = await new RssFeedClient(new HttpClient(handler)).FetchAsync(new Uri(FeedUrl), previous: null, now);
+
+        Assert.NotNull(fetched.Feed);
+        Assert.Equal("\"invented-v1\"", fetched.State.ETag);
+        Assert.Equal("Tue, 02 Jun 2026 10:00:00 GMT", fetched.State.LastModified);
+        Assert.Equal(now, fetched.State.FetchedAtUtc);
+    }
+
+    [Fact]
+    public async Task AnUnchangedFeedIsNotDownloadedAgain()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(FeedUrl, string.Empty, status: System.Net.HttpStatusCode.NotModified);
+        var previous = new FeedState("\"invented-v1\"", "Tue, 02 Jun 2026 10:00:00 GMT", new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        var now = previous.FetchedAtUtc.AddHours(2);
+
+        var fetched = await new RssFeedClient(new HttpClient(handler)).FetchAsync(new Uri(FeedUrl), previous, now);
+
+        Assert.Null(fetched.Feed);
+        Assert.Equal(now, fetched.State.FetchedAtUtc);
+        Assert.Equal("\"invented-v1\"", fetched.State.ETag);
+        var request = Assert.Single(handler.Requests);
+        Assert.Contains("\"invented-v1\"", request.Headers.IfNoneMatch.ToString(), StringComparison.Ordinal);
+        Assert.NotNull(request.Headers.IfModifiedSince);
     }
 }

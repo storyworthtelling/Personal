@@ -24,6 +24,21 @@ runs:
           echo "No signed APKs matched: ${{ inputs.apks }}"
           exit 1
         fi
+        # A sidecar beside each APK (<name>.apk.json) names its package and versionCode, read from the APK itself,
+        # so the phone decides before downloading whether it needs it (efficiency audit §13). Without aapt2 the APKs
+        # go up alone, and the phone downloads and reads them as it always has.
+        AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+        [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
+        sidecars=()
+        for apk in "${files[@]}"; do
+          [ -z "$AAPT2" ] && { echo "::warning::aapt2 not found; publishing without sidecars"; break; }
+          line=$("$AAPT2" dump badging "$apk" | grep -m1 '^package:')
+          package=$(echo "$line" | sed -E "s/.* name='([^']+)'.*/\1/")
+          versionCode=$(echo "$line" | sed -E "s/.* versionCode='([0-9]+)'.*/\1/")
+          printf '{"package":"%s","versionCode":%s}\n' "$package" "$versionCode" > "$apk.json"
+          sidecars+=("$apk.json")
+        done
+        files+=("${sidecars[@]}")
         echo "Publishing to the apps-latest release:"
         printf '  %s\n' "${files[@]}"
         # One shared rolling release across every app workflow, so releases/latest

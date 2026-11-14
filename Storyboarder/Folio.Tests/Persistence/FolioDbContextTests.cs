@@ -146,3 +146,38 @@ public class FolioDbContextTests : IDisposable
         }
     }
 }
+
+// Efficiency audit §6: the desk rebuilt every row from about ten queries per book every five seconds. Every save now
+// moves a counter, and the desk refreshes only when it has moved since the last refresh.
+public class SaveCounterTests : IDisposable
+{
+    private readonly TestDatabase database = new();
+
+    public void Dispose() => database.Dispose();
+
+    [Fact]
+    public void ASaveMovesTheCounter()
+    {
+        var before = Folio.Infrastructure.Persistence.FolioSaves.Count;
+        using (var context = database.NewContext())
+        {
+            context.Novels.Add(new Novel { Title = "Invented", GoogleDocId = "doc-saves" });
+            context.SaveChanges();
+        }
+
+        Assert.True(Folio.Infrastructure.Persistence.FolioSaves.Count > before);
+    }
+
+    [Fact]
+    public async Task AnAsyncSaveMovesTheCounterToo()
+    {
+        var before = Folio.Infrastructure.Persistence.FolioSaves.Count;
+        await using (var context = database.NewContext())
+        {
+            context.Novels.Add(new Novel { Title = "Invented", GoogleDocId = "doc-saves-async" });
+            await context.SaveChangesAsync();
+        }
+
+        Assert.True(Folio.Infrastructure.Persistence.FolioSaves.Count > before);
+    }
+}

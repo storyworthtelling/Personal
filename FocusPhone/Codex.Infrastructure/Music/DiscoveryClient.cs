@@ -25,11 +25,11 @@ public sealed class DiscoveryClient : IDiscoveryClient
 
     private const string PlaylistInstruction =
         "You are a music curator picking a playlist from ONE listener's own library. You are given their " +
-        "TASTE PROFILE, a CATALOG (each track: id, title, artist, genre), and a REQUEST (a mood/genre/idea). " +
+        "TASTE PROFILE, a CATALOG (each track: n, title, artist, genre), and a REQUEST (a mood/genre/idea). " +
         "Choose tracks from the catalog that fit the request and their taste, honoring what the profile says " +
-        "they avoid. Use ONLY ids present in the catalog. Respond with ONLY a JSON object: " +
-        "{\"title\":string,\"trackIds\":[string]}. title = a short playlist name. trackIds = the chosen ids " +
-        "in play order, at most the requested count. No prose outside the JSON.";
+        "they avoid. Use ONLY numbers n present in the catalog. Respond with ONLY a JSON object: " +
+        "{\"title\":string,\"trackIds\":[string]}. title = a short playlist name. trackIds = the chosen " +
+        "tracks' n, as strings, in play order, at most the requested count. No prose outside the JSON.";
 
     private const string DiscoveriesInstruction =
         "You are filling ONE listener's weekly crate: things they do NOT already have and might like. You are " +
@@ -59,11 +59,11 @@ public sealed class DiscoveryClient : IDiscoveryClient
     public Task<DiscoverySelection> GeneratePlaylistAsync(
         TasteProfile profile, IReadOnlyList<Track> catalog, PlaylistRequest request, CancellationToken cancellationToken)
     {
+        var sample = CatalogDigest.Sample(catalog);
         var userContent =
             $"TASTE PROFILE (JSON):\n{ProfileJson(profile)}\n\n" +
-            $"CATALOG (JSON):\n{CatalogJson(catalog)}\n\n" +
             $"REQUEST: {request.Seed}\nMAX TRACKS: {request.MaxTracks}";
-        return Choose(PlaylistInstruction, userContent, cancellationToken);
+        return Choose(CatalogBlock("CATALOG", sample), PlaylistInstruction, userContent, sample, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
@@ -72,12 +72,12 @@ public sealed class DiscoveryClient : IDiscoveryClient
     {
         var userContent =
             $"TASTE PROFILE (JSON):\n{ProfileJson(profile)}\n\n" +
-            $"LIBRARY THEY ALREADY HAVE (JSON):\n{CatalogJson(owned)}\n\n" +
             $"PODCASTS THEY ALREADY FOLLOW (JSON):\n{JsonSerializer.Serialize(subscribedShows)}\n\n" +
             $"MUSIC PICKS: {music}\nPODCAST PICKS: {podcasts}" +
             (string.IsNullOrWhiteSpace(note) ? string.Empty : $"\n\nTHE SHELF IS SHORT OF: {note}");
 
-        var reply = await SendMessage(DiscoveriesInstruction, userContent, WeeklyMaxTokens, cancellationToken);
+        var reply = await SendMessage(
+            CatalogBlock("LIBRARY THEY ALREADY HAVE", CatalogDigest.Sample(owned)), DiscoveriesInstruction, userContent, WeeklyMaxTokens, cancellationToken);
         var json = ExtractObject(reply);
         if (json is null)
         {
@@ -120,9 +120,10 @@ public sealed class DiscoveryClient : IDiscoveryClient
         _ => DiscoveryKind.Song,
     };
 
-    private async Task<DiscoverySelection> Choose(string instruction, string userContent, CancellationToken cancellationToken)
+    private async Task<DiscoverySelection> Choose(
+        string catalogBlock, string instruction, string userContent, IReadOnlyList<Track> sample, CancellationToken cancellationToken)
     {
-        var reply = await SendMessage(instruction, userContent, MaxTokens, cancellationToken);
+        var reply = await SendMessage(catalogBlock, instruction, userContent, MaxTokens, cancellationToken);
         var json = ExtractObject(reply);
         if (json is null)
         {
@@ -137,7 +138,7 @@ public sealed class DiscoveryClient : IDiscoveryClient
                 return DiscoverySelection.Empty;
             }
 
-            return new DiscoverySelection(dto.Title?.Trim() ?? string.Empty, dto.TrackIds ?? []);
+            return new DiscoverySelection(dto.Title?.Trim() ?? string.Empty, IdsOf(dto.TrackIds ?? [], sample));
         }
         catch (JsonException)
         {
@@ -160,20 +161,32 @@ public sealed class DiscoveryClient : IDiscoveryClient
     // The catalog can be large, so the prompt carries a bounded sample of it — taken
     // across artists by CatalogDigest rather than off the top, because the head of an
     // artist-sorted catalog is the letter A and nothing else.
-    private static string CatalogJson(IReadOnlyList<Track> catalog) => JsonSerializer.Serialize(
-        CatalogDigest.Sample(catalog).Select(track => new
+    //
+    // It leads the request as a cached system block, the same bytes for every request over the same library, so
+    // Claude reads it once and every later playlist or crate is a cache hit (efficiency audit §10). Tracks are named
+    // by their place in the sample (n) rather than by long Drive ids, which the model only has to copy back.
+    private static string CatalogBlock(string heading, IReadOnlyList<Track> sample) =>
+        $"{heading} (JSON):\n" + JsonSerializer.Serialize(sample.Select((track, index) => new
         {
-            id = track.Id,
+            n = index + 1,
             title = track.DisplayTitle,
             artist = track.DisplayArtist,
             genre = track.DisplayGenre
         }));
 
-    private async Task<string> SendMessage(string instruction, string userText, int maxTokens, CancellationToken cancellationToken)
-    {
-        return (await claude.SendAsync(ClaudeRequest.Plain(optionsAccessor.Value.Model, maxTokens, instruction, userText), cancellationToken)).Text;
-    }
+    // A number from the catalog becomes its track's id; an id the model copied as it is stays; anything else is
+    // left for PlaylistPlan, which drops what is not in the library.
+    private static IReadOnlyList<string> IdsOf(IReadOnlyList<string> chosen, IReadOnlyList<Track> sample) =>
+        chosen.Select(value => int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n)
+            && n >= 1 && n <= sample.Count ? sample[n - 1].Id : value).ToList();
 
+    private async Task<string> SendMessage(string catalogBlock, string instruction, string userText, int maxTokens, CancellationToken cancellationToken)
+    {
+        var request = new ClaudeRequest(optionsAccessor.Value.Model, maxTokens,
+            System: [ClaudeBlock.Text(catalogBlock, cache: true), ClaudeBlock.Text(instruction)],
+            User: [ClaudeBlock.Text(userText)]);
+        return (await claude.SendAsync(request, cancellationToken)).Text;
+    }
 
     private static string? ExtractObject(string reply)
     {

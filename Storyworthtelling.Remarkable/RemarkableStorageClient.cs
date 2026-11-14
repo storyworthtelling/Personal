@@ -18,12 +18,16 @@ public class RemarkableStorageClient : IRemarkableClient
         this.authProvider = authProvider;
     }
 
-    public async Task Upload(string title, byte[] pdfBytes, string? parentFolderId, CancellationToken cancellationToken)
+    public Task Upload(string title, byte[] pdfBytes, string? parentFolderId, CancellationToken cancellationToken) =>
+        Upload(title, new MemoryStream(pdfBytes, writable: false), pdfBytes.LongLength, parentFolderId, cancellationToken);
+
+    // Streamed with its length stated (efficiency audit §18): the request reads the file as it goes rather than
+    // holding it, and a stated length keeps the stack from buffering it to find one.
+    public async Task Upload(string title, Stream pdf, long length, string? parentFolderId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (RemarkableLimits.TooLarge(pdfBytes.LongLength) is { } tooLarge)
+        if (RemarkableLimits.TooLarge(length) is { } tooLarge)
             throw tooLarge;
-
 
         // The document metadata: file_name always, and parent only when delivering into a folder — an
         // empty/absent parent means the account root, so the root path is byte-identical to before.
@@ -36,15 +40,16 @@ public class RemarkableStorageClient : IRemarkableClient
             using var request = await CreateRequest(HttpMethod.Post, FilesUrl, cancellationToken);
             request.Headers.Add("rm-meta", meta);
             request.Headers.Add("rm-source", "RoR-Browser");
-            request.Content = new ByteArrayContent(pdfBytes);
+            request.Content = new StreamContent(pdf);
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            request.Content.Headers.ContentLength = length;
 
             using var response = await httpClient.SendAsync(request, cancellationToken);
             await EnsureSuccess(response, "upload", title);
         }
         catch (Exception ex) when (ex is not OperationCanceledException && MemoryFailure.IsOutOfMemory(ex))
         {
-            throw new RemarkableRefusedException(RemarkableRefusal.OutOfMemory, pdfBytes.LongLength, ex);
+            throw new RemarkableRefusedException(RemarkableRefusal.OutOfMemory, length, ex);
         }
     }
 

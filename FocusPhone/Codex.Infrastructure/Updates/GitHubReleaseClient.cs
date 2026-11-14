@@ -17,6 +17,9 @@ public record ReleaseAsset(string Name, string DownloadUrl, long Id = 0);
 
 public record ReleaseInfo(string TagName, IReadOnlyList<ReleaseAsset> ApkAssets)
 {
+    /// <summary>The release's sidecars (<c>&lt;apk&gt;.json</c>), by name (efficiency audit §13).</summary>
+    public IReadOnlyDictionary<string, ReleaseAsset> Sidecars { get; init; } = new Dictionary<string, ReleaseAsset>();
+
     public bool IsNewerThan(string installedVersion)
     {
         var match = Regex.Match(TagName, @"\d+\.\d+\.\d+");
@@ -61,7 +64,7 @@ public class GitHubReleaseClient
 
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = json.RootElement;
-        var apkAssets = root.GetProperty("assets").EnumerateArray()
+        var assets = root.GetProperty("assets").EnumerateArray()
             .Select(asset =>
             {
                 var id = asset.TryGetProperty("id", out var idProp) ? idProp.GetInt64() : 0;
@@ -72,9 +75,34 @@ public class GitHubReleaseClient
                     $"https://api.github.com/repos/{repo}/releases/assets/{id}",
                     id);
             })
-            .Where(asset => asset.Name.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
             .ToList();
+        var apkAssets = assets.Where(asset => asset.Name.EndsWith(".apk", StringComparison.OrdinalIgnoreCase)).ToList();
+        var sidecars = assets
+            .Where(asset => asset.Name.EndsWith(".apk.json", StringComparison.OrdinalIgnoreCase))
+            .GroupBy(asset => asset.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-        return new ReleaseInfo(root.GetProperty("tag_name").GetString()!, apkAssets);
+        return new ReleaseInfo(root.GetProperty("tag_name").GetString()!, apkAssets) { Sidecars = sidecars };
+    }
+
+    /// <summary>
+    /// The package and versionCode the APK's sidecar names, or null when it has none or it will not read, in which
+    /// case the APK is downloaded and read as before (efficiency audit §13). A few hundred bytes against tens of MB.
+    /// </summary>
+    public async Task<Storyworthtelling.Updates.InstallCandidate?> ReadSidecarAsync(ReleaseInfo release, ReleaseAsset apk)
+    {
+        if (!release.Sidecars.TryGetValue(Storyworthtelling.Updates.ApkSidecar.NameFor(apk.Name), out var sidecar))
+        {
+            return null;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, sidecar.DownloadUrl);
+        request.Headers.Authorization = new("Bearer", token);
+        request.Headers.Accept.ParseAdd("application/octet-stream");
+        request.Headers.UserAgent.ParseAdd("FocusPhone-UpdateService");
+        using var response = await http.SendAsync(request);
+        return response.IsSuccessStatusCode
+            ? Storyworthtelling.Updates.ApkSidecar.Read(await response.Content.ReadAsStringAsync())
+            : null;
     }
 }

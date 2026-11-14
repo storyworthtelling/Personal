@@ -7,6 +7,7 @@ using Microsoft.Maui;
 using Folio.Domain.Identity;
 using Folio.Domain.Reading;
 using Folio.Infrastructure.Pipeline;
+using Folio.Infrastructure.Services;
 // AndroidX.Work also defines an IClock, so alias the domain one we mean.
 using IClock = Folio.Domain.Time.IClock;
 using Storyworthtelling.Pipeline;
@@ -91,6 +92,15 @@ public class PipelineWorker : Worker
 
         try
         {
+            // Nothing to read: no foreground service and no "reading" notification for an idle phone (efficiency
+            // audit §6). Import and Resume enqueue their own run, so new work does not wait for this one.
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            if (!projects.HasActiveWorkAsync(CancellationToken.None).GetAwaiter().GetResult())
+            {
+                logger.LogInformation("Pipeline cycle skipped: no book is being read.");
+                return Result.InvokeSuccess();
+            }
+
             var runner = scope.ServiceProvider.GetRequiredService<PipelineRunner>();
             var clock = scope.ServiceProvider.GetRequiredService<IClock>();
 

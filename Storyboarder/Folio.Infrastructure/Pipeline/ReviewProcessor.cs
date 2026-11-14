@@ -1276,8 +1276,7 @@ public sealed class ReviewProcessor : IPipelineStep
     private async Task<ProcessResult?> DeliverToRemarkable(
         FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
     {
-        // The upload holds the whole file in memory (and the HTTP stack buffers a second copy), so a file
-        // over the tablet's limit is refused before it is even read: on a real book a 173 MB report ran
+        // A file over the tablet's limit is refused before it is even opened: on a real book a 173 MB report ran
         // the phone out of memory, six times over. The limit is the shared one (RemarkableLimits).
         var size = imageStore.Size(analysis.PdfPath!);
         if (RemarkableLimits.TooLarge(size) is { } tooLarge)
@@ -1292,9 +1291,12 @@ public sealed class ReviewProcessor : IPipelineStep
 
         try
         {
-            await delivery!.DeliverToRemarkableRoot(
-                DeliveredDocument.Name(novel.Title, novel.DraftNumber),
-                imageStore.Read(analysis.PdfPath!), cancellationToken);
+            // Streamed from the file rather than read into memory first (efficiency audit §18).
+            await using (var report = imageStore.OpenRead(analysis.PdfPath!))
+            {
+                await delivery!.DeliverToRemarkableRoot(
+                    DeliveredDocument.Name(novel.Title, novel.DraftNumber), report, size, cancellationToken);
+            }
 
             analysis.DeliveredToRemarkable = true;
             analysis.RemarkableNote = null;

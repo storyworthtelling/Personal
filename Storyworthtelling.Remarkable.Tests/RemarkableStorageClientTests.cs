@@ -42,6 +42,35 @@ public class RemarkableStorageClientTests
         Assert.False(meta.TryGetProperty("parent", out _));
     }
 
+    // Efficiency audit §18: the upload took the whole PDF as one array, and the Android stack kept a second copy.
+    // A file is now streamed from where it lies, with its length stated, so neither copy is made.
+    [Fact]
+    public async Task Upload_StreamsAFileWithItsLength()
+    {
+        var (client, handler) = Create(RecordingHandler.Ok());
+        await using var file = new MemoryStream([37, 80, 68, 70, 45]);
+
+        await client.Upload("Invented report", file, file.Length, null, CancellationToken.None);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.IsType<StreamContent>(request.Content);
+        Assert.Equal(5, request.Content!.Headers.ContentLength);
+        Assert.Equal("application/pdf", request.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("%PDF-", handler.Bodies.Single());
+    }
+
+    [Fact]
+    public async Task Upload_RefusesAnOversizedStreamBeforeSending()
+    {
+        var (client, handler) = Create(RecordingHandler.Ok());
+        await using var file = new MemoryStream([1]);
+
+        await Assert.ThrowsAsync<RemarkableRefusedException>(() =>
+            client.Upload("Invented report", file, RemarkableLimits.MaxBytes + 1, null, CancellationToken.None));
+
+        Assert.Empty(handler.Requests);
+    }
+
     [Fact]
     public async Task Upload_IntoAFolder_SetsParentInRmMeta()
     {
