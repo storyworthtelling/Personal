@@ -31,7 +31,7 @@ public class RecipePickerTests
 
         Assert.Equal(PickerSource.Plate, row.Source);
         Assert.Equal(RecipeBoxText.ScanAction, row.Title);
-        Assert.Equal("Opens Plate · as many pages as it takes", row.Subtitle);
+        Assert.Equal("Opens Plate · one photo per page", row.Subtitle);
         Assert.True(row.Enabled);
     }
 
@@ -63,7 +63,7 @@ public class RecipePickerTests
         Assert.Equal(PickerSource.Camera, row.Source);
         Assert.False(row.Enabled);
         Assert.Equal(RecipePickerText.CannotReadSubtitle, row.Subtitle);
-        Assert.Contains("can’t read a card", row.Subtitle, StringComparison.Ordinal);
+        Assert.Contains("no camera", row.Subtitle, StringComparison.Ordinal);
     }
 
     [Theory]

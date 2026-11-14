@@ -157,7 +157,7 @@ public class MealWeekWorkerGuardTests
     }
 
     [Fact]
-    public void TheMergedReleaseManifestHasEighteenPermissions()
+    public void TheMergedReleaseManifestHasSeventeenPermissions()
     {
         var path = Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "obj", "Release", "net10.0-android", "android", "AndroidManifest.xml");
         if (!File.Exists(path))
@@ -171,12 +171,12 @@ public class MealWeekWorkerGuardTests
             .OfType<string>()
             .ToList();
 
-        // Sixteen, plus POST_NOTIFICATIONS for the brief's short list of notices (C-9.1.3, D155), plus RECEIVE_BUDGET, which the
-        // receiving app must hold for Index's broadcast to land (D174): nothing else.
-        Assert.Equal(18, requested.Count);
+        // Fifteen, plus POST_NOTIFICATIONS for the brief's short list of notices (C-9.1.3, D155), plus RECEIVE_BUDGET, which the
+        // receiving app must hold for Index's broadcast to land (D174): nothing else. Plate's READ_RECIPE went with its contract (D176).
+        Assert.Equal(17, requested.Count);
         Assert.Contains("android.permission.POST_NOTIFICATIONS", requested);
         Assert.Contains(Constitution.Domain.ConstitutionIdentity.BudgetPermission, requested);
-        Assert.Equal(18, requested.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(17, requested.Distinct(StringComparer.Ordinal).Count());
         Assert.DoesNotContain(requested, name => name.Contains("MealWeek", StringComparison.Ordinal));
     }
 }

@@ -16,7 +16,6 @@ public class PaperReadTests
     {
         Assert.Equal(PolicyContext.PlatePackage + ".PaperReadActivity", ReadRequest.PaperActivity);
         Assert.Equal(PolicyContext.PlatePackage + ".READ_PAPER", ReadRequest.PaperPermission);
-        Assert.NotEqual(ReadRequest.RecipePermission, ReadRequest.PaperPermission);
     }
 
     [Fact]

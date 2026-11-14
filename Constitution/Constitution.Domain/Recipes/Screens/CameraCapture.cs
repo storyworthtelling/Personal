@@ -1,9 +1,9 @@
 namespace Constitution.Domain.Recipes.Screens;
 
 /// <summary>
-/// Where the partner's one photograph lives and when it goes (C-6.5.2, D105). The photograph is a file the camera writes into a
-/// folder under the app's cache directory, read on the phone by text recognition and deleted straight after, whatever the reading
-/// came to. It is never in public storage and never in the media library, so no other app and no backup ever holds it. Pure: it
+/// Where a recipe page's one photograph lives and when it goes (C-6.5.2, D105, D176). The photograph is a file the camera (Plate's,
+/// or the phone's own) writes into a folder under the app's cache directory, shrunk into memory and deleted straight after, whatever
+/// that came to. It is never in public storage and never in the media library, so no other app and no backup ever holds it. Pure: it
 /// decides paths and the order of read-then-delete; the head owns the camera and the disk.
 /// </summary>
 public static class CameraCaptureCache
@@ -114,7 +114,7 @@ public enum CameraStep
 public static class CameraAccess
 {
     public const string AskingSentence =
-        "Asking to use the camera, only to read a recipe card page on this phone. The photo is deleted straight after.";
+        "Asking to use the camera, only to photograph a recipe's pages. The photos are read for their words and are not kept.";
 
     public const string DeniedSentence =
         "The camera was not allowed, so a card can't be photographed. You can still use " + RecipePickerText.TypeInTitle + ".";
@@ -143,6 +143,7 @@ public enum CameraEvent
 {
     PageRead,
     NothingRead,
+    RecipeRead,
     ReadFailed,
     PhotoDeleted,
     PhotoKept,
@@ -161,6 +162,8 @@ public static class RecipeCameraTrail
         {
             case CameraEvent.PageRead:
                 return "recipe camera: page read";
+            case CameraEvent.RecipeRead:
+                return "recipe camera: recipe read";
             case CameraEvent.NothingRead:
                 return "recipe camera: nothing read";
             case CameraEvent.PhotoDeleted:

@@ -4,6 +4,7 @@ using Android.Content.PM;
 using Android.OS;
 using Android.Views;
 using Codex.Ui;
+using Storyworthtelling.Diagnostics;
 using Constitution.Domain.Diagnostics;
 using Constitution.Domain.Groceries;
 using Constitution.Domain.Meals.Screens;
@@ -28,11 +29,12 @@ namespace Constitution;
 /// <para>Where there is no household file, <see cref="Source"/> answers so and the box says it in a sentence, with nothing
 /// invented. The cards are read off the UI thread and the page says so in a sentence while it waits.</para>
 ///
-/// <para>Scanning a recipe card (book p.14, PBI C-6.5.3): the pinned bar's Scan a recipe card starts Plate's recipe read through
-/// <see cref="ScanRecipeLauncher"/>; the words come back to <see cref="OnActivityResult"/>, become a <see cref="ScanConfirmModel"/>
-/// and take the whole page until the owner says Looks right (the card goes to <see cref="Keeper"/>, the only way it is kept) or
-/// scans again (the old draft waits out the dog-ear's undo window, then its words are forgotten). Plate returns text only (D99), so
-/// nothing about a picture exists here; <see cref="WordJudge"/> is the seam for p.14's doubted words and offers none until built.</para>
+/// <para>Scanning a recipe card (book p.14, D176): the pinned bar's Scan a recipe card opens the camera (Plate's on the owner's phone,
+/// the system's on the partner's) through <see cref="CameraCaptureLauncher"/>, one photo per page with Add a page between. Each page is
+/// shrunk and re-encoded into memory and its file deleted at once; Read the recipe sends the pages, in order, to
+/// <see cref="IRecipePhotoReader"/> (Claude), whose title, ingredients and steps fill the same three editable boxes typing uses
+/// (<see cref="TypedEntry.Fill"/>). Backstory, tips and page numbers are left out by the read. Keep the card goes to
+/// <see cref="Keeper"/>, the only way a card is kept; Let go waits out the dog-ear's undo window. No photograph is kept.</para>
 ///
 /// <para>Moving a card's cuisine happens on the page at once and folds the shell's one dog-ear (the shared notice board) for
 /// the undo window; a turn of the fold applies the move's inverse. Cook this soon is the card changing to "Planned for next
@@ -42,21 +44,17 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 {
     private readonly Handler handler = new(Looper.MainLooper!);
     private readonly CuisineMoveUndo undo = new();
-    private readonly ScanDiscardUndo scanUndo = new();
     private readonly TypedEntryUndo typedUndo = new();
     private readonly TypedEntry typed = new();
-    private readonly ScanRecipeLauncher scanLauncher;
-    private readonly CameraCaptureLauncher capture;
     private readonly Dictionary<RecipeId, CookSoonState> cooks = [];
 
     private IRecipeBoxSource source = new NoRecipeBoxSource();
     private IRecipeKeeper keeper = new NoRecipeKeeper();
-    private IRecipeWordJudge wordJudge = new NoRecipeWordJudge();
-    private ScanConfirmModel? scan;
-    private ScanReadPage? scanPage;
-    private IRecipeTextReader textReader;
-    private CameraLoop? cameraLoop;
-    private bool scanBusy;
+    private IRecipePhotoReader photoReader;
+    private CameraCaptureLauncher? capture;
+    private RecipePhotoLoop? photoLoop;
+    private bool reading;
+    private bool keeping;
     private bool cameraBusy;
     private bool typing;
     private InstallRole role = InstallRole.Unknown;
@@ -78,9 +76,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     public MealsArea(Activity host)
         : base(host, "meals", Resource.Drawable.areameals)
     {
-        scanLauncher = new ScanRecipeLauncher(host);
-        capture = new CameraCaptureLauncher(host);
-        textReader = new AndroidRecipeTextReader(host);
+        photoReader = RecipeReaderServices.ReaderOf(host);
     }
 
     /// <summary>The "I ate something else" flow the bar opens on This week and whose lines sit on its cards; shared with Today.</summary>
@@ -118,13 +114,6 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         set => keeper = value;
     }
 
-    /// <summary>The second reading of a scan's words, for p.14's doubted words; none is built, so none are offered.</summary>
-    public IRecipeWordJudge WordJudge
-    {
-        get => wordJudge;
-        set => wordJudge = value;
-    }
-
     /// <summary>
     /// Whose phone this is, which decides the scan row (Plate on the owner's, the camera on the partner's). Set by whoever reads the
     /// household file; until it is known the owner's row is offered, and Plate answers or says it is absent.
@@ -139,18 +128,11 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
     }
 
-    /// <summary>
-    /// Reads a photographed card page on the phone, for the partner's camera row (C-6.5.2, D105). The row is live only when this
-    /// phone can read a card; a phone without a camera shows it disabled and typing stays.
-    /// </summary>
-    public IRecipeTextReader TextReader
+    /// <summary>Reads a recipe off its page photographs (D176); Claude over the shared key unless a test or wiring says otherwise.</summary>
+    public IRecipePhotoReader PhotoReader
     {
-        get => textReader;
-        set
-        {
-            textReader = value;
-            picker = null;
-        }
+        get => photoReader;
+        set => photoReader = value;
     }
 
     /// <summary>Where the approved week comes from; set by whoever wires the weekly meal run's saved week.</summary>
@@ -166,9 +148,11 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     /// </summary>
     public event Action<string>? PrimaryActionRequested;
 
-    // The partner's camera row is live where the phone has a camera to read with (D105); the paste row waits on written permission
-    // (PC8, D82), so the picker is built without it.
-    private RecipePickerModel Picker() => picker ??= RecipePickerModel.For(role, cameraCanRead: textReader.CanRead, pasteAllowed: false);
+    // The partner's camera row is live where the phone has a camera (D105); the paste row waits on written permission (PC8, D82), so
+    // the picker is built without it.
+    private RecipePickerModel Picker() => picker ??= RecipePickerModel.For(role, cameraCanRead: HasCamera(), pasteAllowed: false);
+
+    private bool HasCamera() => Host.PackageManager?.HasSystemFeature(PackageManager.FeatureCameraAny) == true;
 
     public override string? Subtitle => notice;
 
@@ -179,16 +163,9 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     protected override View BuildPage()
     {
         boxPage = null;
-        scanPage = null;
         if (typing)
         {
             return new PickerTypedPage(Host, typed);
-        }
-
-        if (scan is not null)
-        {
-            scanPage = new ScanReadPage(Host, scan, OnChoose, OnOther, OnTitle);
-            return scanPage;
         }
 
         View body;
@@ -261,27 +238,20 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         if (typing)
         {
             var letGo = PaperUi.SecondaryButton(Host, TypedEntry.LetGoAction, LetGoOfTyping);
-            var check = PaperUi.PrimaryButton(Host, TypedEntry.CheckAction, CheckTyping);
-            return PaperUi.BottomBar(Host, letGo, check);
+            letGo.Enabled = !keeping;
+            var keep = PaperUi.PrimaryButton(Host, TypedEntry.KeepAction, KeepTyped);
+            keep.Enabled = !keeping;
+            return PaperUi.BottomBar(Host, letGo, keep);
         }
 
-        if (cameraLoop is not null)
+        if (photoLoop is not null)
         {
-            // One photo per page: Add a page opens the camera again, Done turns the pages into a card.
-            var addPage = PaperUi.SecondaryButton(Host, cameraLoop.AddPageAction, OpenCamera);
-            addPage.Enabled = !cameraBusy;
-            var done = PaperUi.PrimaryButton(Host, cameraLoop.DoneAction, FinishCamera);
-            done.Enabled = cameraLoop.CanFinish && !cameraBusy;
+            // One photo per page: Add a page opens the camera again, Read the recipe sends the pages to be read.
+            var addPage = PaperUi.SecondaryButton(Host, photoLoop.AddPageAction, OpenCamera);
+            addPage.Enabled = !cameraBusy && !reading && photoLoop.CanAddPage;
+            var done = PaperUi.PrimaryButton(Host, photoLoop.DoneAction, FinishCamera);
+            done.Enabled = photoLoop.CanFinish && !cameraBusy && !reading;
             return PaperUi.BottomBar(Host, addPage, done);
-        }
-
-        if (scan is not null)
-        {
-            var again = PaperUi.SecondaryButton(Host, scan.ScanAgainAction, ScanAgain);
-            again.Enabled = !scanBusy;
-            var looksRight = PaperUi.PrimaryButton(Host, scan.KeepAction, KeepScan);
-            looksRight.Enabled = !scanBusy;
-            return PaperUi.BottomBar(Host, again, looksRight);
         }
 
         if (view == MealsView.ThisWeek)
@@ -296,7 +266,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
         var action = RecipeBoxScreenModel.Build(ready.Snapshot.Cards, null).PrimaryAction;
         var button = PaperUi.PrimaryButton(Host, action, () => OnPrimary(action));
-        button.Enabled = action != RecipeBoxText.ScanAction || !scanBusy;
+        button.Enabled = action != RecipeBoxText.ScanAction || !cameraBusy;
         if (action == RecipeBoxText.ScanAction)
         {
             // Short of ten the scan is the page's one invitation; typing is still always there beside it.
@@ -544,18 +514,6 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         PrimaryActionRequested?.Invoke(action);
     }
 
-    // Scan again: a scanned draft asks Plate once more; a typed one reopens the three fields with its words still in them.
-    private void ScanAgain()
-    {
-        if (scan?.Origin == ScanOrigin.Typed)
-        {
-            OpenTyping();
-            return;
-        }
-
-        StartScan();
-    }
-
     // A row of the picker was tapped. A row that cannot be used leaves the picker open and says why in the header.
     private void OnPick(PickerSource source)
     {
@@ -568,9 +526,8 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         switch (choice.Started)
         {
             case PickerSource.Plate:
-                LaunchPlate();
-                break;
             case PickerSource.Camera:
+                // Both phones photograph the pages; the owner's in Plate, the partner's in its own camera (D176).
                 StartCamera();
                 break;
             case PickerSource.TypeIn:
@@ -584,9 +541,9 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
     }
 
-    // ---- the partner's camera (C-6.5.2, D105) ----
+    // ---- photographing the pages (C-6.5.2, D105, D176) ----
 
-    // The camera row was tapped. The permission is asked for here, at the tap, after a sentence that says why; a phone without a
+    // The scan row was tapped. The permission is asked for here, at the tap, after a sentence that says why; a phone without a
     // camera is told so. Nothing is asked at install or at launch.
     private void StartCamera()
     {
@@ -595,7 +552,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             return;
         }
 
-        switch (CameraAccess.Decide(textReader.CanRead, CameraAllowed()))
+        switch (CameraAccess.Decide(HasCamera(), CameraAllowed()))
         {
             case CameraStep.NoCamera:
                 notice = CameraAccess.NoCameraSentence;
@@ -637,49 +594,55 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         }
 
         notice = CameraAccess.DeniedSentence;
-        cameraLoop = null;
+        photoLoop = null;
         RecordCamera(CameraEvent.PermissionDenied, null);
         RaiseChanged();
     }
 
-    // One photo per page: opens the camera for the next page. A loop already holding pages is kept if the camera cannot open.
+    // One photo per page: opens the camera for the next page (Plate's on the owner's phone). Pages already taken are kept if the
+    // camera cannot open.
     private void OpenCamera()
     {
-        if (cameraBusy)
+        if (cameraBusy || reading)
         {
             return;
         }
 
-        cameraLoop ??= new CameraLoop();
+        photoLoop ??= new RecipePhotoLoop();
+        capture = new CameraCaptureLauncher(Host, CameraCaptureLauncher.RequestCode, role == InstallRole.Partner ? null : PlateCamera.Package);
+        var opening = TapWatch.Action(ConstitutionKeyActions.ScanRecipe, TimeSpan.FromSeconds(15));
         if (capture.Start() is { } sentence)
         {
+            opening.Failed(sentence);
             notice = sentence;
-            if (!cameraLoop.CanFinish)
+            if (!photoLoop.CanFinish)
             {
-                cameraLoop = null;
+                photoLoop = null;
             }
 
             RaiseChanged();
             return;
         }
 
+        opening.Succeeded();
         notice = null;
         cameraBusy = true;
     }
 
-    // The camera has answered. A backed-out capture leaves the pages read so far as they were and the photograph deleted.
+    // The camera has answered. A backed-out capture leaves the pages taken so far as they were and the photograph deleted.
     private void OnCameraResult(Result resultCode)
     {
         // An app the phone ended while the camera was open has lost its loop; the page just taken still counts as the first.
-        cameraLoop ??= new CameraLoop();
+        photoLoop ??= new RecipePhotoLoop();
+        capture ??= new CameraCaptureLauncher(Host);
         if (resultCode != Result.Ok)
         {
             capture.Discard();
             cameraBusy = false;
-            notice = cameraLoop.CanFinish ? cameraLoop.Status : ScanReturns.CancelledSentence(scan is not null);
-            if (!cameraLoop.CanFinish)
+            notice = photoLoop.CanFinish ? photoLoop.Status : RecipeScanText.CancelledSentence;
+            if (!photoLoop.CanFinish)
             {
-                cameraLoop = null;
+                photoLoop = null;
             }
 
             RaiseChanged();
@@ -689,87 +652,143 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         cameraBusy = true;
         notice = null;
         RaiseChanged();
-        ReadPhoto(capture.PhotoPath);
+        TakePhoto(capture.PhotoPath);
     }
 
-    // Recognition is slow enough to keep off the UI thread. The reader deletes the photograph before it returns or throws.
-    private void ReadPhoto(string photo)
+    // The photograph is shrunk and re-encoded into memory off the UI thread, and its file deleted whatever that came to.
+    private void TakePhoto(string photo)
     {
-        var reader = textReader;
-        _ = Task.Run(async () =>
+        _ = Task.Run(() =>
         {
-            IReadOnlyList<string>? lines = null;
+            byte[]? page = null;
             Exception? failure = null;
             try
             {
-                lines = await reader.ReadPhotoAsync(photo).ConfigureAwait(false);
+                page = AtePhotoScaler.Read(photo);
             }
-            catch (Exception e) when (e is RecipeTextReadException or IOException or ArgumentException or InvalidOperationException)
+            catch (Exception e) when (e is IOException or ArgumentException or Java.Lang.Exception)
             {
-                // The type only is recorded and the sentence is fixed: a message could hold a word read off the card.
+                // The type only is recorded and the sentence is fixed.
                 failure = e;
             }
             finally
             {
-                Host.RunOnUiThread(() => PageRead(lines, failure));
+                var gone = CameraCaptureLauncher.Delete(photo);
+                RecordCamera(gone ? CameraEvent.PhotoDeleted : CameraEvent.PhotoKept, null);
+                Host.RunOnUiThread(() => PhotoTaken(page, failure));
             }
         });
     }
 
-    private void PageRead(IReadOnlyList<string>? lines, Exception? failure)
+    private void PhotoTaken(byte[]? page, Exception? failure)
     {
         cameraBusy = false;
-        cameraLoop ??= new CameraLoop();
-        if (lines is null)
+        photoLoop ??= new RecipePhotoLoop();
+        if (page is null)
         {
             RecordCamera(CameraEvent.ReadFailed, failure);
-            notice = CameraAccess.ReadFailedSentence;
+            notice = RecipePhotoLoop.EmptyPhotoSentence;
         }
         else
         {
-            var added = cameraLoop.AddPage(lines);
+            var added = photoLoop.AddPage(page);
             RecordCamera(added ? CameraEvent.PageRead : CameraEvent.NothingRead, null);
-            notice = cameraLoop.Status;
+            notice = photoLoop.Status;
         }
 
-        if (!cameraLoop.CanFinish)
+        if (!photoLoop.CanFinish)
         {
-            cameraLoop = null;
+            photoLoop = null;
         }
 
         RaiseChanged();
     }
 
-    // Done: the pages become a card by Plate's reading rules and take the same checking step as any scan. The loop forgets its lines.
+    // Read the recipe: the pages go to the reader, in order, off the UI thread; what comes back fills the three boxes to be edited.
     private void FinishCamera()
     {
-        if (cameraLoop is null || !cameraLoop.CanFinish || cameraBusy)
+        if (photoLoop is null || !photoLoop.CanFinish || cameraBusy || reading)
         {
             return;
         }
 
-        var finished = cameraLoop.Finish();
-        cameraLoop = null;
-        switch (finished)
+        var pages = photoLoop.Take();
+        var reader = photoReader;
+        reading = true;
+        notice = RecipePhotoText.ReadingSentence(pages.Count);
+        RaiseChanged();
+        _ = Task.Run(async () =>
         {
-            case ScanReturn.Read read:
+            RecipePhotoRead? answer = null;
+            Exception? failure = null;
+            try
+            {
+                answer = await reader.ReadAsync(pages, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException or InvalidOperationException)
+            {
+                failure = e;
+            }
+            finally
+            {
+                Host.RunOnUiThread(() => PagesRead(answer, failure));
+            }
+        });
+    }
+
+    private void PagesRead(RecipePhotoRead? answer, Exception? failure)
+    {
+        reading = false;
+        photoLoop = null;
+        switch (answer)
+        {
+            case RecipePhotoRead.Read read:
+                RecordCamera(CameraEvent.RecipeRead, null);
+                typed.Fill(read.Payload);
+                typing = true;
                 notice = null;
-                BeginDraft(read.Payload);
                 break;
-            case ScanReturn.Refused refused:
-                notice = refused.Sentence;
-                RaiseChanged();
+            case RecipePhotoRead.Unavailable unavailable:
+                notice = unavailable.Sentence;
+                break;
+            case RecipePhotoRead.Unreadable unreadable:
+                RecordCamera(CameraEvent.NothingRead, null);
+                notice = unreadable.Sentence;
                 break;
             default:
-                notice = ScanReturns.CancelledSentence(scan is not null);
-                RaiseChanged();
+                RecordCamera(CameraEvent.ReadFailed, failure);
+                notice = failure is null
+                    ? RecipePhotoText.UnreadableSentence
+                    : RecipeScanText.NotReadPrefix + PlainError.Describe(failure, "Claude");
                 break;
         }
+
+        RaiseChanged();
     }
 
     // The camera trail: the step and, for a failure, the exception's type. Never a word of the card and never a path.
     private void RecordCamera(CameraEvent step, Exception? failure) =>
         new ConstitutionVaultLog(Host.ApplicationContext ?? Host).Outcome(RecipeCameraTrail.LogPhrase(step, failure));
+
+    // Scan a recipe card from the bar: this install's scan row, chosen without opening the picker.
+    private void StartScan()
+    {
+        if (cameraBusy || reading)
+        {
+            return;
+        }
+
+        Begin(Picker().ScanChoice());
+    }
+
+    /// <summary>The camera's answer, handed over by the shell. A back-out is a sentence; a page taken is added to the loop.</summary>
+    public void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        if (requestCode == CameraCaptureLauncher.RequestCode)
+        {
+            OnCameraResult(resultCode);
+        }
+    }
 
     // ---- typing a card in ----
 
@@ -794,9 +813,15 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         ScheduleExpiry();
     }
 
-    // Check the card: the three fields become the same words a scan gives and take the same checking step.
-    private void CheckTyping()
+    // Keep the card: the three boxes, as the owner left them, become a card and go through the keeper off the UI thread. Only a
+    // kept card leaves the page; anything that stops it is said in the status line and the words stay to be fixed.
+    private void KeepTyped()
     {
+        if (keeping)
+        {
+            return;
+        }
+
         var read = typed.Read();
         if (read.Payload is not { } payload)
         {
@@ -805,152 +830,11 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             return;
         }
 
-        typing = false;
-        TakeDraft(ScanConfirmModel.From(payload, null, ScanOrigin.Typed), null);
-    }
-
-    // Opens Plate. A draft already on the page stays until a new read replaces it, so backing out of Plate loses nothing.
-    private void StartScan()
-    {
-        if (scanBusy)
-        {
-            return;
-        }
-
-        Begin(Picker().ScanChoice());
-    }
-
-    private void LaunchPlate()
-    {
-        if (scanBusy)
-        {
-            return;
-        }
-
-        var opening = TapWatch.Action(ConstitutionKeyActions.ScanRecipe, TimeSpan.FromSeconds(15));
-        if (scanLauncher.Start() is { } sentence)
-        {
-            opening.Failed(sentence);
-            notice = sentence;
-            RaiseChanged();
-            return;
-        }
-
-        opening.Succeeded();
-        notice = null;
-        scanBusy = true;
-    }
-
-    /// <summary>The answer from Plate, handed over by the shell. A back-out is quiet; an unusable answer is a sentence.</summary>
-    public void OnActivityResult(int requestCode, Result resultCode, Intent? data)
-    {
-        if (requestCode == CameraCaptureLauncher.RequestCode)
-        {
-            OnCameraResult(resultCode);
-            return;
-        }
-
-        if (requestCode != ScanRecipeLauncher.RequestCode)
-        {
-            return;
-        }
-
-        scanBusy = false;
-        var answer = ScanRecipeLauncher.Read(resultCode, data);
-        // §4.5: what Plate's read came to, by kind only; the card's words never reach the log.
-        HeadLog.Info("Meals", "recipe scan: " + answer.GetType().Name.ToLowerInvariant());
-        switch (answer)
-        {
-            case ScanReturn.Read read:
-                BeginDraft(read.Payload);
-                break;
-            case ScanReturn.Refused refused:
-                notice = refused.Sentence;
-                RaiseChanged();
-                break;
-            case ScanReturn.Cancelled:
-                // Said in a sentence, so a button that seemed to do nothing does not look broken. A draft on the page is untouched.
-                notice = ScanReturns.CancelledSentence(scan is not null);
-                RaiseChanged();
-                break;
-        }
-    }
-
-    // The second reading, if one is ever built, may be slow, so the draft is made off the UI thread.
-    private void BeginDraft(RecipeReadPayload payload)
-    {
-        var judge = wordJudge;
-        _ = Task.Run(() =>
-        {
-            ScanConfirmModel draft;
-            string? sentence = null;
-            try
-            {
-                draft = ScanConfirmModel.From(payload, judge);
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
-            {
-                // The type only, never the message: the card is shown without doubts rather than not at all.
-                draft = ScanConfirmModel.From(payload);
-                sentence = "The words could not be double-checked (" + e.GetType().Name + ").";
-            }
-
-            Host.RunOnUiThread(() => TakeDraft(draft, sentence));
-        });
-    }
-
-    private void TakeDraft(ScanConfirmModel draft, string? sentence)
-    {
-        if (scan is { } earlier)
-        {
-            ConnectionNoticeBoard.With(board =>
-            {
-                scanUndo.Begin(board, earlier, DateTimeOffset.UtcNow);
-                return true;
-            });
-        }
-
-        scan = draft;
-        notice = sentence;
-        RaiseChanged();
-        ScheduleExpiry();
-    }
-
-    private void OnChoose(int question, int option)
-    {
-        scan?.Choose(question, option);
-        ShowScan();
-    }
-
-    private void OnOther(int question, string text)
-    {
-        if (scan?.ChooseOther(question, text) == true)
-        {
-            ShowScan();
-        }
-    }
-
-    private void OnTitle(string text) => scan?.SetTitle(text);
-
-    private void ShowScan()
-    {
-        if (scan is not null)
-        {
-            scanPage?.Show(scan);
-        }
-    }
-
-    // Looks right. The card goes through the keeper, off the UI thread; only a kept card leaves the page.
-    private void KeepScan()
-    {
-        if (scan is not { } draft || scanBusy)
-        {
-            return;
-        }
-
+        var draft = ScanConfirmModel.From(payload, null, typed.Origin);
         var target = keeper;
         var taken = ExistingIds();
-        scanBusy = true;
+        keeping = true;
+        RaiseChanged();
         _ = Task.Run(() =>
         {
             ScanKeepResult result;
@@ -963,22 +847,17 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
                 result = new ScanKeepResult(ScanKeepOutcome.NotKept, null, ScanConfirmModel.NotKeptSentence + " (" + e.GetType().Name + ")");
             }
 
-            Host.RunOnUiThread(() => KeepDone(draft, result));
+            Host.RunOnUiThread(() => KeepDone(result));
         });
     }
 
-    private void KeepDone(ScanConfirmModel draft, ScanKeepResult result)
+    private void KeepDone(ScanKeepResult result)
     {
-        scanBusy = false;
-        if (!ReferenceEquals(scan, draft))
-        {
-            return;
-        }
-
-        if (result.Outcome is ScanKeepOutcome.Kept or ScanKeepOutcome.AlreadyKept or ScanKeepOutcome.NothingToKeep)
+        keeping = false;
+        if (result.Outcome is ScanKeepOutcome.Kept or ScanKeepOutcome.AlreadyKept)
         {
             // The card is in the box now; the page goes back to the box and reads it again, so the card shows in its pile.
-            scan = null;
+            typing = false;
             typed.Clear();
             notice = null;
             view = MealsView.RecipeBox;
@@ -1038,20 +917,8 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         if (typedUndo.Reverse(actKey) is { } words)
         {
             // The words that were let go come back into the fields, and the page with them.
-            typed.Title = words.Title;
-            typed.IngredientsText = words.IngredientsText;
-            typed.StepsText = words.StepsText;
+            typed.Restore(words);
             typing = true;
-            handler.RemoveCallbacksAndMessages(null);
-            return;
-        }
-
-        if (scanUndo.Reverse(actKey) is { } brought)
-        {
-            // The draft the owner scanned over comes back; the read that replaced it is let go.
-            var replaced = scan;
-            scan = brought;
-            replaced?.Discard();
             handler.RemoveCallbacksAndMessages(null);
             return;
         }
@@ -1089,7 +956,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
 
     private void ScheduleExpiry()
     {
-        if (undo.Pending is null && scanUndo.Pending is null && typedUndo.Pending is null)
+        if (undo.Pending is null && typedUndo.Pending is null)
         {
             return;
         }
@@ -1106,7 +973,6 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     {
         var now = DateTimeOffset.UtcNow;
         undo.Expire(now);
-        scanUndo.Expire(now);
         typedUndo.Expire(now);
     }
 }

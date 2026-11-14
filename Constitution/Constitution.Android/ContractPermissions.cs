@@ -1,7 +1,6 @@
 using Android.App;
 using Android.Content.PM;
 using Constitution.Domain;
-using Constitution.Domain.Recipes;
 
 // Every cross-app contract Constitution takes part in, from either end (RepoGuards ContractPermissionsTests).
 // Each is declared at signature level, so only an app signed with the suite's one keystore can hold it,
@@ -12,7 +11,3 @@ using Constitution.Domain.Recipes;
 // The month's grocery budget: Index sends, BudgetReceiver receives.
 [assembly: Permission(Name = ConstitutionIdentity.BudgetPermission, ProtectionLevel = Protection.Signature)]
 [assembly: UsesPermission(Name = ConstitutionIdentity.BudgetPermission)]
-
-// A recipe read: Constitution starts Plate's RecipeReadActivity, which only a holder may start.
-[assembly: Permission(Name = RecipeReadContract.Permission, ProtectionLevel = Protection.Signature)]
-[assembly: UsesPermission(Name = RecipeReadContract.Permission)]

@@ -1,15 +1,13 @@
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Constitution.Domain;
-using Constitution.Domain.Recipes;
 
 namespace Constitution.Tests.RecipeScan;
 
 /// <summary>
-/// The scan adds two things to the manifest. Constitution holds Plate's recipe permission (a custom permission Plate declares at
-/// signature level, never asked for in a dialog), and since D105 the partner's phone photographs a card page itself, so the app
-/// also holds android.permission.CAMERA (asked for at the tap) with the camera features declared not required. Those two permissions
-/// are the whole of what the scan adds. Read from the head's source and, once a Release build has been made, from the merged
+/// The scan adds one thing to the manifest: android.permission.CAMERA (asked for at the tap), with the camera features declared not
+/// required. Both phones photograph a recipe's pages (D105, D176) and Android refuses a capture intent from an app that declares the
+/// permission without holding it, even one aimed at Plate. Plate's old recipe-read permission is gone with its contract (D176). Read from the head's source and, once a Release build has been made, from the merged
 /// manifest the phone installs.
 /// </summary>
 public class ScanManifestTests
@@ -37,28 +35,9 @@ public class ScanManifestTests
         HeadSources().SelectMany(text => Uses.Matches(text).Select(match => match.Groups[1].Value.Trim()));
 
     [Fact]
-    public void ThePermissionIsPlatesAndNotARuntimeOne()
+    public void PlatesRecipeReadPermissionIsNoLongerHeld()
     {
-        Assert.StartsWith(RecipeReadContract.PlatePackage + ".", RecipeReadContract.Permission, StringComparison.Ordinal);
-        Assert.DoesNotContain("android.permission.", RecipeReadContract.Permission, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void TheHeadUsesItByTheContractConstant()
-    {
-        var mine = HeadUses().Where(argument => argument.Contains("RecipeReadContract.Permission", StringComparison.Ordinal)).ToList();
-
-        Assert.Equal("Name = RecipeReadContract.Permission", Assert.Single(mine));
-    }
-
-    [Fact]
-    public void ConstitutionHoldsAndDeclaresItButNeverAsksForIt()
-    {
-        var sources = HeadSources().ToList();
-
-        // Declared here as well as in Plate, so it exists whichever app is installed first (D174).
-        Assert.Contains(sources, text => text.Contains("[assembly: Permission(Name = RecipeReadContract.Permission, ProtectionLevel = Protection.Signature)]", StringComparison.Ordinal));
-        Assert.DoesNotContain(sources, text => text.Contains("RequestPermissions", StringComparison.Ordinal) && text.Contains("RecipeReadContract", StringComparison.Ordinal));
+        Assert.DoesNotContain(HeadSources(), text => text.Contains("READ_RECIPE", StringComparison.Ordinal) || text.Contains("RecipeReadContract", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -67,7 +46,6 @@ public class ScanManifestTests
         var others = HeadUses()
             .Where(argument => argument != "Android.Manifest.Permission.Internet")
             .Where(argument => !argument.StartsWith("\"android.permission.health.", StringComparison.Ordinal))
-            .Where(argument => argument != "Name = RecipeReadContract.Permission")
             // Index's budget broadcast reaches only an app that holds it (D174).
             .Where(argument => argument != "Name = ConstitutionIdentity.BudgetPermission")
             .Where(argument => argument != "Name = Android.Manifest.Permission.Camera")
@@ -79,7 +57,7 @@ public class ScanManifestTests
     }
 
     [Fact]
-    public void TheMergedManifestAddsPlatesAndCameraOnly()
+    public void TheMergedManifestAddsTheCameraOnly()
     {
         var path = Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "obj", "Release", "net10.0-android", "android", "AndroidManifest.xml");
         if (!File.Exists(path))
@@ -99,10 +77,10 @@ public class ScanManifestTests
             .ToList();
 
         Assert.Equal(
-            new[] { "android.permission.CAMERA", "android.permission.POST_NOTIFICATIONS", RecipeReadContract.Permission, ConstitutionIdentity.BudgetPermission }.Order(StringComparer.Ordinal).ToList(),
+            new[] { "android.permission.CAMERA", "android.permission.POST_NOTIFICATIONS", ConstitutionIdentity.BudgetPermission }.Order(StringComparer.Ordinal).ToList(),
             news.Order(StringComparer.Ordinal).ToList());
         Assert.Contains("android.permission.INTERNET", requested);
-        Assert.Equal(1, requested.Count(name => name == RecipeReadContract.Permission));
+        Assert.DoesNotContain(requested, name => name.EndsWith(".READ_RECIPE", StringComparison.Ordinal));
         Assert.Equal(1, requested.Count(name => name == "android.permission.CAMERA"));
 
         // The capture provider: private, grants only the one file the camera is handed, authority from the frozen application id.

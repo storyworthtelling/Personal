@@ -6,7 +6,7 @@ namespace Plate;
 
 /// <summary>
 /// The card read (from Post's Rolodex) and the statement read (from an Index account), on the errand screen but
-/// behind their own door, like <see cref="RecipeReadActivity"/>.
+/// behind their own door.
 ///
 /// <para>They used to be filters on <see cref="ErrandActivity"/>, which is exported with no permission because the
 /// camera filters must stay open to every app. So any app on the phone could start a statement read and be handed

@@ -24,7 +24,6 @@ public partial class ContractPermissionsTests
     private const string Hidden = "com.storyworthtelling.focusphone.launcher.RECEIVE_HIDDEN";
     private const string LockedOpen = "com.storyworthtelling.focusphone.launcher.RECEIVE_LOCKED_OPEN";
     private const string Sessions = "com.storyworthtelling.pulp.RECEIVE_SESSIONS";
-    private const string Recipe = "com.storyworthtelling.focusphone.camera.READ_RECIPE";
     private const string Paper = "com.storyworthtelling.focusphone.camera.READ_PAPER";
 
     private const string Post = "FocusPhone/Post.Android";
@@ -49,8 +48,6 @@ public partial class ContractPermissionsTests
         (Flyleaf, "LockedOpenHandoff.Permission", LockedOpen),
         (Flyleaf, "PlaybackSessionHandoff.Permission", Sessions),
         (Pulp, "SessionHandOff.Permission", Sessions),
-        (Constitution, "RecipeReadContract.Permission", Recipe),
-        (Plate, "ReadRequest.RecipePermission", Recipe),
         (Plate, "ReadRequest.PaperPermission", Paper),
         (Post, "ReadRequest.PaperPermission", Paper),
         (Index, "PlateStatementRead.Permission", Paper),

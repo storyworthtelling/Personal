@@ -30,7 +30,7 @@ namespace Constitution.MealsTab;
 /// </summary>
 public sealed class AteSomethingElseFlow
 {
-    /// <summary>The camera's answer comes back under this code. Health uses 7311, Plate's scan 7412, the recipe camera 7413 and 7414.</summary>
+    /// <summary>The camera's answer comes back under this code. Health uses 7311, the recipe camera 7413 and 7414.</summary>
     public const int CaptureRequestCode = 7415;
 
     /// <summary>The camera permission's answer comes back under this code.</summary>
@@ -207,7 +207,7 @@ public sealed class AteSomethingElseFlow
     private void OpenCamera()
     {
         // The owner's phone has Plate, so the photograph is taken there; the partner's uses the system camera (D86).
-        capture = new CameraCaptureLauncher(host, CaptureRequestCode, role() == InstallRole.Partner ? null : RecipeReadContract.PlatePackage);
+        capture = new CameraCaptureLauncher(host, CaptureRequestCode, role() == InstallRole.Partner ? null : PlateCamera.Package);
         if (!model.StartCapture(DateTimeOffset.Now))
         {
             return;

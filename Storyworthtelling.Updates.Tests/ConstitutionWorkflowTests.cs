@@ -108,9 +108,8 @@ public class ConstitutionWorkflowTests
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.FOREGROUND_SERVICE",
         "com.storyworthtelling.constitution.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
-        // Plate's custom recipe permission. Assembled from its parts because Codex's frozen-invariant guard allows Plate's package id
-        // to be spelled in one place only.
-        "com.storyworthtelling.focusphone." + "camera" + ".READ_RECIPE",
+        "com.storyworthtelling.constitution.RECEIVE_BUDGET",
+        "android.permission.POST_NOTIFICATIONS",
     ];
 
     [Fact]
@@ -137,6 +136,8 @@ public class ConstitutionWorkflowTests
         Assert.DoesNotContain("READ_EXTERNAL", step);
         Assert.DoesNotContain("RECORD_AUDIO", step);
         Assert.DoesNotContain("WRITE_EXTERNAL", step);
+        // Plate's recipe read retired with its contract (D176); the scan sends photographs, not Plate's words.
+        Assert.DoesNotContain("READ_RECIPE", step);
     }
 
     [Fact]

@@ -99,11 +99,11 @@ public class PickerSourceTests
         var written = All() + area;
 
         Assert.DoesNotContain("\"Type it in\"", written, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"Check the card\"", written, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Keep the card\"", written, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Let go\"", written, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Add a recipe\"", written, StringComparison.Ordinal);
         Assert.Contains("RecipePickerModel.For(", area, StringComparison.Ordinal);
-        Assert.Contains("TypedEntry.CheckAction", area, StringComparison.Ordinal);
+        Assert.Contains("TypedEntry.KeepAction", area, StringComparison.Ordinal);
         Assert.Contains("TypedEntry.LetGoAction", area, StringComparison.Ordinal);
         Assert.Contains("RecipePickerText.TypeInTitle", area, StringComparison.Ordinal);
     }
@@ -130,11 +130,11 @@ public class PickerSourceTests
     }
 
     [Fact]
-    public void TypedWordsReachTheKeeperOnlyThroughTheConfirmModel()
+    public void TheBoxesReachTheKeeperOnlyThroughTheConfirmModel()
     {
         var area = Read("Constitution.Android/MealsArea.cs");
 
-        Assert.Contains("ScanConfirmModel.From(payload, null, ScanOrigin.Typed)", area, StringComparison.Ordinal);
+        Assert.Contains("ScanConfirmModel.From(payload, null, typed.Origin)", area, StringComparison.Ordinal);
         Assert.DoesNotContain("keeper.Keep(", area, StringComparison.Ordinal);
     }
 }
