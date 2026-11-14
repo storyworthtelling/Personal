@@ -33,6 +33,7 @@ public static class SettingsStore
         // The empty desk's voiced line and the local day it was written, so it is composed once a day.
         internal const string EmptyDeskLine = "EmptyDeskLine";
         internal const string EmptyDeskLineDay = "EmptyDeskLineDay";
+        internal const string EmptyDeskLineAskedAt = "EmptyDeskLineAskedAt";
     }
 
     public static string ClaudeApiKey
@@ -151,6 +152,14 @@ public static class SettingsStore
             ? day
             : null;
         set => Preferences.Set(Keys.EmptyDeskLineDay, value?.ToString("yyyy-MM-dd") ?? string.Empty);
+    }
+
+    // When the empty desk last asked for a line, so an attempt that came back empty waits an hour (efficiency §6).
+    public static DateTimeOffset? EmptyDeskLineAskedAt
+    {
+        get => DateTimeOffset.TryParse(Preferences.Get(Keys.EmptyDeskLineAskedAt, string.Empty),
+            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var at) ? at : null;
+        set => Preferences.Set(Keys.EmptyDeskLineAskedAt, value?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty);
     }
 
     public static bool SchemaResetIsDue => SchemaResetGeneration < CurrentSchemaResetGeneration;

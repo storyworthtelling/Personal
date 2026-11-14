@@ -17,11 +17,23 @@ public class FakeHttpMessageHandler : HttpMessageHandler
     public List<string?> RequestBodies { get; } = [];
 
     public void Respond(string url, string body, string mediaType = "application/json",
-        System.Net.HttpStatusCode status = System.Net.HttpStatusCode.OK)
+        System.Net.HttpStatusCode status = System.Net.HttpStatusCode.OK,
+        IReadOnlyDictionary<string, string>? headers = null)
     {
-        responses[url] = () => new HttpResponseMessage(status)
+        responses[url] = () =>
         {
-            Content = new StringContent(body, System.Text.Encoding.UTF8, mediaType),
+            var response = new HttpResponseMessage(status)
+            {
+                Content = new StringContent(body, System.Text.Encoding.UTF8, mediaType),
+            };
+            foreach (var (name, value) in headers ?? new Dictionary<string, string>())
+            {
+                if (!response.Headers.TryAddWithoutValidation(name, value))
+                {
+                    response.Content.Headers.TryAddWithoutValidation(name, value);
+                }
+            }
+            return response;
         };
     }
 

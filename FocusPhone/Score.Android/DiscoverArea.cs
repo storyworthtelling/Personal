@@ -74,7 +74,8 @@ public sealed class DiscoverArea : ScoreArea
         picksStore = new FridayPicksStore(host);
         subscriptionStore = new SubscriptionStore(host);
         voice = new Codex.Ui.Voice.VoiceGreeting(
-            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score");
+            new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
+            Path.Combine(host.FilesDir!.AbsolutePath, "voice-lines.json"));
         library.Changed += Invalidate;
     }
 

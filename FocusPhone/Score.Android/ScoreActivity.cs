@@ -117,7 +117,8 @@ public class ScoreActivity : Activity
         // device-owner check a day and does nothing else.
         ScoreUpdateService.Schedule(this);
 
-        greeting = new Codex.Ui.Voice.VoiceGreeting(musicTokens.GetAccessToken, "Score");
+        greeting = new Codex.Ui.Voice.VoiceGreeting(
+            musicTokens.GetAccessToken, "Score", Path.Combine(FilesDir!.AbsolutePath, "voice-lines.json"));
         rescanOutcomeStore = new RescanOutcomeStore(this);
         SetContentView(BuildLayout());
         playback.Connect();

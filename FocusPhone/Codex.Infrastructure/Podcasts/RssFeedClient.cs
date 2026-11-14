@@ -6,6 +6,9 @@ namespace Codex.Infrastructure.Podcasts;
 
 public record PodcastFeed(string Title, IReadOnlyList<Episode> Episodes);
 
+/// <summary>A conditional fetch: the feed when it changed (null when the server said it had not), and what to send next time.</summary>
+public sealed record FeedFetch(PodcastFeed? Feed, FeedState State);
+
 /// <summary>
 /// Fetches and parses a podcast feed into Domain episodes. Handles RSS 2.0 and
 /// Atom, and looks for the audio in every place feeds actually put it — a bare
@@ -34,12 +37,42 @@ public class RssFeedClient
         this.http = http;
     }
 
-    public async Task<PodcastFeed> FetchAsync(Uri feedUrl)
+    public async Task<PodcastFeed> FetchAsync(Uri feedUrl) =>
+        (await FetchAsync(feedUrl, previous: null, DateTimeOffset.UtcNow)).Feed!;
+
+    /// <summary>
+    /// Asks whether the feed changed since <paramref name="previous"/> (If-None-Match / If-Modified-Since) and
+    /// downloads it only when it did (efficiency audit §9). A 304 comes back with no feed and the old validators.
+    /// </summary>
+    public async Task<FeedFetch> FetchAsync(Uri feedUrl, FeedState? previous, DateTimeOffset now)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, feedUrl);
         request.Headers.UserAgent.ParseAdd(UserAgent);
+        if (previous?.ETag is { Length: > 0 } etag)
+        {
+            request.Headers.TryAddWithoutValidation("If-None-Match", etag);
+        }
+        if (previous?.LastModified is { Length: > 0 } modified)
+        {
+            request.Headers.TryAddWithoutValidation("If-Modified-Since", modified);
+        }
 
-        var response = await http.SendAsync(request);
+        using var response = await http.SendAsync(request);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotModified && previous is not null)
+        {
+            return new FeedFetch(null, previous with { FetchedAtUtc = now });
+        }
+
+        var state = new FeedState(
+            response.Headers.ETag?.ToString(),
+            response.Content.Headers.LastModified?.ToString("R", System.Globalization.CultureInfo.InvariantCulture)
+                ?? (response.Headers.TryGetValues("Last-Modified", out var values) ? values.FirstOrDefault() : null),
+            now);
+        return new FeedFetch(await ParseAsync(feedUrl, response), state);
+    }
+
+    private async Task<PodcastFeed> ParseAsync(Uri feedUrl, HttpResponseMessage response)
+    {
         if (!response.IsSuccessStatusCode)
         {
             throw new HttpRequestException(

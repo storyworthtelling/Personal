@@ -883,12 +883,13 @@ public class ReviewProcessorTests : IDisposable
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
 
+        // Streamed from the file (efficiency audit §18): a long report was held whole in memory, twice over.
         // Delivery rides the proven root path Foreword uses (the "Canonizer" folder path relied on a
         // reMarkable wire format never verified against the live cloud, and silently delivered nothing).
         // Named through the same function the Drive upload uses, so the two targets cannot come to
         // different names for one document — which is what a hand-written "Analysis" here let happen.
         remarkable.Verify(
-            r => r.Upload(DeliveredDocument.Name("Quest", 1), It.IsAny<byte[]>(), null, It.IsAny<CancellationToken>()), Times.Once);
+            r => r.Upload(DeliveredDocument.Name("Quest", 1), It.IsAny<Stream>(), It.IsAny<long>(), null, It.IsAny<CancellationToken>()), Times.Once);
         remarkable.Verify(r => r.EnsureFolder(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
         using var context = database.NewContext();
@@ -903,14 +904,14 @@ public class ReviewProcessorTests : IDisposable
         SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = false }, remarkable.Object));
 
-        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task Review_StillCompletes_WhenRemarkableDeliveryKeepsFailing()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("reMarkable is down"));
 
         var id = SeedManuscript();
@@ -940,7 +941,7 @@ public class ReviewProcessorTests : IDisposable
     public async Task AnUploadThatRunsOutOfMemoryIsNotRepeated()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new RemarkableRefusedException(RemarkableRefusal.OutOfMemory, 5_000_000, new Exception(
                 "Failed to allocate a 8208 byte allocation with 203360 free bytes and 198KB until OOM, " +
                 "target footprint 268435456, growth limit 268435456")));
@@ -949,7 +950,7 @@ public class ReviewProcessorTests : IDisposable
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object, logger: logger));
 
-        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once());
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once());
         using var context = database.NewContext();
         Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
         var analysis = AnalysisOf(id);
@@ -968,7 +969,7 @@ public class ReviewProcessorTests : IDisposable
             new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object,
             store: new OversizedReports(new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })))));
 
-        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never());
+        remarkable.Verify(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never());
         var analysis = AnalysisOf(id);
         Assert.True(analysis.DeliveredToRemarkable);
         Assert.Contains("MB", analysis.RemarkableNote);
@@ -979,7 +980,7 @@ public class ReviewProcessorTests : IDisposable
     public async Task ADeliveryThatGaveUpLeavesANoteEvenAfterDriveSucceeds()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("reMarkable is down"));
 
         var id = SeedManuscript();
@@ -992,7 +993,7 @@ public class ReviewProcessorTests : IDisposable
     public async Task ASuccessfulDeliveryLeavesNoNote()
     {
         var remarkable = new Mock<IRemarkableClient>();
-        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<string?>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));

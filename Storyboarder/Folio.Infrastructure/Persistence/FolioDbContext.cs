@@ -20,6 +20,21 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
     public DbSet<Finding> Findings => Set<Finding>();
     public DbSet<PassRead> PassReads => Set<PassRead>();
 
+    // Every save moves FolioSaves, so the desk can tell whether anything changed without asking (efficiency §6).
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        var saved = base.SaveChanges(acceptAllChangesOnSuccess);
+        FolioSaves.Moved();
+        return saved;
+    }
+
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        var saved = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        FolioSaves.Moved();
+        return saved;
+    }
+
     // SQLite has no native DateTimeOffset, and the provider cannot translate comparisons on the
     // default TEXT mapping. Storing UTC ticks as integers makes the worker's "due units" time
     // comparisons translate to plain integer comparisons.

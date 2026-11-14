@@ -25,6 +25,12 @@ public interface IPaperDelivery
     Task DeliverToRemarkableRoot(string title, byte[] pdf, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The same delivery from a stream of known length — a file on disk — so a long report is sent from where it lies
+    /// rather than held whole in memory (efficiency audit §18).
+    /// </summary>
+    Task DeliverToRemarkableRoot(string title, Stream pdf, long length, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Delivers the PDF into the named folder at the tablet's root, creating the folder when absent. The folder
     /// wire format is reconstructed, not yet seen working on a live account; the root path is the proven one.
     /// </summary>
@@ -58,6 +64,9 @@ public sealed class PaperDelivery : IPaperDelivery
 
     public Task DeliverToRemarkableRoot(string title, byte[] pdf, CancellationToken cancellationToken = default) =>
         Require(remarkable).Upload(title, pdf, null, cancellationToken);
+
+    public Task DeliverToRemarkableRoot(string title, Stream pdf, long length, CancellationToken cancellationToken = default) =>
+        Require(remarkable).Upload(title, pdf, length, null, cancellationToken);
 
     public async Task DeliverToRemarkableFolder(
         string folderName, string title, byte[] pdf, CancellationToken cancellationToken = default)

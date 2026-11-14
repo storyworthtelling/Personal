@@ -61,6 +61,8 @@ public sealed class FileSystemImageStore : IImageStore
 
     public byte[] Read(string absolutePath) => File.ReadAllBytes(absolutePath);
 
+    public Stream OpenRead(string absolutePath) => File.OpenRead(absolutePath);
+
     public bool Exists(string absolutePath) => File.Exists(absolutePath);
 
     public void Delete(string relativePath)

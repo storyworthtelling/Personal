@@ -144,11 +144,44 @@ public static class UpdateService
             return UpdateRunResult.Ran([]);
         }
 
+        // Each APK's sidecar names its package and version, so an APK this phone already has is not downloaded at
+        // all (efficiency audit §13). One with no readable sidecar is downloaded and read as before.
+        var described = new Dictionary<long, InstallCandidate>();
+        foreach (var asset in pending)
+        {
+            try
+            {
+                if (await client.ReadSidecarAsync(release, asset) is { } candidate)
+                {
+                    described[asset.Id] = candidate;
+                }
+            }
+            catch (HttpRequestException e)
+            {
+                HeadLog.Info(Tag, $"The sidecar for {asset.Name} did not read ({e.GetType().Name}); downloading the APK to read it.");
+            }
+        }
+        var wanted = UpdateScope
+            .Decide(UpdateRole.Custodian, PolicyContext.LauncherPackage,
+                described.Values, InstalledVersionCodes(context, described.Values.Select(c => c.Package)))
+            .Select(c => c.Package)
+            .ToHashSet();
+
         // Download each pending APK to the cache and read its package + version.
         var downloaded = new List<(ReleaseAsset Asset, string Path, InstallCandidate Candidate)>();
         var results = new List<AppInstallResult>();
         foreach (var asset in pending)
         {
+            if (described.TryGetValue(asset.Id, out var known) && !wanted.Contains(known.Package))
+            {
+                results.Add(new AppInstallResult(known.Package, known.VersionCode, InstallOutcome.AlreadyCurrent));
+                if (InstallOutcomes.ShouldMarkProcessed(InstallOutcome.AlreadyCurrent))
+                {
+                    processed.Add(asset.Id);
+                }
+                continue;
+            }
+
             var path = System.IO.Path.Combine(context.CacheDir!.AbsolutePath!, $"update-{asset.Id}.apk");
             try
             {

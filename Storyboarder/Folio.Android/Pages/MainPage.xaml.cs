@@ -1,3 +1,4 @@
+using Folio.Infrastructure.Persistence;
 using Storyworthtelling.Folds;
 using Folio.Domain.Diagnostics;
 using Storyworthtelling.Maui.Diagnostics;
@@ -61,9 +62,17 @@ public partial class MainPage : FolioBinderPage
 
         _ = RefreshAsync();
 
+        // The tick is cheap now (efficiency audit §6): the desk is rebuilt only when something was saved since the
+        // last rebuild, or once a minute so its relative times move on.
         refreshTimer = Dispatcher.CreateTimer();
         refreshTimer.Interval = TimeSpan.FromSeconds(5);
-        refreshTimer.Tick += async (_, _) => await RefreshAsync();
+        refreshTimer.Tick += async (_, _) =>
+        {
+            if (FolioSaves.Count != refreshedAtSave || DateTimeOffset.Now - refreshedAt >= TimeSpan.FromMinutes(1))
+            {
+                await RefreshAsync();
+            }
+        };
         refreshTimer.Start();
     }
 
@@ -74,8 +83,13 @@ public partial class MainPage : FolioBinderPage
         refreshTimer = null;
     }
 
+    private long refreshedAtSave = -1;
+    private DateTimeOffset refreshedAt = DateTimeOffset.MinValue;
+
     private async Task RefreshAsync()
     {
+        refreshedAtSave = FolioSaves.Count;
+        refreshedAt = DateTimeOffset.Now;
         try
         {
             IReadOnlyList<NovelStatus> list;
@@ -136,9 +150,11 @@ public partial class MainPage : FolioBinderPage
             if (list.Count == 0)
             {
                 var line = SettingsStore.EmptyDeskLine;
-                var today = DateOnly.FromDateTime(DateTime.Now);
-                if (EmptyDeskLinePlan.NeedsComposing(line, SettingsStore.EmptyDeskLineDay, today))
+                var now = DateTimeOffset.Now;
+                var today = DateOnly.FromDateTime(now.LocalDateTime);
+                if (EmptyDeskLinePlan.NeedsComposing(line, SettingsStore.EmptyDeskLineDay, SettingsStore.EmptyDeskLineAskedAt, now))
                 {
+                    SettingsStore.EmptyDeskLineAskedAt = now;
                     var messenger = scope.ServiceProvider.GetRequiredService<VoicedMessenger>();
                     var composed = await messenger.ComposeAsync(
                         new MessageRequest(VoicedOccasions.EmptyDesk, "no manuscripts yet", HighVisibility: true),

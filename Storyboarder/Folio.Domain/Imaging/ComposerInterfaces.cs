@@ -9,6 +9,9 @@ public interface IImageStore
     // Writes bytes at a path relative to the configured output root and returns the absolute path.
     string Save(string relativePath, byte[] content);
     byte[] Read(string absolutePath);
+
+    // The stored file to read as it goes, for an upload that should not hold it whole (efficiency audit §18).
+    Stream OpenRead(string absolutePath) => new MemoryStream(Read(absolutePath), writable: false);
     bool Exists(string absolutePath);
 
     // How big a stored file is, without reading it. Lets a caller refuse a file that would not fit in

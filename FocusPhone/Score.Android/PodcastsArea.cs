@@ -38,6 +38,9 @@ public sealed class PodcastsArea : ScoreArea
     private SubscriptionList subscriptions = new();
     private List<Episode> episodes = [];
     private Dictionary<string, string> feedTitles = [];
+
+    // Each feed's validators and when it was last asked (efficiency audit §9).
+    private Dictionary<string, FeedState> feedStates = [];
     private IReadOnlySet<string> doneIds = new HashSet<string>();
 
     private Episode? nowPlaying;
@@ -922,10 +925,11 @@ public sealed class PodcastsArea : ScoreArea
         var cache = episodeCache.Load();
         episodes = [.. cache.Episodes];
         feedTitles = new Dictionary<string, string>(cache.FeedTitles);
+        feedStates = new Dictionary<string, FeedState>(cache.FeedStates);
         RecomputeDoneAndRebuild();
     }
 
-    private sealed record FeedFetchResult(PodcastSubscription Subscription, PodcastFeed? Feed, string? FailedHost);
+    private sealed record FeedFetchResult(PodcastSubscription Subscription, PodcastFeed? Feed, string? FailedHost, FeedState? State = null);
 
     private async Task RefreshFeedsAsync()
     {
@@ -943,7 +947,11 @@ public sealed class PodcastsArea : ScoreArea
             var http = HeadHttp.Shared;
             var client = new RssFeedClient(http);
             // Fetch every feed concurrently — wall time is now the slowest feed, not the sum of all.
-            results = await Task.WhenAll(ordered.Select(subscription => FetchFeedAsync(client, subscription)));
+            // A feed asked within the hour keeps what it has; the rest are asked whether they changed (efficiency §9).
+            var now = DateTimeOffset.UtcNow;
+            var states = feedStates;
+            results = await Task.WhenAll(ordered.Select(subscription =>
+                FetchFeedAsync(client, subscription, states.GetValueOrDefault(subscription.FeedUrl), now)));
         }
         finally
         {
@@ -964,8 +972,13 @@ public sealed class PodcastsArea : ScoreArea
             .ToDictionary(pair => pair.Key, pair => pair.Value);
 
         var failedHosts = new List<string>();
+        var nextStates = feedStates.Where(pair => subscribed.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
         foreach (var result in results)
         {
+            if (result.State is { } state)
+            {
+                nextStates[result.Subscription.FeedUrl] = state;
+            }
             if (result.Feed is { } feed)
             {
                 byFeed[result.Subscription.FeedUrl] = feed.Episodes;
@@ -981,7 +994,8 @@ public sealed class PodcastsArea : ScoreArea
         subscriptionStore.Save(subscriptions.Export());
         episodes = [.. byFeed.Values.SelectMany(feedEpisodes => feedEpisodes)];
         feedTitles = titles;
-        episodeCache.Save(episodes, titles); // persist for the next cold launch
+        feedStates = nextStates;
+        episodeCache.Save(episodes, titles, nextStates); // persist for the next cold launch
 
         // Failure may speak (DESIGN.md §7), but not once per feed: summarize when several fail.
         if (failedHosts.Count == 1)
@@ -1034,12 +1048,18 @@ public sealed class PodcastsArea : ScoreArea
     // (UriFormatException) all come back as a failed host. On Android a DNS failure surfaces as a
     // WebException (AndroidMessageHandler), not an HttpRequestException, and a dropped body read as an
     // IOException — missing either let one offline feed fault the whole refresh as an unobserved task.
-    private static async Task<FeedFetchResult> FetchFeedAsync(RssFeedClient client, PodcastSubscription subscription)
+    private static async Task<FeedFetchResult> FetchFeedAsync(RssFeedClient client, PodcastSubscription subscription, FeedState? state, DateTimeOffset now)
     {
+        if (!FeedRefresh.Due(state, now))
+        {
+            return new FeedFetchResult(subscription, null, null, state);
+        }
+
         try
         {
-            var feed = await client.FetchAsync(new Uri(subscription.FeedUrl));
-            return new FeedFetchResult(subscription, feed, null);
+            // A 304 brings no feed: the cached episodes stand and only the time moves on.
+            var fetched = await client.FetchAsync(new Uri(subscription.FeedUrl), state, now);
+            return new FeedFetchResult(subscription, fetched.Feed, null, fetched.State);
         }
         catch (Exception e) when (
             e is HttpRequestException or System.Net.WebException or System.IO.IOException or InvalidDataException
