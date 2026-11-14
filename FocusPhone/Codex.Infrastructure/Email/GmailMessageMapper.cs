@@ -74,8 +74,13 @@ public class GmailMessageMapper
                 Id: string.IsNullOrEmpty(part.ContentId) ? $"att{index}" : part.ContentId,
                 FileName: part.FileName,
                 MimeType: part.ContentType.MimeType,
-                SizeBytes: MeasureContent(part)))
+                SizeBytes: ReportedSize(part) ?? MeasureContent(part)))
             .ToList();
+
+    // An attachment fetched without its bytes carries Gmail's own size (GmailFullMessage.SizeHeader).
+    private static long? ReportedSize(MimePart part) =>
+        long.TryParse(part.Headers[GmailFullMessage.SizeHeader], System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var size) ? size : null;
 
     // The decoded length, which is what a size is worth knowing for. Measured rather than
     // materialized: a count is wanted, not the bytes.

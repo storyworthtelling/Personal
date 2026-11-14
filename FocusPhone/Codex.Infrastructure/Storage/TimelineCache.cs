@@ -216,9 +216,17 @@ public class TimelineCache
     /// represented. Assumes UTC timestamps, matching the cache's writers.
     /// </summary>
     public void ReconcileWindow(
-        TimelineItemKind kind, DateTimeOffset since, IReadOnlyCollection<TimelineItem> authoritative)
+        TimelineItemKind kind, DateTimeOffset since, IReadOnlyCollection<TimelineItem> authoritative) =>
+        ReconcileWindow(kind, since, authoritative, authoritative.Select(item => item.SourceId).ToList());
+
+    /// <summary>
+    /// The same mirror when only what was new was fetched (efficiency audit §2): <paramref name="fresh"/> is
+    /// upserted, and everything in the window whose source id is not in <paramref name="present"/> is removed.
+    /// </summary>
+    public void ReconcileWindow(
+        TimelineItemKind kind, DateTimeOffset since, IReadOnlyCollection<TimelineItem> fresh, IReadOnlyCollection<string> present)
     {
-        Upsert(authoritative);
+        Upsert(fresh);
 
         var sinceText = since.ToUniversalTime().ToString("O");
         using var transaction = connection.BeginTransaction();
@@ -245,9 +253,9 @@ public class TimelineCache
             var parameter = insert.CreateParameter();
             parameter.ParameterName = "$sourceId";
             insert.Parameters.Add(parameter);
-            foreach (var item in authoritative)
+            foreach (var sourceId in present)
             {
-                parameter.Value = item.SourceId;
+                parameter.Value = sourceId;
                 insert.ExecuteNonQuery();
             }
         }

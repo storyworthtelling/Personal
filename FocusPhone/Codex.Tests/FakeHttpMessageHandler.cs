@@ -39,25 +39,28 @@ public class FakeHttpMessageHandler : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        Requests.Add(request);
-        RequestBodies.Add(request.Content is null
-            ? null
-            : await request.Content.ReadAsStringAsync(cancellationToken));
-
+        var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
         var url = request.RequestUri!.AbsoluteUri;
 
-        if (sequences.TryGetValue(url, out var queue) && queue.Count > 0)
+        // Locked: a client may send several requests at once.
+        lock (responses)
         {
-            return queue.Dequeue()();
-        }
+            Requests.Add(request);
+            RequestBodies.Add(body);
 
-        if (!responses.TryGetValue(url, out var factory))
-        {
-            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+            if (sequences.TryGetValue(url, out var queue) && queue.Count > 0)
             {
-                Content = new StringContent($"No canned response for {url}"),
-            };
+                return queue.Dequeue()();
+            }
+
+            if (!responses.TryGetValue(url, out var factory))
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent($"No canned response for {url}"),
+                };
+            }
+            return factory();
         }
-        return factory();
     }
 }

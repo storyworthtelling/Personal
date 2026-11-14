@@ -32,8 +32,7 @@ public class GmailApiClientTests
         var handler = new FakeHttpMessageHandler();
         handler.Respond($"{Base}/messages?q=%28in%3Ainbox%20OR%20in%3Asent%29%20after%3A1756461600&maxResults=200",
             """{"messages":[{"id":"g1"}]}""");
-        handler.Respond($"{Base}/messages/g1?format=raw",
-            $$"""{"id":"g1","raw":"{{Base64Url(RawMessage("her@example.com", "owner@example.com", "Dinner", "Seven?"))}}"}""");
+        handler.Respond($"{Base}/messages/g1?format=full", GmailPayloads.Plain("g1", "her@example.com", "owner@example.com", "Dinner", "Seven?"));
 
         var items = await Client(handler).FetchRecentAsync(DateTimeOffset.FromUnixTimeSeconds(1756461600));
 
@@ -121,8 +120,7 @@ public class GmailApiClientTests
     {
         var handler = new FakeHttpMessageHandler();
         handler.Respond($"{Base}/messages?q=plumber&maxResults=50", """{"messages":[{"id":"g4"}]}""");
-        handler.Respond($"{Base}/messages/g4?format=raw",
-            $$"""{"id":"g4","raw":"{{Base64Url(RawMessage("plumber@example.com", "owner@example.com", "Quote", "Attached"))}}"}""");
+        handler.Respond($"{Base}/messages/g4?format=full", GmailPayloads.Plain("g4", "plumber@example.com", "owner@example.com", "Quote", "Attached"));
 
         var results = await Client(handler).SearchAsync("plumber");
 
@@ -166,7 +164,9 @@ public class GmailApiClientTests
 
         var handler = new FakeHttpMessageHandler();
         handler.Respond($"{Base}/messages?q=plumber&maxResults=50", """{"messages":[{"id":"g9"}]}""");
-        handler.Respond($"{Base}/messages/g9?format=raw", $$"""{"id":"g9","raw":"{{Base64Url(html)}}"}""");
+        handler.Respond($"{Base}/messages/g9?format=full", GmailPayloads.Plain(
+            "g9", "her@example.com", "owner@example.com", "Dinner", "<html><body><p>Seven &amp; a half?</p></body></html>",
+            "<m9@example.com>", "text/html; charset=utf-8"));
 
         var item = Assert.Single(await Client(handler).SearchAsync("plumber"));
 
