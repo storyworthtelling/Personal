@@ -5,10 +5,10 @@ namespace Constitution.Domain.Recipes.Screens;
 /// <summary>The ways a recipe can come into the box (book p.14, C-6.5.4).</summary>
 public enum PickerSource
 {
-    /// <summary>The owner's phone: Plate's recipe read, as many pages as it takes.</summary>
+    /// <summary>The owner's phone: Plate's camera, one photo per page, read by Claude.</summary>
     Plate,
 
-    /// <summary>The partner's phone: one photo per page, read on the phone.</summary>
+    /// <summary>The partner's phone: its own camera, one photo per page, read by Claude.</summary>
     Camera,
 
     /// <summary>Waiting on written permission (PC8); a row only when it is allowed.</summary>
@@ -27,11 +27,11 @@ public sealed record PickerChoice(PickerSource? Started, string? Sentence);
 /// <summary>The picker's words, written once.</summary>
 public static class RecipePickerText
 {
-    public const string PlateSubtitle = "Opens Plate · as many pages as it takes";
+    public const string PlateSubtitle = "Opens Plate · one photo per page";
 
     public const string CameraSubtitle = "One photo per page";
 
-    public const string CannotReadSubtitle = "This phone can’t read a card yet, so type it in instead.";
+    public const string CannotReadSubtitle = "This phone has no camera, so type the card in instead.";
 
     public const string PasteTitle = "Paste an NYT Cooking link";
 
@@ -44,8 +44,8 @@ public static class RecipePickerText
 
 /// <summary>
 /// The inline picker that grows up out of the pinned bar (book p.14, section 7: in place, no dialog). Which rows a phone is offered
-/// is decided here and nowhere else: the owner's phone scans through Plate, the partner's through its own camera when the phone can
-/// read a photograph and otherwise says so, the paste row only with written permission (PC8, D82), and typing always. A phone whose
+/// is decided here and nowhere else: the owner's phone photographs through Plate, the partner's through its own camera when the phone
+/// has one and otherwise says so, the paste row only with written permission (PC8, D82), and typing always. A phone whose
 /// role is not yet known is offered Plate, which answers or says it is absent. Pure; the head only paints the rows.
 /// </summary>
 public sealed class RecipePickerModel
@@ -62,7 +62,7 @@ public sealed class RecipePickerModel
     public bool IsOpen { get; private set; }
 
     /// <param name="role">Whose phone this is.</param>
-    /// <param name="cameraCanRead">Whether this phone can turn a photographed page into words on the phone.</param>
+    /// <param name="cameraCanRead">Whether this phone has a camera to photograph a page with.</param>
     /// <param name="pasteAllowed">Whether the NYT spike found written permission to read a pasted link. Not so today.</param>
     public static RecipePickerModel For(InstallRole role, bool cameraCanRead, bool pasteAllowed)
     {

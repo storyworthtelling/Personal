@@ -139,8 +139,8 @@ public class CameraCaptureTests
         var sentence = CameraAccess.AskingSentence;
 
         Assert.Contains("camera", sentence, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("on this phone", sentence, StringComparison.Ordinal);
-        Assert.Contains("deleted", sentence, StringComparison.Ordinal);
+        Assert.Contains("recipe", sentence, StringComparison.Ordinal);
+        Assert.Contains("not kept", sentence, StringComparison.Ordinal);
     }
 
     [Fact]

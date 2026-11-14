@@ -55,7 +55,7 @@ public class TypedEntryTests
     [Fact]
     public void TooLongAListNamesTheFieldNotTheWords()
     {
-        var lines = string.Join('\n', Enumerable.Range(0, RecipeReadContract.MaxLines + 1).Select(n => "line " + n));
+        var lines = string.Join('\n', Enumerable.Range(0, RecipeWords.MaxLines + 1).Select(n => "line " + n));
         var typed = new TypedEntry { Title = "Pear porridge", IngredientsText = lines }.Read();
 
         Assert.Null(typed.Payload);

@@ -7,9 +7,10 @@ namespace Constitution.Domain.Recipes.Screens;
 public sealed record TypedEntryRead(RecipeReadPayload? Payload, string? Sentence);
 
 /// <summary>
-/// A card typed in by hand (C-6.5.4): a title, ingredients one to a line and steps one to a line. It is the third way into the same
-/// check-and-keep step a scan uses, so its words are shaped into a <see cref="RecipeReadPayload"/> by the scan contract's own
-/// parse (the same bounds, the same refusals) rather than by a second set of rules. The view writes the three texts; this keeps them.
+/// The three boxes a card is made in (C-6.5.4, D176): a title, ingredients one to a line and steps one to a line. A card typed by
+/// hand starts them empty; a scanned card starts them filled with what was read off its photographs (<see cref="Fill"/>), and the
+/// owner edits either before keeping it. The words are shaped into a <see cref="RecipeReadPayload"/> by <see cref="RecipeWords.Parse"/>
+/// (the same bounds, the same refusals) rather than by a second set of rules. The view writes the three texts; this keeps them.
 /// </summary>
 public sealed class TypedEntry
 {
@@ -17,13 +18,17 @@ public sealed class TypedEntry
 
     public const string Heading = "Type the card in.";
 
+    public const string ReadHeading = "Check what was read.";
+
+    public const string ReadNote = "Edit anything that is wrong. The photos are not kept, only these words.";
+
     public const string TitleLabel = "Title";
 
     public const string IngredientsLabel = "Ingredients, one to a line";
 
     public const string StepsLabel = "Steps, one to a line";
 
-    public const string CheckAction = "Check the card";
+    public const string KeepAction = "Keep the card";
 
     public const string LetGoAction = "Let go";
 
@@ -33,6 +38,15 @@ public sealed class TypedEntry
 
     public string StepsText { get; set; } = string.Empty;
 
+    /// <summary>Whether the boxes were filled from photographs rather than typed from nothing.</summary>
+    public bool FromPhotos { get; private set; }
+
+    /// <summary>The page's heading: checking what was read, or typing it in.</summary>
+    public string PageHeading => FromPhotos ? ReadHeading : Heading;
+
+    /// <summary>Where the card is kept from: a read of photographs is a scanned card, anything else a typed one.</summary>
+    public ScanOrigin Origin => FromPhotos ? ScanOrigin.Scanned : ScanOrigin.Typed;
+
     /// <summary>Whether nothing at all has been typed.</summary>
     public bool IsEmpty =>
         string.IsNullOrWhiteSpace(Title) && string.IsNullOrWhiteSpace(IngredientsText) && string.IsNullOrWhiteSpace(StepsText);
@@ -40,7 +54,7 @@ public sealed class TypedEntry
     /// <summary>Shapes the fields into words. A refusal names the list that was refused and never quotes a word.</summary>
     public TypedEntryRead Read()
     {
-        var parsed = RecipeReadContract.Parse(Title, Json(IngredientsText), Json(StepsText));
+        var parsed = RecipeWords.Parse(Title, Json(IngredientsText), Json(StepsText));
         if (parsed.Payload is { } payload)
         {
             return new TypedEntryRead(payload, null);
@@ -55,15 +69,36 @@ public sealed class TypedEntry
         return new TypedEntryRead(null, sentence);
     }
 
-    /// <summary>Empties the fields. Used only by the undo and by a card that has gone on to be checked.</summary>
+    /// <summary>Fills the boxes with what was read off the photographs, one ingredient and one step to a line, for the owner to edit.</summary>
+    public void Fill(RecipeReadPayload payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        Title = payload.Title;
+        IngredientsText = string.Join("\n", payload.Ingredients);
+        StepsText = string.Join("\n", payload.Steps);
+        FromPhotos = true;
+    }
+
+    /// <summary>Puts back the words an undo held, and where they came from.</summary>
+    public void Restore(TypedEntry words)
+    {
+        ArgumentNullException.ThrowIfNull(words);
+        Title = words.Title;
+        IngredientsText = words.IngredientsText;
+        StepsText = words.StepsText;
+        FromPhotos = words.FromPhotos;
+    }
+
+    /// <summary>Empties the fields. Used only by the undo and by a card that has gone on to be kept.</summary>
     public void Clear()
     {
         Title = string.Empty;
         IngredientsText = string.Empty;
         StepsText = string.Empty;
+        FromPhotos = false;
     }
 
-    internal TypedEntry Copy() => new() { Title = Title, IngredientsText = IngredientsText, StepsText = StepsText };
+    internal TypedEntry Copy() => new() { Title = Title, IngredientsText = IngredientsText, StepsText = StepsText, FromPhotos = FromPhotos };
 
     private static string Json(string text) =>
         JsonSerializer.Serialize(text.Split('\n').Select(line => line.Trim()).Where(line => line.Length > 0).ToList());

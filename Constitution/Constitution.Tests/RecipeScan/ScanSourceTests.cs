@@ -3,10 +3,9 @@ using System.Text.RegularExpressions;
 namespace Constitution.Tests.RecipeScan;
 
 /// <summary>
-/// The scan's head files are compile-checked, not run, so what can be said about them is said by reading the source: the errand
-/// aims at Plate by name and carries nothing, no picture type is touched, no toast or dialog, no literal colour or size, the
-/// actions live in the pinned bar and every decision comes from the models. Nothing here says the page looks like book page 14;
-/// the owner has not compared them.
+/// The scan's head files are compile-checked, not run, so what can be said about them is said by reading the source: the three
+/// boxes touch no picture type, no toast or dialog, no literal colour or size, the actions live in the
+/// pinned bar and every decision comes from the models. The photographs themselves are the camera files' (CameraSourceTests).
 /// </summary>
 public class ScanSourceTests
 {
@@ -18,8 +17,8 @@ public class ScanSourceTests
             .Where(file =>
             {
                 var relative = ConstitutionSource.Relative(file);
-                return (relative.StartsWith("Constitution.Android/MealsTab/Scan", StringComparison.Ordinal))
-                    || relative == "Constitution.Android/ContractPermissions.cs";
+                // The reader's wiring hands the key to its one request header, so it is held by CameraSourceTests instead.
+                return relative is "Constitution.Android/MealsTab/PickerTypedPage.cs" or "Constitution.Android/ContractPermissions.cs";
             })
             .ToList();
 
@@ -46,9 +45,7 @@ public class ScanSourceTests
     {
         var names = Files().Select(ConstitutionSource.Relative).ToList();
 
-        Assert.Contains("Constitution.Android/MealsTab/ScanRecipeLauncher.cs", names);
-        Assert.Contains("Constitution.Android/MealsTab/ScanReadPage.cs", names);
-        Assert.Contains("Constitution.Android/ContractPermissions.cs", names);
+        Assert.Equal(2, names.Count);
     }
 
     [Fact]
@@ -81,7 +78,7 @@ public class ScanSourceTests
     {
         var offenders = Files().Where(file => Pictures.IsMatch(File.ReadAllText(file))).Select(ConstitutionSource.Relative).ToList();
 
-        Assert.True(offenders.Count == 0, "A picture, stream, URI or extra put on the errand:\n" + string.Join("\n", offenders));
+        Assert.True(offenders.Count == 0, "A picture, stream, URI or extra in the boxes:\n" + string.Join("\n", offenders));
         Assert.Matches(Pictures, "intent.PutExtra(\"image\", bytes);");
     }
 
@@ -92,29 +89,13 @@ public class ScanSourceTests
     }
 
     [Fact]
-    public void TheErrandNamesPlatesComponentAndWaitsForTheAnswer()
+    public void NothingStartsPlatesOldRecipeRead()
     {
-        var launcher = Read("Constitution.Android/MealsTab/ScanRecipeLauncher.cs");
+        var area = Read("Constitution.Android/MealsArea.cs");
 
-        Assert.Contains("ScanRequest.Action", launcher, StringComparison.Ordinal);
-        Assert.Contains("SetClassName(ScanRequest.Package, ScanRequest.Component)", launcher, StringComparison.Ordinal);
-        Assert.Contains("StartActivityForResult", launcher, StringComparison.Ordinal);
-        Assert.Contains("ActivityNotFoundException", launcher, StringComparison.Ordinal);
-        Assert.Contains("SecurityException", launcher, StringComparison.Ordinal);
-        Assert.DoesNotContain("CreateChooser", launcher, StringComparison.Ordinal);
-        Assert.DoesNotContain("SetPackage", launcher, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void TheAnswerIsReadThroughTheContractNotByHand()
-    {
-        var launcher = Read("Constitution.Android/MealsTab/ScanRecipeLauncher.cs");
-
-        Assert.Contains("ScanReturns.Decide", launcher, StringComparison.Ordinal);
-        Assert.Contains("RecipeReadContract.TitleExtra", launcher, StringComparison.Ordinal);
-        Assert.Contains("RecipeReadContract.IngredientsExtra", launcher, StringComparison.Ordinal);
-        Assert.Contains("RecipeReadContract.StepsExtra", launcher, StringComparison.Ordinal);
-        Assert.Contains("GetStringExtra", launcher, StringComparison.Ordinal);
+        Assert.DoesNotContain("READ_RECIPE", All() + area, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetClassName(", area, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetStringExtra", area, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -123,10 +104,10 @@ public class ScanSourceTests
         var area = Read("Constitution.Android/MealsArea.cs");
 
         Assert.Contains("PaperUi.BottomBar", area, StringComparison.Ordinal);
-        Assert.Contains("scan.KeepAction", area, StringComparison.Ordinal);
-        Assert.Contains("scan.ScanAgainAction", area, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"Looks right\"", All() + area, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"Scan again\"", All() + area, StringComparison.Ordinal);
+        Assert.Contains("TypedEntry.KeepAction", area, StringComparison.Ordinal);
+        Assert.Contains("TypedEntry.LetGoAction", area, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Keep the card\"", All() + area, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Let go\"", All() + area, StringComparison.Ordinal);
         Assert.Contains("PrimaryActionRequested", area, StringComparison.Ordinal);
         Assert.Contains("RecipeBoxText.ScanAction", area, StringComparison.Ordinal);
     }
@@ -145,26 +126,25 @@ public class ScanSourceTests
     }
 
     [Fact]
-    public void AReplacedDraftIsLetGoUndoFirst()
+    public void LettingGoOfTheBoxesIsUndoFirst()
     {
         var area = Read("Constitution.Android/MealsArea.cs");
 
-        Assert.Contains("ScanDiscardUndo", area, StringComparison.Ordinal);
+        Assert.Contains("TypedEntryUndo", area, StringComparison.Ordinal);
         Assert.Contains("ConnectionNoticeBoard.With", area, StringComparison.Ordinal);
-        Assert.Contains("scanUndo.Reverse(", area, StringComparison.Ordinal);
+        Assert.Contains("typedUndo.Reverse(", area, StringComparison.Ordinal);
+        Assert.Contains("typed.Restore(words)", area, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ThePageIsDrawnFromTheModelAndNeverTheWordsOfOne()
+    public void TheBoxesAreDrawnFromTheEntry()
     {
-        var page = Read("Constitution.Android/MealsTab/ScanReadPage.cs");
+        var page = Read("Constitution.Android/MealsTab/PickerTypedPage.cs");
 
-        foreach (var member in new[] { "model.StatusSentence", "model.Label", "model.Lines", "model.Questions", "model.QuestionHeading", "IsOther" })
+        foreach (var member in new[] { "entry.PageHeading", "TypedEntry.ReadNote", "entry.FromPhotos", "TypedEntry.TitleLabel", "TypedEntry.IngredientsLabel", "TypedEntry.StepsLabel" })
         {
             Assert.Contains(member, page, StringComparison.Ordinal);
         }
-
-        Assert.Contains("PaperTheme.Wash(PaperTheme.CautionMark)", page, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -133,8 +133,8 @@ jobs:
           echo "=== END APP ID CHECK ==="
 
       # Fatal: a Release build only carries the permissions the head declares, and the missing
-      # INTERNET permission fails every network call silently. The partner's phone photographs a
-      # recipe card page in the app (D105), so CAMERA is the one runtime permission the scan adds; the
+      # INTERNET permission fails every network call silently. Both phones photograph a recipe's
+      # pages (D105, D176), so CAMERA is the one runtime permission the scan adds; the
       # camera features are declared not required so a phone without one still installs. Every other
       # uses-permission that is not a health read (the next step holds those exactly) fails the build,
       # so a stray storage, audio or location permission is caught here and not by the owner's phone.
@@ -156,8 +156,7 @@ jobs:
             android.permission.FOREGROUND_SERVICE \
             android.permission.POST_NOTIFICATIONS \
             com.storyworthtelling.constitution.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION \
-            com.storyworthtelling.constitution.RECEIVE_BUDGET \
-            com.storyworthtelling.focusphone.camera.READ_RECIPE | sort -u)
+            com.storyworthtelling.constitution.RECEIVE_BUDGET | sort -u)
           echo "$USES" | grep -qx "android.permission.INTERNET" || {
             echo "FAIL: Constitution's APK does not declare android.permission.INTERNET."
             exit 1

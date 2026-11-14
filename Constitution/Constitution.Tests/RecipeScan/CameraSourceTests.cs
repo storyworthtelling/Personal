@@ -6,16 +6,17 @@ using Constitution.Domain.Recipes.Screens;
 namespace Constitution.Tests.RecipeScan;
 
 /// <summary>
-/// The partner's camera (C-6.5.2, D105) is compile-checked, not run, so what can be said about it is said by reading the source:
+/// The recipe camera (C-6.5.2, D105, D176) is compile-checked, not run, so what can be said about it is said by reading the source:
 /// the one permission is CAMERA and sits in its own file, the capture goes to a FileProvider file under the app cache and nowhere
-/// public, the photograph is deleted on every path, nothing recognised or located reaches the trail, the permission is asked for at
-/// the tap after a sentence, and the picker row is live only through the reader. Nothing here has met a camera or ML Kit.
+/// public, the photograph is shrunk into memory and its file deleted on every path, the pages go only to the reader seam, nothing
+/// read or located reaches the trail, the permission is asked for at the tap after a sentence, and the picker row is live only where
+/// the phone has a camera. Nothing here has met a camera or Plate.
 /// </summary>
 public class CameraSourceTests
 {
     private const string PermissionFile = "Constitution.Android/RecipeCameraPermission.cs";
     private const string LauncherFile = "Constitution.Android/MealsTab/CameraCaptureLauncher.cs";
-    private const string ReaderFile = "Constitution.Android/MealsTab/AndroidRecipeTextReader.cs";
+    private const string ReaderFile = "Constitution.Android/Services/RecipeReaderServices.cs";
     private const string ProviderFile = "Constitution.Android/MealsTab/RecipeCaptureProvider.cs";
     private const string PathsFile = "Constitution.Android/Resources/xml/capture_paths.xml";
     private const string AreaFile = "Constitution.Android/MealsArea.cs";
@@ -31,7 +32,7 @@ public class CameraSourceTests
         ConstitutionSource.Files(".cs")
             .Where(file => ConstitutionSource.Relative(file).StartsWith("Constitution.Android/", StringComparison.Ordinal));
 
-    private static IEnumerable<string> CameraFiles() => [Read(LauncherFile), Read(ReaderFile), Read(ProviderFile)];
+    private static IEnumerable<string> CameraFiles() => [Read(LauncherFile), Read(ProviderFile)];
 
     [Fact]
     public void TheGuardReadsTheCameraFilesAndIsNotVacuous()
@@ -105,7 +106,7 @@ public class CameraSourceTests
         var area = Read(AreaFile);
         var denial = area[area.IndexOf("CameraAccess.DeniedSentence", StringComparison.Ordinal)..];
 
-        Assert.Contains("cameraLoop = null", denial[..Math.Min(denial.Length, 400)], StringComparison.Ordinal);
+        Assert.Contains("photoLoop = null", denial[..Math.Min(denial.Length, 400)], StringComparison.Ordinal);
         Assert.Contains("RecordCamera(CameraEvent.PermissionDenied", area, StringComparison.Ordinal);
     }
 
@@ -180,15 +181,15 @@ public class CameraSourceTests
     // ---- the photograph goes on every path ----
 
     [Fact]
-    public void TheReaderDeletesThroughTheFinallyOfTheSharedHelper()
+    public void ThePhotoFileIsDeletedInAFinallyOnceItIsInMemory()
     {
-        var reader = Read(ReaderFile);
-        var domain = File.ReadAllText(Path.Combine(ConstitutionSource.Root(), "Constitution.Domain", "Recipes", "Screens", "CameraCapture.cs"));
+        var area = Read(AreaFile);
+        var take = area[area.IndexOf("private void TakePhoto(", StringComparison.Ordinal)..];
+        take = take[..take.IndexOf("private void PhotoTaken(", StringComparison.Ordinal)];
 
-        Assert.Contains("CameraCaptureCache.ReadAndForgetAsync(", reader, StringComparison.Ordinal);
-        Assert.Matches(@"finally\s*\{[^}]*delete\(", domain);
-        Assert.DoesNotMatch(@"catch\s*(\([^)]*\))?\s*\{\s*\}", reader);
-        Assert.Matches(@"finally\s*\{[^}]*delete\(", "try { x(); } finally { delete(path); }");
+        Assert.Contains("AtePhotoScaler.Read(photo)", take, StringComparison.Ordinal);
+        Assert.Matches(@"finally\s*\{[^}]*CameraCaptureLauncher\.Delete\(photo\)", take);
+        Assert.Contains("CameraEvent.PhotoKept", take, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -206,14 +207,14 @@ public class CameraSourceTests
     {
         var area = Read(AreaFile);
         var handler = area[area.IndexOf("private void OnCameraResult(", StringComparison.Ordinal)..];
-        handler = handler[..handler.IndexOf("// Recognition is slow", StringComparison.Ordinal)];
+        handler = handler[..handler.IndexOf("// The photograph is shrunk", StringComparison.Ordinal)];
 
         Assert.Contains("OnCameraResult(resultCode)", area, StringComparison.Ordinal);
         Assert.Contains("CameraCaptureLauncher.RequestCode", area, StringComparison.Ordinal);
         Assert.Contains("capture.Discard()", handler, StringComparison.Ordinal);
-        Assert.Contains("ReadPhoto(capture.PhotoPath)", handler, StringComparison.Ordinal);
-        Assert.Contains("var reader = textReader;", area, StringComparison.Ordinal);
-        Assert.Contains("reader.ReadPhotoAsync(photo)", area, StringComparison.Ordinal);
+        Assert.Contains("TakePhoto(capture.PhotoPath)", handler, StringComparison.Ordinal);
+        Assert.Contains("var reader = photoReader;", area, StringComparison.Ordinal);
+        Assert.Contains("reader.ReadAsync(pages, ", area, StringComparison.Ordinal);
     }
 
     // ---- what the trail and the page may hold ----
@@ -234,22 +235,26 @@ public class CameraSourceTests
     }
 
     [Fact]
-    public void RecognisedTextIsNeverAMessageOrAPhrase()
+    public void WhatWasReadIsNeverAMessageOrAPath()
     {
-        var reader = Read(ReaderFile);
+        var area = Read(AreaFile);
 
-        Assert.DoesNotContain("$\"", reader, StringComparison.Ordinal);
-        Assert.DoesNotMatch(@"Message\b", reader);
-        Assert.DoesNotContain("AbsolutePath", Read(AreaFile), StringComparison.Ordinal);
+        Assert.DoesNotContain("AbsolutePath", area, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"\.Message\b", area);
     }
 
     [Fact]
-    public void ReadingNeedsNoNetwork()
+    public void TheCameraFilesNeedNoNetworkAndOnlyTheReaderSeamSendsThePages()
     {
         foreach (var source in CameraFiles())
         {
             Assert.DoesNotMatch(@"Http|WebRequest|Socket|Claude|Anthropic|UploadAsync", source);
         }
+
+        var area = Read(AreaFile);
+        Assert.DoesNotMatch(@"HttpClient|ClaudeMessagesClient|ClaudeRecipeReader", area);
+        Assert.Contains("RecipeReaderServices.ReaderOf(host)", area, StringComparison.Ordinal);
+        Assert.Contains("new ClaudeRecipeReader(", Read(ReaderFile), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -289,37 +294,47 @@ public class CameraSourceTests
     // ---- the picker and the loop ----
 
     [Fact]
-    public void ThePickerRowIsLiveOnlyThroughTheReader()
+    public void ThePickerRowIsLiveOnlyWhereThereIsACamera()
     {
         var area = Read(AreaFile);
 
-        Assert.Contains("cameraCanRead: textReader.CanRead", area, StringComparison.Ordinal);
+        Assert.Contains("cameraCanRead: HasCamera()", area, StringComparison.Ordinal);
         Assert.DoesNotContain("cameraCanRead: false", area, StringComparison.Ordinal);
-        Assert.Contains("HasSystemFeature(PackageManager.FeatureCameraAny)", Read(ReaderFile), StringComparison.Ordinal);
+        Assert.Contains("HasSystemFeature(PackageManager.FeatureCameraAny)", area, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TheLoopGivesOnePhotoPerPageAndForgetsOnDone()
+    public void TheOwnersPagesArePhotographedInPlate()
     {
         var area = Read(AreaFile);
 
-        Assert.Contains("new CameraLoop()", area, StringComparison.Ordinal);
-        Assert.Contains("cameraLoop.AddPage(", area, StringComparison.Ordinal);
-        Assert.Contains("cameraLoop.Finish()", area, StringComparison.Ordinal);
-        Assert.Contains("cameraLoop.AddPageAction", area, StringComparison.Ordinal);
-        Assert.Contains("cameraLoop.DoneAction", area, StringComparison.Ordinal);
-        Assert.Contains("cameraLoop.CanFinish", area, StringComparison.Ordinal);
+        Assert.Contains("role == InstallRole.Partner ? null : PlateCamera.Package", area, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheLoopGivesOnePhotoPerPageAndHandsThePagesOverOnRead()
+    {
+        var area = Read(AreaFile);
+
+        Assert.Contains("new RecipePhotoLoop()", area, StringComparison.Ordinal);
+        Assert.Contains("photoLoop.AddPage(", area, StringComparison.Ordinal);
+        Assert.Contains("photoLoop.Take()", area, StringComparison.Ordinal);
+        Assert.Contains("photoLoop.AddPageAction", area, StringComparison.Ordinal);
+        Assert.Contains("photoLoop.DoneAction", area, StringComparison.Ordinal);
+        Assert.Contains("photoLoop.CanFinish", area, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Add a page\"", area, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"Done\"", area, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Read the recipe\"", area, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ADoneCardTakesTheSameConfirmStep()
+    public void WhatWasReadFillsTheEditableBoxes()
     {
         var area = Read(AreaFile);
-        var finish = area[area.IndexOf("cameraLoop.Finish()", StringComparison.Ordinal)..];
+        var read = area[area.IndexOf("private void PagesRead(", StringComparison.Ordinal)..];
 
-        Assert.Contains("BeginDraft(", finish[..Math.Min(finish.Length, 700)], StringComparison.Ordinal);
+        Assert.Contains("typed.Fill(read.Payload)", read[..Math.Min(read.Length, 700)], StringComparison.Ordinal);
+        Assert.Contains("typing = true", read[..Math.Min(read.Length, 700)], StringComparison.Ordinal);
+        Assert.Contains("RecipePhotoText.ReadingSentence(", area, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -58,12 +58,6 @@ public class ErrandActivity : AppCompatActivity
     private bool abandoned;
     private CardReading card = new(string.Empty, string.Empty, string.Empty);
     private MoneyFacts statement = new(null, null, null, null);
-    private RecipeReading recipe = new(string.Empty, [], []);
-
-    // Every page's recognised lines, in order. Words only: the frame they came from is deleted as
-    // soon as it has been read, and nothing about it is kept or returned.
-    private readonly List<string> recipeLines = [];
-    private int recipePages;
     private bool read;
 
     protected override void OnCreate(Bundle? savedInstanceState)
@@ -167,7 +161,6 @@ public class ErrandActivity : AppCompatActivity
         Errand.Video => "A video",
         Errand.ShowImage => "A picture",
         Errand.ReadCard => "Read a card",
-        Errand.ReadRecipe => "Read a recipe",
         _ => "Read a statement",
     };
 
@@ -179,7 +172,6 @@ public class ErrandActivity : AppCompatActivity
         Errand.Video => "Something asked for a video.",
         Errand.ShowImage => "Handed over to look at.",
         Errand.ReadCard => "Point at the card, then send back what it says.",
-        Errand.ReadRecipe => "Read each page in turn, then send back the words. The photographs are not kept.",
         _ => "Point at the statement, then send back the balance.",
     };
 
@@ -200,12 +192,6 @@ public class ErrandActivity : AppCompatActivity
             PaperUi.DestructiveButton(this, "Stop", StopVideo)),
         Errand.Video => PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Record", StartVideo),
-            PaperUi.QuietButton(this, "Cancel", Cancel)),
-        Errand.ReadRecipe => PaperUi.BottomBar(this,
-            read
-                ? PaperUi.PrimaryButton(this, "Send it back", SendReading)
-                : PaperUi.PrimaryButton(this, "Read this page", ReadFrame),
-            read ? PaperUi.SecondaryButton(this, "Read another page", ReadFrame) : Blank(),
             PaperUi.QuietButton(this, "Cancel", Cancel)),
         _ => PaperUi.BottomBar(this,
             read
@@ -463,7 +449,7 @@ public class ErrandActivity : AppCompatActivity
 
     /// <summary>
     /// A read frame is only ever the input to recognition. Once the words are out (or recognition failed) it is
-    /// deleted, so a recipe page, a card or a statement does not sit in the cache after the owner has gone.
+    /// deleted, so a card or a statement does not sit in the cache after the owner has gone.
     /// </summary>
     private void DiscardFrame(Java.IO.File file)
     {
@@ -497,14 +483,6 @@ public class ErrandActivity : AppCompatActivity
         {
             card = BusinessCard.Read(lines);
         }
-        else if (errand == Errand.ReadRecipe)
-        {
-            // Each page adds to the words so far; the whole is read again, because a step can run
-            // across the foot of one page and onto the next.
-            recipeLines.AddRange(lines);
-            recipePages++;
-            recipe = RecipeRead.Read(recipeLines);
-        }
         else
         {
             statement = MoneyMail.Read(null, string.Join('\n', lines));
@@ -530,10 +508,6 @@ public class ErrandActivity : AppCompatActivity
             results.AddView(Field("Phone", card.Phone, value => card = card with { Phone = value }));
             results.AddView(Field("Email", card.Email, value => card = card with { Email = value }));
         }
-        else if (errand == Errand.ReadRecipe)
-        {
-            ShowRecipe();
-        }
         else
         {
             var payload = ReadRequest.StatementExtras(statement);
@@ -548,24 +522,6 @@ public class ErrandActivity : AppCompatActivity
 
         HideStatus();
         Rebuild();
-    }
-
-    // Constitution shows the owner every word again and asks about the doubtful ones before anything is
-    // kept, so this screen only says what was found and lets the name be put right.
-    private void ShowRecipe()
-    {
-        if (results is null)
-        {
-            return;
-        }
-
-        results.AddView(Field("Name", recipe.Title, value => recipe = recipe with { Title = value }));
-        results.AddView(PaperUi.Body(this,
-            recipe.Ingredients.Count == 0 && recipe.Steps.Count == 0
-                ? "No ingredients or steps found yet."
-                : $"{recipe.Ingredients.Count} ingredients, {recipe.Steps.Count} steps"));
-        results.AddView(PaperUi.Secondary(this,
-            recipePages == 1 ? "From 1 page." : $"From {recipePages} pages."));
     }
 
     private View Field(string label, string value, Action<string> onChanged)
@@ -585,21 +541,6 @@ public class ErrandActivity : AppCompatActivity
         if (errand == Errand.ReadCard)
         {
             foreach (var (key, value) in ReadRequest.CardExtras(card))
-            {
-                result.PutExtra(key, value);
-            }
-        }
-        else if (errand == Errand.ReadRecipe)
-        {
-            var payload = ReadRequest.RecipeExtras(recipe);
-            if (payload is null)
-            {
-                ShowStatus("There is no recipe to send back yet.");
-                return;
-            }
-
-            // Strings only. No image, no file, no URI: the caller gets the words and nothing to open.
-            foreach (var (key, value) in payload)
             {
                 result.PutExtra(key, value);
             }

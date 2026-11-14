@@ -23,9 +23,6 @@ public enum Errand
 
     /// <summary>Read a statement and return a balance on the existing Index contract.</summary>
     ReadStatement,
-
-    /// <summary>Read a recipe card across 1-N pages and return its title, ingredient lines and step lines as text.</summary>
-    ReadRecipe,
 }
 
 /// <summary>
@@ -57,7 +54,6 @@ public static class Errands
             => Errand.ShowImage,
         ReadRequest.ReadCard => Errand.ReadCard,
         ReadRequest.ReadStatement => Errand.ReadStatement,
-        ReadRequest.ReadRecipe => Errand.ReadRecipe,
         _ => Errand.None,
     };
 }
