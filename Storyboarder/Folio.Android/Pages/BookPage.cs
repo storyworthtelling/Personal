@@ -102,7 +102,7 @@ public class BookPage : FolioBinderPage
 
         Content = new ScrollView
         {
-            Padding = new Thickness(24, 4, 16, 24),
+            Padding = PaperResources.Token<Thickness>("ScreenPadding"),
             Content = body,
         };
 
@@ -120,7 +120,8 @@ public class BookPage : FolioBinderPage
         openButton.Clicked += (_, _) => _ = OpenReport();
         SelectDraft(book.LatestDraftId);
 
-        SetBar(openButton, draft);
+        // The primary on the right, the suite's order (owner's ruling, audit W8.3a).
+        SetBar(draft, openButton);
     }
 
     /// <summary>

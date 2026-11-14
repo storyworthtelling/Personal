@@ -34,7 +34,8 @@ public partial class MainPage : BinderPage
 
         dogEar = new DogEar(dogEarState);
         dogEar.NoticesOpened += OnNoticesOpened;
-        NoticeCorner.Content = dogEar;
+        // In the frame's corner, beside the binder, like every page's (audit W8.3a: it sat inline, under the status line).
+        SetCorner(dogEar, dogEarState);
 
         // Today is the app's root, so its tab is the one lit when nothing else is. The bar carries
         // the one thing this screen is for; Tasks and Settings used to sit here as quiet buttons,
@@ -70,14 +71,13 @@ public partial class MainPage : BinderPage
             UnreadableCalendarNotice.Key,
             detail is null ? null : new DogEarNotice("A calendar was skipped", detail, DogEarHue.Caution));
         // Google turned the background sign-in away: the calendar, Tasks and the vault are waiting (audit 11 §4).
-        var signIn = Storyworthtelling.Maui.Health.GoogleSignInHealth.Apply(dogEarState);
-        NoticeCorner.IsVisible = detail is not null || signIn;
+        Storyworthtelling.Maui.Health.GoogleSignInHealth.Apply(dogEarState);
         dogEar.Refresh();
     }
 
     // Opening the dog-ear turns the page to the notices the kit collects; the same state the corner shows.
     private void OnNoticesOpened(IReadOnlyList<DogEarNotice> opened) =>
-        _ = Navigation.PushAsync(new WaitingPage(dogEarState));
+        _ = Navigation.PushAsync(new ForewordWaitingPage(ForewordArea.Today, dogEarState));
 
     // A greeting composed fresh in the owner's voice, shown only once a shared voice profile exists. Pulls
     // the Claude key from the shared Drive config first (RefreshAsync); everything degrades to a hidden
@@ -347,7 +347,6 @@ public partial class MainPage : BinderPage
                 System.IO.File.WriteAllText(CrashLogPath, log);
                 CrashLogButton.IsVisible = true;
             }, DateTimeOffset.Now, FoldTiming.UndoWindow);
-            NoticeCorner.IsVisible = true;
             dogEar.Refresh();
         }
     }

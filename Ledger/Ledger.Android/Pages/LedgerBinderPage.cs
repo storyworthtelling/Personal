@@ -21,26 +21,8 @@ namespace Index.Android.Pages;
 ///
 /// <para>There is no navigation bar. The header <em>is</em> the header.</para>
 /// </summary>
-public abstract class LedgerBinderPage : ContentPage, ICardHost
+public abstract class LedgerBinderPage : PaperBinderPage
 {
-    private readonly BinderTabs strip = new();
-    private readonly PaperPageHeader header = new();
-    private readonly ContentView well = new();
-    private readonly ContentView barSlot = new();
-
-    // The haze and the card set over it (mockups 2 and 4): the whole page, binder and bar included, so it
-    // belongs to the frame and not to any one well.
-    private readonly ContentView overlaySlot = new() { IsVisible = false };
-
-    // The dog-ear's place: the page's own top-right corner, which is the right edge of the content
-    // column and so flush to the binder gutter (mockup 17: top 0, right 66dp). It spans the header and
-    // the well rather than living in the well, where it sat below the header and over the first card.
-    private readonly ContentView cornerSlot = new()
-    {
-        HorizontalOptions = LayoutOptions.End,
-        VerticalOptions = LayoutOptions.Start,
-    };
-
     // Set while this page has taken over the window's soft-input mode and the insets listener (see
     // HidesBarForKeyboard); remembered so the way the window was before is put back.
     private KeyboardInsetsListener? keyboardListener;
@@ -96,7 +78,7 @@ public abstract class LedgerBinderPage : ContentPage, ICardHost
         softInputBefore = window.Attributes?.SoftInputMode;
         window.SetSoftInputMode(global::Android.Views.SoftInput.AdjustResize);
 
-        keyboardListener = new KeyboardInsetsListener(open => barSlot.IsVisible = !open);
+        keyboardListener = new KeyboardInsetsListener(open => ShowBar(!open));
         window.DecorView.SetOnApplyWindowInsetsListener(keyboardListener);
     }
 
@@ -117,7 +99,7 @@ public abstract class LedgerBinderPage : ContentPage, ICardHost
         keyboardListener.Dispose();
         keyboardListener = null;
         softInputBefore = null;
-        barSlot.IsVisible = true; // the bar is never left hidden by a page that has gone
+        ShowBar(true); // the bar is never left hidden by a page that has gone
     }
 
     /// <summary>
@@ -147,7 +129,7 @@ public abstract class LedgerBinderPage : ContentPage, ICardHost
     /// </summary>
     protected override bool OnBackButtonPressed()
     {
-        var overlayAction = OverlayBackPress.Decide(overlaySlot.IsVisible);
+        var overlayAction = OverlayBackPress.Decide(OverlayShowing);
         if (OverlayBackPress.Consumes(overlayAction))
         {
             HideOverlay();
@@ -173,149 +155,21 @@ public abstract class LedgerBinderPage : ContentPage, ICardHost
     }
 
     /// <summary>Which tab is lit. A detail screen lights the area it was opened from.</summary>
-    protected LedgerArea Area { get; private set; }
+    protected LedgerArea Area => (LedgerArea)AreaIndex;
 
     /// <summary>
-    /// Puts the frame around whatever this page's XAML built. Call it once, after
-    /// <c>InitializeComponent</c>. <see cref="PaperPageHeader"/> reads its own "DisplayLabel"
-    /// style through <c>PaperResources</c>, which walks the app's merged resources rather than
-    /// any one dictionary's own entries — so it resolves against the kit's Paper.xaml, merged in
-    /// App.xaml.cs (Release B).
+    /// Puts the kit's frame around whatever this page's XAML built (audit W8.3a: this was Index's own copy
+    /// of it). Call it once, after <c>InitializeComponent</c>.
     /// </summary>
     protected void Wrap(LedgerArea area, string title)
     {
-        Area = area;
-        header.Text = title;
-        header.Ink = LedgerAreas.RuleInk(area);
-
-        // The page still holds what its XAML built as its own Content; take it off before the frame adopts it.
-        var inner = Content;
-        Content = null;
-        well.Content = inner;
-
-        strip.SetAreas(LedgerAreas.All, (int)area);
-        strip.AreaSelected += OnAreaSelected;
-
-        var page = new Grid
-        {
-            RowDefinitions = [new RowDefinition(GridLength.Star), new RowDefinition(GridLength.Auto)],
-            ColumnDefinitions =
-            [
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(new GridLength(BinderTabs.WidthDp)),
-            ],
-        };
-
-        var column = new Grid
-        {
-            RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
-        };
         if (PaperBehindHeader)
         {
-            // Under everything else in the column, and spanning both rows: one grid from the page's top edge.
-            var paper = new Views.GraphPaperBackground { GroundColour = Color.FromArgb(LedgerAreas.AccountsGroundHex) };
-            column.Children.Add(paper);
-            Grid.SetRowSpan(paper, 2);
+            // Under the header and the well from one origin: one grid from the page's top edge.
+            SetBackdrop(new Views.GraphPaperBackground { GroundColour = Color.FromArgb(LedgerAreas.AccountsGroundHex) });
         }
 
-        column.Children.Add(header);
-        column.Children.Add(well);
-        Grid.SetRow(header, 0);
-        Grid.SetRow(well, 1);
-
-        // The strip runs beside the header and the content but stops at the bar, which spans the
-        // whole width: the bar belongs to the page you are on, not to the binder.
-        page.Children.Add(column);
-        page.Children.Add(strip);
-        page.Children.Add(cornerSlot);
-        page.Children.Add(barSlot);
-        page.Children.Add(overlaySlot);
-        Grid.SetRowSpan(overlaySlot, 2);
-        Grid.SetColumnSpan(overlaySlot, 2);
-        Grid.SetRow(cornerSlot, 0);
-        Grid.SetColumn(cornerSlot, 0);
-        Grid.SetRow(column, 0);
-        Grid.SetColumn(column, 0);
-        Grid.SetRow(strip, 0);
-        Grid.SetColumn(strip, 1);
-        Grid.SetRow(barSlot, 1);
-        Grid.SetColumn(barSlot, 0);
-        Grid.SetColumnSpan(barSlot, 2);
-
-        Content = page;
-    }
-
-    /// <summary>
-    /// Sets <paramref name="overlay"/> over the WHOLE page — header, well, binder strip and pinned bar — which
-    /// is where the action cards' haze goes (mockups 2 and 4: the tabs fade with the page). The overlay owns
-    /// its own dismissal; <see cref="HideOverlay"/> takes it away.
-    /// </summary>
-    protected void ShowOverlay(View overlay)
-    {
-        overlaySlot.Content = overlay;
-        overlaySlot.IsVisible = true;
-    }
-
-    void ICardHost.ShowCard(View card) => ShowOverlay(card);
-
-    void ICardHost.HideCard() => HideOverlay();
-
-    /// <summary>Takes the overlay away, leaving the page as it was.</summary>
-    protected void HideOverlay()
-    {
-        overlaySlot.IsVisible = false;
-        overlaySlot.Content = null;
-    }
-
-    /// <summary>
-    /// Puts the page's dog-ear in its corner. Call it with the page's <c>DogEar</c> once; the frame owns
-    /// the placement so no screen decides for itself where the corner is.
-    /// </summary>
-    protected void SetCorner(View ear) => cornerSlot.Content = ear;
-
-    /// <summary>
-    /// The pinned bar (§7). Buttons in order, the primary one last — it takes the width that is
-    /// left, so the one thing the screen is for is the widest target on it. No buttons clears it.
-    /// </summary>
-    protected void SetBar(params View[] buttons)
-    {
-        if (buttons.Length == 0)
-        {
-            barSlot.Content = null;
-            return;
-        }
-
-        var row = new Grid { ColumnSpacing = 8, Padding = new Thickness(24, 12) };
-
-        for (var i = 0; i < buttons.Length; i++)
-        {
-            row.ColumnDefinitions.Add(new ColumnDefinition(
-                i == buttons.Length - 1 ? GridLength.Star : GridLength.Auto));
-            // A view has one parent. The page's primary button is set into the bar by its constructor and
-            // again on every appearance, so it is still in the previous row here; take it out first.
-            if (buttons[i].Parent is Layout previousRow)
-            {
-                previousRow.Children.Remove(buttons[i]);
-            }
-            row.Children.Add(buttons[i]);
-            Grid.SetColumn(buttons[i], i);
-        }
-
-        barSlot.Content = new VerticalStackLayout
-        {
-            Children =
-            {
-                new BoxView
-                {
-                    HeightRequest = 1,
-                    // Not the indexer: it looks only at a dictionary's own entries, while
-                    // PaperResources.Colour walks what has been merged into it — and "Hairline"
-                    // now arrives from the kit by merge, not from a dictionary this head owns.
-                    Color = PaperResources.Colour("Hairline"),
-                },
-                row,
-            },
-        };
+        Frame(LedgerAreas.All, (int)area, title, LedgerAreas.RuleInk(area));
     }
 
     /// <summary>
@@ -324,7 +178,7 @@ public abstract class LedgerBinderPage : ContentPage, ICardHost
     /// contradict. Tapping the area you are already in is how a detail screen (Connect an
     /// account, under Settings) returns to it.
     /// </summary>
-    private async void OnAreaSelected(int index)
+    protected override async void OnAreaSelected(int index)
     {
         var chosen = (LedgerArea)index;
 

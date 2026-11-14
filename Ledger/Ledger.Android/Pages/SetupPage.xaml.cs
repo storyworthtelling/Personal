@@ -68,7 +68,7 @@ public partial class SetupPage : LedgerBinderPage
         dogEar = new DogEar(dogEarState);
 
         Wrap(LedgerArea.Settings, "Settings");
-        SetCorner(dogEar);
+        SetCorner(dogEar, dogEarState);
 
         // Mockup 10: no pinned bar, every field saves itself. Each commits when it is left, and when entry
         // is completed from the keyboard; leaving the page (OnDisappearing) commits whatever is left.

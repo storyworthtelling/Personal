@@ -77,7 +77,9 @@
     <x:Double x:Key="VoiceSize">26</x:Double>
 
     <!-- Layout -->
-    <Thickness x:Key="ScreenPadding">24</Thickness>
+    <!-- The well's padding: 24 at the sides and foot, nothing at the top, where the header's own spacing
+         and rule already sit (the native frame's shape; audit W8.3 found five paddings under one header). -->
+    <Thickness x:Key="ScreenPadding">24,0,24,24</Thickness>
 
     <!-- Pages -->
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">

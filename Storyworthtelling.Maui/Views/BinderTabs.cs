@@ -75,7 +75,7 @@ public class BinderTabs : ContentView
     public const int WidthDp = 66;
 
     /// <summary>The glyph over the label, at the size the mockups draw it.</summary>
-    public const int GlyphDp = 24;
+    public const int GlyphDp = DesignTokens.Shape.TabGlyphDp;
 
     private readonly AbsoluteLayout strip = new();
     private readonly List<BinderArea> areas = [];

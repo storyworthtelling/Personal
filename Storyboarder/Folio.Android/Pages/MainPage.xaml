@@ -11,7 +11,7 @@
              xmlns:local="clr-namespace:Folio.Android.Pages"
              x:Class="Folio.Android.Pages.MainPage">
     <ScrollView>
-        <VerticalStackLayout Padding="24,4,16,24">
+        <VerticalStackLayout Padding="{StaticResource ScreenPadding}">
 
             <kit:PaperWarningCard x:Name="ConfigWarningCard" IsVisible="False" Margin="0,0,0,12">
                 <Label x:Name="ConfigWarningLabel" FontSize="{StaticResource SecondarySize}" />

@@ -160,7 +160,7 @@ public partial class MainPage : LedgerBinderPage
 
         // Accounts is the app's root, so its tab is the one lit when nothing else is.
         Wrap(LedgerArea.Accounts, "Accounts");
-        SetCorner(dogEar); // the page's own top-right corner, flush to the binder (mockup 17)
+        SetCorner(dogEar, dogEarState); // the page's own top-right corner, flush to the binder (mockup 17)
     }
 
     // Mockup 15: the keyboard pushes the post-it up and the pinned bar hides while it is open.
@@ -175,10 +175,6 @@ public partial class MainPage : LedgerBinderPage
         {
             base.OnAppearing();
             isAppearing = true;
-
-            // A notice another page raised as it left (the Plaid link's backup) folds in here.
-            CarriedNotices.Shared.DeliverTo(dogEarState);
-            dogEar.Refresh();
             if (Window is not null)
             {
                 Window.Resumed -= OnWindowResumed;

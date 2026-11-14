@@ -263,7 +263,9 @@ public class AccountsCosmeticSourceTests
     [Fact]
     public void TheHazeCoversTheWholePage_SoItIsHostedByTheFrameNotTheWell()
     {
-        var binder = Source("Ledger.Android/Pages/LedgerBinderPage.cs");
+        // The overlay slot is the kit frame's since audit W8.3a, and Index's binder page is that frame.
+        Assert.Contains(": PaperBinderPage", Source("Ledger.Android/Pages/LedgerBinderPage.cs"), StringComparison.Ordinal);
+        var binder = Source("../Storyworthtelling.Maui/Views/PaperBinderPage.cs");
         Assert.Contains("ShowOverlay(", binder, StringComparison.Ordinal);
         Assert.Contains("HideOverlay(", binder, StringComparison.Ordinal);
 

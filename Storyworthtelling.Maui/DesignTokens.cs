@@ -36,6 +36,13 @@ public static class DesignTokens
         /// <summary>A button's padding, DESIGN.md §7's 18×11 (owner's ruling, audit W8; the kits drew 16×12).</summary>
         public const int ButtonPaddingX = 18;
         public const int ButtonPaddingY = 11;
+
+        /// <summary>The pinned bar's padding (§7), one pair for every app (audit W8.3: four paddings were drawn).</summary>
+        public const int BarPaddingX = Space.X6;
+        public const int BarPaddingY = Space.X3;
+
+        /// <summary>§9's binder-tab glyph: 26dp above a horizontal label.</summary>
+        public const int TabGlyphDp = 26;
         public const int RadiusCard = 12;
         public const int HairlineDp = 1;
         public const int WarningRuleDp = 3;

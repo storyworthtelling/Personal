@@ -58,13 +58,15 @@ public class WaitingPageWiringTests
     [Fact]
     public void TheEarSitsInTheBinderPagesCornerNotInsideTheWell()
     {
-        var binder = Read("LedgerBinderPage.cs");
-        Assert.Contains("SetCorner(", binder, StringComparison.Ordinal);
+        // The corner slot is the kit frame's since audit W8.3a, and Index's binder page is that frame.
+        Assert.Contains(": PaperBinderPage", Read("LedgerBinderPage.cs"), StringComparison.Ordinal);
+        var binder = File.ReadAllText(Path.Combine(Index.Tests.Design.DesignTestHelpers.LedgerRoot(), "../Storyworthtelling.Maui/Views/PaperBinderPage.cs"));
+        Assert.Contains("protected void SetCorner(DogEar ear, DogEarState state)", binder, StringComparison.Ordinal);
 
         foreach (var page in new[] { "MainPage.xaml.cs", "BudgetPage.xaml.cs", "SavingsPage.xaml.cs", "SetupPage.xaml.cs" })
         {
             var source = Read(page);
-            Assert.Contains("SetCorner(dogEar)", source, StringComparison.Ordinal);
+            Assert.Contains("SetCorner(dogEar, dogEarState)", source, StringComparison.Ordinal);
             Assert.DoesNotMatch(new Regex(@"(rootLayout|root|overlay)\.Children\.Add\(dogEar\)"), source);
         }
     }

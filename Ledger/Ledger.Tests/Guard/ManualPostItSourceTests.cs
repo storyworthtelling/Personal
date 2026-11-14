@@ -120,11 +120,11 @@ public class ManualPostItSourceTests
 
         Assert.Contains("SetSoftInputMode(global::Android.Views.SoftInput.AdjustResize)", binder, StringComparison.Ordinal);
         Assert.Contains("WindowInsets.Type.Ime()", binder, StringComparison.Ordinal);
-        Assert.Contains("barSlot.IsVisible = !open", binder, StringComparison.Ordinal);
+        Assert.Contains("ShowBar(!open)", binder, StringComparison.Ordinal);
         // Put back: the window's own mode, the listener, and the bar itself.
         Assert.Contains("window.SetSoftInputMode(before)", binder, StringComparison.Ordinal);
         Assert.Contains("SetOnApplyWindowInsetsListener(null)", binder, StringComparison.Ordinal);
-        Assert.Contains("barSlot.IsVisible = true", binder, StringComparison.Ordinal);
+        Assert.Contains("ShowBar(true)", binder, StringComparison.Ordinal);
 
         Assert.Matches(new Regex(@"HidesBarForKeyboard\s*=>\s*true"), Source(MainPagePath));
         Assert.Matches(new Regex(@"HidesBarForKeyboard\s*=>\s*true"), Source(AddPagePath));
