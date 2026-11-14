@@ -7,6 +7,7 @@ using Android.Views;
 using Android.Widget;
 using AndroidX.AppCompat.App;
 using AndroidX.Camera.Core;
+using AndroidX.Camera.Video;
 using AndroidX.Camera.View;
 using AndroidX.Core.Content;
 using Codex.Domain.Design;
@@ -54,6 +55,7 @@ public class ErrandActivity : AppCompatActivity
     private TextView? statusLine;
     private LinearLayout? results;
     private FrameLayout? barSlot;
+    private bool abandoned;
     private CardReading card = new(string.Empty, string.Empty, string.Empty);
     private MoneyFacts statement = new(null, null, null, null);
     private RecipeReading recipe = new(string.Empty, [], []);
@@ -194,6 +196,8 @@ public class ErrandActivity : AppCompatActivity
         Errand.Photo => PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Take it", TakePhoto),
             PaperUi.QuietButton(this, "Cancel", Cancel)),
+        Errand.Video when camera.IsRecording => PaperUi.BottomBar(this,
+            PaperUi.DestructiveButton(this, "Stop", StopVideo)),
         Errand.Video => PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Record", StartVideo),
             PaperUi.QuietButton(this, "Cancel", Cancel)),
@@ -226,6 +230,9 @@ public class ErrandActivity : AppCompatActivity
     protected override void OnPause()
     {
         base.OnPause();
+        // Leaving while recording abandons the video: the release stops it, and a clip cut off by the owner
+        // walking away is not the one the caller asked for.
+        abandoned = camera?.IsRecording == true;
         camera?.Release();
     }
 
@@ -234,6 +241,7 @@ public class ErrandActivity : AppCompatActivity
         // Backstop: whatever way the owner leaves, no frame of a page and no picture taken for another app is left in the cache.
         DiscardFrame(new Java.IO.File(CacheDir, ReadFrameName));
         DiscardFrame(new Java.IO.File(CacheDir, CaptureFrameName));
+        DiscardFrame(new Java.IO.File(CacheDir, VideoFileName));
         base.OnDestroy();
     }
 
@@ -271,8 +279,11 @@ public class ErrandActivity : AppCompatActivity
             new ErrandCaptureCallback(this, file));
     }
 
-    private void Delivered(Java.IO.File file)
+    // A picture, or (W7.4) a video: the same path either way, into the caller's destination or the roll.
+    private void Delivered(Java.IO.File file, bool video = false)
     {
+        var entry = video ? CaptureFiling.Video(DateTime.Now) : CaptureFiling.Photo(DateTime.Now);
+        var collection = video ? MediaStore.Video.Media.ExternalContentUri! : MediaStore.Images.Media.ExternalContentUri!;
         try
         {
             // Honour the caller's destination when it gave one: that is the contract, and a
@@ -289,12 +300,11 @@ public class ErrandActivity : AppCompatActivity
             // No destination given: file it in the camera roll like any other capture and
             // hand back the row we made. It is a picture the owner took either way, so it
             // belongs in the one folder Google Photos actually backs up.
-            var entry = CaptureFiling.Photo(DateTime.Now);
             var values = new ContentValues();
             values.Put(MediaStore.IMediaColumns.DisplayName, entry.DisplayName);
             values.Put(MediaStore.IMediaColumns.MimeType, entry.MimeType);
             values.Put(MediaStore.IMediaColumns.RelativePath, entry.RelativePath);
-            var target = ContentResolver!.Insert(MediaStore.Images.Media.ExternalContentUri!, values);
+            var target = ContentResolver!.Insert(collection, values);
             if (target is null)
             {
                 ShowStatus("Could not make a place to save that.");
@@ -329,12 +339,108 @@ public class ErrandActivity : AppCompatActivity
         input.CopyTo(output);
     }
 
-    private void StartVideo() =>
-        // Not built: a requested video needs the same shoot-and-return path as a photo
-        // through the Darkroom. The VIDEO_CAPTURE filter stays declared anyway, because on the
-        // locked phone it is what keeps another camera app from answering, and the refusal
-        // says so plainly rather than failing with nothing on screen (audit W2, report 03).
-        ShowStatus("Plate cannot record for another app yet.");
+    // A video another app asked for (audit W7.4): the same shoot-and-return path as a photo. It records to
+    // Plate's cache, within whatever duration or size the caller allowed, then goes to the caller's
+    // EXTRA_OUTPUT or the camera roll exactly as a picture does, and the cache copy is deleted.
+    private void StartVideo()
+    {
+        if (camera.Video is not { } video)
+        {
+            ShowStatus("The camera is not ready yet.");
+            return;
+        }
+
+        var limits = VideoErrand.Limits(
+            Intent?.GetIntExtra(VideoErrand.ExtraDurationLimit, 0) ?? 0,
+            Intent?.GetLongExtra(VideoErrand.ExtraSizeLimit, 0) ?? 0);
+        var file = new Java.IO.File(CacheDir, VideoFileName);
+        DiscardFrame(file);
+
+        // The builder's setters hand back Object in the binding, so they are called one at a time.
+        var builder = new FileOutputOptions.Builder(file);
+        if (limits.Duration is { } duration)
+        {
+            builder.SetDurationLimitMillis((long)duration.TotalMilliseconds);
+        }
+        if (limits.SizeBytes is { } size)
+        {
+            builder.SetFileSizeLimitReturnJavaLangObject(size);
+        }
+
+        var pending = ((Recorder)video.Output!).PrepareRecording(this, builder.Build());
+        if (CheckSelfPermission(Android.Manifest.Permission.RecordAudio) == Android.Content.PM.Permission.Granted)
+        {
+            // Without the permission the video still records, silently, rather than refusing to start.
+            pending = pending.WithAudioEnabled();
+        }
+
+        camera.Recording = pending.Start(ContextCompat.GetMainExecutor(this), new ErrandRecordListener(this, file));
+        ShowStatus(limits.Duration is { } most ? $"Recording… up to {most.TotalSeconds:0} seconds." : "Recording…");
+        RefreshBar();
+    }
+
+    private void StopVideo()
+    {
+        camera.Recording?.Stop();
+        ShowStatus("Finishing the video…");
+    }
+
+    private void Recorded(Java.IO.File file, VideoRecordingEnd end)
+    {
+        camera.Recording = null;
+        RefreshBar();
+        if (abandoned)
+        {
+            DiscardFrame(file);
+            Cancel();
+            return;
+        }
+        if (!VideoErrand.IsUsable(end) || !file.Exists())
+        {
+            DiscardFrame(file);
+            ShowStatus(end == VideoRecordingEnd.NothingRecorded
+                ? "Nothing was recorded. Try again."
+                : "That recording did not save. Try again.");
+            return;
+        }
+
+        Delivered(file, video: true);
+    }
+
+    private void RefreshBar()
+    {
+        if (barSlot is null)
+        {
+            return;
+        }
+        barSlot.RemoveAllViews();
+        barSlot.AddView(BarFor());
+    }
+
+    private const string VideoFileName = "errand-video.mp4";
+
+    private static VideoRecordingEnd EndOf(VideoRecordEvent.Finalize finished) => finished.Error switch
+    {
+        VideoRecordEvent.Finalize.ErrorNone => VideoRecordingEnd.Finished,
+        VideoRecordEvent.Finalize.ErrorDurationLimitReached => VideoRecordingEnd.DurationLimit,
+        VideoRecordEvent.Finalize.ErrorFileSizeLimitReached => VideoRecordingEnd.SizeLimit,
+        VideoRecordEvent.Finalize.ErrorNoValidData => VideoRecordingEnd.NothingRecorded,
+        _ => VideoRecordingEnd.Failed,
+    };
+
+    private sealed class ErrandRecordListener(ErrandActivity host, Java.IO.File file)
+        : Java.Lang.Object, AndroidX.Core.Util.IConsumer
+    {
+        public void Accept(Java.Lang.Object? value)
+        {
+            if (value is not VideoRecordEvent.Finalize finished)
+            {
+                return;
+            }
+            var end = EndOf(finished);
+            host.RunOnUiThread(() => host.Recorded(file, end));
+        }
+    }
 
     private void ReadFrame()
     {
