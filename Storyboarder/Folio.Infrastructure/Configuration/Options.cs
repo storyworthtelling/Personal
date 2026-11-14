@@ -145,7 +145,6 @@ public sealed class RateLimitOptions
     public int MaxTruncatedAttempts { get; set; } = 2;
     public int BaseDelaySeconds { get; set; } = 4;
     public int MaxDelaySeconds { get; set; } = 600;
-    public int IdlePollSeconds { get; set; } = 10;
 
     // How long to wait before asking again when the phone has no network. A flat, short interval: nothing
     // is billed while offline, so there is no reason to back off — only to stop asking every few seconds.

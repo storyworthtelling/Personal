@@ -84,6 +84,9 @@ public sealed record AppVersionBand(string Package, int Band, int LastShippedBef
 /// Every app on the rolling channel, with the band it was given. Recorded here rather than
 /// in each workflow so the choice can be checked against what actually shipped — the check
 /// nobody ran before either floor bump.
+///
+/// <para>This is reference data for the guard tests (<c>VersionCodeTests</c>, <c>SuiteVersionBandsTests</c>),
+/// not something the phone reads: the workflows pass each band to the version-code action themselves.</para>
 /// </summary>
 public static class SuiteVersionBands
 {

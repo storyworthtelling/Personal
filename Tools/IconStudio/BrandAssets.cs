@@ -23,7 +23,6 @@ public static class BrandAssets
 
     private static readonly string[] MedallionTargets =
     [
-        "Storyboarder/Folio.Infrastructure/Resources/owner.png",
         "Storyboarder/Folio.Android/Resources/drawable-nodpi/owner_medallion.png",
         "Foreword/Foreword.Android/Resources/drawable-nodpi/owner_medallion.png",
         "FocusPhone/Post.Android/Resources/drawable-nodpi/owner_medallion.png",

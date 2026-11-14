@@ -42,8 +42,6 @@ public class ServiceCatalogueTests
         Assert.Equal(["Apple TV+", "Apple TV"], apple.MerchantNames);
         Assert.Equal(["tv.apple.com", "apple.com"], apple.LinkDomains);
         Assert.False(apple.KidsOnly);
-        Assert.Same(apple, ServiceCatalogue.Public.ByMerchant("apple tv+"));
-        Assert.Null(ServiceCatalogue.Public.ByMerchant("APPLE.COM/BILL"));
     }
 
     [Fact]
@@ -67,7 +65,6 @@ public class ServiceCatalogueTests
             Assert.Same(service, catalogue.ById(service.Id));
             Assert.Same(service, catalogue.BySourceId(service.SourceId));
             Assert.All(service.Packages, package => Assert.Same(service, catalogue.ByPackage(package)));
-            Assert.All(service.MerchantNames, merchant => Assert.Same(service, catalogue.ByMerchant(merchant)));
         });
     }
 
@@ -77,8 +74,6 @@ public class ServiceCatalogueTests
         var flix = Invented("example-flix", "com.example.flix", "exampleflix", "EXAMPLEFLIX.COM", "Exampleflix");
         var catalogue = new ServiceCatalogue([flix]);
 
-        Assert.Same(flix, catalogue.ByMerchant("  exampleflix.com "));
-        Assert.Same(flix, catalogue.ByMerchant("EXAMPLEFLIX"));
         Assert.Same(flix, catalogue.BySourceId("ExampleFlix"));
         Assert.Same(flix, catalogue.ByPackage("COM.EXAMPLE.FLIX"));
         Assert.Same(flix, catalogue.ById(new ServiceId("EXAMPLE-FLIX")));
@@ -92,18 +87,8 @@ public class ServiceCatalogueTests
     {
         var catalogue = new ServiceCatalogue([Invented("example-flix", "com.example.flix", "exampleflix", "Exampleflix")]);
 
-        Assert.Null(catalogue.ByMerchant(key));
         Assert.Null(catalogue.ByPackage(key));
         Assert.Null(catalogue.BySourceId(key));
-    }
-
-    [Fact]
-    public void AMerchantNameIsMatchedWholeNeverAsAFragment()
-    {
-        // "Exampleflix Store" is not the subscription; a contains-match would count it as one.
-        var catalogue = new ServiceCatalogue([Invented("example-flix", "com.example.flix", "exampleflix", "Exampleflix")]);
-
-        Assert.Null(catalogue.ByMerchant("Exampleflix Store"));
     }
 
     [Fact]

@@ -79,18 +79,6 @@ public class GitHubReleaseClientTests
         Assert.True(request.Headers.UserAgent.Count > 0);
     }
 
-    [Theory]
-    [InlineData("focusphone-v1.4.0", "1.3.9", true)]
-    [InlineData("focusphone-v1.4.0", "1.4.0", false)]
-    [InlineData("focusphone-v1.4.0", "1.5.0", false)]
-    [InlineData("v2.0.0", "1.9.9", true)]
-    public void IsNewerThan_ComparesSemanticVersions(string tag, string installed, bool expected)
-    {
-        var release = new ReleaseInfo(tag, []);
-
-        Assert.Equal(expected, release.IsNewerThan(installed));
-    }
-
     [Fact]
     public async Task GetLatestRelease_HttpFailure_ThrowsWithRepoInMessage()
     {

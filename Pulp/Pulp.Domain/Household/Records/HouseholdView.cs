@@ -119,7 +119,6 @@ public sealed class HouseholdView
     public IReadOnlyList<ChildLeagueAllowance> ChildLeagueAllowances { get; }
 
     /// <summary>The leagues a parent has allowed this child; empty when none.</summary>
-    public IReadOnlySet<LeagueId> LeaguesAllowedFor(ViewerId child) => ChildSports.AllowedFor(ChildLeagueAllowances, child);
 
     /// <summary>The teams one adult follows.</summary>
     public IReadOnlyList<SportsFollow> FollowsOf(ViewerId viewer) => SportsFollows.Where(follow => follow.Viewer == viewer).ToList();

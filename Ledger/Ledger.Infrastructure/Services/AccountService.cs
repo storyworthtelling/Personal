@@ -38,12 +38,6 @@ public sealed class AccountService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<bool> HasInstitutionsAsync(CancellationToken cancellationToken)
-    {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        return await db.Institutions.AnyAsync(cancellationToken);
-    }
-
     // Records a newly connected Plaid Item and marks it due for an immediate first refresh. Joins at
     // the bottom of the owner's existing order (D123) — never re-alphabetized in with the rest, since
     // that would silently move banks the owner had already arranged.

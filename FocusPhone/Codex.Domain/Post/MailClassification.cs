@@ -123,8 +123,6 @@ public sealed class SenderPromotions
 
     public void Promote(string fromAddress) => promoted.Add(Normalize(fromAddress));
 
-    public void Demote(string fromAddress) => promoted.Remove(Normalize(fromAddress));
-
     public bool IsPromoted(string fromAddress) => promoted.Contains(Normalize(fromAddress));
 
     /// <summary>The verdict, with the owner's correction applied over it.</summary>

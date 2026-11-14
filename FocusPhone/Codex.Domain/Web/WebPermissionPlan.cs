@@ -14,7 +14,6 @@ public static class WebPermissionPlan
     // The WebKit resource names. Written out here so this file stays free of Android types; the
     // Android head passes PermissionRequest.GetResources() straight through.
     public const string VideoCapture = "android.webkit.resource.VIDEO_CAPTURE";
-    public const string AudioCapture = "android.webkit.resource.AUDIO_CAPTURE";
 
     public static WebPermissionVerdict Decide(IReadOnlyCollection<string> requested, bool cameraGranted, bool originAllowed)
     {

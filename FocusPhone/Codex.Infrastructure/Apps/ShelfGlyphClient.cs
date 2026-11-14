@@ -8,13 +8,6 @@ using Storyworthtelling.Voice.Health;
 
 namespace Codex.Infrastructure.Apps;
 
-/// <summary>Generates an engraved-bookend glyph for an owner-created shelf (feature #11).</summary>
-public interface IShelfGlyphClient
-{
-    /// <summary>An SVG path (0–100 viewBox) for the shelf name, or null to fall back to the monogram.</summary>
-    Task<string?> GenerateAsync(string shelfName, CancellationToken cancellationToken);
-}
-
 /// <summary>
 /// The Claude-backed shelf-glyph client. Reuses the shared <see cref="VoiceOptions"/> key + cheap
 /// model tier (like the Taste/Discovery clients) to turn a shelf name into a single monochrome SVG
@@ -23,7 +16,7 @@ public interface IShelfGlyphClient
 /// draws the offline pencil monogram (<see cref="ShelfMonogram"/>) instead — so shelf creation
 /// never blocks on the model.
 /// </summary>
-public sealed class ShelfGlyphClient : IShelfGlyphClient
+public sealed class ShelfGlyphClient
 {
     private const string Instruction =
         "You design tiny solid bronze statues for a bookshelf's category labels — a small figure that " +

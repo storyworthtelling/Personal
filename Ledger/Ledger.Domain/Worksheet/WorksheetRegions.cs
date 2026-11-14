@@ -114,9 +114,6 @@ public static class WorksheetRegions
     /// from, so the painter's printed name/last-month text lines up with its own box.</summary>
     public static float CategoryRowTop(int index) => CategoriesTop + index * RowPitch;
 
-    public static float NewCategoryRowTop(int categoryRowCount, int index, int setAsideLineCount = 0) =>
-        AddCategoryHeaderTop(categoryRowCount, setAsideLineCount) + SectionHeaderHeight + index * RowPitch;
-
     /// <summary>The "Income different?" box, top-right of the income summary block — a fixed position,
     /// independent of how many categories the month has.</summary>
     public static WorksheetBox IncomeCorrectionBox()
@@ -148,10 +145,6 @@ public static class WorksheetRegions
     /// category rows.</summary>
     public static float ContinuationSetAsideHeaderTop(int categoryRowCount) =>
         ContinuationRowsTop(categoryRowCount) + categoryRowCount * RowPitch;
-
-    /// <summary>Where "ADD A CATEGORY" sits on the continuation sheet.</summary>
-    public static float ContinuationAddCategoryHeaderTop(int categoryRowCount, int setAsideLineCount) =>
-        AddCategoryHeaderTopFrom(ContinuationSetAsideHeaderTop(categoryRowCount), setAsideLineCount);
 
     private static float AddCategoryHeaderTopFrom(float setAsideHeaderTop, int setAsideLineCount) =>
         setAsideLineCount == 0

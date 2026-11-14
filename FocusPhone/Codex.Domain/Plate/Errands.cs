@@ -60,12 +60,4 @@ public static class Errands
         ReadRequest.ReadRecipe => Errand.ReadRecipe,
         _ => Errand.None,
     };
-
-    /// <summary>
-    /// Whether somebody is sitting in <c>onActivityResult</c> waiting. That is why an errand
-    /// screen drops the binder gutter entirely — there is nowhere else to go, and the frame
-    /// says so rather than a rule politely asking the owner not to wander.
-    /// </summary>
-    public static bool HasAWaitingCaller(Errand errand) =>
-        errand is not (Errand.None or Errand.OpenCamera);
 }

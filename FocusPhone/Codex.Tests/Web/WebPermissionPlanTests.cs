@@ -6,7 +6,8 @@ namespace Codex.Tests.Web;
 public class WebPermissionPlanTests
 {
     private const string Video = WebPermissionPlan.VideoCapture;
-    private const string Audio = WebPermissionPlan.AudioCapture;
+    // A page asking for the microphone, which the browser never grants.
+    private const string Audio = "android.webkit.resource.AUDIO_CAPTURE";
 
     // A page asking for the camera in Flyleaf's browser gets it once the phone has said yes to the
     // app: the grant is the page's own video capture, and nothing else.

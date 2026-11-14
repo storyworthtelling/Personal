@@ -28,7 +28,6 @@ public class RecipeErrandTests
         Assert.NotEqual(ReadRequest.ReadRecipe, ReadRequest.ReadCard);
         Assert.NotEqual(ReadRequest.ReadRecipe, ReadRequest.ReadStatement);
         Assert.Equal(Errand.ReadRecipe, Errands.For(ReadRequest.ReadRecipe, null));
-        Assert.True(Errands.HasAWaitingCaller(Errand.ReadRecipe));
     }
 
     [Fact]

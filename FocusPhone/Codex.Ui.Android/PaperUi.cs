@@ -385,44 +385,6 @@ public static class PaperUi
         return row;
     }
 
-    /// <summary>The highlighter alpha DESIGN.md §3 gives the wash tier (~30%).</summary>
-
-    /// <summary>
-    /// A two-state segmented selector, kept for the heads that still call it.
-    /// Prefer <see cref="Segmented"/> — §8 wants the selection to be the highlighter
-    /// wash rather than inked text, and most switches now have more than two states.
-    /// </summary>
-    public static LinearLayout SegmentedToggle(
-        Context context, string leftLabel, string rightLabel, Action<int> onSelect, int initialIndex = 0)
-    {
-        var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
-        Button left = null!;
-        Button right = null!;
-
-        void Paint(int index)
-        {
-            left.SetTextColor(index == 0 ? PaperTheme.Accent : PaperTheme.InkMuted);
-            right.SetTextColor(index == 1 ? PaperTheme.Accent : PaperTheme.InkMuted);
-        }
-
-        left = SecondaryButton(context, leftLabel, () => { Paint(0); onSelect(0); });
-        right = SecondaryButton(context, rightLabel, () => { Paint(1); onSelect(1); });
-
-        row.AddView(left, new LinearLayout.LayoutParams(0,
-            Android.Views.ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        row.AddView(right, new LinearLayout.LayoutParams(0,
-            Android.Views.ViewGroup.LayoutParams.WrapContent)
-        {
-            Weight = 1,
-            MarginStart = PaperTheme.Dp(context, DesignTokens.Space.X2),
-        });
-
-        // Paint the starting selection without firing onSelect — a toggle should reflect the current
-        // state on open (e.g. a radio that is already off) without acting on it.
-        Paint(initialIndex);
-        return row;
-    }
-
     /// <summary>
     /// The quiet line at the foot of a Settings screen: app name, versionName, package id, in
     /// mono, at Label size, with the owner's maker's mark beside it (Suite S3).

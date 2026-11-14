@@ -18,7 +18,7 @@ namespace Constitution.Infrastructure.Workouts;
 /// <param name="Conditions">The hourly forecast and air quality; a source that cannot read says so and changes nothing.</param>
 /// <param name="HotelGyms">The places lookup for a work trip's hotel.</param>
 /// <param name="Recovery">The morning's Body reads.</param>
-/// <param name="Encouragement">The voiced seat; <see cref="SeatCacheEncouragement"/> over the shared cache.</param>
+/// <param name="Encouragement">The voiced seat (the head wires <c>SeatLineEncouragement</c>).</param>
 /// <param name="CalendarWriter">Google Calendar, written. The run puts <see cref="PastWriteGuard"/> in front of it.</param>
 /// <param name="WrittenKeys">The record of keys written, which placement reads and grows.</param>
 /// <param name="KeyAssignments">The record of workout numbers issued (B2), which gives a session the same key on every run however the week is re-planned.</param>

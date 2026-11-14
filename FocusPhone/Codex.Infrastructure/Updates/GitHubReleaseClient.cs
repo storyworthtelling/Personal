@@ -19,12 +19,6 @@ public record ReleaseInfo(string TagName, IReadOnlyList<ReleaseAsset> ApkAssets)
 {
     /// <summary>The release's sidecars (<c>&lt;apk&gt;.json</c>), by name (efficiency audit §13).</summary>
     public IReadOnlyDictionary<string, ReleaseAsset> Sidecars { get; init; } = new Dictionary<string, ReleaseAsset>();
-
-    public bool IsNewerThan(string installedVersion)
-    {
-        var match = Regex.Match(TagName, @"\d+\.\d+\.\d+");
-        return match.Success && Version.Parse(match.Value) > Version.Parse(installedVersion);
-    }
 }
 
 /// <summary>

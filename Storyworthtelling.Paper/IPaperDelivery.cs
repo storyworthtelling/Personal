@@ -7,7 +7,7 @@ namespace Storyworthtelling.Paper;
 /// proven Foreword path — or a named folder) and the Drive-beside-source archive behind one interface, so every
 /// app delivers the same way. It is the only door to the tablet for an upload (audit 01 §11,
 /// <c>OneRemarkableDoorTests</c>); an app may still read, list and trash through <see cref="IRemarkableClient"/>.
-/// The colour profile of the bytes is chosen by the caller via <see cref="DeliveryProfilePolicy"/> before rendering; this seam is a byte-pipe. Either transport may be absent on a given head (no reMarkable
+/// The colour profile of the bytes is the caller's to choose before rendering; this seam is a byte-pipe. Either transport may be absent on a given head (no reMarkable
 /// pairing, or the Drive write scope not yet granted), reported by the capability flags so the caller can skip
 /// a target rather than fail.
 /// </summary>

@@ -16,7 +16,7 @@ namespace Score;
 /// it whenever the async work behind <paramref name="refreshAccessToken"/> finishes.
 /// Calling into TIDAL's own suspend sign-in methods was the opposite, harder
 /// direction, which is why device-code sign-in went through plain HTTP instead of the
-/// binding (see <c>TidalDeviceAuthClient</c>).
+/// binding (see <c>TidalAuthClient</c>).
 ///
 /// <see cref="GetCredentials"/> still has to satisfy Kotlin's suspend-function JVM
 /// ABI: return <see cref="TidalKotlinBridge.CoroutineSuspended"/> to signal "the

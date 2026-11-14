@@ -10,7 +10,6 @@ public static class GoogleScopes
 {
     public const string Drive = "https://www.googleapis.com/auth/drive";
     public const string DriveReadonly = "https://www.googleapis.com/auth/drive.readonly";
-    public const string DocumentsReadonly = "https://www.googleapis.com/auth/documents.readonly";
     public const string Calendar = "https://www.googleapis.com/auth/calendar";
     public const string Tasks = "https://www.googleapis.com/auth/tasks";
 

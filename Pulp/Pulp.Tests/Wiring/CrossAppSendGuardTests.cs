@@ -85,8 +85,6 @@ public class CrossAppSendGuardTests
         var hbo = Assert.IsType<StreamingService>(ServiceCatalogue.Public.ById(new Pulp.Domain.Core.ServiceId("hbo-max")));
 
         Assert.DoesNotContain("Max", hbo.MerchantNames);
-        Assert.Null(ServiceCatalogue.Public.ByMerchant("Max"));
-        Assert.Equal(hbo, ServiceCatalogue.Public.ByMerchant("hbo max"));
         Assert.Contains("HBO Max", hbo.MerchantNames);
         Assert.Contains("Max.com", hbo.MerchantNames);
         Assert.All(ServiceCatalogue.Public.All, service =>

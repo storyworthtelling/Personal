@@ -55,21 +55,7 @@ public static class CaptureFormat
             "A capture ratio with no window would have to be produced by cropping the preview."),
     };
 
-    public static CaptureRatio NextRatio(CaptureRatio from) =>
-        from == CaptureRatio.ThreeFour ? CaptureRatio.NineSixteen : CaptureRatio.ThreeFour;
-
     public static Lens NextLens(Lens from) => from == Lens.Back ? Lens.Front : Lens.Back;
-
-    /// <summary>
-    /// One control, three states, in a fixed order — so the owner can get back to where they
-    /// were by tapping rather than by hunting through a menu.
-    /// </summary>
-    public static Flash NextFlash(Flash from) => from switch
-    {
-        Flash.Off => Flash.On,
-        Flash.On => Flash.Auto,
-        _ => Flash.Off,
-    };
 
     /// <summary>
     /// The phone has no front-facing flash. Offering the control there would be a button
