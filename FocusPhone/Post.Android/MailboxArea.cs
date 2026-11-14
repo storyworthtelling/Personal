@@ -247,6 +247,32 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         ReloadThreads();
         SyncInBackground();
         CheckPendingMmsSendFailure();
+        CheckStuckFilings();
+    }
+
+    // A filing whose delete Gmail keeps refusing (Tombstones.Fold, orphan audit §21). The sync retries it
+    // every time and the message stays filed; the fold is how the owner learns the server disagrees.
+    // Read off the UI thread, since it opens the timeline database.
+    private void CheckStuckFilings()
+    {
+        Task.Run(() =>
+        {
+            FilingFold? fold;
+            try
+            {
+                using var database = TimelineDatabase.Open(Host);
+                fold = database.Filing.LoadTombstones().Fold();
+            }
+            catch (Exception e)
+            {
+                PostDiagnostics.LogWarning("Filing", "Could not read the owed deletes for the fold", e);
+                return;
+            }
+
+            Host.RunOnUiThread(() => DogEar.SetNotice(Host, Overlay, NoticeKeys.Filing, fold is null
+                ? null
+                : new DogEar.Notice(fold.Title, fold.Detail, PaperTheme.ProblemMark)));
+        });
     }
 
     public override void OnPermissionsResult() => ReloadThreads();
@@ -1529,6 +1555,11 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         {
             actions.Add(new CardAction("Name this group", () => AskGroupName(groupKey, openTitle)));
         }
+        if (IdentityRepair.CanSeparate(openMemberKeys, item.ContactKey, openIsGroup))
+        {
+            actions.Add(new CardAction("Not the same person", () => SeparateWithUndo(item.ContactKey),
+                Detail: $"Take {item.ContactKey} out of this correspondence"));
+        }
 
         ActionCard.Show(Host, Overlay, openTitle, TimelineItemFormatter.Describe(item), actions.ToArray());
     }
@@ -1635,6 +1666,28 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     // Filing one message: the ghost is kept and the source delete is owed. The correspondence
     // screen's unit is the message; the Mailbox's is the whole correspondence.
+    // An address the address book joined to the wrong person (orphan audit §25): pinned on its own, so its
+    // messages leave this correspondence for one of their own. Undo-first, like everything that moves mail.
+    private void SeparateWithUndo(string key)
+    {
+        using (var database = TimelineDatabase.Open(Host))
+        {
+            database.IdentityLinks.Unlink(key);
+        }
+        LoadOpenThread();
+        ReloadThreads();
+
+        DogEar.Show(Host, Overlay, $"Separated {key}.", onUndo: () =>
+        {
+            using (var database = TimelineDatabase.Open(Host))
+            {
+                database.IdentityLinks.Rejoin(key);
+            }
+            LoadOpenThread();
+            ReloadThreads();
+        });
+    }
+
     private void FileWithUndo(TimelineItem item) =>
         KeyActs.Run(TapWatch.Action(PostKeyActions.File, KeyActs.Local), () => FileWithUndoNow(item));
 

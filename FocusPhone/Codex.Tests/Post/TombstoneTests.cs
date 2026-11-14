@@ -140,4 +140,44 @@ public class TombstoneTests
         Assert.Single(book.Outstanding());
         Assert.Equal(2, book.FailedAttempts("m1"));
     }
+
+    // Orphan audit §21: ShouldSpeak had no caller, so a delete that kept failing earned a log line and never
+    // the fold the class promises. The Mailbox reads this on open.
+    [Fact]
+    public void TheFoldSpeaksOnlyOnceAFilingHasFailedPastTheQuietAttempts()
+    {
+        var book = Filed("m1", "m2");
+        for (var i = 0; i < Tombstones.QuietAttempts - 1; i++)
+        {
+            book.AttemptFailed("m1", Now);
+        }
+
+        Assert.Null(book.Fold());
+
+        book.AttemptFailed("m1", Now);
+        var one = book.Fold();
+        Assert.NotNull(one);
+        Assert.Equal("A filed message is still in Gmail.", one!.Title);
+
+        for (var i = 0; i < Tombstones.QuietAttempts; i++)
+        {
+            book.AttemptFailed("m2", Now);
+        }
+        Assert.Equal("2 filed messages are still in Gmail.", book.Fold()!.Title);
+        Assert.Contains("stay filed", book.Fold()!.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AConfirmedDeleteSilencesItsFold()
+    {
+        var book = Filed("m1");
+        for (var i = 0; i < Tombstones.QuietAttempts; i++)
+        {
+            book.AttemptFailed("m1", Now);
+        }
+
+        book.SourceConfirmed("m1");
+
+        Assert.Null(book.Fold());
+    }
 }

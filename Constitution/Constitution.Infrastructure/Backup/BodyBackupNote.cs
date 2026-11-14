@@ -111,6 +111,17 @@ public static class BodyBackupNote
         }
     }
 
+    /// <summary>
+    /// Whether a run's sentence should replace the one Settings is showing. A run with nothing to do (not due,
+    /// no new reading, a restore already checked) says nothing worth keeping and would wipe what the last real
+    /// run said; everything else, success or failure, is shown.
+    /// </summary>
+    public static bool WorthShowing(BodyBackupRunResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return result.Status is not (BodyBackupRunStatus.NotDue or BodyBackupRunStatus.SyncDidNotRun or BodyBackupRunStatus.AlreadyRestored);
+    }
+
     // A detail reads "TypeName: message", or is a bare type name, or is a sentence from the backup about
     // what it did. Only something shaped like a type name is repeated; anything else is dropped, because
     // a message is exactly the part that could carry a value.

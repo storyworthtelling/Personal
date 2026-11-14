@@ -30,7 +30,8 @@ public sealed class OwnerWork : IOwnerWorkScheduler
 
     public void CancelRefresh() => RefreshWorker.CancelAll(Platform.AppContext);
 
-    public void RunRefreshNow() => RefreshWorker.RunNow(Platform.AppContext);
+    // Every bank, not only those due: "balances refresh every time Index opens" (D149).
+    public void RunRefreshNow() => RefreshWorker.RunNow(Platform.AppContext, everyBank: true);
 
     public void ScheduleWorksheet() => WorksheetDeliveryWorker.Schedule(Platform.AppContext);
 

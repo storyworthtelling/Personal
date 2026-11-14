@@ -8,6 +8,7 @@ using Index.Domain.Household;
 using Index.Domain.Identity;
 using Index.Infrastructure.Household;
 using Index.Infrastructure.Pipeline;
+using Index.Infrastructure.Services;
 // AndroidX.Work also defines an IClock, so alias the domain one we mean.
 using IClock = Index.Domain.Time.IClock;
 using Storyworthtelling.Pipeline;
@@ -28,6 +29,9 @@ namespace Index.Android;
 public class RefreshWorker : Worker
 {
     private const string WorkName = "ledger-refresh";
+
+    // The one-shot's input: refresh every bank, not only those already due (D149, orphan audit §33).
+    private const string EveryBankKey = "everyBank";
 
     // WorkManager can run the periodic worker and a RunNow one-shot at the same time (separate unique-
     // work chains). This process-wide gate lets only one cycle run at a time; a second wakeup returns
@@ -102,6 +106,15 @@ public class RefreshWorker : Worker
 
         try
         {
+            // "Balances refresh every time Index opens" (D149): a bank refreshed this morning waits a day
+            // before it is due again, so the open marks every bank due first, inside the gate, so a cycle
+            // already running is never disturbed. The one-shot after connecting a bank does not ask this.
+            if (InputData.GetBoolean(EveryBankKey, false))
+            {
+                scope.ServiceProvider.GetRequiredService<AccountService>().MarkAllDueAsync(CancellationToken.None)
+                    .GetAwaiter().GetResult();
+            }
+
             var runner = scope.ServiceProvider.GetRequiredService<PipelineRunner>();
             var clock = scope.ServiceProvider.GetRequiredService<IClock>();
 
@@ -189,12 +202,14 @@ public class RefreshWorker : Worker
             .EnqueueUniquePeriodicWork(WorkName, ExistingPeriodicWorkPolicy.Keep!, (PeriodicWorkRequest)request);
     }
 
-    // An immediate one-shot drain (used by "Refresh now" and right after connecting an institution) so
-    // balances update without waiting for the next daily window.
-    public static void RunNow(Context context)
+    // An immediate one-shot drain (refresh on open, with everyBank, and right after connecting an
+    // institution) so balances update without waiting for the next daily window.
+    public static void RunNow(Context context, bool everyBank = false)
     {
+        var input = new Data.Builder().PutBoolean(EveryBankKey, everyBank)!.Build();
         var request = new OneTimeWorkRequest.Builder(typeof(RefreshWorker))
             .SetConstraints(NetworkConnected())!
+            .SetInputData(input)!
             .Build();
 
         WorkManager.GetInstance(context)

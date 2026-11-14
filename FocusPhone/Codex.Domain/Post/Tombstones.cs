@@ -1,5 +1,8 @@
 namespace Codex.Domain.Post;
 
+/// <summary>The fold's two lines for filings the source keeps refusing.</summary>
+public sealed record FilingFold(string Title, string Detail);
+
 /// <summary>One filing that the source has not yet confirmed.</summary>
 public sealed record Tombstone(string SourceId, DateTimeOffset FiledAtUtc, int FailedAttempts);
 
@@ -74,6 +77,26 @@ public sealed class Tombstones
 
     /// <summary>Whether this filing has failed often enough to be worth a fold.</summary>
     public bool ShouldSpeak(string sourceId) => FailedAttempts(sourceId) >= QuietAttempts;
+
+    /// <summary>
+    /// What the Mailbox's fold says about filings the source keeps refusing, or null while every
+    /// one is still within its quiet attempts. It never offers to give a message back: the item
+    /// stays filed and the delete is retried on every sync.
+    /// </summary>
+    public FilingFold? Fold()
+    {
+        var stuck = standing.Keys.Count(ShouldSpeak);
+        if (stuck == 0)
+        {
+            return null;
+        }
+
+        var title = stuck == 1
+            ? "A filed message is still in Gmail."
+            : $"{stuck} filed messages are still in Gmail.";
+        return new FilingFold(title,
+            "Gmail has not accepted the delete. They stay filed here, and Post asks again on every sync.");
+    }
 
     /// <summary>
     /// Deletes still owed to the source, retried on every sync until one lands. There is

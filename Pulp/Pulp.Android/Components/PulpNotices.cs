@@ -48,6 +48,11 @@ public static class PulpNotices
         {
             case HandOffResult.Started:
                 Withdraw(context, overlay, WaitingNotices.HandOffKey(title));
+                // Where it landed is told later, by the playing app's session (D122).
+                if (outcome.Recorded is { } pending)
+                {
+                    Landings.Watch(context, overlay, pending, serviceName, titleName, buttons);
+                }
                 break;
             case HandOffResult.NotInstalled:
                 Raise(context, overlay, WaitingNotices.NotInstalled(serviceName, title, at), buttons, title);

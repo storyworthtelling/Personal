@@ -86,6 +86,28 @@ public class BalanceRefreshProcessorTests
         plaid.Verify(p => p.GetLiabilitiesAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // Orphan audit §33, D149: "balances refresh every time Index opens". The open asks for every bank, so a
+    // bank refreshed this morning (not due for a day) and one that failed are both refreshed, not skipped.
+    [Fact]
+    public async Task RefreshNow_MarksEveryBankDue_SoANotYetDueBankIsRefreshed()
+    {
+        using var db = new TestDatabase();
+        var id = SeedInstitution(db, WorkStatus.Completed, Now.AddHours(20));
+        var clock = new FakeClock(Now);
+        var plaid = new Mock<IPlaidClient>();
+        plaid.Setup(p => p.GetBalancesAsync("access-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[] { Depository("acc1") });
+        var processor = Create(db, plaid.Object, clock);
+
+        Assert.Equal(ProcessOutcome.Waiting, (await processor.ProcessNextAsync(CancellationToken.None)).Outcome);
+
+        await new Index.Infrastructure.Services.AccountService(db, clock).MarkAllDueAsync(CancellationToken.None);
+        var result = await processor.ProcessNextAsync(CancellationToken.None);
+
+        Assert.Equal(ProcessOutcome.DidWork, result.Outcome);
+        Assert.Equal(id, result.SubjectId);
+    }
+
     [Fact]
     public async Task CreditAccounts_FetchLiabilities_AndMergeDetail()
     {

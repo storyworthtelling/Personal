@@ -27,6 +27,14 @@ public static class PolicyPlanBuilder
             restrictions.Add(AndroidUserRestrictions.NoDebuggingFeatures);
         }
 
+        // Accounts are added and removed only inside the owner's Admin session (owner's ruling, audit W7).
+        // A token refresh or a consent screen for an existing account is not a modification, so the apps'
+        // sign-ins keep working; adding a new account waits for Admin mode.
+        if (!context.AdminModeActive)
+        {
+            restrictions.Add(AndroidUserRestrictions.NoModifyAccounts);
+        }
+
         var suspended = new HashSet<string>(context.BrowserPackages);
         suspended.UnionWith(context.OtherHomePackages);
         // The never-visible categories (games/social/dating/gambling/short-form) are hard-suspended

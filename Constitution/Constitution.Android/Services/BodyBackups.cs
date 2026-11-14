@@ -33,6 +33,23 @@ public static class BodyBackups
     private static readonly object Gate = new();
     private static readonly BodyBackupDebouncer Debouncer = new();
     private static BodyBackupRunner? runner;
+    private static string? lastNote;
+
+    /// <summary>
+    /// What the last run worth saying came to, in <see cref="BodyBackupNote"/>'s words, for Settings (orphan audit
+    /// §41); null until one has run in this process. Words only: no reading, number or failure message.
+    /// </summary>
+    public static string? LastNote => Volatile.Read(ref lastNote);
+
+    private static async Task<BodyBackupRunResult> Noted(Task<BodyBackupRunResult> run)
+    {
+        var result = await run;
+        if (BodyBackupNote.WorthShowing(result))
+        {
+            Volatile.Write(ref lastNote, BodyBackupNote.For(result));
+        }
+        return result;
+    }
 
     /// <summary>
     /// The one call a launch makes: restores the household's connections from the vault, and only then the
@@ -52,7 +69,7 @@ public static class BodyBackups
                 await ConstitutionVaults.Create(appContext).RestoreAsync(CancellationToken.None);
 
                 var store = BodyServices.Create(appContext).Store;
-                await RunnerFor(appContext).RestoreAtLaunchAsync(store, onRestored, CancellationToken.None);
+                await Noted(RunnerFor(appContext).RestoreAtLaunchAsync(store, onRestored, CancellationToken.None));
             }
             catch (Exception e)
             {
@@ -75,7 +92,7 @@ public static class BodyBackups
         {
             try
             {
-                await RunnerFor(appContext).FlushAsync(BodyServices.CreateStore(appContext), CancellationToken.None);
+                await Noted(RunnerFor(appContext).FlushAsync(BodyServices.CreateStore(appContext), CancellationToken.None));
             }
             catch (Exception e)
             {
@@ -86,14 +103,14 @@ public static class BodyBackups
 
     /// <summary>After the app's open-time read: notes the history and backs it up once it has been quiet.</summary>
     public static Task<BodyBackupRunResult> AfterOpenSyncAsync(Context context, BodySyncResult sync, IBodyStore store, CancellationToken cancellationToken) =>
-        RunnerFor(context).AfterSyncAsync(sync, store, BodyBackupTiming.WhenDue, cancellationToken);
+        Noted(RunnerFor(context).AfterSyncAsync(sync, store, BodyBackupTiming.WhenDue, cancellationToken));
 
     /// <summary>
     /// After the overnight worker's read: backs up at once. The worker has no later turn in which a quiet
     /// window could pass, so debouncing it would be never writing.
     /// </summary>
     public static Task<BodyBackupRunResult> AfterWorkerSyncAsync(Context context, BodySyncResult sync, IBodyStore store, CancellationToken cancellationToken) =>
-        RunnerFor(context).AfterSyncAsync(sync, store, BodyBackupTiming.Now, cancellationToken);
+        Noted(RunnerFor(context).AfterSyncAsync(sync, store, BodyBackupTiming.Now, cancellationToken));
 
     private static BodyBackupRunner RunnerFor(Context context)
     {

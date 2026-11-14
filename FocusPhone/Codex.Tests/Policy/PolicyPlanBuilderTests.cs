@@ -73,12 +73,24 @@ public class PolicyPlanBuilderTests
         Assert.Contains("com.king.candycrushsaga", plan.SuspendedPackages);
     }
 
+    // Owner's ruling (audit W7): accounts cannot be added or removed outside Admin mode. This reverses the
+    // earlier "never restrict account modification" guard; Admin mode is the way to add or remove an account.
     [Fact]
-    public void Plan_NeverRestrictsAccountModification()
+    public void Plan_RestrictsAccountModificationOutsideAdminMode()
     {
         var plan = PolicyPlanBuilder.Build(DefaultContext(finalized: true));
 
+        Assert.Contains(AndroidUserRestrictions.NoModifyAccounts, plan.UserRestrictions);
+    }
+
+    [Fact]
+    public void AdminMode_LiftsTheAccountRestriction_AndThePolicyPassClearsIt()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext(finalized: true, adminModeActive: true));
+
         Assert.DoesNotContain(AndroidUserRestrictions.NoModifyAccounts, plan.UserRestrictions);
+        // Android keeps a restriction until it is cleared, so leaving it out of the plan is not enough.
+        Assert.Contains(AndroidUserRestrictions.NoModifyAccounts, AndroidUserRestrictions.ToClear(plan.UserRestrictions));
     }
 
     [Fact]

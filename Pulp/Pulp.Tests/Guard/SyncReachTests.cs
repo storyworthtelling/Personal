@@ -55,4 +55,26 @@ public class SyncReachTests
 
         Assert.Contains("HouseholdDraftWrite.Apply", services);
     }
+
+    // Orphan audit §29: a league whose feed was down showed old games with no word.
+    [Fact]
+    public void TheSportsTabRaisesTheUnreachableFeedNotice()
+    {
+        Assert.Contains("SportsUnreachable", Text("Pulp.Android/App/PulpServices.cs"));
+        var screen = Text("Pulp.Android/Sports/SportsScreen.cs");
+        Assert.Contains("services.SportsUnreachable", screen);
+        Assert.Contains("WaitingNotices.SportsFeedUnreachable(", screen);
+    }
+
+    // Orphan audit §28: the mis-landing check (D122) was computed nowhere, so its dog-ear never showed.
+    [Fact]
+    public void AStartedHandOffIsWatchedAndRelayedSessionsSettleIt()
+    {
+        Assert.Contains("Landings.Watch(", Text("Pulp.Android/Components/PulpNotices.cs"));
+        Assert.Contains("Landings.Saw(", Text("Pulp.Android/Sessions/SessionReceiver.cs"));
+        var landings = Text("Pulp.Android/HandOffs/Landings.cs");
+        Assert.Contains("LandingWatch", landings);
+        Assert.Contains("PulpNotices.AfterLanding(", landings);
+        Assert.Contains("LandingCheck.Window", landings);
+    }
 }

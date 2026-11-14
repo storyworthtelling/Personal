@@ -570,8 +570,8 @@ public sealed class AccountService
         return false;
     }
 
-    // Marks every institution due right now (used by "Refresh now"), including previously failed ones so
-    // a manual pull gives them another chance.
+    // Marks every institution due right now (refresh on open, D149, through RefreshWorker's everyBank
+    // one-shot), including previously failed ones so opening Index gives them another chance.
     public async Task MarkAllDueAsync(CancellationToken cancellationToken)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
