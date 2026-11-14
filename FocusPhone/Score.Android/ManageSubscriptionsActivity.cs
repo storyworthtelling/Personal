@@ -73,12 +73,12 @@ public class ManageSubscriptionsActivity : Activity
         undoHost.AddView(scroll, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, "Subscriptions", ScoreShellAreas.All[ScoreShellAreas.Podcasts].Hue, undoHost,
-            ScoreShellAreas.All, ScoreShellAreas.Podcasts, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            ScoreShellAreas.All, ScoreShellAreas.Podcasts, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        root.AddView(PaperUi.BottomBar(this,
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Add feed", ShowAddFeedDialog),
             PaperUi.QuietButton(this, "Import OPML", ImportOpml),
             PaperUi.QuietButton(this, "Diagnostics",

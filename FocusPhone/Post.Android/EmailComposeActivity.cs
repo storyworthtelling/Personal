@@ -69,11 +69,11 @@ public class EmailComposeActivity : Activity
         content.AddView(PaperUi.ProblemLine(this,
             "Gmail is not set up on this phone yet, so this email cannot be sent."), Row());
 
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, $"Email {name}", PostShellAreas.All[PostShellAreas.Mailbox].Hue, content,
-            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
-        root.AddView(PaperUi.BottomBar(this,
+            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Set up Gmail", () => SwitchArea(PostShellAreas.Settings))));
         return root;
     }
@@ -101,13 +101,13 @@ public class EmailComposeActivity : Activity
         status.Visibility = ViewStates.Gone;
         content.AddView(status, Row());
 
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, $"Email {name}", PostShellAreas.All[PostShellAreas.Mailbox].Hue, content,
-            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         sendButton = PaperUi.PrimaryButton(this, "Send", Send);
-        root.AddView(PaperUi.BottomBar(this, sendButton));
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this, sendButton));
         return root;
     }
 

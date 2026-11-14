@@ -104,6 +104,8 @@ public static class PaperUi
     {
         var button = ButtonBase(context, label, onClick, PaperTheme.PaperBright, PaperTheme.SansSemibold(context));
         button.Background = PressedHairline(context, PaperTheme.ActionDeep);
+        // The bar puts a primary last and widest, whatever order it was handed in (BarOrder).
+        Primaries.AddOrUpdate(button, PrimaryMark);
         return button;
     }
 
@@ -466,6 +468,9 @@ public static class PaperUi
     /// The pinned bottom bar: a hairline rule over a horizontal action row,
     /// fixed at the screen bottom (append after a weight-1 content view).
     /// </summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Android.Views.View, object> Primaries = new();
+    private static readonly object PrimaryMark = new();
+
     public static LinearLayout BottomBar(Context context, params Android.Views.View[] actions)
     {
         var bar = new LinearLayout(context) { Orientation = Orientation.Vertical };
@@ -477,17 +482,31 @@ public static class PaperUi
             PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp)));
 
         var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
-        var horizontal = PaperTheme.Dp(context, DesignTokens.Space.X6);
-        var vertical = PaperTheme.Dp(context, DesignTokens.Space.X3);
+        row.SetGravity(GravityFlags.CenterVertical);
+        var horizontal = PaperTheme.Dp(context, DesignTokens.Shape.BarPaddingX);
+        var vertical = PaperTheme.Dp(context, DesignTokens.Shape.BarPaddingY);
         row.SetPadding(horizontal, vertical, horizontal, vertical);
-        foreach (var action in actions)
+
+        // §7: the primary last, on the right, taking the width that is left; the rest in the order
+        // given, sized to their words; no primary, and the width is shared (audit W8.3b, report 14 §4).
+        var plan = BarOrder.Arrange([.. actions.Select(action => Primaries.TryGetValue(action, out _))]);
+        var gap = PaperTheme.Dp(context, DesignTokens.Space.X2);
+        for (var position = 0; position < plan.Order.Count; position++)
         {
-            row.AddView(action, new LinearLayout.LayoutParams(0,
+            var index = plan.Order[position];
+            var shares = plan.Widest is null || plan.Widest == index;
+            var layout = new LinearLayout.LayoutParams(
+                shares ? 0 : Android.Views.ViewGroup.LayoutParams.WrapContent,
                 Android.Views.ViewGroup.LayoutParams.WrapContent)
             {
-                Weight = 1,
-                MarginEnd = PaperTheme.Dp(context, DesignTokens.Space.X2),
-            });
+                Weight = shares ? 1 : 0,
+            };
+            if (position > 0)
+            {
+                layout.MarginStart = gap; // between buttons only, so both ends sit on the bar's own padding
+            }
+
+            row.AddView(actions[index], layout);
         }
         bar.AddView(row, new LinearLayout.LayoutParams(
             Android.Views.ViewGroup.LayoutParams.MatchParent,

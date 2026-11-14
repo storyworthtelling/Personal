@@ -447,7 +447,8 @@ public class PlateActivity : AppCompatActivity
         // A slot rather than a bar: each area supplies its own actions, and an area with
         // none simply leaves it empty.
         bottomBarSlot = new FrameLayout(this);
-        root.AddView(bottomBarSlot);
+        // Under the page, not the spread: the strip beside it runs to the foot (owner's ruling, audit W8.3b).
+        page.AddView(bottomBarSlot);
         return root;
     }
 

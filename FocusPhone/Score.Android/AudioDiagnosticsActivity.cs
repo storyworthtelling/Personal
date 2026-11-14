@@ -42,10 +42,10 @@ public class AudioDiagnosticsActivity : Activity
         undoHost.AddView(scroll, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, "Diagnostics", ScoreShellAreas.All[ScoreShellAreas.Settings].Hue, undoHost,
-            ScoreShellAreas.All, ScoreShellAreas.Settings, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            ScoreShellAreas.All, ScoreShellAreas.Settings, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         // Send logs now is the screen's one primary act (§7): the weekly upload, this minute. The shared
         // screen carries the upload, so this one hands over to it rather than keep a second copy.
@@ -54,7 +54,7 @@ public class AudioDiagnosticsActivity : Activity
         copyButton = PaperUi.QuietButton(this, "Copy", CopyToClipboard);
         var copy = copyButton;
         var clear = PaperUi.QuietButton(this, "Clear", ClearLog);
-        root.AddView(PaperUi.BottomBar(this, send, share, copy, clear));
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this, send, share, copy, clear));
 
         SetContentView(root);
     }

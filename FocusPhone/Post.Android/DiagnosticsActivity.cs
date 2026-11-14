@@ -43,10 +43,10 @@ public class DiagnosticsActivity : Activity
         undoHost.AddView(scroll, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, "Diagnostics", PostShellAreas.All[PostShellAreas.Settings].Hue, undoHost,
-            PostShellAreas.All, PostShellAreas.Settings, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            PostShellAreas.All, PostShellAreas.Settings, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         // Send logs now is the screen's one primary act (§7): the weekly upload, this minute.
         var send = PaperUi.PrimaryButton(this, "Send logs now", SendLogsNow);
@@ -54,7 +54,7 @@ public class DiagnosticsActivity : Activity
         copyButton = PaperUi.QuietButton(this, "Copy", CopyToClipboard);
         var copy = copyButton;
         var clear = PaperUi.QuietButton(this, "Clear", ClearLog);
-        root.AddView(PaperUi.BottomBar(this, send, share, copy, clear));
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this, send, share, copy, clear));
 
         SetContentView(root);
     }
