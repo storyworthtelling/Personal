@@ -75,4 +75,18 @@ public class OrphansWiredTests
 
         Assert.Contains("tag.ReplayGainTrackGain", LogLoopSource.File("FocusPhone/Score.Android/MusicTagReader.cs"), StringComparison.Ordinal);
     }
+
+    // W7.4 (owner's ruling): a requested video was refused; it is now recorded and returned like a picture.
+    [Fact]
+    public void PlateRecordsAVideoForTheAppThatAskedAndReturnsIt()
+    {
+        var errand = LogLoopSource.File("FocusPhone/Plate.Android/ErrandActivity.cs");
+
+        Assert.DoesNotContain("cannot record for another app", errand, StringComparison.Ordinal);
+        Assert.Contains("VideoErrand.Limits(", errand, StringComparison.Ordinal);
+        Assert.Contains("PrepareRecording(", errand, StringComparison.Ordinal);
+        Assert.Contains("VideoErrand.IsUsable(", errand, StringComparison.Ordinal);
+        Assert.Contains("CaptureFiling.Video(", errand, StringComparison.Ordinal);
+        Assert.Contains("MediaStore.Video.Media.ExternalContentUri", errand, StringComparison.Ordinal);
+    }
 }
