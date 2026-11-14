@@ -40,4 +40,11 @@ public class PulpLogLinesTests
         Assert.Equal("CALENDAR not written: this install only reads it", PulpLogLines.Calendar(new CalendarNightlyOutcome("cal-1", null)));
         Assert.Equal("CALENDAR not run: no household or account yet", PulpLogLines.CalendarSkipped);
     }
+
+    // W7.5: the weekly refresh says how much it did and how much of the month it has used — counts only, no title.
+    [Fact]
+    public void TheWeeklyRefreshCountsWithoutNamingATitle()
+    {
+        Assert.Equal("WEEKLY REFRESH looked again at 3 of 12 tracked titles; 140 lookups this month", PulpLogLines.WeeklyRefresh(3, 12, 140));
+    }
 }

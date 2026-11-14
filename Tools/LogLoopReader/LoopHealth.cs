@@ -51,7 +51,7 @@ public sealed partial record LoopHealth(
             ],
             ["post"] = [("EmailSyncWorker", TimeSpan.FromMinutes(30)), ("LogUploadWorker", TimeSpan.FromDays(1))],
             ["plate"] = [("LoopUploadWorker", TimeSpan.FromDays(1))],
-            ["pulp"] = [("CalendarSyncWorker", TimeSpan.FromDays(1)), ("LoopUploadWorker", TimeSpan.FromDays(1))],
+            ["pulp"] = [("CalendarSyncWorker", TimeSpan.FromDays(1)), ("WeeklyRefreshWorker", TimeSpan.FromDays(1)), ("LoopUploadWorker", TimeSpan.FromDays(1))],
             ["constitution"] =
             [
                 ("BodySyncWorker", TimeSpan.FromHours(12)), ("ReadBackWorker", TimeSpan.FromDays(1)),

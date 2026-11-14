@@ -77,4 +77,18 @@ public class SyncReachTests
         Assert.Contains("PulpNotices.AfterLanding(", landings);
         Assert.Contains("LandingCheck.Window", landings);
     }
+
+    // W7.5 (owner's ruling): the weekly refresh had frozen names and no worker; it now runs, daily, under them.
+    [Fact]
+    public void TheWeeklyRefreshIsScheduledUnderItsFrozenNames()
+    {
+        var worker = Text("Pulp.Android/Catalogue/WeeklyRefreshWorker.cs");
+        Assert.Contains("[global::Android.Runtime.Register(PulpIdentity.WeeklyRefreshWorkerName)]", worker);
+        Assert.Contains("EnqueueUniquePeriodicWork(PulpIdentity.WeeklyRefreshWorkName, ExistingPeriodicWorkPolicy.Keep!", worker);
+        Assert.Contains("RefreshTrackedAsync(", worker);
+
+        var services = Text("Pulp.Android/App/PulpServices.cs");
+        Assert.Contains("WeeklyRefreshSchedule.Schedule(context);", services);
+        Assert.Contains("WeeklyRefresh.Due(", services);
+    }
 }

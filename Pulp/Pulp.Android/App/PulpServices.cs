@@ -6,6 +6,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Pulp.Calendar;
+using Pulp.Catalogue;
 using Pulp.Domain;
 using Pulp.Domain.Calendar;
 using Pulp.Domain.Catalogue;
@@ -77,6 +78,7 @@ public sealed class PulpServices
     private readonly LocalInstallStore install;
     private readonly CatalogueCache cache;
     private readonly StreamingAvailabilityClient availability;
+    private readonly DiagnosticsLookupCounter lookups;
     private readonly TvMazeClient episodes;
     private readonly OmdbClient ratings;
     private readonly DriveVoiceOptions voiceOptions;
@@ -98,6 +100,7 @@ public sealed class PulpServices
         var account = new VoiceGoogleAccount();
         Keys = new VaultPulpKeySource(account, Diagnostics);
         var counter = new DiagnosticsLookupCounter(files, Diagnostics);
+        lookups = counter;
         var health = HeadCredentialHealth.Store();
         var http = HeadHttp.WithTimeout(TimeSpan.FromSeconds(30));
         Posters = new Posters(http, cacheRoot, Diagnostics);
@@ -133,6 +136,7 @@ public sealed class PulpServices
             Diagnostics.Warn("calendar", message, exception);
         };
         CalendarSchedule.Schedule(context);
+        WeeklyRefreshSchedule.Schedule(context);
 
         // Flyleaf's relayed playback sessions (G18). Set here like the calendar hooks, so the receiver, which
         // Android can start with no shell, finds it once these services exist. The hook only records evidence.
@@ -810,6 +814,27 @@ public sealed class PulpServices
         fetched = await WithAirDatesAsync(fetched, cancellationToken);
         cache.Store(fetched, DateTimeOffset.UtcNow);
         return fetched;
+    }
+
+    /// <summary>
+    /// The weekly refresh (D204, W7.5): the tracked titles that are a week stale, oldest first, within
+    /// <see cref="WeeklyRefresh"/>'s limits, each looked at again through <see cref="TitleAsync"/> (which keeps
+    /// the cached copy when a lookup fails). Returns the counts for the worker's line.
+    /// </summary>
+    public async Task<(int Refreshed, int Tracked, int LookupsThisMonth)> RefreshTrackedAsync(CancellationToken cancellationToken)
+    {
+        var view = await HouseholdAsync(cancellationToken);
+        var tracked = WeeklyRefresh.Tracked(view.AllSittings, view.AllPlaylists);
+        var due = WeeklyRefresh.Due(
+            tracked.Select(id => (id, ReadCache(id)?.Stamp)),
+            lookups.ThisMonth(LookupSource.StreamingAvailability),
+            DateTimeOffset.UtcNow);
+        foreach (var id in due)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await TitleAsync(id, tracked: true, opened: false, cancellationToken);
+        }
+        return (due.Count, tracked.Count, lookups.ThisMonth(LookupSource.StreamingAvailability));
     }
 
     /// <summary>
