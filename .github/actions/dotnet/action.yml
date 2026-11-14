@@ -1,0 +1,52 @@
+name: Set up .NET 10
+description: >
+  The .NET 10 SDK, NuGet's package folder and (optionally) an Android workload, each restored from
+  the Actions cache when it can be. Every workflow sets up .NET through here (CiHygieneTests), so a
+  run no longer downloads the same packages and a gigabyte of workload packs from nothing.
+
+inputs:
+  workload:
+    description: "The workload to install: 'android', 'maui-android', or empty for none."
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    # The SDK goes in the home folder rather than the runner's own, so it can be cached with the
+    # workload installed into it. The week is part of the key: a new SDK patch or workload release
+    # is picked up within seven days, and a cache never goes stale for longer.
+    - name: Locate the SDK
+      id: where
+      shell: bash
+      run: |
+        echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+        echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the SDK and workload
+      if: inputs.workload != ''
+      id: sdk
+      uses: actions/cache@v4
+      with:
+        path: ~/.dotnet
+        key: dotnet10-${{ runner.os }}-${{ inputs.workload }}-${{ steps.where.outputs.week }}
+
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    # Keyed by workflow and job, so each keeps the packages it actually restores, and by the
+    # project files, so a changed reference saves a new set; the prefix restores the last set.
+    - name: Restore NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-${{ hashFiles('**/*.csproj', '**/Directory.*.props', '**/Directory.*.targets') }}
+        restore-keys: |
+          nuget-${{ runner.os }}-${{ github.workflow }}-${{ github.job }}-
+
+    - name: Install the workload
+      if: inputs.workload != '' && steps.sdk.outputs.cache-hit != 'true'
+      shell: bash
+      run: dotnet workload install ${{ inputs.workload }}

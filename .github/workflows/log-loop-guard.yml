@@ -18,25 +18,46 @@ on:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # A push to a branch with a PR open fires both triggers, and the guard ran twice over the same
+  # commit. The PR's run is the one branch protection reads, so the push's run steps aside for it —
+  # a few seconds on a bare runner instead of the whole guard. If the question cannot be answered,
+  # the guard runs: paying twice is the lesser failure than checking nothing.
+  covered:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      open: ${{ steps.pr.outputs.open }}
+    steps:
+      - name: Is a pull request already checking this branch?
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open=$(gh pr list --repo "${{ github.repository }}" --head "${{ github.ref_name }}" --base main --state open --json number --jq length || echo "")
+          echo "open=$open" >> "$GITHUB_OUTPUT"
+
   log-loop-guard:
     name: log-loop-guard
+    needs: covered
+    if: >-
+      always() && !(github.event_name == 'push'
+      && needs.covered.outputs.open != '' && needs.covered.outputs.open != '0')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+      - uses: ./.github/actions/dotnet
 
       - name: Test the reader (fetch, digest, sanitize, leakscan, gate)
         run: dotnet test Tools/LogLoopReader.Tests/LogLoopReader.Tests.csproj

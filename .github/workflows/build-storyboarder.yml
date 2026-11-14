@@ -18,12 +18,13 @@ on:
       - 'Storyworthtelling.Google/**'
       - 'Storyworthtelling.Google.Android/**'
       - 'Storyworthtelling.Pipeline/**'
-      - 'Storyworthtelling.Voice.Tests/**'
       # The shared reMarkable delivery library also ships in the APK (Infrastructure references it).
       - 'Storyworthtelling.Remarkable/**'
-      - 'Storyworthtelling.Remarkable.Tests/**'
       # The shared MAUI kit ships in the APK, and with it the file logger.
       - 'Storyworthtelling.Maui/**'
+      # Everything the head and its tests build from (CiHygieneTests reads the ProjectReference closure).
+      - 'Storyworthtelling.Paper/**'
+      - '.github/actions/dotnet/**'
       - '.github/workflows/build-storyboarder.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
@@ -43,10 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+      - uses: ./.github/actions/dotnet
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android head, which would require the MAUI/Android workload. The
@@ -55,15 +53,6 @@ jobs:
         run: >
           dotnet test Storyboarder/Folio.Tests/Folio.Tests.csproj
           -p:FolioTfms=net10.0
-
-      # The shared owner's-voice library (net10.0, pure .NET) ships in the APK; its own tests run here so
-      # a change to it is verified in the same workflow that rebuilds Folio.
-      - name: Run voice tests
-        run: dotnet test Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj
-
-      # The shared reMarkable delivery library also ships in the APK; its tests run here too.
-      - name: Run reMarkable tests
-        run: dotnet test Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj
 
   build:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
@@ -76,10 +65,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: '10.0.x'
+          workload: maui-android
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android head, which would require the MAUI/Android workload. The
@@ -89,17 +77,8 @@ jobs:
           dotnet test Storyboarder/Folio.Tests/Folio.Tests.csproj
           -p:FolioTfms=net10.0
 
-      # The shared owner's-voice library (net10.0, pure .NET) ships in the APK; its own tests run here so
-      # a change to it is verified in the same workflow that rebuilds Folio.
-      - name: Run voice tests
-        run: dotnet test Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj
-
-      # The shared reMarkable delivery library also ships in the APK; its tests run here too.
-      - name: Run reMarkable tests
-        run: dotnet test Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj
-
-      - name: Install MAUI Android workload
-        run: dotnet workload install maui-android
+      # The shared libraries' own tests run in build-shared-libs.yml, once, wherever a change reaches
+      # them; running Voice's and reMarkable's here as well paid for them twice.
 
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true

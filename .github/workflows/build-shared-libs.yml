@@ -36,43 +36,73 @@ on:
       # The guards in Updates.Tests read the OTHER workflows — that every root test project is run
       # here, and that every app workflow runs its own app's tests. A change to one of those files
       # has to be able to trip them, or the guard only fires by luck.
-      - '.github/workflows/build-*.yml'
+      - '.github/workflows/*.yml'
+      - '.github/actions/**'
+      - '.github/scripts/**'
+      # What the suites read by content rather than build (affected-tests.py READS): the design
+      # guards read the heads' settings pages and token files, the CI guards every project file.
+      - '**/*.csproj'
+      - 'CLAUDE.md'
+      - 'Fonts/**'
+      - 'FocusPhone/**'
+      - 'Foreword/**'
+      - 'Ledger/**'
+      - 'Storyboarder/**'
+      - 'Branding/**'
+
+# One run per branch at a time: a newer push makes the in-flight one worthless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  test:
+  # Which suites this change reaches (.github/scripts/affected-tests.py): a test project's own folder,
+  # everything it builds from, and what it reads by content. A change to one library used to run all
+  # eleven suites one after another on one runner; now only the reached ones run, side by side.
+  plan:
     runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.plan.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A manual run, or a push with no earlier commit to compare with, tests everything.
+      - name: Find the affected test projects
+        id: plan
+        run: |
+          base="${{ github.event_name == 'push' && github.event.before || '' }}"
+          projects=$(python3 .github/scripts/affected-tests.py "$base" "${{ github.sha }}")
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
+          echo "$projects"
+
+  # Each shared lib is pure net10.0 (no Android workload).
+  #
+  # Storyworthtelling.Maui is the exception and deliberately so: the kit itself is net10.0-android and
+  # cannot be built here at all, so only its TESTS run, and they read the kit by content. Its
+  # compilation is proven by the heads that reference it (build-android). That is a real gap in what
+  # this job can promise, and it is the reason the kit's guards read files rather than load types.
+  #
+  # The suites, named so SharedLibraryCoverageTests can see each is here (the plan finds them by folder):
+  # Storyworthtelling.Voice.Tests.csproj, Storyworthtelling.Remarkable.Tests.csproj,
+  # Storyworthtelling.Paper.Tests.csproj, Storyworthtelling.Google.Tests.csproj,
+  # Storyworthtelling.Updates.Tests.csproj, Storyworthtelling.Household.Tests.csproj,
+  # Storyworthtelling.Handwriting.Tests.csproj, Storyworthtelling.Diagnostics.Tests.csproj,
+  # Storyworthtelling.Time.Tests.csproj, Storyworthtelling.Pipeline.Tests.csproj,
+  # Storyworthtelling.Maui.Tests.csproj
+  test:
+    needs: plan
+    if: needs.plan.outputs.projects != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.plan.outputs.projects) }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+      - uses: ./.github/actions/dotnet
 
-      # Each shared lib is pure net10.0 (no Android workload). Test whichever test projects exist — Google
-      # arrives in a later P3 increment, so its test project is exercised only once present.
-      #
-      # Storyworthtelling.Maui is the exception and deliberately so: the kit itself is net10.0-android and
-      # cannot be built here at all, so only its TESTS run, and they read the kit by content. Its
-      # compilation is proven by the heads that reference it (build-android). That is a real gap in what
-      # this job can promise, and it is the reason the kit's guards read files rather than load types.
-      - name: Test shared libraries
-        run: |
-          set -e
-          for proj in \
-            Storyworthtelling.Voice.Tests/Storyworthtelling.Voice.Tests.csproj \
-            Storyworthtelling.Remarkable.Tests/Storyworthtelling.Remarkable.Tests.csproj \
-            Storyworthtelling.Paper.Tests/Storyworthtelling.Paper.Tests.csproj \
-            Storyworthtelling.Google.Tests/Storyworthtelling.Google.Tests.csproj \
-            Storyworthtelling.Updates.Tests/Storyworthtelling.Updates.Tests.csproj \
-            Storyworthtelling.Household.Tests/Storyworthtelling.Household.Tests.csproj \
-            Storyworthtelling.Handwriting.Tests/Storyworthtelling.Handwriting.Tests.csproj \
-            Storyworthtelling.Diagnostics.Tests/Storyworthtelling.Diagnostics.Tests.csproj \
-            Storyworthtelling.Time.Tests/Storyworthtelling.Time.Tests.csproj \
-            Storyworthtelling.Pipeline.Tests/Storyworthtelling.Pipeline.Tests.csproj \
-            Storyworthtelling.Maui.Tests/Storyworthtelling.Maui.Tests.csproj ; do
-            if [ -f "$proj" ]; then
-              echo "== dotnet test $proj =="
-              dotnet test "$proj"
-            fi
-          done
+      - name: Test
+        run: dotnet test "${{ matrix.project }}"

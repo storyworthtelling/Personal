@@ -3,7 +3,7 @@ name: Build Post APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'claude/**']
+    branches: [main]
     paths:
       - 'FocusPhone/Post.Android/**'
       - 'FocusPhone/gmbridge/**'
@@ -19,6 +19,11 @@ on:
       - 'Storyworthtelling.Folds/**'
       - 'Storyworthtelling.Google/**'
       - 'Storyworthtelling.Google.Android/**'
+      # Everything the head and its tests build from (CiHygieneTests reads the ProjectReference closure).
+      - 'Storyworthtelling.Paper/**'
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Pipeline/**'
+      - '.github/actions/dotnet/**'
       - '.github/workflows/build-post.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
@@ -28,26 +33,10 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Branch pushes run the tests and nothing else — Actions minutes are the budget, and signing an
-  # APK on every push of a working branch, then again on merge, is where they went. main (and a
-  # manual "Run workflow", which is how a branch gets its APK compiled when it needs one) runs the
-  # tests inside the build job instead, so one runner does both rather than two.
-  test:
-    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      # Target the test project directly (not the .sln) so the build never touches the
-      # net10.0-android heads, which would require the Android workload.
-      - name: Run tests
-        run: dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj
-
+  # Branch pushes run nothing here: the FocusPhone tests behind all three heads run once, in
+  # test-focusphone.yml, rather than once per head. main (and a manual "Run workflow", which is how
+  # a branch gets its APK compiled when it needs one) runs them inside the build job, so the APK
+  # this publishes is never one whose tests were not run.
   build:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -59,20 +48,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      # A plain .NET-for-Android head (not MAUI), so the lighter 'android' workload is enough.
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: '10.0.x'
+          workload: android
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android heads, which would require the Android workload.
       - name: Run tests
         run: dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj
-
-      # Post is plain .NET-for-Android (not MAUI), so the lighter 'android'
-      # workload is sufficient.
-      - name: Install Android workload
-        run: dotnet workload install android
 
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
