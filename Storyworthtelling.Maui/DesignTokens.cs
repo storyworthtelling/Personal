@@ -32,6 +32,10 @@ public static class DesignTokens
     {
         public const int RadiusInput = 12;
         public const int RadiusButton = 12;
+
+        /// <summary>A button's padding, DESIGN.md §7's 18×11 (owner's ruling, audit W8; the kits drew 16×12).</summary>
+        public const int ButtonPaddingX = 18;
+        public const int ButtonPaddingY = 11;
         public const int RadiusCard = 12;
         public const int HairlineDp = 1;
         public const int WarningRuleDp = 3;

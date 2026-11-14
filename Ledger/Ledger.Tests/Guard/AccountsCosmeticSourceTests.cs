@@ -278,7 +278,7 @@ public class AccountsCosmeticSourceTests
     {
         var chooser = Source("Ledger.Android/Views/AddAccountChooserCard.cs");
         Assert.Contains("ActionIcon", chooser, StringComparison.Ordinal);
-        Assert.Contains("\"AccentDeep\"", chooser, StringComparison.Ordinal);
+        Assert.Contains("\"ActionDeep\"", chooser, StringComparison.Ordinal);
         Assert.Contains("SansSemibold", chooser, StringComparison.Ordinal);
 
         var reorder = Source("Ledger.Android/Views/InstitutionActionCard.cs");

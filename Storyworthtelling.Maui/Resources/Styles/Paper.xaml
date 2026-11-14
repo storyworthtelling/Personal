@@ -22,13 +22,19 @@
     <Color x:Key="Ink">#33322B</Color>
     <Color x:Key="InkSoft">#6B6759</Color>
     <Color x:Key="InkMuted">#8A8578</Color>
-    <!-- The Action role (pine). DESIGN.md §4 retires terracotta EVERYWHERE and §3 makes the accent
-         a semantic role rather than a decoration; the native heads moved at their rebrand phases and
-         the MAUI heads did not, so every button in all three was still #C2542F. PaperColorTokens
-         keeps the old Accent constant so existing renderers do not break, which is exactly why the
-         name alone could not be trusted to say which value was current. -->
-    <Color x:Key="Accent">#38734A</Color>
-    <Color x:Key="AccentDeep">#174025</Color>
+    <!-- The Action role (pine) in the two tiers a style fills or writes with. These were the keys
+         "Accent" and "AccentDeep", and the name is what went wrong: the error label, the "Needs you"
+         group, the error chip and the warning card all took Accent, so a setup error showed in the
+         colour of success (audit W8.1). A style now names its role. -->
+    <Color x:Key="ActionText">#295E3A</Color>
+    <Color x:Key="ActionDeep">#174025</Color>
+
+    <!-- The Problem role's text and deep tiers (DESIGN.md §8: an error is Problem-rose helper text). -->
+    <Color x:Key="ProblemText">#82333B</Color>
+    <Color x:Key="ProblemDeep">#5C1F26</Color>
+
+    <!-- The In-progress role's text tier: the status line's colour (§6, "Loading is words"). -->
+    <Color x:Key="ProgressText">#085C65</Color>
 
     <!-- "The pen": signatures, editorial marks, and the colour of the owner's voice. -->
     <Color x:Key="InkBlue">#2C3E5E</Color>
@@ -137,18 +143,35 @@
     <Style x:Key="ErrorLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="Sans" />
         <Setter Property="FontSize" Value="{StaticResource SecondarySize}" />
-        <Setter Property="TextColor" Value="{StaticResource AccentDeep}" />
+        <Setter Property="TextColor" Value="{StaticResource ProblemText}" />
     </Style>
 
     <!-- Buttons: primary by default; one per screen at most. -->
+    <!-- §3: a filled primary is the DEEP tier. §8: pressing changes no colour; it shows an inset
+         hairline, so the press is felt as the paper giving rather than as the button turning dark. -->
     <Style TargetType="Button">
         <Setter Property="FontFamily" Value="SansSemibold" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
-        <Setter Property="BackgroundColor" Value="{StaticResource Accent}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource ActionDeep}" />
         <Setter Property="TextColor" Value="{StaticResource PaperBright}" />
+        <Setter Property="BorderColor" Value="Transparent" />
+        <Setter Property="BorderWidth" Value="1" />
         <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="Padding" Value="18,11" />
         <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Property="BorderColor" Value="{StaticResource Hairline}" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Disabled" />
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
     </Style>
     <Style x:Key="SecondaryButton" TargetType="Button">
         <Setter Property="FontFamily" Value="SansSemibold" />
@@ -158,7 +181,7 @@
         <Setter Property="BorderColor" Value="{StaticResource Hairline}" />
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="Padding" Value="18,11" />
         <Setter Property="MinimumHeightRequest" Value="48" />
     </Style>
     <Style x:Key="QuietButton" TargetType="Button">
@@ -167,18 +190,18 @@
         <Setter Property="BackgroundColor" Value="Transparent" />
         <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
         <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="Padding" Value="18,11" />
         <Setter Property="MinimumHeightRequest" Value="48" />
     </Style>
     <Style x:Key="DestructiveButton" TargetType="Button">
         <Setter Property="FontFamily" Value="SansSemibold" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
         <Setter Property="BackgroundColor" Value="{StaticResource Paper}" />
-        <Setter Property="TextColor" Value="{StaticResource Accent}" />
-        <Setter Property="BorderColor" Value="{StaticResource Accent}" />
+        <Setter Property="TextColor" Value="{StaticResource ActionMark}" />
+        <Setter Property="BorderColor" Value="{StaticResource ActionMark}" />
         <Setter Property="BorderWidth" Value="1" />
         <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="Padding" Value="18,11" />
         <Setter Property="MinimumHeightRequest" Value="48" />
     </Style>
 
@@ -224,7 +247,7 @@
     <!-- The same label in the problem hue: the "Needs you" group, which simply does not exist
          on a morning when nothing is broken. -->
     <Style x:Key="GroupLabelProblem" TargetType="Label" BasedOn="{StaticResource GroupLabel}">
-        <Setter Property="TextColor" Value="{StaticResource Accent}" />
+        <Setter Property="TextColor" Value="{StaticResource ProblemText}" />
     </Style>
 
     <Style x:Key="GroupCard" TargetType="Border">
@@ -274,13 +297,6 @@
         <Setter Property="StrokeShape" Value="RoundRectangle 12" />
         <Setter Property="Padding" Value="16" />
     </Style>
-    <Style x:Key="WarningCard" TargetType="Border">
-        <Setter Property="BackgroundColor" Value="{StaticResource PaperDeep}" />
-        <Setter Property="Stroke" Value="{StaticResource Accent}" />
-        <Setter Property="StrokeThickness" Value="1" />
-        <Setter Property="StrokeShape" Value="RoundRectangle 12" />
-        <Setter Property="Padding" Value="16,12" />
-    </Style>
 
     <!-- Chips: phase progress and problems (DESIGN.md §7) -->
     <Style x:Key="PhaseChip" TargetType="Border">
@@ -292,7 +308,7 @@
     </Style>
     <Style x:Key="ErrorChip" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{StaticResource PaperBright}" />
-        <Setter Property="Stroke" Value="{StaticResource Accent}" />
+        <Setter Property="Stroke" Value="{StaticResource ProblemMark}" />
         <Setter Property="StrokeThickness" Value="1" />
         <Setter Property="StrokeShape" Value="RoundRectangle 10" />
         <Setter Property="Padding" Value="8,2" />
@@ -320,18 +336,15 @@
     <Style x:Key="ChipLabelError" TargetType="Label">
         <Setter Property="FontFamily" Value="SansSemibold" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
-        <Setter Property="TextColor" Value="{StaticResource AccentDeep}" />
+        <Setter Property="TextColor" Value="{StaticResource ProblemDeep}" />
     </Style>
 
-    <!-- The loading voice: one quiet sentence, updated in place (DESIGN.md §5) -->
+    <!-- The loading voice: one quiet sentence in the In-progress hue, updated in place (DESIGN.md §6).
+         There is no spinner style: §6 retires it, and a style in the kit is an invitation. -->
     <Style x:Key="StatusLine" TargetType="Label">
         <Setter Property="FontFamily" Value="Sans" />
         <Setter Property="FontSize" Value="{StaticResource SecondarySize}" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource ProgressText}" />
     </Style>
 
-    <!-- Progress -->
-    <Style TargetType="ActivityIndicator">
-        <Setter Property="Color" Value="{StaticResource Accent}" />
-    </Style>
 </ResourceDictionary>

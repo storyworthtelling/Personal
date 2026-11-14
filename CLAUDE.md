@@ -169,6 +169,8 @@ merged in, so the indexer appears to work until the kit is the only source left.
 lives in the dictionary as 8-digit ARGB and the palette guard *composes* it from the role's mark and
 `PaperColorTokens.WashAlpha` rather than trusting the digits.
 
+**Styles name their role (audit W8.1):** the `Accent`/`AccentDeep` keys are gone, so the error label, error chip and "Needs you" group take Problem rose, the status line takes the In-progress text tier, a primary button fills with `ActionDeep` and shows a press as an inset hairline rather than a colour change, every button is padded 18×11 (DESIGN.md §7, `DesignTokens.Shape.ButtonPaddingX/Y`, the native kit too), the warning card is the `PaperWarningCard` view with a 3dp Action rule down its left, and there is no spinner style (`KitRolesTests`).
+
 The kit is `net10.0-android`, so `build-shared-libs` can only run its **tests**; its compilation is proven by the heads that reference it, which is why `Storyworthtelling.Maui/**` is in `build-android.yml`'s path filter and why the guards read files rather than load types. Tests: `dotnet test Storyworthtelling.Maui.Tests/Storyworthtelling.Maui.Tests.csproj` — palette against `PaperColorTokens` **by reflection**, the type ladder against `Codex.Domain`'s own source file, every `FontFamily` against what `PaperFonts` registers, the nine roles' faces and inks, Serif Italic's single role, no letterspacing, buttons at Label size. **Not yet verified:** no screen drawn from the kit has been opened on a device.
 
 ### Cross-app contracts (cross-cutting)

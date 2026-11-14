@@ -93,7 +93,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
 
         // Mockup 5's two bar buttons: the primary is the deep pine, the secondary an outline in the
         // muted ink. Tokens are read through PaperResources, not the indexer (see LedgerBinderPage.SetBar).
-        openPlaidButton.BackgroundColor = PaperResources.Colour("AccentDeep");
+        openPlaidButton.BackgroundColor = PaperResources.Colour("ActionDeep");
         openPlaidButton.Clicked += OnOpenPlaidClicked;
         checkAgainButton.Style = PaperResources.Token<Style>("SecondaryButton");
         checkAgainButton.BorderColor = PaperResources.Colour("InkMuted");
@@ -279,7 +279,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
         var status = new Label
         {
             Text = ConnectCopy.Waiting(updateInstitutionName),
-            TextColor = Color.FromArgb(PaperColorTokens.ProgressText),
+            Style = PaperResources.Token<Style>("StatusLine"),
         };
 
         Show(ConnectCopy.FinishingHeading, status, Paragraph(ConnectCopy.FinishingBody), chromeAgain);

@@ -33,7 +33,7 @@ public sealed class BinderGlyphDrawable : IDrawable
 
     public string? PathData { get; set; }
 
-    public Color Ink { get; set; } = Colors.Black;
+    public Color Ink { get; set; } = PaperResources.Colour("Ink");
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {

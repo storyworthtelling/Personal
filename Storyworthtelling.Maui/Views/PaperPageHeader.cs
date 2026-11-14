@@ -10,7 +10,7 @@ namespace Storyworthtelling.Maui.Views;
 public sealed class MarkerRuleDrawable : IDrawable
 {
     /// <summary>The ink. An area's identity hue, or the neutral grey on Settings (DESIGN.md §9).</summary>
-    public Color Ink { get; set; } = Colors.Black;
+    public Color Ink { get; set; } = PaperResources.Colour("Ink");
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
