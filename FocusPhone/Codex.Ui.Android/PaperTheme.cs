@@ -28,6 +28,7 @@ public static class PaperTheme
     // lead intent, Problem for a destructive one, Caution for a soft heads-up, and
     // In-progress for "something is running". Parsed once, like everything above.
     public static readonly Color ActionText = Color.ParseColor(DesignTokens.ActionText);
+    public static readonly Color ActionDeep = Color.ParseColor(DesignTokens.ActionDeep);
     public static readonly Color ProblemMark = Color.ParseColor(DesignTokens.ProblemMark);
     public static readonly Color CautionMark = Color.ParseColor(DesignTokens.CautionMark);
     public static readonly Color ProgressFill = Color.ParseColor(DesignTokens.ProgressFill);

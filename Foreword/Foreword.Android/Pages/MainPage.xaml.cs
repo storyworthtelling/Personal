@@ -249,7 +249,7 @@ public partial class MainPage : BinderPage
             {
                 Text = rowDone ? "\u2713" : string.Empty,
                 Style = LookupStyle("CardRowTitle"),
-                TextColor = LookupColor("Accent"),
+                TextColor = LookupColor("ActionMark"),
             };
             Grid.SetColumn(mark, 0);
             row.Add(mark);
