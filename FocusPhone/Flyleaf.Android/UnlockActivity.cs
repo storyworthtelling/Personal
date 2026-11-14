@@ -30,6 +30,8 @@ namespace Flyleaf;
     Theme = "@style/Theme.FocusPhone.Paper")]
 public class UnlockActivity : Activity
 {
+    private FrameLayout overlay = null!;
+
     private const int InstallApkRequestCode = 4210;
 
     private readonly Handler handler = new(Looper.MainLooper!);
@@ -68,7 +70,9 @@ public class UnlockActivity : Activity
 
         // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
         // (API 35+), so the page isn't drawn partly behind the battery/clock icons.
-        SetContentView(PaperUi.WrapForTopInset(this, root));
+        // The inset frame doubles as the page's overlay, where its cards open (audit W8.2).
+        overlay = PaperUi.WrapForTopInset(this, root);
+        SetContentView(overlay);
     }
 
     protected override void OnResume()
@@ -215,7 +219,7 @@ public class UnlockActivity : Activity
                 break;
 
             case CutoverPrompt.Finalize:
-                AddContentButton(PaperUi.DestructiveButton(this, "Finalize cutover: disable debugging permanently", () =>
+                AddContentButton(PaperUi.SecondaryButton(this, "Finalize cutover: disable debugging permanently", () =>
                 {
                     cutover.Start();
                     Render();
@@ -303,20 +307,18 @@ public class UnlockActivity : Activity
             return;
         }
 
-        new AlertDialog.Builder(this)
-            .SetTitle("Unblock which app?")!
-            .SetItems(blocked, (_, e) =>
+        ActionCard.Show(this, overlay, "Unblock which app?", null,
+            [.. blocked.Select(package => new CardAction(package, () =>
             {
                 var categorizer = new AppCategorizer(data);
-                categorizer.Unblock(blocked[e.Which]);
+                categorizer.Unblock(package);
                 blocklistStore.Save(categorizer.Export());
                 new PolicyAuditStore(this).Record(
-                    Codex.Domain.Policy.PolicyEventKind.AppUnblocked, $"Unblocked {blocked[e.Which]}");
+                    Codex.Domain.Policy.PolicyEventKind.AppUnblocked, $"Unblocked {package}");
                 PolicyManager.ApplyCurrentPolicy(this);
-                inlineStatus = $"Unblocked {blocked[e.Which]}.";
+                inlineStatus = $"Unblocked {package}.";
                 Render();
-            })!
-            .Show();
+            }))]);
     }
 
     // The reviewable/exportable policy audit log: what the device-owner policy did and any failures,
@@ -326,12 +328,9 @@ public class UnlockActivity : Activity
     private void ShowPolicyLog()
     {
         var text = new PolicyAuditStore(this).Load().Format();
-        new AlertDialog.Builder(this)
-            .SetTitle("Policy log")!
-            .SetMessage(text)!
-            .SetPositiveButton("Export", (_, _) => ExportPolicyLog(text))!
-            .SetNegativeButton("Close", (_, _) => { })!
-            .Show();
+        ActionCard.ShowText(this, overlay, "Policy log", text,
+            new CardButton("Close", () => { }),
+            new CardButton("Export", () => ExportPolicyLog(text), Primary: true));
     }
 
     private void ExportPolicyLog(string text)
@@ -473,9 +472,6 @@ public class UnlockActivity : Activity
         passphrase.Text = VaultPassphraseStore.Passphrase;
 
         var fields = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        fields.SetPadding(
-            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X4),
-            PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), 0);
         fields.AddView(tokenStatusRow);
         fields.AddView(input);
         if (tokenConsole is not null)
@@ -485,19 +481,16 @@ public class UnlockActivity : Activity
 
         fields.AddView(passphrase);
 
-        new AlertDialog.Builder(this)
-            .SetTitle("Update channel token")!
-            .SetView(fields)!
-            .SetPositiveButton("Save", (_, _) =>
+        ActionCard.ShowBody(this, overlay, "Update channel token", null, fields,
+            new CardButton("Cancel", () => { }),
+            new CardButton("Save", () =>
             {
                 new UpdateSettingsStore(this).GitHubToken = input.Text;
                 VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
                 PublishTokenToVault(input.Text);
                 inlineStatus = "Update token set.";
                 Render();
-            })!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Show();
+            }, Primary: true));
     }
 
     // Backs the GitHub update token up to the owner's encrypted secrets vault (needs Google signed in for the

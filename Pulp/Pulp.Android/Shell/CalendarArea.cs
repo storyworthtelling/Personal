@@ -254,6 +254,10 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
     /// from the system pickers, a place, and who it is for. It is checked by <see cref="CalendarPlans.Check"/>
     /// before anything is written, and what is written is a household record, so the other phone sees it too.
     /// </summary>
+    // How far ahead a plan can be put, and the step its times are offered in.
+    private const int PlanDaysAhead = 120;
+    private const int PlanMinuteStep = 15;
+
     private View PlanForm()
     {
         var form = PaperUi.HairlineCard(Host);
@@ -265,32 +269,30 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
         text.TextChanged += (_, _) => planText = text.Text ?? string.Empty;
         form.AddView(text);
 
+        // The day and the time are picked from a paper card, not the platform's dialogs (audit W8.2).
         form.AddView(PaperUi.SecondaryButton(Host, planDate.ToString("ddd, MMM d", System.Globalization.CultureInfo.CurrentCulture), () =>
         {
-            var dialog = new DatePickerDialog(
-                Host,
-                (_, picked) =>
-                {
-                    planDate = DateOnly.FromDateTime(picked.Date);
-                    Invalidate();
-                },
-                planDate.Year, planDate.Month - 1, planDate.Day);
-            dialog.Show();
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            ActionCard.Show(Host, Overlay, "Which day?", null,
+                [.. Enumerable.Range(0, PlanDaysAhead).Select(offset => today.AddDays(offset)).Select(day =>
+                    new CardAction(day.ToString("dddd, MMM d", System.Globalization.CultureInfo.CurrentCulture), () =>
+                    {
+                        planDate = day;
+                        Invalidate();
+                    }, Lead: day == planDate))]);
         }), Spaced(gap));
 
         var time = planTime is { } at ? CalendarScreen.TimeText(new CalendarWhen(planDate, at)) : CalendarScreen.AllDayText;
         form.AddView(PaperUi.SecondaryButton(Host, time, () =>
         {
             var start = planTime ?? new TimeOnly(19, 0);
-            var dialog = new TimePickerDialog(
-                Host,
-                (_, picked) =>
-                {
-                    planTime = new TimeOnly(picked.HourOfDay, picked.Minute);
-                    Invalidate();
-                },
-                start.Hour, start.Minute, false);
-            dialog.Show();
+            ActionCard.Show(Host, Overlay, "What time?", null,
+                [.. Enumerable.Range(0, 24 * 60 / PlanMinuteStep).Select(step => new TimeOnly(0, 0).AddMinutes(step * PlanMinuteStep))
+                    .Select(slot => new CardAction(CalendarScreen.TimeText(new CalendarWhen(planDate, slot)), () =>
+                    {
+                        planTime = slot;
+                        Invalidate();
+                    }, Lead: slot == start))]);
         }), Spaced(gap));
         if (planTime is not null)
         {

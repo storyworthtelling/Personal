@@ -189,8 +189,17 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             actions.Add(new CardAction("Move later",
                 () => { Tray = held.Move(index, index + 1); Invalidate(); }));
         }
-        actions.Add(new CardAction("Remove this page",
-            () => { Tray = held.RemoveAt(index); Invalidate(); }, Destructive: true));
+        // Undo-first like every removal (§7): the page goes at once and comes back from the corner.
+        actions.Add(new CardAction("Remove this page", () =>
+        {
+            Tray = held.RemoveAt(index);
+            Invalidate();
+            DogEar.Show(Host, Overlay, $"Removed page {index + 1}.", onUndo: () =>
+            {
+                Tray = held;
+                Invalidate();
+            });
+        }));
 
         ActionCard.Show(Host, Overlay, $"Page {index + 1}",
             $"scanned {TimeFormats.Clock12(held.Pages[index].ScannedAt)}", [.. actions]);

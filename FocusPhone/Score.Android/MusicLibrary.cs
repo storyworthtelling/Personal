@@ -61,6 +61,12 @@ public sealed class MusicLibrary(
     /// <summary>A sentence about work in flight, or null. DESIGN.md §7: status, not a spinner.</summary>
     public string? Status { get; private set; }
 
+    /// <summary>
+    /// What the last sign-in or folder listing ran into, said plainly, or null. The screen that
+    /// asked shows it under its button (audit W8.2: it was a toast that vanished).
+    /// </summary>
+    public string? Problem { get; private set; }
+
     /// <summary>Drive folders offered by the picker; null until fetched.</summary>
     public IReadOnlyList<DriveMusicClient.DriveFolder>? Folders { get; private set; }
 
@@ -334,11 +340,13 @@ public sealed class MusicLibrary(
         try
         {
             await DeviceAccountSignIn.SignIn(host);
+            Problem = null;
             Changed?.Invoke();
         }
         catch (Exception e)
         {
-            Toast.MakeText(host, Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google"), ToastLength.Long)!.Show();
+            Problem = Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google");
+            Changed?.Invoke();
         }
     }
 
@@ -347,11 +355,13 @@ public sealed class MusicLibrary(
         try
         {
             Folders = await driveClient.ListFoldersAsync("root", CancellationToken.None);
+            Problem = null;
             Changed?.Invoke();
         }
         catch (Exception e)
         {
-            Toast.MakeText(host, Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google Drive"), ToastLength.Long)!.Show();
+            Problem = Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google Drive");
+            Changed?.Invoke();
         }
     }
 

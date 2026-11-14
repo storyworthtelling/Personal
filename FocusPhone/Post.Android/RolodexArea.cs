@@ -391,34 +391,23 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
 
     private void ShowManualEntry()
     {
-        var input = PaperUi.MonoField(Host, "Number or email");
-        var dialog = new AlertDialog.Builder(Host)
-            .SetTitle("Reach someone new")!
-            .SetView(input)!
-            .SetPositiveButton("Go", (IDialogInterfaceOnClickListener?)null)!
-            .SetNegativeButton("Cancel", (_, _) => { })!
-            .Create()!;
-
-        dialog.Show();
-        // Wired after Show so invalid input keeps the dialog open.
-        dialog.GetButton((int)DialogButtonType.Positive)!.Click += (_, _) =>
+        var field = ActionCard.AskText(Host, Overlay, "Reach someone new", null, "Number or email", null, "Go", raw =>
         {
-            var raw = input.Text ?? string.Empty;
             if (raw.Contains('@') && RecipientInput.TryCreateEmail(raw, out var email))
             {
-                dialog.Dismiss();
                 Dispatch(Channel.Email, email);
+                return null;
             }
-            else if (RecipientInput.TryCreatePhone(raw, out var phone))
+
+            if (RecipientInput.TryCreatePhone(raw, out var phone))
             {
-                dialog.Dismiss();
                 ShowChannelChooser(new ContactPicker.Person(phone, [phone], []));
+                return null;
             }
-            else
-            {
-                input.Error = "Enter a phone number or email.";
-            }
-        };
+
+            return "Enter a phone number or an email address.";
+        });
+        field.Typeface = PaperTheme.Mono(Host);
     }
 
     private void Dispatch(Channel kind, string address)

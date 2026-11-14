@@ -35,6 +35,25 @@ public static class PaperUi
     public static TextView BodyMuted(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Body, PaperTheme.InkSoft, PaperTheme.SansRegular(context));
 
+    /// <summary>One sentence about work in flight, in the In-progress hue (§6: loading is words).</summary>
+    public static TextView StatusLine(Context context, string text)
+    {
+        var line = Secondary(context, text);
+        line.SetTextColor(PaperTheme.ProgressText);
+        return line;
+    }
+
+    /// <summary>
+    /// A sentence saying what went wrong, in the Problem hue (§8), where the thing that failed is —
+    /// the place a toast used to stand in for (audit W8.2).
+    /// </summary>
+    public static TextView ProblemLine(Context context, string text)
+    {
+        var line = Secondary(context, text);
+        line.SetTextColor(PaperTheme.ProblemText);
+        return line;
+    }
+
     public static TextView Secondary(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Secondary, PaperTheme.InkMuted, PaperTheme.SansRegular(context));
 
@@ -99,13 +118,6 @@ public static class PaperUi
     {
         var button = ButtonBase(context, label, onClick, PaperTheme.InkMuted, PaperTheme.SansSemibold(context));
         button.Background = null;
-        return button;
-    }
-
-    public static Button DestructiveButton(Context context, string label, Action onClick)
-    {
-        var button = ButtonBase(context, label, onClick, PaperTheme.Accent, PaperTheme.SansSemibold(context));
-        button.Background = PressableOutline(context, PaperTheme.Accent);
         return button;
     }
 

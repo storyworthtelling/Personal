@@ -75,7 +75,7 @@ public class MailReaderActivity : Activity
                 this, Attachments.Label(item.Attachments), () => Attachments.Offer(this, host, item)));
         }
         buttons.Add(PaperUi.SecondaryButton(this, "File", () => Hand(item, ReaderAction.File)));
-        buttons.Add(PaperUi.DestructiveButton(this, "Delete", () => Hand(item, ReaderAction.Delete)));
+        buttons.Add(PaperUi.SecondaryButton(this, "Delete", () => Hand(item, ReaderAction.Delete)));
         root.AddView(PaperUi.BottomBar(this, [.. buttons]));
 
         SetContentView(root);

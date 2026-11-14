@@ -21,7 +21,7 @@ public class NativeTextAttachTests
     {
         var body = MethodBody("ComposeText");
 
-        Assert.Contains("SetNeutralButton(\"Attach\", (_, _) => PickMedia(recipients, conversationId))", body);
+        Assert.Contains("also: new CardButton(\"Attach\", () => PickMedia(recipients, conversationId))", body);
     }
 
     [Fact]

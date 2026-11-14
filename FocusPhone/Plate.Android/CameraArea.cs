@@ -112,7 +112,7 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
 
     public override View BuildBottomBar() => shell.Camera.IsRecording
         ? PaperUi.BottomBar(Host,
-            PaperUi.DestructiveButton(Host, "Stop", StopVideo))
+            PaperUi.SecondaryButton(Host, "Stop", StopVideo))
         : PaperUi.BottomBar(Host,
             PaperUi.PrimaryButton(Host, "Capture", TakePhoto),
             PaperUi.SecondaryButton(Host, "Video", StartVideo),

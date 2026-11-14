@@ -43,7 +43,7 @@
                 <Button Grid.Column="0" x:Name="AddNameButton" Text="Add a name"
                         Clicked="OnAddNameClicked" />
                 <Button Grid.Column="1" Text="Delete" Clicked="OnDeleteClicked"
-                        Style="{StaticResource DestructiveButton}" />
+                        Style="{StaticResource SecondaryButton}" />
             </Grid>
         </VerticalStackLayout>
     </Grid>

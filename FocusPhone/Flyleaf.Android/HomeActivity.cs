@@ -351,9 +351,15 @@ public class HomeActivity : Activity
         }
         else
         {
-            Toast.MakeText(this, $"{art!.Label(item.Key)} isn't installed", ToastLength.Short)!.Show();
+            // Behind the fold, not a toast (audit W8.2): the update channel may still be installing it.
+            DogEar.SetNotice(this, root, NotInstalledNotice, new DogEar.Notice(
+                $"{art!.Label(item.Key)} is not installed.",
+                "Its book is still on the shelf, but the app is not on this phone. If it is one of the suite's, Flyleaf installs it on its next update check.",
+                DogEar.Hues.Caution));
         }
     }
+
+    private const string NotInstalledNotice = "not-installed";
 
     private void OnItemLongPressed(PlacedItem item)
     {
