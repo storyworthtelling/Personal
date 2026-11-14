@@ -244,6 +244,11 @@ Each item replaces copies in several apps; the source findings are in report 01 
    - Flyleaf's cover timings move to tokens.
    - Sources: 04 §21–24.
 8. **Icons.** An IconStudio glyph set emits stroked area and tab glyphs for both platforms, replacing the hand-made ones (04 §33).
+9a. **UI application audit (report 14, asked for during W8).**
+   - One binder page in the MAUI kit. It fills the gutter to the screen's edges and owns three things: the well's padding (24 at the sides, 0 at the top), the dog-ear corner and the Waiting page (14 §1–3, §6–8).
+   - One pinned bar in both kits: the primary is last and widest, with one set of padding tokens (14 §4–5).
+   - The tab glyph is 26dp in both kits (14 §9).
+   - In-page accents take their tab's hue across the suite (owner's ruling), the restraint guard is reversed, and DESIGN.md §9 is updated (14 §11).
 9. **Screen-level fixes.**
    - Index Settings bank removal moves to the dog-ear, and the kebab is removed (02 §11, 04 §31).
    - Two headers missing their underline (02 §24).
@@ -327,10 +332,12 @@ Each item replaces copies in several apps; the source findings are in report 01 
 
 ## Decisions still to ask (per discrepancy, when the workstream starts)
 
-- Post's Filed and Rolodex filter fields wearing their tab's role hue (W8).
-- Folio's book cloths using role colours: register material tokens, or keep (W8).
-- Button padding: §7's 18×11 or the kits' 16×12 (W8).
-- Folio's near-square paper radii: register as material tokens, or move to 12 (W8).
+- ~~Post's filter fields and the tab hue (W8)~~ Decided: every page's accents take their tab's hue, suite-wide.
+- ~~Folio's book cloths (W8)~~ Decided: keep the role colours.
+- ~~Button padding (W8)~~ Decided: §7's 18×11 (done in W8.1).
+- ~~Folio's near-square paper radii (W8)~~ Decided: move to 12.
+- The gutter beside the pinned bar: the bar spans the full width, or the strip runs to the bottom (W8, report 14 §1).
+- Folio's primary-first bar order: follow the suite rule or keep as an exception (W8, report 14 §4).
 - The voiced line inside Constitution's never-hidden fallback (W10).
 - Score's unwired device-EQ, sound-check and gesture features: build or delete (W7).
 - Whether Pulp's child seats get extra voice guidance beyond reading level (W10).
