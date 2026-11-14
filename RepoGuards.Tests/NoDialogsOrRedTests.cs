@@ -8,8 +8,8 @@ namespace RepoGuards.Tests;
 /// and a destructive act happens at once with an undo — so there is no Destructive button, no red on
 /// a long-press card, no toast and no platform dialog.
 ///
-/// <para>The native heads moved in W8.2a; the MAUI heads' <c>Display*</c> calls move in W8.2b, whose
-/// guard joins this file then.</para>
+/// <para>The native heads moved in W8.2a; the MAUI heads' <c>Display*</c> calls moved in W8.2b onto the
+/// kit's <c>PaperCards</c>, inline lines and the dog-ear.</para>
 /// </summary>
 public partial class NoDialogsOrRedTests
 {
@@ -41,6 +41,16 @@ public partial class NoDialogsOrRedTests
         Assert.True(found.Count == 0, "Ask on a paper card (ActionCard), not an AlertDialog:\n" + string.Join("\n", found));
     }
 
+    [Fact]
+    public void NoMauiHeadOpensAPlatformDialog()
+    {
+        var found = Hits(Maui(), MauiDialog());
+        Assert.True(found.Count == 0, "Ask on a paper card (PaperCards), or say it inline, not in a platform alert:\n" + string.Join("\n", found));
+    }
+
+    [GeneratedRegex(@"\bDisplay(?:Alert|ActionSheet|PromptAsync)(?:Async)?\(")]
+    private static partial Regex MauiDialog();
+
     [GeneratedRegex(@"DestructiveButton")]
     private static partial Regex DestructiveButton();
 
@@ -63,6 +73,9 @@ public partial class NoDialogsOrRedTests
 
     private static IEnumerable<string> Native() =>
         Sources("FocusPhone", "Pulp", "Constitution");
+
+    private static IEnumerable<string> Maui() =>
+        Sources("Ledger", "Storyboarder", "Foreword", "Storyworthtelling.Maui");
 
     private static IEnumerable<string> AllUi() =>
         Sources("FocusPhone", "Pulp", "Constitution", "Ledger", "Storyboarder", "Foreword", "Storyworthtelling.Maui");

@@ -157,7 +157,8 @@ public partial class CalendarColumnsPage : BinderPage
 
     private async void OnAddClicked(object sender, EventArgs e)
     {
-        var typed = await DisplayPromptAsync("Add a column", "Whose column is it?", "Add", "Cancel");
+        var typed = await PaperCards.AskText(this, "Add a column", null, "Whose column is it?", null, "Add",
+            text => text.Length == 0 ? "A column needs a name." : null);
         if (typed is null)
         {
             return;

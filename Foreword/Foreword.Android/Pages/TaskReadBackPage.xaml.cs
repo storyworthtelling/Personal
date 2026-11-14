@@ -95,7 +95,8 @@ public partial class TaskReadBackPage : BinderPage
         {
             // Said out loud rather than swallowed: a task the owner believes is in Google and is not
             // is worse than one that plainly failed to save.
-            await DisplayAlert("Saved here only", result.Message, "OK");
+            // Said on the list it returns to rather than in an alert (audit W8.2b).
+            TasksPage.CarriedProblem = result.Message;
         }
 
         // Back past the add screen, so Accept lands on the list rather than on an empty form.

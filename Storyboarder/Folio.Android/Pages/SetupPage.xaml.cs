@@ -1,3 +1,5 @@
+using Storyworthtelling.Maui;
+using Storyworthtelling.Folds;
 using Storyworthtelling.Google.Android;
 using Folio.Infrastructure.Vault;
 using Folio.Domain.Diagnostics;
@@ -236,16 +238,17 @@ public partial class SetupPage : FolioBinderPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Status snapshot", "Couldn't build the snapshot: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), "OK");
+            Say(DiagnosticsStatusLabel, "The snapshot could not be built: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), problem: true);
             return;
         }
 
-        var action = await DisplayActionSheet("Status snapshot", "Cancel", null, "View & copy", "Share");
-        if (action == "View & copy")
+        // Read on a card, with what to do about it (audit W8.2b: an action sheet, then an alert).
+        var preview = report.Length > 3000 ? report[..3000] + "\n\n(cut short here — Share sends the full snapshot)" : report;
+        var action = await PaperCards.ShowText(this, "Status snapshot", preview, "Copy", "Share");
+        if (action == "Copy")
         {
-            var preview = report.Length > 3000 ? report[..3000] + "\n\n(truncated — use Share for the full snapshot)" : report;
             await Clipboard.SetTextAsync(report);
-            await DisplayAlert("Status snapshot (copied to clipboard)", preview, "OK");
+            Say(DiagnosticsStatusLabel, "Status snapshot copied.", problem: false);
         }
         else if (action == "Share")
         {
@@ -269,7 +272,7 @@ public partial class SetupPage : FolioBinderPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Export diagnostics", "Couldn't export: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), "OK");
+            Say(DiagnosticsStatusLabel, "The diagnostics could not be exported: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), problem: true);
         }
     }
 
@@ -293,17 +296,17 @@ public partial class SetupPage : FolioBinderPage
     {
         if (!HasContent(path))
         {
-            await DisplayAlert(title, $"No {title.ToLowerInvariant()} recorded yet — nothing to show.", "OK");
+            Say(DiagnosticsStatusLabel, $"No {title.ToLowerInvariant()} recorded yet.", problem: false);
             return;
         }
 
         var log = System.IO.File.ReadAllText(path);
-        var action = await DisplayActionSheet(title, "Cancel", null, "View & copy", "Share", "Clear");
-        if (action == "View & copy")
+        var preview = log.Length > 3000 ? "(the last part — Share sends the whole log)\n\n" + log[^3000..] : log;
+        var action = await PaperCards.ShowText(this, title, preview, "Clear", "Copy", "Share");
+        if (action == "Copy")
         {
-            var preview = log.Length > 3000 ? "(truncated — use Share for the full log)\n\n" + log[^3000..] : log;
             await Clipboard.SetTextAsync(log);
-            await DisplayAlert($"{title} (copied to clipboard)", preview, "OK");
+            Say(DiagnosticsStatusLabel, $"{title} copied.", problem: false);
         }
         else if (action == "Share")
         {
@@ -311,9 +314,24 @@ public partial class SetupPage : FolioBinderPage
         }
         else if (action == "Clear")
         {
+            // Undo-first (§7): the words are held for the fold's window and written back on undo.
             clear();
-            DiagnosticsStatusLabel.Text = $"{title} cleared.";
+            Say(DiagnosticsStatusLabel, $"{title} cleared.", problem: false);
+            OfferUndo($"Cleared the {title.ToLowerInvariant()}.", () =>
+            {
+                System.IO.File.WriteAllText(path, log);
+                Say(DiagnosticsStatusLabel, $"{title} put back.", problem: false);
+            });
         }
+    }
+
+    private const string VaultBackupNotice = "vault-backup";
+
+    // One line, in the Problem hue when it is a problem and its own quiet colour when it is not.
+    private static void Say(Label label, string text, bool problem)
+    {
+        label.Text = text;
+        label.TextColor = problem ? PaperResources.Colour("ProblemText") : PaperResources.Colour("ProgressText");
     }
 
     private void UpdateGoogleStatus() =>
@@ -343,7 +361,7 @@ public partial class SetupPage : FolioBinderPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            await DisplayAlert("Google", "Could not start sign-in (no active window).", "OK");
+            Say(GoogleStatusLabel, "Sign-in could not start: Folio has no open window. Try again.", problem: true);
             return;
         }
 
@@ -352,24 +370,22 @@ public partial class SetupPage : FolioBinderPage
             var email = await DeviceAccountSignIn.SignIn(activity);
             UpdateGoogleStatus();
             // The status line below the button is the state change.
-            GoogleStatusLabel.Text = $"Signed in as {email}.";
+            Say(GoogleStatusLabel, $"Signed in as {email}.", problem: false);
         }
         catch (Exception ex) when (ex.ToString().Contains("UnregisteredOnApiConsole", StringComparison.OrdinalIgnoreCase))
         {
             var info = SigningInfoText();
             await Clipboard.SetTextAsync(info);
-            await DisplayAlert(
-                "This app isn't registered with Google yet",
-                "Google rejected sign-in because this app isn't a registered OAuth client.\n\n" +
-                "In the Google Cloud Console, create an Android OAuth client with the package and " +
-                "SHA-1 below (copied to your clipboard), enable the Google Docs & Drive APIs, and " +
-                "add your account as a test user on the consent screen. Then try again.\n\n" + info,
-                "OK");
+            // Said under the button, beside the one-time setup card that already explains the console.
+            Say(GoogleStatusLabel,
+                "Google turned the sign-in away: this app is not registered with it yet. The package and SHA-1 "
+                + "are copied; set them up as the card above says, then sign in again.", problem: true);
         }
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            await DisplayAlert("Google sign-in failed (copied to clipboard)", Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google"), "OK");
+            Say(GoogleStatusLabel, "Sign-in did not finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google")
+                + " The details are copied.", problem: true);
         }
     }
 
@@ -421,7 +437,12 @@ public partial class SetupPage : FolioBinderPage
             result = SecretsVaultPublishResult.WriteFailed(ex.Message);
         }
         if (result.NeedsAttention)
-            await DisplayAlert("Vault backup didn't complete", result.Message, "OK");
+        {
+            // Behind the fold, here and on the page saving returns to (audit W8.2b: it was an alert).
+            var notice = new DogEarNotice("The vault backup did not finish.", result.Message, DogEarHue.Problem);
+            SetNotice(VaultBackupNotice, notice);
+            CarriedNotices.Shared.Carry(VaultBackupNotice, notice);
+        }
     }
 
     // Both toggles save on change — the setting is read live by the worker, so there is nothing to confirm
@@ -449,11 +470,10 @@ public partial class SetupPage : FolioBinderPage
     // to the vault so a factory reset (or a sibling app) restores it without re-pairing.
     private async void OnRegisterRemarkableClicked(object sender, EventArgs e)
     {
-        var code = await DisplayPromptAsync(
-            "Register reMarkable",
-            "Visit my.remarkable.com/device/mobile/connect and enter the one-time code:",
-            placeholder: "e.g. abcdefgh");
-        if (string.IsNullOrWhiteSpace(code))
+        var code = await PaperCards.AskText(this, "Pair the reMarkable",
+            "Open my.remarkable.com/device/mobile/connect and enter its one-time code", "e.g. abcdefgh", null, "Pair",
+            text => text.Length == 0 ? "Enter the code the page shows." : null);
+        if (code is null)
             return;
 
         var pairing = PairingTrail.Start();
@@ -469,13 +489,13 @@ public partial class SetupPage : FolioBinderPage
         catch (HttpRequestException ex)
         {
             PairingTrail.Failed(pairing, ex);
-            await DisplayAlert("Registration failed",
-                $"The reMarkable cloud returned {(int?)ex.StatusCode}. Check the code and try again.", "OK");
+            Say(RemarkableStatusLabel,
+                $"The reMarkable cloud did not accept that code ({(int?)ex.StatusCode}). Check it and pair again.", problem: true);
         }
         catch (Exception ex)
         {
             PairingTrail.Failed(pairing, ex);
-            await DisplayAlert("Registration failed", Storyworthtelling.Diagnostics.PlainError.Describe(ex, "reMarkable"), "OK");
+            Say(RemarkableStatusLabel, "Pairing did not finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "reMarkable"), problem: true);
         }
     }
 

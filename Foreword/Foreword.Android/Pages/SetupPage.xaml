@@ -229,6 +229,7 @@
                          other apps, and Android blocks clipboard copy on a password-typed entry. -->
                     <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
                            Style="{StaticResource MonoEntry}" TextChanged="OnVaultPassphraseChanged" />
+                    <Label x:Name="VaultProblemLabel" Style="{StaticResource ErrorLabel}" IsVisible="False" />
                 </VerticalStackLayout>
             </Border>
 

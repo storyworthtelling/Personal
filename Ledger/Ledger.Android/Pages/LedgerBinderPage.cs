@@ -21,7 +21,7 @@ namespace Index.Android.Pages;
 ///
 /// <para>There is no navigation bar. The header <em>is</em> the header.</para>
 /// </summary>
-public abstract class LedgerBinderPage : ContentPage
+public abstract class LedgerBinderPage : ContentPage, ICardHost
 {
     private readonly BinderTabs strip = new();
     private readonly PaperPageHeader header = new();
@@ -255,6 +255,10 @@ public abstract class LedgerBinderPage : ContentPage
         overlaySlot.Content = overlay;
         overlaySlot.IsVisible = true;
     }
+
+    void ICardHost.ShowCard(View card) => ShowOverlay(card);
+
+    void ICardHost.HideCard() => HideOverlay();
 
     /// <summary>Takes the overlay away, leaving the page as it was.</summary>
     protected void HideOverlay()

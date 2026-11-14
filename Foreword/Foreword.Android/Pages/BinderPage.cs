@@ -20,12 +20,15 @@ namespace Foreword.Android.Pages;
 /// <para>There is no navigation bar. The header <em>is</em> the header — a second title in a system
 /// bar above it would say the same word twice, in the wrong face.</para>
 /// </summary>
-public abstract class BinderPage : ContentPage
+public abstract class BinderPage : ContentPage, ICardHost
 {
     private readonly BinderTabs strip = new();
     private readonly PaperPageHeader header = new();
     private readonly ContentView well = new();
     private readonly ContentView barSlot = new();
+
+    // Over the whole page — header, well, strip and bar — where a paper card and its haze go.
+    private readonly ContentView cardSlot = new() { IsVisible = false };
 
     protected BinderPage()
     {
@@ -88,7 +91,35 @@ public abstract class BinderPage : ContentPage
         Grid.SetColumn(barSlot, 0);
         Grid.SetColumnSpan(barSlot, 2);
 
+        page.Children.Add(cardSlot);
+        Grid.SetRowSpan(cardSlot, 2);
+        Grid.SetColumnSpan(cardSlot, 2);
+
         Content = page;
+    }
+
+    void ICardHost.ShowCard(View card)
+    {
+        cardSlot.Content = card;
+        cardSlot.IsVisible = true;
+    }
+
+    void ICardHost.HideCard()
+    {
+        cardSlot.IsVisible = false;
+        cardSlot.Content = null;
+    }
+
+    /// <summary>The back gesture puts a card away before it leaves the screen.</summary>
+    protected override bool OnBackButtonPressed()
+    {
+        if (cardSlot.IsVisible)
+        {
+            ((ICardHost)this).HideCard();
+            return true;
+        }
+
+        return base.OnBackButtonPressed();
     }
 
     /// <summary>

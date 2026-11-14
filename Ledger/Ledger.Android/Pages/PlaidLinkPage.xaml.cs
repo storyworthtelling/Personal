@@ -10,6 +10,7 @@ using Index.Domain.Connect;
 using Index.Domain.External;
 using Index.Infrastructure.Services;
 using Storyworthtelling.Maui;
+using Storyworthtelling.Folds;
 using Storyworthtelling.Paper;
 using Storyworthtelling.Voice.Secrets;
 using Storyworthtelling.Pipeline;
@@ -534,8 +535,11 @@ public partial class PlaidLinkPage : LedgerBinderPage
             SecretsVaultPublishResult backup;
             try { backup = await vaultSync.PublishAsync(CancellationToken.None); }
             catch (Exception ex) { backup = SecretsVaultPublishResult.WriteFailed(ex.Message); }
+            // This page leaves next, so the notice is carried to the dog-ear of the page it lands on
+            // (audit W8.2b: it was an alert in front of a connection that had already worked).
             if (backup.NeedsAttention)
-                await DisplayAlert("Vault backup didn’t complete", backup.Message, "OK");
+                CarriedNotices.Shared.Carry("vault-backup", new DogEarNotice(
+                    "The new bank’s backup did not finish.", backup.Message, DogEarHue.Problem));
 
             // Kick an immediate refresh so balances appear without waiting for the daily cycle, then
             // turn to Accounts, where the new bank's cards appear (no toast: the cards are the news).

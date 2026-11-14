@@ -29,6 +29,9 @@
                      about the list, not a problem with it. -->
                 <Label x:Name="AwayLabel" Style="{StaticResource CardCaption}" IsVisible="False" />
 
+                <!-- A task the read-back screen saved here but could not put in Google. -->
+                <Label x:Name="ProblemLabel" Style="{StaticResource ErrorLabel}" IsVisible="False" />
+
                 <Border Style="{StaticResource GroupCard}" Margin="0,16,0,0">
                     <VerticalStackLayout x:Name="Rows" />
                 </Border>

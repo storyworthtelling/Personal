@@ -25,9 +25,18 @@ public partial class TasksPage : BinderPage
         Wrap(ForewordArea.Tasks, "Tasks");
     }
 
+    /// <summary>
+    /// What the read-back screen could not do as it left (a task saved here but not in Google), said once
+    /// on the list it lands on, in the Problem hue.
+    /// </summary>
+    public static string? CarriedProblem { get; set; }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        ProblemLabel.Text = CarriedProblem ?? string.Empty;
+        ProblemLabel.IsVisible = CarriedProblem is not null;
+        CarriedProblem = null;
         await Render();
     }
 

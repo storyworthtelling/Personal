@@ -175,6 +175,10 @@ public partial class MainPage : LedgerBinderPage
         {
             base.OnAppearing();
             isAppearing = true;
+
+            // A notice another page raised as it left (the Plaid link's backup) folds in here.
+            CarriedNotices.Shared.DeliverTo(dogEarState);
+            dogEar.Refresh();
             if (Window is not null)
             {
                 Window.Resumed -= OnWindowResumed;
