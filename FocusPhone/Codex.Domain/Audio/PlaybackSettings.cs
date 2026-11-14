@@ -19,10 +19,6 @@ public record PlaybackSettings(
 
     public PlaybackSettings WithSpeed(float speed) => this with { Speed = Clamp(speed) };
 
-    public PlaybackSettings Faster() => WithSpeed(Speed + Step);
-
-    public PlaybackSettings Slower() => WithSpeed(Speed - Step);
-
     private static float Clamp(float speed) =>
         Math.Clamp(SnapToStep(speed), MinSpeed, MaxSpeed);
 

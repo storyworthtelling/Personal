@@ -23,12 +23,6 @@ public class PlaybackTimelineTests
         Assert.Equal(1.0, PlaybackTimeline.Fraction(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(4)));
     }
 
-    [Fact]
-    public void SeekTarget_MapsFractionToPosition()
-    {
-        Assert.Equal(TimeSpan.FromMinutes(3), PlaybackTimeline.SeekTarget(0.75, TimeSpan.FromMinutes(4)));
-    }
-
     [Theory]
     [InlineData(5, "0:05")]
     [InlineData(65, "1:05")]

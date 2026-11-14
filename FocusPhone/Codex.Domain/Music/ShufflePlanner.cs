@@ -1,14 +1,5 @@
 namespace Codex.Domain.Music;
 
-/// <summary>The thing being shuffled — never a single global toggle.</summary>
-public enum ShuffleScope
-{
-    Album,
-    Playlist,
-    Artist,
-    Genre,
-}
-
 /// <summary>
 /// Produces a shuffled play order for a set of tracks. The caller decides the
 /// scope (an album's, a playlist's, an artist's whole discography, or a genre)

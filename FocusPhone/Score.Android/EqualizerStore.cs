@@ -15,6 +15,8 @@ public class EqualizerStore
     private const string PreferencesName = "equalizer";
     private const string LibraryKey = "library";
     private const string LoudnessKey = "loudnessMillibels";
+    private const string SoundCheckKey = "soundCheck";
+    private const string DevicesKey = "devices";
 
     private readonly ISharedPreferences preferences;
 
@@ -25,6 +27,20 @@ public class EqualizerStore
 
     public void SaveLibrary(EqualizerLibrary library) =>
         preferences.Edit()!.PutString(LibraryKey, EqualizerCodec.Encode(library))!.Apply();
+
+    /// <summary>Sound check (W7.3): even loudness between tracks from their ReplayGain tags. Off until chosen.</summary>
+    public bool SoundCheck
+    {
+        get => preferences.GetBoolean(SoundCheckKey, false);
+        set => preferences.Edit()!.PutBoolean(SoundCheckKey, value)!.Apply();
+    }
+
+    /// <summary>Each output device's remembered volume and preset (W7.3). Kept on this phone only: devices are this phone's.</summary>
+    public PlaybackDeviceSettings LoadDevices() =>
+        new(PlaybackDeviceSettingsCodec.Decode(preferences.GetString(DevicesKey, null)));
+
+    public void SaveDevices(PlaybackDeviceSettings devices) =>
+        preferences.Edit()!.PutString(DevicesKey, PlaybackDeviceSettingsCodec.Encode(devices.Export()))!.Apply();
 
     /// <summary>Extra loudness applied via LoudnessEnhancer, in millibels (0 = off).</summary>
     public int LoudnessMillibels

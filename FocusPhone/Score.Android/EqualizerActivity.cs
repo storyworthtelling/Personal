@@ -12,7 +12,8 @@ using Codex.Ui;
 namespace Score;
 
 /// <summary>
-/// The equalizer band editor: a slider per hardware band plus an "extra loudness" boost. Reads the device's
+/// The equalizer band editor: a slider per hardware band, the owner's saved presets (tap to apply, long-press
+/// to delete, undo-first), "Save as preset", sound check and an "extra loudness" boost. Reads the device's
 /// band count and range from a throwaway Equalizer bound to the global output mix, edits the stored
 /// <see cref="EqualizerLibrary"/>, and on save persists it and tells the playback service to re-apply. If the
 /// device refuses audio effects, the screen says so rather than crashing.
@@ -25,6 +26,8 @@ public class EqualizerActivity : Activity
     private EqualizerStore store = null!;
     private readonly DeviceAccountTokenProvider tokens = new();
     private EqualizerLibrary library = EqualizerLibrary.Flat(0);
+    private bool loaded;
+    private FrameLayout? overlay;
     private short bandMin;
     private short bandMax;
 
@@ -102,15 +105,20 @@ public class EqualizerActivity : Activity
             return root;
         }
 
-        var stored = store.LoadLibrary();
-        library = stored is not null && stored.Active.BandGains.Count == bandCount
-            ? stored
-            : EqualizerLibrary.Flat(bandCount);
+        // Read once; a rebuild after a preset is applied keeps the edits in hand rather than the stored copy.
+        if (!loaded)
+        {
+            var stored = store.LoadLibrary();
+            library = stored is not null && stored.Active.BandGains.Count == bandCount
+                ? stored
+                : EqualizerLibrary.Flat(bandCount);
+            loaded = true;
+        }
 
         var enabledButton = PaperUi.SecondaryButton(this, EnabledLabel(), () => { });
         enabledButton.Click += (_, _) =>
         {
-            library = library with { Active = library.Active with { Enabled = !library.Active.Enabled } };
+            library = library.EditActive(active => active with { Enabled = !active.Enabled });
             enabledButton.Text = EnabledLabel();
         };
         content.AddView(enabledButton);
@@ -120,12 +128,28 @@ public class EqualizerActivity : Activity
             content.AddView(BuildBandRow(band, centerFrequencies[band]));
         }
 
+        BuildPresets(content);
+
+        content.AddView(PaperUi.Secondary(this,
+            "Sound check evens out loudness between tracks that carry a ReplayGain tag. Tracks without one play as they are."));
+        var soundCheck = PaperUi.SecondaryButton(this, SoundCheckLabel(), () => { });
+        soundCheck.Click += (_, _) =>
+        {
+            store.SoundCheck = !store.SoundCheck;
+            soundCheck.Text = SoundCheckLabel();
+        };
+        content.AddView(soundCheck);
+
         content.AddView(PaperUi.Secondary(this, "Extra loudness"));
         content.AddView(BuildLoudnessRow());
 
         var scroll = new ScrollView(this);
         scroll.AddView(content);
-        root.AddView(Framed(scroll), Fill());
+        var (framed, host) = BinderFrame.WrapWithOverlay(
+            this, "Equalizer", ScoreShellAreas.All[ScoreShellAreas.Music].Hue, scroll,
+            ScoreShellAreas.All, ScoreShellAreas.Music, SwitchArea);
+        overlay = host;
+        root.AddView(framed, Fill());
 
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Save", Save),
@@ -150,7 +174,7 @@ public class EqualizerActivity : Activity
         {
             if (e.FromUser)
             {
-                library = library with { Active = library.Active.WithBand(band, (short)(e.Progress + bandMin)) };
+                library = library.EditActive(active => active.WithBand(band, (short)(e.Progress + bandMin)));
             }
         };
         row.AddView(slider, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
@@ -180,6 +204,69 @@ public class EqualizerActivity : Activity
     }
 
     private string EnabledLabel() => library.Active.Enabled ? "Equalizer: on" : "Equalizer: off";
+
+    private string SoundCheckLabel() => store.SoundCheck ? "Sound check: on" : "Sound check: off";
+
+    // The saved presets (W7.3). A preset is a curve, so it is the one thing on this screen with a name: tap
+    // applies it, long-press offers deleting it, and the current curve can be saved under a new name. The
+    // playback service remembers which preset each output device was left on.
+    private void BuildPresets(LinearLayout content)
+    {
+        content.AddView(PaperUi.Secondary(this, library.Presets.Count == 0
+            ? "No presets yet. Shape a curve, then save it under a name."
+            : library.InForce is { } inForce ? $"Presets — {inForce} is on" : "Presets"));
+
+        foreach (var preset in library.Presets)
+        {
+            var name = preset.Name;
+            var row = PaperUi.SecondaryButton(this, name, () => ApplyPreset(name));
+            row.LongClick += (_, _) => OfferDelete(name);
+            content.AddView(row);
+        }
+
+        var field = PaperUi.Field(this, "Preset name");
+        content.AddView(field);
+        content.AddView(PaperUi.QuietButton(this, "Save as preset", () =>
+        {
+            var name = (field.Text ?? string.Empty).Trim();
+            if (name.Length == 0)
+            {
+                return;
+            }
+            library = library.SavePreset(name);
+            Rebuild();
+        }));
+    }
+
+    private void ApplyPreset(string name)
+    {
+        library = library.ApplyPreset(name);
+        Rebuild();
+    }
+
+    private void OfferDelete(string name)
+    {
+        if (overlay is null)
+        {
+            return;
+        }
+        ActionCard.Show(this, overlay, name, null, new CardAction("Delete preset", () =>
+        {
+            var before = library;
+            library = library.DeletePreset(name);
+            Rebuild();
+            if (overlay is { } host)
+            {
+                DogEar.Show(this, host, $"Deleted {name}.", onUndo: () =>
+                {
+                    library = before;
+                    Rebuild();
+                });
+            }
+        }, Destructive: true));
+    }
+
+    private void Rebuild() => SetContentView(BuildLayout());
 
     private static string FrequencyLabel(int milliHz)
     {

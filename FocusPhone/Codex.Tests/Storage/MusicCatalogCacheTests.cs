@@ -37,6 +37,16 @@ public class MusicCatalogCacheTests : IDisposable
     }
 
     [Fact]
+    public void TheReplayGainRoundTrips()
+    {
+        cache.Upsert([Tr("1") with { ReplayGainDb = -7.25 }, Tr("2")]);
+
+        var tracks = cache.LoadAll().OrderBy(track => track.Id).ToList();
+        Assert.Equal(-7.25, tracks[0].ReplayGainDb);
+        Assert.Null(tracks[1].ReplayGainDb);
+    }
+
+    [Fact]
     public void Upsert_UpdatesExistingTrackById()
     {
         cache.Upsert([Tr("1", "Old")]);

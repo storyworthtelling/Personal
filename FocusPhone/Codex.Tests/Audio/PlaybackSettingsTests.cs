@@ -30,18 +30,6 @@ public class PlaybackSettingsTests
     }
 
     [Fact]
-    public void Faster_StepsUpByOneTenth()
-    {
-        Assert.Equal(1.5f, new PlaybackSettings(1.4f).Faster().Speed);
-    }
-
-    [Fact]
-    public void Slower_StepsDownByOneTenth()
-    {
-        Assert.Equal(1.3f, new PlaybackSettings(1.4f).Slower().Speed);
-    }
-
-    [Fact]
     public void Toggles_DefaultOff()
     {
         var settings = new PlaybackSettings();

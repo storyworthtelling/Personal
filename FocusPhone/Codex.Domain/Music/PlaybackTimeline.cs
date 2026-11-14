@@ -2,16 +2,13 @@ namespace Codex.Domain.Music;
 
 /// <summary>
 /// The now-playing scrubber's math and labels: the elapsed/remaining clock strings and the 0–1 progress
-/// fraction, plus the seek target for a scrub. Pure so the now-playing screen stays a thin adapter. Music
+/// fraction. Pure so the now-playing screen stays a thin adapter. Music
 /// clocks are m:ss (h:mm:ss past an hour) — distinct from the podcast "min left" of <see cref="Audio.PlaybackFormatting"/>.
 /// </summary>
 public static class PlaybackTimeline
 {
     public static double Fraction(TimeSpan position, TimeSpan duration) =>
         duration > TimeSpan.Zero ? Math.Clamp(position / duration, 0.0, 1.0) : 0.0;
-
-    public static TimeSpan SeekTarget(double fraction, TimeSpan duration) =>
-        duration > TimeSpan.Zero ? duration * Math.Clamp(fraction, 0.0, 1.0) : TimeSpan.Zero;
 
     public static string Elapsed(TimeSpan position) => Clock(position);
 
