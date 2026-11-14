@@ -3,6 +3,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using Android.Views;
 using AndroidX.Media3.Common;
 using AndroidX.Media3.DataSource;
 using AndroidX.Media3.ExoPlayer;
@@ -72,6 +73,10 @@ public class PlaybackService : MediaLibraryService
     private Java.Lang.Runnable? recorder;
     private EqualizerStore? equalizerStore;
     private readonly AudioEffects audioEffects = new();
+    private DeviceAudioWatch? deviceAudio;
+
+    // Each track's ReplayGain, for sound check (W7.3). Read with the catalog; refreshed when effects are re-applied.
+    private IReadOnlyDictionary<string, double?> replayGains = new Dictionary<string, double?>();
 
     // Which session OnGetSession hands back to a controller that connects without naming one —
     // see ConnectionHintSessionKey. Defaults to Drive: until something has actually started TIDAL
@@ -109,7 +114,9 @@ public class PlaybackService : MediaLibraryService
             .Build()!;
         // A Drive 401, a codec failure or a dead podcast redirect used to leave no trace at all (audit 08 §13).
         player.AddListener(new PlayerErrorListener(player));
-        var tree = new MediaBrowseTree(LoadCatalog());
+        var catalog = LoadCatalog();
+        replayGains = GainsOf(catalog);
+        var tree = new MediaBrowseTree(catalog);
         driveMediaSession = new MediaLibrarySession.Builder(this, player, new LibraryCallback(tree))
             .SetId(DriveSessionId)!
             .Build();
@@ -119,6 +126,8 @@ public class PlaybackService : MediaLibraryService
 
         handler = new Handler(Looper.MainLooper!);
         recorder = new Java.Lang.Runnable(RecordTick);
+        deviceAudio = new DeviceAudioWatch(this, equalizerStore, ApplyAudioEffects);
+        deviceAudio.Start(handler);
         handler.PostDelayed(recorder, RecordIntervalMs);
 
         // Best-effort, off the main thread, matching MusicLibrary.RestoreFolderFromVault: there is
@@ -203,8 +212,18 @@ public class PlaybackService : MediaLibraryService
         }
 
         var settings = equalizerStore.LoadLibrary()?.Active ?? new EqualizerSettings(false, []);
-        audioEffects.Apply(player.AudioSessionId, settings, equalizerStore.LoudnessMillibels);
+        var mediaId = player.CurrentMediaItem?.MediaId;
+        var gain = mediaId is not null && replayGains.TryGetValue(mediaId, out var known) ? known : null;
+        var loudness = SoundCheck.Plan(gain, equalizerStore.SoundCheck, equalizerStore.LoudnessMillibels);
+        audioEffects.Apply(player.AudioSessionId, settings, loudness.BoostMillibels);
+        // A cut is the player's own volume: Android's loudness enhancer only raises (sound check, W7.3).
+        player.Volume = loudness.Volume;
     }
+
+    private static IReadOnlyDictionary<string, double?> GainsOf(MusicCatalog catalog) =>
+        catalog.Songs().Where(track => track.ReplayGainDb is not null)
+            .GroupBy(track => track.Id)
+            .ToDictionary(group => group.Key, group => group.First().ReplayGainDb);
 
     // Covariant return (MediaLibrarySession, not MediaSession): Java's
     // MediaLibraryService.onGetSession returns MediaLibrarySession, so the generated
@@ -245,6 +264,8 @@ public class PlaybackService : MediaLibraryService
 
         if (intent?.Action == AudioPlaybackCommands.ActionApplyAudioEffects)
         {
+            // The equalizer screen may have turned sound check on after a rescan read new tags.
+            replayGains = GainsOf(LoadCatalog());
             ApplyAudioEffects();
             return StartCommandResult.Sticky;
         }
@@ -266,7 +287,8 @@ public class PlaybackService : MediaLibraryService
     private void RecordTick()
     {
         RecordCurrentPosition();
-        ApplyAudioEffects(); // keep effects bound as the audio session changes across tracks
+        ApplyAudioEffects(); // keep effects bound as the audio session changes across tracks, and sound check per track
+        deviceAudio?.Observe(); // learn what the owner set on the device that is playing
         if (handler is not null && recorder is not null)
         {
             handler.PostDelayed(recorder, RecordIntervalMs);
@@ -298,6 +320,8 @@ public class PlaybackService : MediaLibraryService
         }
 
         audioEffects.Release();
+        deviceAudio?.Stop();
+        deviceAudio = null;
         driveMediaSession?.Player?.Release();
         driveMediaSession?.Release();
         driveMediaSession = null;
@@ -322,7 +346,54 @@ public class PlaybackService : MediaLibraryService
     private sealed class LibraryCallback(MediaBrowseTree tree)
         : Java.Lang.Object, MediaLibrarySession.ICallback
     {
+        private readonly MediaButtonGesture gesture = new(MediaButtonGesture.DefaultWindow);
+        private readonly Handler buttons = new(Looper.MainLooper!);
+
         public MediaBrowseTree Tree { get; } = tree;
+
+        // Headset gestures (W7.3): one press plays or pauses, two skip forward, three skip back. Only the
+        // headset's own button is taken; every other media key goes to Media3 as before.
+        // Explicit, so a signature that drifts from the binding fails the build instead of quietly overriding nothing.
+        bool MediaSession.ICallback.OnMediaButtonEvent(MediaSession session, MediaSession.ControllerInfo controllerInfo, Intent intent)
+        {
+#pragma warning disable CA1422, CS0618 // the typed overload is API 33+; this runs on older phones too
+            var key = intent.GetParcelableExtra(Intent.ExtraKeyEvent) as KeyEvent;
+#pragma warning restore CA1422, CS0618
+            if (key is null || key.KeyCode is not (Keycode.Headsethook or Keycode.MediaPlayPause))
+            {
+                return false;
+            }
+
+            if (key.Action == KeyEventActions.Down && key.RepeatCount == 0)
+            {
+                gesture.Press(DateTimeOffset.UtcNow);
+                buttons.PostDelayed(() => Resolve(session.Player), (long)MediaButtonGesture.DefaultWindow.TotalMilliseconds + 50);
+            }
+            return true;
+        }
+
+        private void Resolve(IPlayer? player)
+        {
+            if (player is null)
+            {
+                return;
+            }
+            switch (gesture.Flush(DateTimeOffset.UtcNow))
+            {
+                case MediaButtonAction.PlayPause when player.IsPlaying:
+                    player.Pause();
+                    break;
+                case MediaButtonAction.PlayPause:
+                    player.Play();
+                    break;
+                case MediaButtonAction.Next:
+                    player.SeekToNext();
+                    break;
+                case MediaButtonAction.Previous:
+                    player.SeekToPrevious();
+                    break;
+            }
+        }
     }
 }
 

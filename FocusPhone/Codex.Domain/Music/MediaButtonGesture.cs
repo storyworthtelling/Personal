@@ -16,6 +16,9 @@ public enum MediaButtonAction
 /// </summary>
 public sealed class MediaButtonGesture
 {
+    /// <summary>How long after a press another one still counts toward the same gesture.</summary>
+    public static readonly TimeSpan DefaultWindow = TimeSpan.FromMilliseconds(450);
+
     private readonly TimeSpan window;
     private int count;
     private DateTimeOffset lastPress;

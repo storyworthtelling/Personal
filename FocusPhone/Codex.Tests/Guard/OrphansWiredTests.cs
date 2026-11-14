@@ -51,4 +51,28 @@ public class OrphansWiredTests
         Assert.Contains("IdentityLinks.Unlink(", mailbox, StringComparison.Ordinal);
         Assert.Contains("IdentityLinks.Rejoin(", mailbox, StringComparison.Ordinal);
     }
+
+    // §14, §17 (owner's ruling, W7.3): Score's device features were tested and reached nothing.
+    [Fact]
+    public void ScorePlaysWithItsDeviceFeatures()
+    {
+        var service = LogLoopSource.File("FocusPhone/Score.Android/PlaybackService.cs");
+        Assert.Contains("SoundCheck.Plan(", service, StringComparison.Ordinal);
+        Assert.Contains("new DeviceAudioWatch(", service, StringComparison.Ordinal);
+        Assert.Contains("deviceAudio?.Observe()", service, StringComparison.Ordinal);
+        Assert.Contains("OnMediaButtonEvent(", service, StringComparison.Ordinal);
+        Assert.Contains("gesture.Flush(", service, StringComparison.Ordinal);
+
+        var watch = LogLoopSource.File("FocusPhone/Score.Android/DeviceAudioWatch.cs");
+        Assert.Contains("DeviceAudioRoute.KeyFor(", watch, StringComparison.Ordinal);
+        Assert.Contains("memory.Routed(", watch, StringComparison.Ordinal);
+
+        var equalizer = LogLoopSource.File("FocusPhone/Score.Android/EqualizerActivity.cs");
+        Assert.Contains(".SavePreset(", equalizer, StringComparison.Ordinal);
+        Assert.Contains(".ApplyPreset(", equalizer, StringComparison.Ordinal);
+        Assert.Contains(".DeletePreset(", equalizer, StringComparison.Ordinal);
+        Assert.Contains("store.SoundCheck", equalizer, StringComparison.Ordinal);
+
+        Assert.Contains("tag.ReplayGainTrackGain", LogLoopSource.File("FocusPhone/Score.Android/MusicTagReader.cs"), StringComparison.Ordinal);
+    }
 }

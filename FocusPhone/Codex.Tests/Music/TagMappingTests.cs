@@ -96,4 +96,12 @@ public class TagMappingTests
 
         Assert.Equal(0, track.Bitrate);
     }
+
+    // Sound check (W7.3) reads the track's ReplayGain; TagLibSharp reports NaN for a file with none.
+    [Fact]
+    public void ToTrack_CarriesTheReplayGainOrNothing()
+    {
+        Assert.Equal(-6.5, TagMapping.ToTrack("f", "T", ["A"], "Al", ["A"], 1, 1, ["G"], TimeSpan.Zero, replayGainDb: -6.5).ReplayGainDb);
+        Assert.Null(TagMapping.ToTrack("f", "T", ["A"], "Al", ["A"], 1, 1, ["G"], TimeSpan.Zero, replayGainDb: double.NaN).ReplayGainDb);
+    }
 }

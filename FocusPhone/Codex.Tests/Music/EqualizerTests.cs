@@ -71,3 +71,54 @@ public class EqualizerTests
         Assert.Null(EqualizerCodec.Decode("{bad"));
     }
 }
+
+/// <summary>The presets screen (W7.3): which preset is in force, and deleting one.</summary>
+public class EqualizerPresetTests
+{
+    [Fact]
+    public void ApplyingAPresetNamesItAsInForce()
+    {
+        var library = EqualizerLibrary.Flat(2).SavePreset("Road").ApplyPreset("Road");
+
+        Assert.Equal("Road", library.InForce);
+    }
+
+    [Fact]
+    public void EditingABandMeansNoPresetIsInForce()
+    {
+        var library = EqualizerLibrary.Flat(2).SavePreset("Road").ApplyPreset("Road").EditActive(active => active.WithBand(0, 300));
+
+        Assert.Null(library.InForce);
+        Assert.Equal(300, library.Active.BandGains[0]);
+    }
+
+    [Fact]
+    public void SavingTheActiveCurveNamesIt()
+    {
+        Assert.Equal("Mine", EqualizerLibrary.Flat(2).SavePreset("Mine").InForce);
+    }
+
+    [Fact]
+    public void DeletingAPresetLeavesTheActiveCurveAlone()
+    {
+        var library = EqualizerLibrary.Flat(2).EditActive(a => a.WithBand(1, 200)).SavePreset("Road").DeletePreset("road");
+
+        Assert.Empty(library.Presets);
+        Assert.Null(library.InForce);
+        Assert.Equal(200, library.Active.BandGains[1]);
+    }
+}
+
+/// <summary>The stored library keeps which preset is in force, so the per-device memory can read it back.</summary>
+public class EqualizerCodecPresetTests
+{
+    [Fact]
+    public void ThePresetInForceSurvivesStorage()
+    {
+        var library = EqualizerLibrary.Flat(2).SavePreset("Road").ApplyPreset("Road");
+
+        var decoded = Codex.Infrastructure.Music.EqualizerCodec.Decode(Codex.Infrastructure.Music.EqualizerCodec.Encode(library));
+
+        Assert.Equal("Road", decoded!.InForce);
+    }
+}

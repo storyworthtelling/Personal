@@ -22,7 +22,8 @@ public static class TagMapping
         TimeSpan duration,
         string? artRef = null,
         uint beatsPerMinute = 0,
-        int bitrateKbps = 0) =>
+        int bitrateKbps = 0,
+        double replayGainDb = double.NaN) =>
         new(
             fileId,
             title ?? string.Empty,
@@ -35,7 +36,8 @@ public static class TagMapping
             duration,
             artRef,
             (int)beatsPerMinute,
-            Bitrate: bitrateKbps);
+            Bitrate: bitrateKbps,
+            ReplayGainDb: double.IsNaN(replayGainDb) ? null : replayGainDb);
 
     private static string First(IReadOnlyList<string>? values) =>
         values is { Count: > 0 } ? values[0] : string.Empty;

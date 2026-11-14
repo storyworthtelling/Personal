@@ -35,7 +35,8 @@ public class MusicCatalogCache
                 bpm INTEGER NOT NULL DEFAULT 0,
                 sourceId TEXT,
                 clipStartTicks INTEGER NOT NULL DEFAULT 0,
-                bitrate INTEGER NOT NULL DEFAULT 0
+                bitrate INTEGER NOT NULL DEFAULT 0,
+                replayGain REAL
             )
             """;
         create.ExecuteNonQuery();
@@ -58,6 +59,10 @@ public class MusicCatalogCache
         // Bitrate arrived with duplicate detection. Zero = unmeasured, so an older
         // cache keeps every row and the next scan fills it in from the tags.
         EnsureColumn("bitrate");
+
+        // ReplayGain arrived with sound check (W7.3). NULL = no tag, so an older cache reads as "no gain" until
+        // the reader's version bump re-reads every file once.
+        EnsureColumn("replayGain", "REAL");
 
         using var meta = connection.CreateCommand();
         meta.CommandText = "CREATE TABLE IF NOT EXISTS meta (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)";
@@ -135,10 +140,10 @@ public class MusicCatalogCache
         upsert.CommandText = """
             INSERT INTO tracks (
                 id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef,
-                modifiedTimeTicks, sizeBytes, bpm, sourceId, clipStartTicks, bitrate)
+                modifiedTimeTicks, sizeBytes, bpm, sourceId, clipStartTicks, bitrate, replayGain)
             VALUES (
                 $id, $title, $artist, $album, $albumArtist, $trackNumber, $discNumber, $genre, $durationTicks, $artRef,
-                $modifiedTimeTicks, $sizeBytes, $bpm, $sourceId, $clipStartTicks, $bitrate)
+                $modifiedTimeTicks, $sizeBytes, $bpm, $sourceId, $clipStartTicks, $bitrate, $replayGain)
             ON CONFLICT (id) DO UPDATE SET
                 title = excluded.title,
                 artist = excluded.artist,
@@ -154,7 +159,8 @@ public class MusicCatalogCache
                 bpm = excluded.bpm,
                 sourceId = excluded.sourceId,
                 clipStartTicks = excluded.clipStartTicks,
-                bitrate = excluded.bitrate
+                bitrate = excluded.bitrate,
+                replayGain = excluded.replayGain
             """;
 
         var parameters = new Dictionary<string, SqliteParameter>();
@@ -162,7 +168,7 @@ public class MusicCatalogCache
         {
             "$id", "$title", "$artist", "$album", "$albumArtist",
             "$trackNumber", "$discNumber", "$genre", "$durationTicks", "$artRef",
-            "$modifiedTimeTicks", "$sizeBytes", "$bpm", "$sourceId", "$clipStartTicks", "$bitrate",
+            "$modifiedTimeTicks", "$sizeBytes", "$bpm", "$sourceId", "$clipStartTicks", "$bitrate", "$replayGain",
         })
         {
             var parameter = upsert.CreateParameter();
@@ -189,6 +195,7 @@ public class MusicCatalogCache
             parameters["$sourceId"].Value = (object?)track.SourceFileId ?? DBNull.Value;
             parameters["$clipStartTicks"].Value = track.ClipStart?.Ticks ?? 0L;
             parameters["$bitrate"].Value = track.Bitrate;
+            parameters["$replayGain"].Value = (object?)track.ReplayGainDb ?? DBNull.Value;
             upsert.ExecuteNonQuery();
         }
 
@@ -246,7 +253,7 @@ public class MusicCatalogCache
         using var select = connection.CreateCommand();
         select.CommandText = """
             SELECT id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef, bpm,
-                sourceId, clipStartTicks, bitrate
+                sourceId, clipStartTicks, bitrate, replayGain
             FROM tracks
             """;
         using var reader = select.ExecuteReader();
@@ -269,7 +276,8 @@ public class MusicCatalogCache
                 reader.GetInt32(10),
                 SourceFileId: sourceId,
                 ClipStart: sourceId is null ? null : TimeSpan.FromTicks(reader.GetInt64(12)),
-                Bitrate: reader.GetInt32(13)));
+                Bitrate: reader.GetInt32(13),
+                ReplayGainDb: reader.IsDBNull(14) ? null : reader.GetDouble(14)));
         }
 
         return tracks;

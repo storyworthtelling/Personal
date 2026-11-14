@@ -53,7 +53,8 @@ public record Track(
     TrackAvailability Availability = TrackAvailability.Local,
     string? SourceFileId = null,
     TimeSpan? ClipStart = null,
-    int Bitrate = 0)
+    int Bitrate = 0,
+    double? ReplayGainDb = null)
 {
     /// <summary>Whether this can actually be started. False only for a track the
     /// provider has stopped carrying.</summary>
