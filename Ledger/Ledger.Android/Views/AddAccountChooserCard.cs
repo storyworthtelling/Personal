@@ -55,7 +55,7 @@ public static class AddAccountChooserCard
                     Style = PaperResources.Token<Style>("CardRowTitle"),
                     // Semibold throughout; the primary choice is also the deep green (mockup 4).
                     FontFamily = "SansSemibold",
-                    TextColor = PaperResources.Colour(primary ? "AccentDeep" : "Ink"),
+                    TextColor = PaperResources.Colour(primary ? "ActionDeep" : "Ink"),
                 },
                 new Label
                 {

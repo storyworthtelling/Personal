@@ -444,7 +444,7 @@ public partial class SetupPage : BinderPage
             Spacing = 8,
             Children =
             {
-                new Label { Text = title, Style = LookupStyle("CardRowTitle"), TextColor = LookupColor("Accent") },
+                new Label { Text = title, Style = LookupStyle("CardRowTitle"), TextColor = LookupColor("ActionMark") },
                 new Label { Text = status, Style = LookupStyle("CardRowDescription") },
                 entry,
                 new Label { Text = hint, Style = LookupStyle("CardRowDescription") },

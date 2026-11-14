@@ -84,7 +84,7 @@ public static class PaperUi
     public static Button PrimaryButton(Context context, string label, Action onClick)
     {
         var button = ButtonBase(context, label, onClick, PaperTheme.PaperBright, PaperTheme.SansSemibold(context));
-        button.Background = PressableFill(context, PaperTheme.Accent, PaperTheme.AccentDeep);
+        button.Background = PressedHairline(context, PaperTheme.ActionDeep);
         return button;
     }
 
@@ -124,8 +124,8 @@ public static class PaperUi
         };
         button.SetTextColor(textColor);
         button.SetPadding(
-            PaperTheme.Dp(context, DesignTokens.Space.X4), PaperTheme.Dp(context, DesignTokens.Space.X3),
-            PaperTheme.Dp(context, DesignTokens.Space.X4), PaperTheme.Dp(context, DesignTokens.Space.X3));
+            PaperTheme.Dp(context, DesignTokens.Shape.ButtonPaddingX), PaperTheme.Dp(context, DesignTokens.Shape.ButtonPaddingY),
+            PaperTheme.Dp(context, DesignTokens.Shape.ButtonPaddingX), PaperTheme.Dp(context, DesignTokens.Shape.ButtonPaddingY));
         button.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
         // The platform's default Button style (Widget.Material.Button) carries its own
         // android:minWidth (88dp), which forces even a single-glyph button like "↑" to that
@@ -596,12 +596,14 @@ public static class PaperUi
         return drawable;
     }
 
-    private static StateListDrawable PressableFill(Context context, Color normal, Color pressed)
+    // §3: a filled button is the deep tier. §8: pressing changes no colour — the fill stays and an
+    // inset hairline shows the press (audit W8.1; it used to darken from the mark tier to the deep).
+    private static StateListDrawable PressedHairline(Context context, Color fill)
     {
         var states = new StateListDrawable();
         states.AddState([Android.Resource.Attribute.StatePressed],
-            Fill(context, pressed, DesignTokens.Shape.RadiusButton));
-        states.AddState([], Fill(context, normal, DesignTokens.Shape.RadiusButton));
+            Outline(context, fill, PaperTheme.Hairline, DesignTokens.Shape.RadiusButton));
+        states.AddState([], Fill(context, fill, DesignTokens.Shape.RadiusButton));
         return states;
     }
 

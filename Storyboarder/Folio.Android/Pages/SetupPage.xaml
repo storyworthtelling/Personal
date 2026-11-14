@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <local:FolioBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:kit="clr-namespace:Storyworthtelling.Maui.Views;assembly=Storyworthtelling.Maui"
              xmlns:local="clr-namespace:Folio.Android.Pages"
              x:Class="Folio.Android.Pages.SetupPage">
     <Grid RowDefinitions="*,Auto">
@@ -8,9 +9,9 @@
         <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="14">
 
 
-            <Border x:Name="MigrationErrorCard" IsVisible="False" Style="{StaticResource WarningCard}" Margin="0,8,0,0">
+            <kit:PaperWarningCard x:Name="MigrationErrorCard" IsVisible="False" Margin="0,8,0,0">
                 <Label x:Name="MigrationErrorLabel" FontSize="{StaticResource SecondarySize}" />
-            </Border>
+            </kit:PaperWarningCard>
 
             <Label Text="API keys" Style="{StaticResource TitleLabel}" Margin="0,8,0,0" />
             <Label Text="A working key stays put — it's backed up to the vault and restored automatically, so its field only appears when a key is missing or a call with it was just rejected."
@@ -63,10 +64,10 @@
                     Clicked="OnGoogleSignInClicked" Style="{StaticResource SecondaryButton}" />
             <Label x:Name="GoogleStatusLabel" Style="{StaticResource SecondaryLabel}" />
 
-            <Border Style="{StaticResource WarningCard}" Margin="0,8,0,0">
+            <kit:PaperWarningCard Margin="0,8,0,0">
                 <Label Text="One-time setup in Google Cloud Console: create an Android OAuth client with the package and SHA-1 below, enable the Google Docs &amp; Drive APIs, and add your account as a test user."
                        FontSize="{StaticResource SecondarySize}" />
-            </Border>
+            </kit:PaperWarningCard>
             <ContentView x:Name="GoogleCloudConsoleLink" />
             <Label x:Name="SigningInfoLabel" Style="{StaticResource MonoLabel}"
                    FontSize="{StaticResource LabelSize}" />

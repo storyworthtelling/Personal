@@ -7,15 +7,15 @@
 -->
 <local:FolioBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:kit="clr-namespace:Storyworthtelling.Maui.Views;assembly=Storyworthtelling.Maui"
              xmlns:local="clr-namespace:Folio.Android.Pages"
              x:Class="Folio.Android.Pages.MainPage">
     <ScrollView>
         <VerticalStackLayout Padding="24,4,16,24">
 
-            <Border x:Name="ConfigWarningCard" IsVisible="False"
-                    Style="{StaticResource WarningCard}" Margin="0,0,0,12">
+            <kit:PaperWarningCard x:Name="ConfigWarningCard" IsVisible="False" Margin="0,0,0,12">
                 <Label x:Name="ConfigWarningLabel" FontSize="{StaticResource SecondarySize}" />
-            </Border>
+            </kit:PaperWarningCard>
 
             <VerticalStackLayout x:Name="Desk" />
 
