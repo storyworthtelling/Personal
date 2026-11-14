@@ -33,6 +33,8 @@ public static class PulpIdentity
     /// The Friday stack worker's registered Java name. WorkManager persists a scheduled row by
     /// class name and periodic work is enqueued with <c>Keep</c>, so a moved class is one
     /// WorkManager can no longer instantiate — and the Friday stack silently stops arriving.
+    /// <b>Reserved:</b> no worker carries it yet; the Friday stack is dealt when the Discover page opens
+    /// (<c>DiscoverPageWeek</c>). Kept frozen so a worker built later takes the name planned for it.
     /// </summary>
     public const string FridayStackWorkerName = ApplicationId + ".FridayStackWorker";
 

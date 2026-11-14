@@ -62,6 +62,15 @@ public sealed class DiagnosticsLookupCounter : ILookupCounter
         Load();
     }
 
+    /// <summary>This month's lookups to one source so far; zero once the month has turned.</summary>
+    public int ThisMonth(LookupSource source)
+    {
+        lock (gate)
+        {
+            return tallies.TryGetValue(source, out var tally) && tally.Month == LookupMonth.Of(DateTimeOffset.UtcNow) ? tally.Count : 0;
+        }
+    }
+
     public void Counted(LookupSource source)
     {
         MonthCount counted;

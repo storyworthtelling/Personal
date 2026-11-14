@@ -143,6 +143,9 @@ public sealed class HouseholdView
     /// <summary>Everyone's sittings, for what is about the household and not one viewer: the usage count and which hand-off a session belongs to.</summary>
     public IReadOnlyList<WatchedSitting> AllSittings => sittings;
 
+    /// <summary>Every playlist, private ones included: what the weekly refresh tracks (W7.5), never what a screen shows.</summary>
+    public IReadOnlyList<HouseholdPlaylist> AllPlaylists => playlists;
+
     /// <summary>One viewer's own sittings (D97): what Continue Watching and Recently watched are built from.</summary>
     public IReadOnlyList<WatchEvent> SittingsOf(ViewerId viewer) =>
         sittings.Where(sitting => sitting.Viewer == viewer).Select(sitting => sitting.Sitting).ToList();

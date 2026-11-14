@@ -19,6 +19,10 @@ public static class PulpLogLines
 
     public static string Refused(string why) => $"refused ({why})";
 
+    /// <summary>The weekly refresh (D204, W7.5): counts only.</summary>
+    public static string WeeklyRefresh(int refreshed, int tracked, int lookupsThisMonth) =>
+        $"WEEKLY REFRESH looked again at {refreshed} of {tracked} tracked titles; {lookupsThisMonth} lookups this month";
+
     public static string HandOff(string service, string outcome) => $"HAND-OFF {service}: {outcome}";
 
     public static string LockedOpen(int? answer) => answer switch
