@@ -336,8 +336,8 @@ Each item replaces copies in several apps; the source findings are in report 01 
 - ~~Folio's book cloths (W8)~~ Decided: keep the role colours.
 - ~~Button padding (W8)~~ Decided: §7's 18×11 (done in W8.1).
 - ~~Folio's near-square paper radii (W8)~~ Decided: move to 12.
-- The gutter beside the pinned bar: the bar spans the full width, or the strip runs to the bottom (W8, report 14 §1).
-- Folio's primary-first bar order: follow the suite rule or keep as an exception (W8, report 14 §4).
+- ~~The gutter beside the pinned bar (W8)~~ Decided: the binder strip always runs to the foot of the screen, and the bar sits under the page only (report 14 §1).
+- ~~Folio's bar order (W8)~~ Decided: follow the suite, with the primary on the right and widest (report 14 §4).
 - The voiced line inside Constitution's never-hidden fallback (W10).
 - Score's unwired device-EQ, sound-check and gesture features: build or delete (W7).
 - Whether Pulp's child seats get extra voice guidance beyond reading level (W10).

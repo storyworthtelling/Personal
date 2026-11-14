@@ -235,12 +235,12 @@ the `AreaHueTests` restraint guard (which lists Post's Filed and Rolodex as exce
 
 ---
 
-## Decisions for the owner
+## Owner's rulings
 
-1. **The gutter beside the bar:** the bar spans the full width (recommended), or the strip runs to
-   the bottom.
-2. **Folio's bar order:** Folio's drawings put the primary first. Should Folio follow the suite
-   rule (primary right), or is that an approved exception?
+1. **The gutter beside the bar:** the binder strip always runs to the foot of the screen, and the
+   bar sits under the page only. Pulp and Constitution already do this. Score, Post, Plate, the
+   `BinderFrame` secondary screens, Foreword, Index and Folio change.
+2. **Folio's bar order:** Folio follows the suite, with the primary on the right and widest.
 
 ## Where each finding lands in W8
 
@@ -250,4 +250,4 @@ the `AreaHueTests` restraint guard (which lists Post's Filed and Rolodex as exce
 | New 3a (one bar) | 4 and 5, in both kits |
 | 8 (IconStudio glyphs) | 10 |
 | New 10 (tab-hue accents) | 11 |
-| Native frame fix | Pulp's and Constitution's halves of 1 |
+| Native frame fix | 1 for Score, Post, Plate and `BinderFrame` (move the bar under the page column, as Pulp and Constitution do) |
