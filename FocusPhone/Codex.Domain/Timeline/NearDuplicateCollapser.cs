@@ -20,12 +20,13 @@ public static class NearDuplicateCollapser
 
     public static IReadOnlyList<TimelineItem> Collapse(IReadOnlyList<TimelineItem> items)
     {
-        var providerTexts = items.Where(item => IsProviderText(item) || IsBridgeText(item) || IsFiVoicemail(item)).ToList();
-        var voicemailNotifications = items
-            .Where(item => item.Kind == TimelineItemKind.Voicemail && HasPrefix(item, "vm:"))
-            .ToList();
+        // Each candidate is compared only with the items inside its three-minute window, found by a search over a
+        // time-sorted copy, rather than with every provider text on the phone (efficiency audit §23).
+        var providerTexts = new WindowIndex(items.Where(item => IsProviderText(item) || IsBridgeText(item) || IsFiVoicemail(item)));
+        var voicemailNotifications = new WindowIndex(items
+            .Where(item => item.Kind == TimelineItemKind.Voicemail && HasPrefix(item, "vm:")));
 
-        var groupNotifications = items.Where(IsGroupNotificationText).ToList();
+        var groupNotifications = new WindowIndex(items.Where(IsGroupNotificationText));
 
         return items
             .Where(item => !IsShadowedNotificationText(item, providerTexts))
@@ -49,13 +50,13 @@ public static class NearDuplicateCollapser
     private static bool IsBridgeText(TimelineItem item) =>
         item.Kind == TimelineItemKind.Message && HasPrefix(item, "gm:");
 
-    private static bool IsShadowedNotificationText(TimelineItem item, List<TimelineItem> providerTexts)
+    private static bool IsShadowedNotificationText(TimelineItem item, WindowIndex providerTexts)
     {
         if (item.Kind != TimelineItemKind.Message || IsProviderText(item) || IsBridgeText(item))
         {
             return false;
         }
-        return providerTexts.Any(provider =>
+        return providerTexts.Near(item).Any(provider =>
             // A group's notification copy yields only to the provider's own group copy;
             // against a one-to-one fallback it is the one that knows where the message belongs.
             (!item.IsGroup || provider.IsGroup)
@@ -74,22 +75,22 @@ public static class NearDuplicateCollapser
     /// the one-to-one provider copy steps aside, so the message reads in its group rather than
     /// under one member. The provider row itself is untouched — only the merge view changes.
     /// </summary>
-    private static bool IsOneToOneFallbackOfGroupText(TimelineItem item, List<TimelineItem> groupNotifications) =>
+    private static bool IsOneToOneFallbackOfGroupText(TimelineItem item, WindowIndex groupNotifications) =>
         IsProviderText(item)
         && !item.IsGroup
-        && groupNotifications.Any(notification =>
+        && groupNotifications.Near(item).Any(notification =>
             notification.Incoming == item.Incoming
             && SnippetsMatch(notification, item)
             && WithinWindow(notification, item)
             && KeysCompatible(notification, item));
 
-    private static bool IsShadowedCallLogVoicemail(TimelineItem item, List<TimelineItem> notifications)
+    private static bool IsShadowedCallLogVoicemail(TimelineItem item, WindowIndex notifications)
     {
         if (item.Kind != TimelineItemKind.Voicemail || HasPrefix(item, "vm:"))
         {
             return false;
         }
-        return notifications.Any(notification =>
+        return notifications.Near(item).Any(notification =>
             WithinWindow(notification, item) && KeysCompatible(notification, item));
     }
 
@@ -138,4 +139,42 @@ public static class NearDuplicateCollapser
     private static bool KeysCompatible(TimelineItem notification, TimelineItem other) =>
         notification.ContactKey == other.ContactKey
         || !notification.ContactKey.All(char.IsAsciiDigit);
+
+    /// <summary>Items sorted by time, so those within <see cref="Window"/> of one are found by a binary search.</summary>
+    private sealed class WindowIndex
+    {
+        private readonly TimelineItem[] sorted;
+
+        public WindowIndex(IEnumerable<TimelineItem> items) =>
+            sorted = items.OrderBy(item => item.TimestampUtc.UtcTicks).ToArray();
+
+        public IEnumerable<TimelineItem> Near(TimelineItem item)
+        {
+            var from = (item.TimestampUtc - Window).UtcTicks;
+            var to = (item.TimestampUtc + Window).UtcTicks;
+            for (var index = FirstAtOrAfter(from); index < sorted.Length && sorted[index].TimestampUtc.UtcTicks <= to; index++)
+            {
+                yield return sorted[index];
+            }
+        }
+
+        private int FirstAtOrAfter(long ticks)
+        {
+            var low = 0;
+            var high = sorted.Length;
+            while (low < high)
+            {
+                var middle = (low + high) / 2;
+                if (sorted[middle].TimestampUtc.UtcTicks < ticks)
+                {
+                    low = middle + 1;
+                }
+                else
+                {
+                    high = middle;
+                }
+            }
+            return low;
+        }
+    }
 }

@@ -69,26 +69,69 @@ public static class SmsLogReader
         {
             return;
         }
+        // Every part in one query, grouped by message, rather than two part queries and two address queries per
+        // message (efficiency audit §7); each message's addresses are still its own query, once.
+        var parts = cursor.Count > 0 ? ReadAllParts(context) : new Dictionary<string, MmsContent>();
         while (cursor.MoveToNext())
         {
             var id = cursor.GetString(0)!;
             var messageBox = cursor.GetInt(2);
             var threadId = cursor.IsNull(3) ? 0 : cursor.GetLong(3);
+            var (counterpart, all) = MmsRows.Addresses(ReadAddressRows(context, id), messageBox);
+            var content = MmsRows.ContentOf(parts, id);
             var item = SmsRecordMapper.MapMms(
                 id,
                 cursor.GetLong(1),
                 messageBox,
-                ReadMmsAddress(context, id, messageBox),
-                ReadMmsText(context, id),
+                counterpart,
+                content.Text,
                 threadId,
-                ReadMmsAllAddresses(context, id),
-                ReadMmsAttachments(context, id),
+                all,
+                content.Attachments.ToList(),
                 ownNumbers);
             if (item is not null)
             {
                 items.Add(item);
             }
         }
+    }
+
+    private static IReadOnlyDictionary<string, MmsContent> ReadAllParts(Context context)
+    {
+        var rows = new List<MmsStoredPart>();
+        using var cursor = context.ContentResolver!.Query(
+            Android.Net.Uri.Parse("content://mms/part")!,
+            ["mid", "_id", "ct", "text", "_data", "fn", "name", "cl"], null, null, null);
+        while (cursor is not null && cursor.MoveToNext())
+        {
+            if (cursor.IsNull(0))
+            {
+                continue;
+            }
+            rows.Add(new MmsStoredPart(
+                cursor.GetString(0)!,
+                cursor.IsNull(1) ? null : cursor.GetString(1),
+                cursor.IsNull(2) ? null : cursor.GetString(2),
+                cursor.IsNull(3) ? null : cursor.GetString(3),
+                !cursor.IsNull(4),
+                cursor.IsNull(5) ? null : cursor.GetString(5),
+                cursor.IsNull(6) ? null : cursor.GetString(6),
+                cursor.IsNull(7) ? null : cursor.GetString(7)));
+        }
+        return MmsRows.GroupParts(rows);
+    }
+
+    private static List<MmsStoredAddress> ReadAddressRows(Context context, string id)
+    {
+        var rows = new List<MmsStoredAddress>();
+        using var cursor = context.ContentResolver!.Query(
+            Android.Net.Uri.Parse($"content://mms/{id}/addr")!,
+            ["address", "type"], null, null, null);
+        while (cursor is not null && cursor.MoveToNext())
+        {
+            rows.Add(new MmsStoredAddress(cursor.IsNull(0) ? null : cursor.GetString(0), cursor.IsNull(1) ? null : cursor.GetString(1)));
+        }
+        return rows;
     }
 
     // Internal rather than private: MmsDownloader's download-completion receiver reads the

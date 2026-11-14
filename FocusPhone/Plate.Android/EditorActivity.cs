@@ -68,8 +68,10 @@ public class EditorActivity : AppCompatActivity
 
         files = new DarkroomStore(this);
         itemId = Intent?.GetStringExtra(ItemExtra) ?? string.Empty;
-        original = BitmapFactory.DecodeFile(
-            new Java.IO.File(files.Directory(), itemId).AbsolutePath);
+        // The window shows a copy sampled to the screen (efficiency audit §11): a full capture is about 50 MB as a
+        // bitmap and used to be decoded here on the UI thread. The edit is fractions of the picture, so it applies to
+        // the full-size file unchanged when it is sent.
+        original = DecodeForScreen(new Java.IO.File(files.Directory(), itemId).AbsolutePath!);
         if (original is null)
         {
             // The file is gone — deleted from under us, or never written. Going back is the
@@ -345,38 +347,65 @@ public class EditorActivity : AppCompatActivity
 
     private void Send()
     {
-        try
+        // The full-size picture is decoded and written off the UI thread; the editor leaves once it has landed.
+        var unchanged = edit.IsUnchanged;
+        var chosen = edit;
+        Task.Run(() =>
         {
-            Flatten();
-        }
-        catch (Exception e)
-        {
-            // The original is untouched, so nothing is lost — which is what makes it safe to
-            // say so and stay put rather than leave with a half-written file.
-            HeadLog.Warn("Plate", $"Could not write the edit: {e}");
-            return;
-        }
+            try
+            {
+                if (!unchanged)
+                {
+                    Flatten(chosen);
+                }
+            }
+            catch (Exception e)
+            {
+                // The original is untouched, so nothing is lost — which is what makes it safe to
+                // say so and stay put rather than leave with a half-written file.
+                HeadLog.Warn("Plate", $"Could not write the edit: {e}");
+                return;
+            }
 
-        SetResult((Result)SentResult, WithId());
-        Finish();
+            RunOnUiThread(() =>
+            {
+                SetResult((Result)SentResult, WithId());
+                Finish();
+            });
+        });
+    }
+
+    private Bitmap? DecodeForScreen(string path)
+    {
+        var bounds = new BitmapFactory.Options { InJustDecodeBounds = true };
+        BitmapFactory.DecodeFile(path, bounds);
+        // The picture's shorter side is kept at least as long as the screen's shorter side, which is as much as the
+        // window can ever show of it.
+        var screen = Resources!.DisplayMetrics!;
+        var options = new BitmapFactory.Options
+        {
+            InSampleSize = SampleSize.For(bounds.OutWidth, bounds.OutHeight, Math.Min(screen.WidthPixels, screen.HeightPixels)),
+        };
+        return BitmapFactory.DecodeFile(path, options);
     }
 
     // Only a picture the owner actually changed is written back. Re-encoding a JPEG they
     // did not touch loses quality for nothing, every single time.
-    private void Flatten()
+    private void Flatten(PhotoEdit chosen)
     {
-        if (original is null || edit.IsUnchanged)
+        var file = new Java.IO.File(files.Directory(), itemId);
+        using var full = BitmapFactory.DecodeFile(file.AbsolutePath);
+        if (full is null)
         {
             return;
         }
 
-        using var edited = PhotoRender.Apply(original, edit);
+        using var edited = PhotoRender.Apply(full, chosen);
         if (edited is null)
         {
             return;
         }
 
-        var file = new Java.IO.File(files.Directory(), itemId);
         using var output = System.IO.File.Create(file.AbsolutePath!);
         edited.Compress(Bitmap.CompressFormat.Jpeg!, 92, output);
     }

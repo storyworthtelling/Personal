@@ -1,6 +1,7 @@
 using Android.Content;
 using Android.Graphics;
 using Android.Views;
+using Android.Widget;
 using Codex.Domain.Apps;
 using Codex.Domain.Home;
 using Codex.Ui;
@@ -15,7 +16,7 @@ namespace Flyleaf;
 /// so swiping up scrolls the same shelf down into the tray.
 /// <para>
 /// Geometry is the unit-tested <see cref="BookshelfLayout"/>; this view is the painter. The static
-/// scene is baked once per size into a bitmap and blitted on scroll; only the live clock hands and
+/// scene is baked once per size into screen-high tiles (only those near the screen are held) and blitted on scroll; only the live clock hands and
 /// the notification bookmark tabs are redrawn on invalidate. The look is tuned on-device (this is
 /// the first pass); the math underneath is verified in Codex.Tests.
 /// </para>
@@ -28,7 +29,9 @@ public class BookshelfView : View
 
     private IReadOnlyList<ShelfSpec> shelves = [];
     private ShelfSceneLayout layout = new([], 0);
-    private Bitmap? baked;
+    // Baked in screen-high tiles, of which only those near the screen are held (efficiency audit §14).
+    private readonly Dictionary<int, Bitmap> tiles = [];
+    private bool bakeFailed;
     private TimeSpan time;
     private float viewportHeight;
 
@@ -93,10 +96,43 @@ public class BookshelfView : View
         catch (Exception) { return null; }
     }
 
+    protected override void OnAttachedToWindow()
+    {
+        base.OnAttachedToWindow();
+        if (Parent is ScrollView scroll)
+        {
+            scroll.ScrollChange += OnScrolled;
+        }
+    }
+
     protected override void OnDetachedFromWindow()
     {
         base.OnDetachedFromWindow();
+        if (Parent is ScrollView scroll)
+        {
+            scroll.ScrollChange -= OnScrolled;
+        }
         woodTexture?.Recycle(); woodTexture = null;
+        DropBaked();
+    }
+
+    // A hardware-drawn view records its picture once, not once per scroll, so the visible band is read from the
+    // scroll position, and the view is redrawn only when the scroll reaches a tile it has not drawn.
+    private (int First, int Last) drawnTiles = (0, -1);
+
+    private void OnScrolled(object? sender, View.ScrollChangeEventArgs e)
+    {
+        if (VisibleTiles() != drawnTiles)
+        {
+            Invalidate();
+        }
+    }
+
+    private (int First, int Last) VisibleTiles()
+    {
+        var top = Parent is ScrollView scroll ? scroll.ScrollY : 0;
+        var height = Parent is ScrollView viewport ? viewport.Height : Height;
+        return ShelfTiles.Visible((int)layout.TotalHeight, TileHeight, top, top + Math.Max(height, 1));
     }
 
     public override bool OnTouchEvent(MotionEvent? e)
@@ -115,12 +151,7 @@ public class BookshelfView : View
         {
             return;
         }
-        EnsureBaked();
-        if (baked is not null)
-        {
-            canvas.DrawBitmap(baked, 0, 0, null);
-        }
-        else
+        if (!DrawTiles(canvas))
         {
             DrawScene(canvas); // OOM fallback: paint straight to the screen canvas
         }
@@ -134,28 +165,62 @@ public class BookshelfView : View
 
     private void DropBaked()
     {
-        baked?.Recycle();
-        baked = null;
+        foreach (var tile in tiles.Values)
+        {
+            tile.Recycle();
+        }
+        tiles.Clear();
+        bakeFailed = false;
         bakedWidth = -1;
     }
 
-    private void EnsureBaked()
+    private int TileHeight => Math.Max(1, Resources?.DisplayMetrics?.HeightPixels ?? 2000);
+
+    // Draws the tiles the visible band touches, baking any not yet held and letting go of those far from it.
+    // False when a tile could not be made (out of memory), so the caller paints the scene directly.
+    private bool DrawTiles(Canvas canvas)
     {
-        if (baked is not null || layout.TotalHeight <= 0)
+        if (bakeFailed || layout.TotalHeight <= 0)
         {
-            return;
+            return false;
         }
-        try
+
+        var total = (int)layout.TotalHeight;
+        var tileHeight = TileHeight;
+        var (first, last) = VisibleTiles();
+        drawnTiles = (first, last);
+
+        foreach (var index in tiles.Keys.Where(index => !ShelfTiles.Keep(index, first, last)).ToList())
         {
-            var bitmap = Bitmap.CreateBitmap(Width, (int)layout.TotalHeight, Bitmap.Config.Argb8888!);
-            DrawScene(new Canvas(bitmap!));
-            baked = bitmap;
-            bakedWidth = Width;
+            tiles[index].Recycle();
+            tiles.Remove(index);
         }
-        catch (Java.Lang.Throwable)
+
+        // The tile either side is drawn too, so a short scroll lands on a picture already recorded.
+        for (var index = Math.Max(0, first - 1); index <= Math.Min(ShelfTiles.Count(total, tileHeight) - 1, last + 1); index++)
         {
-            baked = null; // out of memory for a tall scene — fall back to per-frame drawing
+            if (!tiles.TryGetValue(index, out var tile))
+            {
+                try
+                {
+                    tile = Bitmap.CreateBitmap(Width, ShelfTiles.HeightOf(index, total, tileHeight), Bitmap.Config.Argb8888!)!;
+                    var tileCanvas = new Canvas(tile);
+                    tileCanvas.Translate(0, -index * tileHeight);
+                    DrawScene(tileCanvas);
+                    tiles[index] = tile;
+                }
+                catch (Java.Lang.Throwable)
+                {
+                    DropBaked();
+                    bakeFailed = true;
+                    return false;
+                }
+            }
+            canvas.DrawBitmap(tile, 0, index * tileHeight, null);
         }
+
+        bakedWidth = Width;
+        return true;
     }
 
     // ---- Static scene ----

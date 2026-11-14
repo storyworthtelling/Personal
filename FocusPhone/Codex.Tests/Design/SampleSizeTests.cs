@@ -53,4 +53,8 @@ public class SampleSizeTests
     {
         Assert.Equal(1, SampleSize.For(500, 500, 0));
     }
+
+    // Efficiency audit §11: Plate's editor shows a camera capture sampled to the screen's shorter side.
+    [Fact]
+    public void ACameraCaptureIsHalvedForAPhoneScreen() => Assert.Equal(2, SampleSize.For(4080, 3072, 1080));
 }

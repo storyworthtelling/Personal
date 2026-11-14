@@ -158,8 +158,7 @@ public class MailReaderActivity : Activity
         try
         {
             using var database = TimelineDatabase.Open(this);
-            return database.Cache.LoadRecent(limit: 2_000)
-                .FirstOrDefault(candidate => candidate.SourceId == sourceId);
+            return database.Cache.Find(sourceId);
         }
         catch (Exception e)
         {

@@ -91,15 +91,47 @@ public sealed class MusicLibrary(
         }
     }
 
+    // The owned half as last read from the database. A saved or removed TIDAL track only changes the streamed half,
+    // so those re-merge from this rather than reading every owned track again (efficiency audit §15).
+    private IReadOnlyList<Track>? owned;
+
+    /// <summary>Reads the owned library from the database and merges it; for a scan or a tempo lookup that changed it.</summary>
     public void LoadCatalog()
     {
         using var database = MusicDatabase.Open(host);
+        owned = database.Catalog.LoadAll();
+        Remerge();
+    }
 
-        // One library out of both sources. The streamed half is empty until the
-        // provider is wired, and this is deliberately the seam rather than a branch
-        // added later: when it fills, nothing downstream learns that it did — which
-        // is the whole of the merged-library rule.
-        Catalog = new MusicCatalog(LibraryMerge.Merge(database.Catalog.LoadAll(), Streamed()));
+    /// <summary>
+    /// The first load, off the UI thread (efficiency audit §15): the areas draw the empty library at once and
+    /// <see cref="Changed"/> redraws them when it is read.
+    /// </summary>
+    public void LoadCatalogInBackground() => Task.Run(() =>
+    {
+        try
+        {
+            LoadCatalog();
+            host.RunOnUiThread(() => Changed?.Invoke());
+        }
+        catch (Exception e)
+        {
+            AudioDiagnostics.LogWarning("MusicLibrary", $"Loading the library failed: {e}");
+        }
+    });
+
+    // One library out of both sources. The streamed half is empty until the
+    // provider is wired, and this is deliberately the seam rather than a branch
+    // added later: when it fills, nothing downstream learns that it did — which
+    // is the whole of the merged-library rule.
+    private void Remerge()
+    {
+        if (owned is null)
+        {
+            LoadCatalog();
+            return;
+        }
+        Catalog = new MusicCatalog(LibraryMerge.Merge(owned, Streamed()));
     }
 
     // What the streaming provider carries: the tracks the owner has explicitly saved
@@ -120,7 +152,7 @@ public sealed class MusicLibrary(
     public void SaveTrack(Track track)
     {
         savedTidal.Add(track);
-        LoadCatalog();
+        Remerge();
         Changed?.Invoke();
         _ = EnrichSavedTrackAsync(track);
     }
@@ -138,7 +170,7 @@ public sealed class MusicLibrary(
             return added;
         }
 
-        LoadCatalog();
+        Remerge();
         Changed?.Invoke();
         var addedSet = added.ToHashSet();
         _ = EnrichSavedTracksAsync(tracks.Where(track => addedSet.Contains(track.Id)).ToList());
@@ -153,7 +185,7 @@ public sealed class MusicLibrary(
             savedTidal.Remove(trackId);
         }
 
-        LoadCatalog();
+        Remerge();
         Changed?.Invoke();
     }
 
@@ -206,7 +238,7 @@ public sealed class MusicLibrary(
             }
 
             savedTidal.Replace(track with { ArtRef = artPath ?? track.ArtRef, Bpm = bpm != 0 ? bpm : track.Bpm });
-            LoadCatalog();
+            Remerge();
             Changed?.Invoke();
         }
         catch (Exception e)
@@ -220,7 +252,7 @@ public sealed class MusicLibrary(
     public void RemoveSavedTrack(string trackId)
     {
         savedTidal.Remove(trackId);
-        LoadCatalog();
+        Remerge();
         Changed?.Invoke();
     }
 
@@ -287,7 +319,7 @@ public sealed class MusicLibrary(
             savedTidal.LastValidatedUtc = DateTimeOffset.UtcNow;
             if (changed)
             {
-                LoadCatalog();
+                Remerge();
                 Changed?.Invoke();
             }
         }

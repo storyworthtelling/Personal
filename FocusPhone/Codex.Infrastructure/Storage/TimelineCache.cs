@@ -53,6 +53,14 @@ public class TimelineCache
             """;
         create.ExecuteNonQuery();
         EnsureColumns();
+
+        // The list reads newest first and the reconcile and ageing read one kind's window (efficiency audit §8).
+        using var index = connection.CreateCommand();
+        index.CommandText = """
+            CREATE INDEX IF NOT EXISTS ixTimelineNewest ON timelineItems (timestampUtc DESC, kind DESC, sourceId DESC);
+            CREATE INDEX IF NOT EXISTS ixTimelineKindNewest ON timelineItems (kind, timestampUtc);
+            """;
+        index.ExecuteNonQuery();
     }
 
     private void EnsureColumns()
@@ -205,6 +213,61 @@ public class TimelineCache
         return Read(select);
     }
 
+    /// <summary>One message by its source id, whatever its kind, or null (efficiency audit §8).</summary>
+    public TimelineItem? Find(string sourceId)
+    {
+        using var select = connection.CreateCommand();
+        select.CommandText = $"SELECT {SelectColumns} FROM timelineItems WHERE sourceId = $sourceId LIMIT 1";
+        select.Parameters.AddWithValue("$sourceId", sourceId);
+        return Read(select).FirstOrDefault();
+    }
+
+    /// <summary>
+    /// The next page, newest first, after the last item already shown (efficiency audit §8): read from the index
+    /// where the last page stopped rather than by counting past every row before it. Null starts at the newest.
+    /// </summary>
+    public IReadOnlyList<TimelineItem> LoadPage(TimelinePosition? after, int limit)
+    {
+        using var select = connection.CreateCommand();
+        var where = after is null ? string.Empty : "WHERE (timestampUtc, kind, sourceId) < ($at, $kind, $sourceId)";
+        select.CommandText = $"""
+            SELECT {SelectColumns} FROM timelineItems {where}
+            ORDER BY timestampUtc DESC, kind DESC, sourceId DESC
+            LIMIT $limit
+            """;
+        if (after is { } position)
+        {
+            select.Parameters.AddWithValue("$at", position.TimestampUtc.ToUniversalTime().ToString("O"));
+            select.Parameters.AddWithValue("$kind", (int)position.Kind);
+            select.Parameters.AddWithValue("$sourceId", position.SourceId);
+        }
+        select.Parameters.AddWithValue("$limit", limit);
+        return Read(select);
+    }
+
+    /// <summary>The newest sorted items' kind, id, time and class only, for ageing them out: no bodies (efficiency audit §8).</summary>
+    public IReadOnlyList<TimelineClassified> LoadClassified(int limit)
+    {
+        using var select = connection.CreateCommand();
+        select.CommandText = """
+            SELECT kind, sourceId, timestampUtc, mailClass FROM timelineItems
+            WHERE mailClass IS NOT NULL
+            ORDER BY timestampUtc DESC
+            LIMIT $limit
+            """;
+        select.Parameters.AddWithValue("$limit", limit);
+        var rows = new List<TimelineClassified>();
+        using var reader = select.ExecuteReader();
+        while (reader.Read())
+        {
+            rows.Add(new TimelineClassified(
+                (TimelineItemKind)reader.GetInt32(0), reader.GetString(1),
+                DateTimeOffset.Parse(reader.GetString(2), System.Globalization.CultureInfo.InvariantCulture),
+                (Codex.Domain.Post.MailClass)reader.GetInt32(3)));
+        }
+        return rows;
+    }
+
     /// <summary>
     /// Brings a slice of the cache into line with an authoritative snapshot from
     /// the source (e.g. the current Gmail inbox+sent for the last N days): upserts
@@ -330,3 +393,12 @@ public class TimelineCache
             ? []
             : JsonSerializer.Deserialize<List<AttachmentRef>>(encoded) ?? [];
 }
+
+/// <summary>Where a page of the timeline stopped: the last item's time, kind and source id.</summary>
+public readonly record struct TimelinePosition(DateTimeOffset TimestampUtc, TimelineItemKind Kind, string SourceId)
+{
+    public static TimelinePosition Of(TimelineItem item) => new(item.TimestampUtc, item.Kind, item.SourceId);
+}
+
+/// <summary>A sorted item without its bodies, for ageing.</summary>
+public sealed record TimelineClassified(TimelineItemKind Kind, string SourceId, DateTimeOffset TimestampUtc, Codex.Domain.Post.MailClass MailClass);
