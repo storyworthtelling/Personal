@@ -1,0 +1,42 @@
+name: Test FocusPhone
+
+# The FocusPhone tests stand behind three heads (Flyleaf and Score, Post, Plate), and each head's
+# workflow used to run them on every branch push — the same suite three times for one change. They
+# run here once instead; the head workflows build only on main or by hand, and run the suite inside
+# that build so a published APK is never one whose tests were skipped.
+on:
+  push:
+    branches: ['claude/**']
+    paths:
+      # Codex.Tests reads the heads' own sources (the frozen ids, the manifests, the guards), so a
+      # change anywhere under FocusPhone can trip it.
+      - 'FocusPhone/**'
+      - 'Storyworthtelling.Updates/**'
+      - 'Storyworthtelling.Voice/**'
+      - 'Storyworthtelling.Diagnostics/**'
+      - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
+      - 'Storyworthtelling.Google/**'
+      - 'Storyworthtelling.Google.Android/**'
+      - 'Storyworthtelling.Paper/**'
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Pipeline/**'
+      - '.github/actions/dotnet/**'
+      - '.github/workflows/test-focusphone.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/dotnet
+
+      # Target the test project directly (not the .sln) so the build never touches the
+      # net10.0-android heads, which would require the Android workload.
+      - name: Run tests
+        run: dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj

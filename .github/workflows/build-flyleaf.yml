@@ -3,7 +3,7 @@ name: Build Flyleaf APKs
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'claude/**']
+    branches: [main]
     paths:
       - 'FocusPhone/Flyleaf.Android/**'
       - 'FocusPhone/Score.Android/**'
@@ -20,6 +20,11 @@ on:
       # Flyleaf and Score ship the vault through Codex.Ui.Android, so a vault change must rebuild
       # them, or their old copy stays on the phone and erases newer fields (contracts H1).
       - 'Storyworthtelling.Voice/**'
+      # Everything the head and its tests build from (CiHygieneTests reads the ProjectReference closure).
+      - 'Storyworthtelling.Paper/**'
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Pipeline/**'
+      - '.github/actions/dotnet/**'
       - '.github/workflows/build-flyleaf.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
@@ -29,26 +34,10 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Branch pushes run the tests and nothing else — Actions minutes are the budget, and signing an
-  # APK on every push of a working branch, then again on merge, is where they went. main (and a
-  # manual "Run workflow", which is how a branch gets its APK compiled when it needs one) runs the
-  # tests inside the build job instead, so one runner does both rather than two.
-  test:
-    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      # Target the test project directly (not the .sln) so the build never touches the
-      # net10.0-android heads, which would require the Android workload.
-      - name: Run tests
-        run: dotnet test FocusPhone/Codex.Tests/Codex.Tests.csproj
-
+  # Branch pushes run nothing here: the FocusPhone tests behind all three heads run once, in
+  # test-focusphone.yml, rather than once per head. main (and a manual "Run workflow", which is how
+  # a branch gets its APK compiled when it needs one) runs them inside the build job, so the APK
+  # this publishes is never one whose tests were not run.
   build:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -60,10 +49,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      # A plain .NET-for-Android head (not MAUI), so the lighter 'android' workload is enough.
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: '10.0.x'
+          workload: android
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android heads, which would require the Android workload.
@@ -83,14 +72,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # The FocusPhone heads are plain .NET-for-Android (not MAUI), so the lighter
-      # 'android' workload is sufficient. Plate — the head whose ML Kit bindings need
+      # Plate — the head whose ML Kit bindings need
       # dl.google.com at build time — has its own workflow (build-plate.yml), so that
       # download is no longer this build's problem and a binding failure there cannot
       # stop Flyleaf and Score shipping.
-      - name: Install Android workload
-        run: dotnet workload install android
-
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 

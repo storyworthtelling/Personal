@@ -17,6 +17,13 @@ on:
       - 'Storyworthtelling.Updates/**'
       - 'Tools/IconStudio/**'
       - 'Fonts/**'
+      # Everything the head and its tests build from (CiHygieneTests reads the ProjectReference closure).
+      - 'Storyworthtelling.Household/**'
+      - 'Storyworthtelling.Handwriting/**'
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Pipeline/**'
+      - 'Storyworthtelling.Paper/**'
+      - '.github/actions/dotnet/**'
       - '.github/workflows/build-constitution.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
@@ -35,10 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+      - uses: ./.github/actions/dotnet
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android head, which would require the Android workload.
@@ -56,10 +60,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      # A plain .NET-for-Android head (not MAUI), so the lighter 'android' workload is enough.
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: '10.0.x'
+          workload: android
 
       - name: Run tests
         run: dotnet test Constitution/Constitution.Tests/Constitution.Tests.csproj
@@ -71,10 +75,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-
-      # Constitution is plain .NET-for-Android (not MAUI), so the lighter 'android' workload is enough.
-      - name: Install Android workload
-        run: dotnet workload install android
 
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true

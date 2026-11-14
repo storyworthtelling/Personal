@@ -19,18 +19,30 @@ on:
       - 'Storyworthtelling.Google.Android/**'
       - 'Storyworthtelling.Pipeline/**'
       - 'Storyworthtelling.Voice/**'
+      # Everything the head and its tests build from (CiHygieneTests reads the ProjectReference closure).
+      - 'Storyworthtelling.Handwriting/**'
+      - 'Storyworthtelling.Remarkable/**'
+      - 'Storyworthtelling.Paper/**'
+      - '.github/actions/dotnet/**'
       - '.github/workflows/build-index.yml'
 
+# A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
+# for both. main is never cancelled: every main run publishes to the rolling release.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
+  # Branch pushes run the tests and nothing else — Actions minutes are the budget, and Index alone
+  # still signed an APK on every push of a working branch. main (and a manual "Run workflow") runs
+  # the tests inside the build job instead, so one runner does both rather than two.
   test:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+      - uses: ./.github/actions/dotnet
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android head, which would require the MAUI/Android workload. The
@@ -41,7 +53,7 @@ jobs:
           -p:LedgerTfms=net10.0
 
   build:
-    needs: test
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # actions: write lets the prune step delete artifacts from older runs;
     # contents: write lets the rolling-release step publish the signed APK.
@@ -51,13 +63,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: '10.0.x'
+          workload: maui-android
 
-      - name: Install MAUI Android workload
-        run: dotnet workload install maui-android
+      - name: Run tests
+        run: >
+          dotnet test Ledger/Ledger.Tests/Ledger.Tests.csproj
+          -p:LedgerTfms=net10.0
 
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true

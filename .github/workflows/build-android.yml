@@ -25,6 +25,12 @@ on:
       - 'Storyworthtelling.Google/**'
       - 'Storyworthtelling.Google.Android/**'
       - 'Storyworthtelling.Remarkable/**'
+      # Everything the head and its tests build from (CiHygieneTests reads the ProjectReference closure).
+      - 'Foreword/Foreword.Tests/**'
+      - 'Storyworthtelling.Handwriting/**'
+      - 'Storyworthtelling.Paper/**'
+      - 'Storyworthtelling.Pipeline/**'
+      - '.github/actions/dotnet/**'
       - '.github/workflows/build-android.yml'
 
 # A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
@@ -49,10 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+      - uses: ./.github/actions/dotnet
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android head, which would need the MAUI/Android workload. The -p:ForewordTfms switch
@@ -73,10 +76,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
+      - uses: ./.github/actions/dotnet
         with:
-          dotnet-version: '10.0.x'
+          workload: maui-android
 
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android head, which would need the MAUI/Android workload. The -p:ForewordTfms switch
@@ -85,9 +87,6 @@ jobs:
         run: >
           dotnet test Foreword/Foreword.Tests/Foreword.Tests.csproj
           -p:ForewordTfms=net10.0
-
-      - name: Install MAUI Android workload
-        run: dotnet workload install maui-android
 
       - name: Accept Android SDK licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
