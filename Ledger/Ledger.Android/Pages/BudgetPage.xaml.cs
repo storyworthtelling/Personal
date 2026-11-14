@@ -71,7 +71,7 @@ public partial class BudgetPage : LedgerBinderPage
         Content = rootLayout;
 
         Wrap(LedgerArea.Budget, "Budget");
-        SetCorner(dogEar); // the page's own top-right corner, flush to the binder (mockup 17)
+        SetCorner(dogEar, dogEarState); // the page's own top-right corner, flush to the binder (mockup 17)
     }
 
     // Mockups 7 and 8: the graph paper runs up behind "Budget" and its rule, not just under the well.

@@ -95,11 +95,12 @@ public class SetBarReparentingGuardTests
     [Fact]
     public void SetBarDetachesEachButtonFromItsPreviousRowBeforeAddingIt()
     {
-        var binder = File.ReadAllText(Path.Combine(DesignTestHelpers.LedgerRoot(), "Ledger.Android/Pages/LedgerBinderPage.cs"));
+        // The bar is the kit's one PaperBar since audit W8.3a; the frame builds through it.
+        var binder = File.ReadAllText(Path.Combine(DesignTestHelpers.LedgerRoot(), "../Storyworthtelling.Maui/Views/PaperBar.cs"));
 
-        var setBar = NoDoubleLinkTests.ExtractMethod(binder, "protected void SetBar(params View[] buttons)");
-        var detach = setBar.IndexOf("buttons[i].Parent", StringComparison.Ordinal);
-        var add = setBar.IndexOf("row.Children.Add(buttons[i]);", StringComparison.Ordinal);
+        var setBar = NoDoubleLinkTests.ExtractMethod(binder, "private void Rebuild()");
+        var detach = setBar.IndexOf("button.Parent", StringComparison.Ordinal);
+        var add = setBar.IndexOf("row.Children.Add(button);", StringComparison.Ordinal);
 
         Assert.True(detach >= 0 && add > detach, "SetBar adds a button that may still belong to an earlier bar row.");
     }

@@ -17,216 +17,31 @@ namespace Folio.Android.Pages;
 /// passing. The tabs are the kit's <c>BinderTabLayout</c> geometry — 66dp tall, a one-tab lead-in, a
 /// gap between them — not the mockup's 76dp abutting strip starting 104dp down: the strip is one
 /// component across five apps, and Folio's reaching differently from Score's and Post's would cost
-/// more than the drawing gains. The bar, which is this page's own composition rather than anything
-/// the kit owns, follows the drawing and stops at the gutter.</para>
+/// more than the drawing gains. The bar follows the suite rather than the drawing: the primary on the
+/// right (owner's ruling, audit W8.3a), and the strip running to the foot beside it.</para>
+///
+/// <para>The frame itself is the kit's <see cref="PaperBinderPage"/>; this keeps Folio's area table, where
+/// each tab leads, and the deferred half of a hard delete.</para>
 ///
 /// <para>There is no navigation bar. The header <em>is</em> the header.</para>
 /// </summary>
-public abstract class FolioBinderPage : ContentPage, ICardHost
+public abstract class FolioBinderPage : PaperBinderPage
 {
-    private readonly BinderTabs strip = new();
-    private readonly PaperPageHeader header = new();
-    private readonly ContentView well = new();
-    private readonly ContentView barSlot = new();
-    private Grid? column;
-    private Grid? root;
-    private View? presented;
-    private View? pendingBackdrop;
-    private readonly DogEarState folds = new();
-    private DogEar? corner;
-
-    protected FolioBinderPage()
-    {
-        BackgroundColor = PaperResources.Colour("Paper");
-        NavigationPage.SetHasNavigationBar(this, false);
-    }
-
     /// <summary>Which tab is lit. A detail screen lights the area it was opened from.</summary>
-    protected FolioArea Area { get; private set; }
-
-    protected string HeaderText
-    {
-        get => header.Text;
-        set => header.Text = value;
-    }
+    protected FolioArea Area => (FolioArea)AreaIndex;
 
     /// <summary>
     /// Puts the frame around whatever this page's XAML built. Call it once, after
     /// <c>InitializeComponent</c>.
     /// </summary>
-    protected void Wrap(FolioArea area, string title)
-    {
-        Area = area;
-        header.Text = title;
-        header.Ink = FolioAreas.RuleInk(area);
+    protected void Wrap(FolioArea area, string title) =>
+        Frame(FolioAreas.All, (int)area, title, FolioAreas.RuleInk(area));
 
-        // Detach before reparenting: at this point Content is still the ContentPage's own child
-        // (InitializeComponent set it), so handing the same view straight to well.Content while it
-        // is still attached there logged "X is already a child of <page>. Remove X from <page>
-        // before adding to ContentView." on every screen that calls Wrap — observed live on device
-        // for MainPage, SetupPage and ShelfPage (folio-diagnostics-20260920-1503.txt).
-        var body = Content;
-        Content = null;
-        well.Content = body;
+    /// <summary>Puts an action card over the whole screen, binder and bar included.</summary>
+    protected void Present(View card) => ShowOverlay(card);
 
-        strip.SetAreas(FolioAreas.All, (int)area);
-        strip.AreaSelected += OnAreaSelected;
-
-        var page = new Grid
-        {
-            RowDefinitions = [new RowDefinition(GridLength.Star), new RowDefinition(GridLength.Auto)],
-            ColumnDefinitions =
-            [
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(new GridLength(BinderTabs.WidthDp)),
-            ],
-        };
-
-        column = new Grid
-        {
-            RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
-            Children = { header, well },
-        };
-        Grid.SetRow(header, 0);
-        Grid.SetRow(well, 1);
-
-        page.Children.Add(column);
-        page.Children.Add(strip);
-        page.Children.Add(barSlot);
-        Grid.SetRow(column, 0);
-        Grid.SetColumn(column, 0);
-        Grid.SetRow(strip, 0);
-        Grid.SetColumn(strip, 1);
-        Grid.SetRow(barSlot, 1);
-        Grid.SetColumn(barSlot, 0);
-
-        // The dog-ear sits in the page's own top corner, inside the gutter: it belongs to what is on
-        // the page, not to the binder.
-        corner = new DogEar(folds);
-        page.Children.Add(corner);
-        Grid.SetRow(corner, 0);
-        Grid.SetColumn(corner, 0);
-
-        root = page;
-        Content = page;
-
-        if (pendingBackdrop is not null)
-        {
-            Hang(pendingBackdrop);
-            pendingBackdrop = null;
-        }
-    }
-
-    // Every binder page carries the sign-in notice when Google turned the background sign-in away (audit 11 §4).
-    protected override void OnAppearing()
-    {
-        base.OnAppearing();
-        Storyworthtelling.Maui.Health.GoogleSignInHealth.Apply(folds);
-        // A notice a page raised as it left (a vault backup that did not land on Save) folds in here.
-        CarriedNotices.Shared.DeliverTo(folds);
-        corner?.Refresh();
-    }
-
-    /// <summary>
-    /// Puts something behind the header <b>and</b> the content, rather than behind the content
-    /// alone.
-    ///
-    /// <para>The Work desk needs it: the frame runs the wood the full height of the well with the
-    /// screen header sitting on top of it, so a backdrop confined to the content would leave the
-    /// header floating on paper above a desk that starts halfway down.</para>
-    /// </summary>
-    /// <para><b>It may be called before <see cref="Wrap"/>, and used not to be.</b> The column it
-    /// hangs on is built by <c>Wrap</c>, so calling this first threw out of the page's constructor,
-    /// out of the DI resolution that built it, and out of <c>CreateWindow</c> — the app opened on
-    /// its failure page and nothing else ran. Both orders compile, no test in this project can
-    /// construct a MAUI page, and the home screen's constructor runs on every launch and in nothing
-    /// else; so the order is held here rather than trusted. A backdrop set early waits and is hung
-    /// when the frame exists.</para>
-    protected void SetBackdrop(View backdrop)
-    {
-        ArgumentNullException.ThrowIfNull(backdrop);
-
-        if (column is null)
-        {
-            pendingBackdrop = backdrop;
-            return;
-        }
-
-        Hang(backdrop);
-    }
-
-    private void Hang(View backdrop)
-    {
-        backdrop.InputTransparent = true;
-        column!.Children.Insert(0, backdrop);
-        Grid.SetRow(backdrop, 0);
-        Grid.SetRowSpan(backdrop, 2);
-    }
-
-    /// <summary>
-    /// The pinned bar (§7). Buttons in order, the primary one last — it takes the width that is
-    /// left, so the one thing the screen is for is the widest target on it. No buttons clears it.
-    /// </summary>
-    protected void SetBar(params View[] buttons)
-    {
-        if (buttons.Length == 0)
-        {
-            barSlot.Content = null;
-            return;
-        }
-
-        var row = new Grid
-        {
-            ColumnSpacing = DesignTokens.Space.X2,
-            Padding = new Thickness(
-                DesignTokens.Space.X6, DesignTokens.Space.X3, DesignTokens.Space.X4, DesignTokens.Space.X4),
-        };
-
-        // The PRIMARY leads and takes the room left over; anything after it is sized to its own
-        // words. That is the order the drawings use on both screens that carry two buttons — "Open
-        // report · New draft", "Connect Google · Skip" — and it had been built the other way round,
-        // which put the secondary under the thumb and the primary in the corner.
-        for (var i = 0; i < buttons.Length; i++)
-        {
-            row.ColumnDefinitions.Add(new ColumnDefinition(i == 0 ? GridLength.Star : GridLength.Auto));
-            row.Children.Add(buttons[i]);
-            Grid.SetColumn(buttons[i], i);
-        }
-
-        barSlot.Content = new VerticalStackLayout
-        {
-            Children =
-            {
-                new BoxView
-                {
-                    HeightRequest = DesignTokens.Shape.HairlineDp,
-                    Color = PaperResources.Colour("Hairline"),
-                },
-                row,
-            },
-        };
-    }
-
-    /// <summary>
-    /// Does the thing, and offers it back (§6).
-    ///
-    /// <para>This is what lets every destructive act here ask nothing first. The corner folds over
-    /// with the back-turn arrow for the length of the window; turning it reverses the act, and
-    /// letting it close is the confirmation — given afterwards, by doing nothing, instead of
-    /// beforehand by answering a question.</para>
-    /// </summary>
-    /// <summary>States, or withdraws, one notice behind this page's fold (DESIGN.md §13).</summary>
-    protected void SetNotice(string key, DogEarNotice? notice)
-    {
-        folds.SetNotice(key, notice);
-        corner?.Refresh();
-    }
-
-    protected void OfferUndo(string hint, Action reverse)
-    {
-        folds.BeginUndo(hint, reverse, DateTimeOffset.Now, FoldTiming.UndoWindow);
-        corner?.Refresh();
-    }
+    /// <summary>Takes the card away. Safe to call when there is none.</summary>
+    protected void Dismiss() => HideOverlay();
 
     /// <summary>
     /// The deferred half of a destructive act nothing can literally put back (a hard delete: rows
@@ -264,59 +79,11 @@ public abstract class FolioBinderPage : ContentPage, ICardHost
     }
 
     /// <summary>
-    /// Puts an action card over the whole screen — the binder strip and the bar included, since a
-    /// card is about one item and turning to another area behind it would be answering a question
-    /// nobody asked. Only one is up at a time; presenting a second replaces the first.
-    /// </summary>
-    protected void Present(View card)
-    {
-        ArgumentNullException.ThrowIfNull(root);
-
-        Dismiss();
-        presented = card;
-        root.Children.Add(card);
-        Grid.SetRow(card, 0);
-        Grid.SetColumn(card, 0);
-        Grid.SetRowSpan(card, 2);
-        Grid.SetColumnSpan(card, 2);
-    }
-
-    void ICardHost.ShowCard(View card) => Present(card);
-
-    void ICardHost.HideCard() => Dismiss();
-
-    /// <summary>Takes the card away. Safe to call when there is none.</summary>
-    protected void Dismiss()
-    {
-        if (presented is not null && root is not null)
-        {
-            root.Children.Remove(presented);
-        }
-
-        presented = null;
-    }
-
-    /// <summary>
-    /// The back gesture closes the card before it leaves the screen — which is what makes the card
-    /// dismissible rather than a thing you have to tap precisely outside of.
-    /// </summary>
-    protected override bool OnBackButtonPressed()
-    {
-        if (presented is null)
-        {
-            return base.OnBackButtonPressed();
-        }
-
-        Dismiss();
-        return true;
-    }
-
-    /// <summary>
     /// Turning to an area means turning to <b>its root</b>, which is why this pops rather than
     /// pushing on top: a strip that stacked screens would grow a back history the tabs then
     /// contradict. Tapping the area you are already in is how a detail screen returns to it.
     /// </summary>
-    private async void OnAreaSelected(int index)
+    protected override async void OnAreaSelected(int index)
     {
         var chosen = (FolioArea)index;
 

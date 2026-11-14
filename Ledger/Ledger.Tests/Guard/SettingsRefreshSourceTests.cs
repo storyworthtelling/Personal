@@ -63,7 +63,7 @@ public class SettingsRefreshSourceTests
         Assert.Contains("protected override Task BeforeLeavingAsync() => CommitSafelyAsync();", setup, StringComparison.Ordinal);
 
         var binder = Source("Ledger.Android/Pages/LedgerBinderPage.cs");
-        var area = NoDoubleLinkTests.ExtractMethod(binder, "private async void OnAreaSelected(int index)");
+        var area = NoDoubleLinkTests.ExtractMethod(binder, "protected override async void OnAreaSelected(int index)");
         var wait = area.IndexOf("await BeforeLeavingAsync();", StringComparison.Ordinal);
         var pop = area.IndexOf("PopToRootAsync", StringComparison.Ordinal);
         Assert.True(wait >= 0 && wait < pop, "The tab turn must await the commit before it pops.");
@@ -128,7 +128,7 @@ public class SettingsRefreshSourceTests
         // frame exists.
         Assert.DoesNotMatch(@"Children\.Add\(dogEar\)|\.Add\(dogEar\)", setup);
         Assert.True(
-            setup.IndexOf("SetCorner(dogEar)", StringComparison.Ordinal) is var corner and >= 0
+            setup.IndexOf("SetCorner(dogEar, dogEarState)", StringComparison.Ordinal) is var corner and >= 0
             && corner > setup.IndexOf("Wrap(LedgerArea.Settings", StringComparison.Ordinal),
             "The dog-ear has to be given to the frame's corner after Wrap has built it.");
     }

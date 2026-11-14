@@ -113,7 +113,7 @@ public partial class SavingsPage : LedgerBinderPage
         BuildChrome();
 
         Wrap(LedgerArea.Savings, "Savings");
-        SetCorner(dogEar);
+        SetCorner(dogEar, dogEarState);
     }
 
     // Mockups 9 and 16: the graph paper runs up behind "Savings" and its rule, not just under the well.

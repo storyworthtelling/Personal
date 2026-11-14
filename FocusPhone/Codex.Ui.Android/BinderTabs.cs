@@ -114,7 +114,7 @@ public class BinderTabs : ViewGroup
 
         var glyph = new ImageView(Context!);
         glyph.SetImageResource(area.GlyphResourceId);
-        var size = PaperTheme.Dp(Context!, 26);
+        var size = PaperTheme.Dp(Context!, DesignTokens.Shape.TabGlyphDp);
         tab.AddView(glyph, new LinearLayout.LayoutParams(size, size));
 
         var label = PaperUi.Label(Context!, area.Label);

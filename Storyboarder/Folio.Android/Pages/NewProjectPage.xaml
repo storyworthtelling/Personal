@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <local:FolioBinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:kit="clr-namespace:Storyworthtelling.Maui.Views;assembly=Storyworthtelling.Maui"
              xmlns:local="clr-namespace:Folio.Android.Pages"
              x:Class="Folio.Android.Pages.NewProjectPage">
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Padding="{StaticResource ScreenPadding}" RowSpacing="10">
@@ -47,14 +48,11 @@
         <Label Grid.Row="7" x:Name="StatusLabel" Style="{StaticResource StatusLine}" />
 
         <!-- Pinned bottom bar (DESIGN.md §7). -->
-        <VerticalStackLayout Grid.Row="8" Margin="-24,0,-24,-24">
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Padding="24,12">
-                <Button Grid.Column="0" x:Name="RefreshButton" Text="Refresh"
+        <kit:PaperBar Grid.Row="8" Margin="-24,0,-24,-24">
+                <Button x:Name="RefreshButton" Text="Refresh"
                         Clicked="OnRefreshClicked" Style="{StaticResource SecondaryButton}" />
-                <Button Grid.Column="1" x:Name="CreateButton" Text="Create"
+                <Button x:Name="CreateButton" Text="Create"
                         Clicked="OnCreateClicked" IsEnabled="False" />
-            </Grid>
-        </VerticalStackLayout>
+        </kit:PaperBar>
     </Grid>
 </local:FolioBinderPage>
