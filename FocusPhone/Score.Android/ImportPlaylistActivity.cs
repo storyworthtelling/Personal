@@ -64,12 +64,12 @@ public class ImportPlaylistActivity : Activity
         page.AddView(scroll, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, "Import playlist", ScoreShellAreas.All[ScoreShellAreas.Music].Hue, page,
-            ScoreShellAreas.All, ScoreShellAreas.Music, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            ScoreShellAreas.All, ScoreShellAreas.Music, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        root.AddView(PaperUi.BottomBar(this,
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this,
             PaperUi.QuietButton(this, "Close", Finish),
             PaperUi.PrimaryButton(this, "Save playlist", Save)));
         return root;

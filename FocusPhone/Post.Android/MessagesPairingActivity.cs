@@ -79,13 +79,13 @@ public class MessagesPairingActivity : Activity
         webHost = new FrameLayout(this);
         page.AddView(webHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, "Google Messages", PaperTheme.PostMark, page,
-            PostShellAreas.All, PostShellAreas.Settings, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            PostShellAreas.All, PostShellAreas.Settings, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         barSlot = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.AddView(barSlot);
+        BinderFrame.SetBar(framed, barSlot);
         SetContentView(root);
 
         GmBridgeClient.Shared(this).PairingChanged += OnPairingChanged;

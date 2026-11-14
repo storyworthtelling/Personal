@@ -158,7 +158,7 @@ public class EditorActivity : AppCompatActivity
         overlay = host;
         root.AddView(framed, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
-        root.AddView(PaperUi.BottomBar(this,
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Send", Send),
             PaperUi.SecondaryButton(this, "Delete", Delete)));
         return root;

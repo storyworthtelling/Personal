@@ -100,8 +100,9 @@ public class EqualizerActivity : Activity
         catch (Exception e) when (e is Java.Lang.RuntimeException or Java.Lang.UnsupportedOperationException)
         {
             content.AddView(PaperUi.Body(this, "This device doesn't offer an equalizer."));
-            root.AddView(Framed(content), Fill());
-            root.AddView(PaperUi.BottomBar(this, PaperUi.SecondaryButton(this, "Back", Finish)));
+            var bare = Framed(content);
+            root.AddView(bare, Fill());
+            BinderFrame.SetBar(bare, PaperUi.BottomBar(this, PaperUi.SecondaryButton(this, "Back", Finish)));
             return root;
         }
 
@@ -151,7 +152,7 @@ public class EqualizerActivity : Activity
         overlay = host;
         root.AddView(framed, Fill());
 
-        root.AddView(PaperUi.BottomBar(this,
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Save", Save),
             PaperUi.QuietButton(this, "Back", Finish)));
         return root;

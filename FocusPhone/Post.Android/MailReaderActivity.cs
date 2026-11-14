@@ -63,10 +63,10 @@ public class MailReaderActivity : Activity
         // BinderFrame applies its own top-inset padding to the page it draws (see its own
         // remarks for why), so this screen no longer wraps its whole root in WrapForTopInset
         // itself — doing both would pad the subject header down twice.
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, item.Subject ?? "(no subject)", PaperTheme.PostMark, page,
-            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            PostShellAreas.All, PostShellAreas.Mailbox, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
         var buttons = new List<View>();
         if (item.Attachments.Count > 0)
@@ -76,7 +76,7 @@ public class MailReaderActivity : Activity
         }
         buttons.Add(PaperUi.SecondaryButton(this, "File", () => Hand(item, ReaderAction.File)));
         buttons.Add(PaperUi.SecondaryButton(this, "Delete", () => Hand(item, ReaderAction.Delete)));
-        root.AddView(PaperUi.BottomBar(this, [.. buttons]));
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this, [.. buttons]));
 
         SetContentView(root);
         // 0, not edge: BinderFrame's own contentHost already pads the horizontal edge, and

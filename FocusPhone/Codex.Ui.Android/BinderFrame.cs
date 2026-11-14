@@ -71,6 +71,12 @@ public static class BinderFrame
         page.AddView(contentHost, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
+        // The bar sits under the page, not under the spread, so the strip beside it runs to the foot
+        // of the screen (owner's ruling, audit W8.3b). SetBar fills it.
+        var barHost = new FrameLayout(activity) { Tag = BarHostTag };
+        page.AddView(barHost, new LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+
         var spread = new LinearLayout(activity) { Orientation = Orientation.Horizontal };
 
         // Padded down by the status-bar/display-cutout inset under enforced edge-to-edge
@@ -90,4 +96,25 @@ public static class BinderFrame
 
         return (spread, overlay);
     }
+
+    /// <summary>
+    /// Puts <paramref name="bar"/> (a <see cref="PaperUi.BottomBar"/>) under the page of a spread
+    /// <see cref="Wrap"/> built, replacing any bar already there; null clears it.
+    /// </summary>
+    public static void SetBar(View spread, View? bar)
+    {
+        if (spread.FindViewWithTag(BarHostTag) is not FrameLayout host)
+        {
+            throw new InvalidOperationException("SetBar needs a spread built by BinderFrame.Wrap.");
+        }
+
+        host.RemoveAllViews();
+        if (bar is not null)
+        {
+            host.AddView(bar, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+        }
+    }
+
+    private static readonly Java.Lang.String BarHostTag = new("binder-frame-bar");
 }

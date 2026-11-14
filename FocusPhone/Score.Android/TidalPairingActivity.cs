@@ -126,12 +126,12 @@ public class TidalPairingActivity : Activity
         body.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X4), 0, 0);
         scroll.AddView(body);
 
-        root.AddView(BinderFrame.Wrap(
+        var framed = BinderFrame.Wrap(
             this, "TIDAL", ScoreShellAreas.All[ScoreShellAreas.Settings].Hue, scroll,
-            ScoreShellAreas.All, ScoreShellAreas.Settings, SwitchArea),
-            new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
+            ScoreShellAreas.All, ScoreShellAreas.Settings, SwitchArea);
+        root.AddView(framed, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
 
-        root.AddView(PaperUi.BottomBar(this, PaperUi.QuietButton(this, "Close", Finish)));
+        BinderFrame.SetBar(framed, PaperUi.BottomBar(this, PaperUi.QuietButton(this, "Close", Finish)));
         return root;
     }
 
