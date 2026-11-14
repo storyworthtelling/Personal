@@ -263,4 +263,29 @@ public class NearDuplicateCollapserTests
 
         Assert.Equal(2, NearDuplicateCollapser.Collapse([other, group]).Count);
     }
+
+    // Efficiency audit §23: each notification copy is now compared only with provider texts inside its window, found
+    // by a search over a time-sorted list, instead of with all of them. The window's edges must still hold.
+    [Fact]
+    public void AmongThousandsOfTextsOnlyTheOneInTheWindowShadowsTheCopy()
+    {
+        var items = Enumerable.Range(0, 5000)
+            .Select(index => Item(TimelineItemKind.Message, "5551234567", $"sms:{index}", secondsAfterT0: (index - 2500) * 600))
+            .ToList();
+        items.Add(Item(TimelineItemKind.Message, "5551234567", "5551234567:1", secondsAfterT0: 180));
+
+        var result = NearDuplicateCollapser.Collapse(items);
+
+        Assert.Equal(5000, result.Count);
+        Assert.DoesNotContain(result, item => item.SourceId == "5551234567:1");
+    }
+
+    [Fact]
+    public void ACopyJustOutsideTheWindowIsKept()
+    {
+        var provider = Item(TimelineItemKind.Message, "5551234567", "sms:1");
+        var notification = Item(TimelineItemKind.Message, "5551234567", "5551234567:2", secondsAfterT0: 181);
+
+        Assert.Equal(2, NearDuplicateCollapser.Collapse([provider, notification]).Count);
+    }
 }

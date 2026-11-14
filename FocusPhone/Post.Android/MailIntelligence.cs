@@ -234,9 +234,9 @@ internal static class MailIntelligence
     // make Filed a landfill instead of a record.
     private static void AgeOutTrivia(TimelineDatabase database, DateTimeOffset now)
     {
-        foreach (var item in database.Cache.LoadRecent(limit: 500))
+        foreach (var item in database.Cache.LoadClassified(limit: 500))
         {
-            if (item.MailClass is { } kind && MailAgeing.HasExpired(kind, item.TimestampUtc, now))
+            if (MailAgeing.HasExpired(item.MailClass, item.TimestampUtc, now))
             {
                 database.Cache.Delete(item.Kind, item.SourceId);
             }

@@ -90,7 +90,7 @@ public class ScoreActivity : Activity
             this, new Score.Google.MusicTasteService(musicTokens.GetAccessToken, "Score"));
         var progressStore = new PlaybackProgressStore(this);
         var musicLibrary = new MusicLibrary(this, musicTokens, playback, listening, progressStore);
-        musicLibrary.LoadCatalog();
+        musicLibrary.LoadCatalogInBackground();
 
         areas =
         [

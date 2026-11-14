@@ -9,6 +9,7 @@ using Codex.Domain.Post;
 using Storyworthtelling.Time;
 using Codex.Domain.Timeline;
 using Codex.Infrastructure.Email;
+using Codex.Infrastructure.Storage;
 using Codex.Ui;
 using Codex.Ui.Voice;
 
@@ -50,7 +51,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // returns; the merge/title work itself runs off the UI thread.
     private readonly List<TimelineItem> liveItems = [];
     private readonly List<TimelineItem> cachedItems = [];
-    private int cacheOffset;
+    // Where the last cache page stopped, so the next is read from the index there (efficiency audit §8).
+    private TimelinePosition? cacheAfter;
     private bool cacheExhausted;
     private bool loading;
     private bool syncing;
@@ -330,7 +332,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         Task.Run(() =>
         {
             var live = ReadLiveTail();
-            var (page, rows, marketing) = ReadPageAndBuild(live, [], 0, titleSeed);
+            var (page, rows, marketing) = ReadPageAndBuild(live, [], null, titleSeed);
             Host.RunOnUiThread(() =>
             {
                 if (generation != loadGeneration)
@@ -341,7 +343,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 liveItems.AddRange(live);
                 cachedItems.Clear();
                 cachedItems.AddRange(page);
-                cacheOffset = page.Count;
+                cacheAfter = page.Count > 0 ? TimelinePosition.Of(page[^1]) : null;
                 cacheExhausted = page.Count < CachePageSize;
                 allRows = rows;
                 marketingRows = marketing;
@@ -366,12 +368,12 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         var generation = loadGeneration;
         var live = liveItems.ToList();
         var prior = cachedItems.ToList();
-        var offset = cacheOffset;
+        var after = cacheAfter;
         var titleSeed = allRows.ToDictionary(row => row.ContactKey, row => row.Title);
 
         Task.Run(() =>
         {
-            var (page, rows, marketing) = ReadPageAndBuild(live, prior, offset, titleSeed);
+            var (page, rows, marketing) = ReadPageAndBuild(live, prior, after, titleSeed);
             Host.RunOnUiThread(() =>
             {
                 if (generation != loadGeneration)
@@ -379,7 +381,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                     return;
                 }
                 cachedItems.AddRange(page);
-                cacheOffset += page.Count;
+                cacheAfter = page.Count > 0 ? TimelinePosition.Of(page[^1]) : cacheAfter;
                 cacheExhausted = page.Count < CachePageSize;
                 allRows = rows;
                 marketingRows = marketing;
@@ -426,7 +428,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // section (BuildMarketingSection). This is a visibility split, not a new expiry path:
     // MailAgeing still decides when a marketing item goes, unchanged.
     private (List<TimelineItem> Page, List<ThreadRow> Rows, List<ThreadRow> MarketingRows) ReadPageAndBuild(
-        List<TimelineItem> live, List<TimelineItem> priorCache, int offset,
+        List<TimelineItem> live, List<TimelineItem> priorCache, TimelinePosition? after,
         Dictionary<string, string> titleSeed)
     {
         var page = new List<TimelineItem>();
@@ -435,7 +437,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         try
         {
             using var database = TimelineDatabase.Open(Host);
-            page.AddRange(database.Cache.LoadRecent(CachePageSize, offset));
+            page.AddRange(database.Cache.LoadPage(after, CachePageSize));
 
             var all = new List<TimelineItem>(live.Count + priorCache.Count + page.Count);
             all.AddRange(live);
@@ -1321,7 +1323,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         try
         {
             using var database = TimelineDatabase.Open(Host);
-            item = database.Cache.LoadRecent(limit: 2_000).FirstOrDefault(candidate => candidate.SourceId == sourceId);
+            item = database.Cache.Find(sourceId);
         }
         catch (Exception e)
         {

@@ -327,4 +327,64 @@ public class TimelineCacheTests : IDisposable
 
         Assert.Equal(Codex.Domain.Post.MailClass.Bill, cache.LoadRecent(10).Single().MailClass);
     }
+
+    // Efficiency audit §8: the list order had no index, paging was by OFFSET, every read carried the bodies, and the
+    // reader found one message by loading 2,000 rows on the UI thread.
+    [Fact]
+    public void TheListOrderAndTheWindowAreIndexed()
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'timelineItems'";
+        using var reader = command.ExecuteReader();
+        var names = new List<string>();
+        while (reader.Read())
+        {
+            names.Add(reader.GetString(0));
+        }
+
+        Assert.Contains("ixTimelineNewest", names);
+        Assert.Contains("ixTimelineKindNewest", names);
+    }
+
+    [Fact]
+    public void OneMessageIsFoundBySourceId()
+    {
+        cache.Upsert([Item("m1"), Item("e1", TimelineItemKind.Email, minute: 5)]);
+
+        Assert.Equal(TimelineItemKind.Email, cache.Find("e1")?.Kind);
+        Assert.Null(cache.Find("missing"));
+    }
+
+    [Fact]
+    public void PagesFollowOnFromTheLastItemShown()
+    {
+        cache.Upsert(
+        [
+            Item("m1", minute: 1),
+            Item("m2", minute: 2),
+            Item("m3", minute: 3),
+            Item("m3b", TimelineItemKind.Email, minute: 3),
+            Item("m4", minute: 4),
+        ]);
+
+        var first = cache.LoadPage(after: null, limit: 2);
+        var second = cache.LoadPage(TimelinePosition.Of(first[^1]), limit: 2);
+        var third = cache.LoadPage(TimelinePosition.Of(second[^1]), limit: 2);
+
+        Assert.Equal(["m4", "m3b"], first.Select(i => i.SourceId));
+        Assert.Equal(["m3", "m2"], second.Select(i => i.SourceId));
+        Assert.Equal(["m1"], third.Select(i => i.SourceId));
+    }
+
+    [Fact]
+    public void TheAgeingReadCarriesNoBodies()
+    {
+        cache.Upsert([Item("e1", TimelineItemKind.Email, minute: 5) with { Body = "invented body", MailClass = Codex.Domain.Post.MailClass.Marketing }]);
+
+        var header = Assert.Single(cache.LoadClassified(limit: 10));
+
+        Assert.Equal("e1", header.SourceId);
+        Assert.Equal(Codex.Domain.Post.MailClass.Marketing, header.MailClass);
+        Assert.Equal(new DateTimeOffset(2026, 6, 10, 9, 5, 0, TimeSpan.Zero), header.TimestampUtc);
+    }
 }

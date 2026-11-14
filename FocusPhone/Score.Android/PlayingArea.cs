@@ -52,6 +52,10 @@ public sealed class PlayingArea : ScoreArea
     private string? pendingAlbumKey;
     private string? lastMediaId;
 
+    // The cover is decoded once per track (or override, or feed), not on every tick (efficiency audit §5).
+    private readonly ArtworkRefresh artworkRefresh = new();
+    private string? artworkKey;
+
     // The words, and which track they belong to. Fetched once per track and held for
     // as long as it plays — they do not change, and the panel is opened and closed
     // more often than the track changes.
@@ -264,6 +268,7 @@ public sealed class PlayingArea : ScoreArea
                 artwork = new ArtworkWindow(Host);
                 var size = PaperTheme.Dp(Host, ArtworkSizeDp);
                 panel.AddView(artwork, new FrameLayout.LayoutParams(size, size, GravityFlags.Center));
+                artworkRefresh.Forget(); // a new window has nothing on it yet
                 RenderArtwork();
                 break;
         }
@@ -439,46 +444,70 @@ public sealed class PlayingArea : ScoreArea
         // Post's that carry no embedded ID3 art otherwise always fell straight to the
         // bookplate, even though the feed's own image had already been fetched), then the
         // bookplate the window falls back to.
-        var overrideUri = artworkStore.Resolve(AlbumKeyOf(playback.Controller?.MediaMetadata));
-        if (overrideUri is not null && TrySetOverrideArt(overrideUri))
+        var metadata = playback.Controller?.MediaMetadata;
+        var overrideUri = artworkStore.Resolve(AlbumKeyOf(metadata));
+        var data = metadata?.ArtworkData;
+        var feedId = metadata?.Extras?.GetString(PodcastsArea.FeedIdExtraKey);
+        var key = ArtworkRefresh.KeyOf(playback.CurrentMediaId, overrideUri, data?.Count ?? 0, feedId);
+        if (!artworkRefresh.Due(key))
         {
             return;
         }
 
-        var data = playback.Controller?.MediaMetadata?.ArtworkData;
-        if (data is { Count: > 0 })
+        // Decoded off the UI thread, sampled to the window's size, and shown only if the window and the cover are
+        // still the ones it was decoded for.
+        artworkKey = key;
+        var window = artwork;
+        var embedded = data is { Count: > 0 } ? data.ToArray() : null;
+        var targetPx = PaperTheme.Dp(Host, ArtworkSizeDp);
+        _ = Task.Run(() =>
         {
-            var bytes = data.ToArray();
-            artwork.SetArtwork(BitmapFactory.DecodeByteArray(bytes, 0, bytes.Length));
-            return;
-        }
-
-        var feedId = playback.Controller?.MediaMetadata?.Extras?.GetString(PodcastsArea.FeedIdExtraKey);
-        var feedArtPath = feedId is not null ? podcastArtwork.ExistingPath(feedId) : null;
-        var feedArtBitmap = feedArtPath is not null
-            ? CoverCache.Get(feedArtPath, PaperTheme.Dp(Host, ArtworkSizeDp))
-            : null;
-        artwork.SetArtwork(feedArtBitmap);
+            var bitmap = (overrideUri is not null ? DecodeOverride(overrideUri, targetPx) : null)
+                ?? (embedded is not null ? DecodeSampled(embedded, targetPx) : null)
+                ?? FeedArt(feedId, targetPx);
+            Host.RunOnUiThread(() =>
+            {
+                if (ReferenceEquals(window, artwork) && artworkKey == key)
+                {
+                    window.SetArtwork(bitmap);
+                }
+            });
+        });
     }
 
-    private bool TrySetOverrideArt(string uri)
+    private Bitmap? FeedArt(string? feedId, int targetPx)
+    {
+        var feedArtPath = feedId is not null ? podcastArtwork.ExistingPath(feedId) : null;
+        return feedArtPath is not null ? CoverCache.Get(feedArtPath, targetPx) : null;
+    }
+
+    private static Bitmap? DecodeSampled(byte[] bytes, int targetPx)
+    {
+        var bounds = new BitmapFactory.Options { InJustDecodeBounds = true };
+        BitmapFactory.DecodeByteArray(bytes, 0, bytes.Length, bounds);
+        var options = new BitmapFactory.Options { InSampleSize = SampleSize.For(bounds.OutWidth, bounds.OutHeight, targetPx) };
+        return BitmapFactory.DecodeByteArray(bytes, 0, bytes.Length, options);
+    }
+
+    private Bitmap? DecodeOverride(string uri, int targetPx)
     {
         try
         {
-            using var stream = Host.ContentResolver!.OpenInputStream(Android.Net.Uri.Parse(uri));
-            var bitmap = BitmapFactory.DecodeStream(stream);
-            if (bitmap is not null)
+            var parsed = Android.Net.Uri.Parse(uri);
+            var bounds = new BitmapFactory.Options { InJustDecodeBounds = true };
+            using (var measuring = Host.ContentResolver!.OpenInputStream(parsed))
             {
-                artwork.SetArtwork(bitmap);
-                return true;
+                BitmapFactory.DecodeStream(measuring, null, bounds);
             }
+            var options = new BitmapFactory.Options { InSampleSize = SampleSize.For(bounds.OutWidth, bounds.OutHeight, targetPx) };
+            using var stream = Host.ContentResolver!.OpenInputStream(parsed);
+            return BitmapFactory.DecodeStream(stream, null, options);
         }
         catch (Exception e) when (e is Java.IO.FileNotFoundException or Java.Lang.SecurityException or Java.IO.IOException)
         {
             // A revoked or missing override just falls through to the embedded art.
+            return null;
         }
-
-        return false;
     }
 
     private static string AlbumKeyOf(MediaMetadata? metadata) => ArtworkOverrides.AlbumKey(
