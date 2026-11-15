@@ -7,7 +7,7 @@ namespace Storyworthtelling.Voice.Secrets;
 /// <summary>
 /// Carries the verdict on each shared credential between apps through the vault (audit 11 §13). A 401 seen by Post or
 /// Plate used to stay in that app's own health store, so Folio, which holds the Claude key field, kept saying
-/// "Working ✓".
+/// it was working.
 ///
 /// <para>A verdict is about one value. Each entry is stamped with a fingerprint of the vault's value when it was
 /// written, and is applied only while the vault still holds that value and the app reading it uses the same one. A

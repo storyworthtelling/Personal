@@ -70,23 +70,16 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
                 + $"enabled):\n\nPackage: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
         }
 
-        // The tablet.
-        column.AddView(Label("reMarkable", gap));
-        // The pairing's health, not the token's presence (audit 11 §11): a revoked pairing opens the code field.
+        // The tablet: on the screen only while the pairing needs doing (never paired, or the tablet turned it
+        // away). A working pairing is not on the screen at all (owner's ruling, audit W8.4b), and pairing
+        // health, not the token's presence, decides (audit 11 §11).
         var pairing = Storyworthtelling.Remarkable.RemarkablePairingStatus.Describe(
             PlateRemarkable.IsPaired,
             HeadCredentialHealth.Store().Load().Get(Storyworthtelling.Remarkable.RemarkableCredentialId.Value),
             "Not paired.");
-        if (!pairing.NeedsPairing)
+        if (pairing.NeedsPairing)
         {
-            // §3: a working credential is a done state, not a field to keep on screen.
-            column.AddView(PaperUi.Body(Host, pairing.Line));
-            column.AddView(PaperUi.Secondary(Host,
-                "Scans sent here land at the root of the tablet."));
-            column.AddView(PaperUi.SecondaryButton(Host, "Pair again", ShowPairingField));
-        }
-        else
-        {
+            column.AddView(Label("reMarkable", gap));
             if (PlateRemarkable.IsPaired)
             {
                 column.AddView(PaperUi.Body(Host, pairing.Line));
@@ -149,12 +142,6 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
                 + $"SHA-1: {AppSigningInfo.Sha1Fingerprint()} — register these as an OAuth client "
                 + "if they aren't already.");
         }
-    }
-
-    private void ShowPairingField()
-    {
-        PlateRemarkable.DeviceToken = string.Empty;
-        Invalidate();
     }
 
     private async void Pair()

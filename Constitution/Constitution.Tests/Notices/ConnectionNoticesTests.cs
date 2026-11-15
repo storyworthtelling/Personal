@@ -194,12 +194,13 @@ public class ConnectionNoticesTests
         var health = ConnectionNotices.Judge(ConnectionHealth.Rejected, Judged, Replaced);
         var input = new ConnectionInput(CredentialIds.SleepNumber, true, health);
         SettingsModel.ApplyNotices(board, [input], Replaced.AddMinutes(1));
-        var row = SettingsModel
+        var rows = SettingsModel
             .Build(new Pillars(true, true, true), EquipmentSet.Everything(), [input])
-            .Connections.Single(connection => connection.CredentialId == CredentialIds.SleepNumber);
+            .Connections;
 
+        // Replaced since the refusal, so not yet checked: nothing to do, so not on the screen (audit W8.4b).
         Assert.Empty(board.Waiting());
-        Assert.Equal(ConnectionStatus.Saved, row.Status);
+        Assert.DoesNotContain(rows, connection => connection.CredentialId == CredentialIds.SleepNumber);
     }
 
     [Theory]

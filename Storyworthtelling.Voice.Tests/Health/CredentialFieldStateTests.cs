@@ -17,13 +17,14 @@ public class CredentialFieldStateTests
     }
 
     [Fact]
-    public void SetAndOk_HidesTheEntryWithAWorkingStatus()
+    public void SetAndOk_DoesNotAppearAtAll()
     {
+        // Owner's ruling (audit W8.4b): a working key is noise, so it is not on the screen — no line, no Replace.
         var state = CredentialFieldState.Decide(isSet: true, CredentialHealth.Ok(Now));
 
         Assert.False(state.ShowEntry);
-        Assert.False(state.IsWarning);
-        Assert.Contains("✓", state.StatusText);
+        Assert.False(state.Appears);
+        Assert.Equal(string.Empty, state.StatusText);
     }
 
     [Fact]
@@ -44,6 +45,7 @@ public class CredentialFieldStateTests
         var state = CredentialFieldState.Decide(isSet: true, CredentialHealth.Unknown);
 
         Assert.False(state.ShowEntry);
+        Assert.False(state.Appears);
         Assert.False(state.IsWarning);
     }
 

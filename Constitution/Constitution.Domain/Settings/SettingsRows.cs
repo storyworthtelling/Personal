@@ -30,7 +30,7 @@ public sealed record PassphraseFieldSpec(bool Masked, bool Mono, string Helper);
 /// <summary>What a connection says about itself, in Domain's words.</summary>
 public enum ConnectionStatus
 {
-    /// <summary>Set, and the last live call was not rejected: collapses to "Working ✓".</summary>
+    /// <summary>Set, and the last live call was not rejected. Not drawn: a working connection is not on the screen.</summary>
     Working,
 
     /// <summary>Set, never exercised.</summary>

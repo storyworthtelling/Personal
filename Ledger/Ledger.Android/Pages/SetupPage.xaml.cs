@@ -185,10 +185,9 @@ public partial class SetupPage : LedgerBinderPage
 
         // D09/D36, mockup 11 frame 2: her Settings holds only Vault and Google account, plus the foot.
         // No Plaid, no shared-key status, no connect flow, no Budget group, no Diagnostics.
-        PlaidSection.IsVisible = !isHers;
-        PlaidDivider.IsVisible = !isHers;
-        SharedKeysSection.IsVisible = !isHers;
-        SharedKeysDivider.IsVisible = !isHers;
+        hersInstall = isHers;
+        ApplyPlaidCredentialField();
+        ApplySharedKeySection();
         ConnectedAccountsSection.IsVisible = !isHers;
         ConnectedAccountsDivider.IsVisible = !isHers;
         BudgetSection.IsVisible = !isHers;
@@ -221,44 +220,61 @@ public partial class SetupPage : LedgerBinderPage
         RemarkableStatusLabel.Text = pairing.NeedsPairing && !string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken)
             ? pairing.Line + " Pairing is done in Foreword or Folio."
             : pairing.Line;
+        // A working pairing is not on the screen (owner's ruling, audit W8.4b).
+        RemarkableSection.IsVisible = pairing.NeedsPairing;
     }
+
+    // Her install never shows Plaid or the shared keys (D09/D36); the owner's shows each only when it needs work.
+    private bool hersInstall;
+
+    // Unknown until the vault has been read: shown "Not set." only once a read says so.
+    private bool? sharedKeyPresent;
 
     // Reads whether the shared Claude key (Storyworthtelling.Voice, entered once in Folio) is present
     // in the Drive config Index already reads for the balances-screen greeting (DriveVoiceOptions is
-    // wired the same way in MainPage). This is a REAL, live read — not a placeholder — but it reports
-    // presence only, not a verified-working call: VoiceClient has no ICredentialHealthSink seam of its
-    // own anywhere in the suite, so nothing ever marks this key Ok/Failing the way Plaid's is marked
-    // below. "Working" here means "the key is there to read", which is what makes a silently-degraded
-    // greeting diagnosable at all (D80) — it does not mean "Claude just accepted a real call".
+    // wired the same way in MainPage). It reports presence only, since nothing here marks the key
+    // Ok/Failing. A key that is there is not on the screen (owner's ruling, audit W8.4b); a missing one
+    // says so, which is what makes a silently-degraded greeting diagnosable at all (D80).
     private async Task ApplySharedKeyStatusAsync()
     {
-        var hasKey = false;
         try
         {
             var options = await voiceOptions.RefreshAsync(CancellationToken.None);
-            hasKey = !string.IsNullOrEmpty(options.ApiKey);
+            sharedKeyPresent = !string.IsNullOrEmpty(options.ApiKey);
         }
-        catch
+        catch (Exception ex)
         {
-            // Best-effort: Drive being unreachable just means "can't tell right now".
+            // Drive being unreachable just means "can't tell right now", so the row stays hidden.
+            logger.LogWarning(ex, "Could not read the shared Claude key's presence from the vault.");
+            sharedKeyPresent = null;
         }
 
-        SharedKeyStatusLabel.Text = hasKey ? "✓ Working" : "Not set.";
+        SharedKeyStatusLabel.Text = "Not set.";
+        ApplySharedKeySection();
+    }
+
+    private void ApplySharedKeySection()
+    {
+        var shown = !hersInstall && sharedKeyPresent == false;
+        SharedKeysSection.IsVisible = shown;
+        SharedKeysDivider.IsVisible = shown;
     }
 
     // Shows the Plaid client id/secret fields only when there's something to do: no credentials stored yet,
-    // or Plaid just rejected them. Working credentials collapse to a "Working ✓" line with a Replace button,
-    // so the screen stays quiet and the secret isn't left on display (the vault keeps the backup).
+    // or Plaid just rejected them. Working credentials are not on the screen at all (owner's ruling, audit
+    // W8.4b): the vault keeps the backup.
     private void ApplyPlaidCredentialField()
     {
         var isSet = !string.IsNullOrEmpty(SettingsStore.PlaidClientId) &&
                     !string.IsNullOrEmpty(SettingsStore.PlaidSecret);
         var state = CredentialFieldState.Decide(isSet, CredentialHealth().Get(CredentialIds.Plaid));
+        var shown = !hersInstall && state.Appears;
+        PlaidSection.IsVisible = shown;
+        PlaidDivider.IsVisible = shown;
         PlaidCredentialFields.IsVisible = state.ShowEntry;
-        PlaidStatusRow.IsVisible = !state.ShowEntry || state.IsWarning;
-        PlaidReplaceButton.IsVisible = !state.ShowEntry;
+        PlaidStatusLabel.IsVisible = state.IsWarning;
         PlaidStatusLabel.Text = state.StatusText;
-        PlaidStatusLabel.Style = LookupStyle(state.IsWarning ? "ErrorLabel" : "SecondaryLabel");
+        PlaidStatusLabel.Style = LookupStyle("ErrorLabel");
     }
 
     private static CredentialHealthReport CredentialHealth() =>
@@ -269,16 +285,6 @@ public partial class SetupPage : LedgerBinderPage
     private static Style? LookupStyle(string key) =>
         Application.Current?.Resources.TryGetValue(key, out var value) == true ? value as Style : null;
 
-    // Deliberate rotation of working credentials: hide the status row and open the fields (kept empty so the
-    // new values are typed fresh rather than edited over the old ones).
-    private void OnReplacePlaidClicked(object? sender, EventArgs e)
-    {
-        PlaidStatusRow.IsVisible = false;
-        ClientIdEntry.Text = string.Empty;
-        SecretEntry.Text = string.Empty;
-        PlaidCredentialFields.IsVisible = true;
-        ClientIdEntry.Focus();
-    }
 
     // Opens the system Google account picker and requests read-only Drive consent, so Ledger can read the
     // shared owner's-voice profile. The result returns through MainActivity.OnActivityResult.
@@ -367,7 +373,7 @@ public partial class SetupPage : LedgerBinderPage
         {
             SettingsStore.PlaidClientId = ClientIdEntry.Text?.Trim() ?? string.Empty;
             SettingsStore.PlaidSecret = SecretEntry.Text?.Trim() ?? string.Empty;
-            // New credentials: the status row reflects them (a working pair collapses to "Working ✓").
+            // New credentials: the section reflects them (a working pair leaves the screen).
             ApplyPlaidCredentialField();
         }
 
@@ -634,7 +640,7 @@ public partial class SetupPage : LedgerBinderPage
         sb.AppendLine("Credential health:");
         var health = CredentialHealth();
         var plaidState = CredentialFieldState.Decide(SettingsStore.IsConfigured, health.Get(CredentialIds.Plaid));
-        sb.AppendLine($"  Plaid: {plaidState.StatusText}");
+        sb.AppendLine($"  Plaid: {(plaidState.Appears ? plaidState.StatusText : "nothing to do")}");
 
         var claudeSet = false;
         try

@@ -28,8 +28,8 @@ public static class SettingsGroups
         return listed.Count == 0 ? "Nobody yet" : string.Join(", ", listed);
     }
 
-    /// <summary>"Working ✓" when no key wants entering (credential health), else how many do.</summary>
-    public static string VaultMeta(IEnumerable<bool> keysNeedingEntry)
+    /// <summary>How many keys want entering; nothing when none does, since a working key is not on the screen.</summary>
+    public static string? VaultMeta(IEnumerable<bool> keysNeedingEntry)
     {
         ArgumentNullException.ThrowIfNull(keysNeedingEntry);
         var keys = keysNeedingEntry.ToList();
@@ -41,7 +41,7 @@ public static class SettingsGroups
         var needed = keys.Count(needs => needs);
         return needed switch
         {
-            0 => "Working ✓",
+            0 => null,
             1 => "1 key needed",
             _ => needed.ToString(CultureInfo.InvariantCulture) + " keys needed",
         };
