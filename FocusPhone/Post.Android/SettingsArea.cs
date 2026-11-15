@@ -49,15 +49,24 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
 
         address = PaperUi.Field(Host, string.Empty);
         address.Text = account.GmailAddress;
+        PaperUi.CommitsAsTyped(address, text => { account.GmailAddress = text; changed = true; }, Settle);
         AddFieldGroup(layout, "Gmail address", address, null);
 
         password = PaperUi.MonoField(Host, string.Empty);
         password.Text = account.GmailAppPassword;
         password.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationPassword;
         password.Typeface = PaperTheme.Mono(Host); // setting InputType resets the typeface
+        // Replace empties the field for a paste; a blank never overwrites the working password.
+        PaperUi.CommitsAsTyped(password, text =>
+        {
+            if (text.Trim().Length > 0)
+            {
+                account.GmailAppPassword = text.Trim();
+                changed = true;
+            }
+        }, Settle);
 
-        // The field object is always created so Save reads its pre-filled value back even
-        // while the field itself is hidden.
+        // The field object is always created, and stores itself as it is typed, even while it is hidden.
         const string passwordHelper = "Make one in your Google Account, then paste it here.";
         var passwordContainer = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         layout.AddView(passwordContainer, Spaced(0, 0));
@@ -146,6 +155,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         // every app, and Android blocks clipboard copy on a password-typed field.
         passphrase = PaperUi.MonoField(Host, "Choose a passphrase");
         passphrase.Text = VaultPassphraseStore.Passphrase;
+        PaperUi.CommitsAsTyped(passphrase, text => { VaultPassphraseStore.Passphrase = text; changed = true; }, Settle);
         AddFieldGroup(layout, "Secrets vault passphrase", passphrase,
             "Backs up your Gmail credentials to your Google Drive, encrypted. Restores after a reset. " +
             "Shown in the clear so you can copy it into your other apps.");
@@ -163,20 +173,24 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         return scroll;
     }
 
-    // Saving is the area's one primary action, so it lives in the pinned bottom bar (§7).
-    // Success is the state change — no toast, no dialog.
-    public override View? BuildBottomBar() =>
-        PaperUi.BottomBar(Host, PaperUi.PrimaryButton(Host, "Save", Save));
+    // There is no Save (§5): each field stores itself as it is typed, and what follows a change — the
+    // vault backup and a sync — runs when a field loses focus or the screen goes away.
+    public override void Pause() => Settle();
 
-    private void Save()
+    private bool changed;
+
+    private void Settle()
     {
-        account.GmailAddress = address?.Text;
-        account.GmailAppPassword = password?.Text;
-        VaultPassphraseStore.Passphrase = passphrase?.Text ?? string.Empty;
+        if (!changed)
+        {
+            return;
+        }
+
+        changed = false;
 
         // Back up the credentials to the encrypted Drive vault. Best-effort — they already
         // work locally, so no passphrase/Google/network yet just means the vault picks
-        // them up on the next save.
+        // them up on the next change.
         PublishGmailToVault();
 
         if (account.IsConfigured)
@@ -185,7 +199,6 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
             // periodic run.
             EmailSyncWorker.RunOnce(Host);
         }
-        Invalidate();
     }
 
     // Opens the system Google account picker and requests Drive consent, so the vault can

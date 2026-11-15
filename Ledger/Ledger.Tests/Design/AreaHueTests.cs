@@ -72,8 +72,10 @@ public class AreaHueTests
         var settingsLine = source.Split('\n').Single(line => line.Contains("\"Settings\"", StringComparison.Ordinal)
             && line.Contains("new(", StringComparison.Ordinal));
 
-        Assert.Contains("PaperResources.Colour(\"InkMuted\")", settingsLine, StringComparison.Ordinal);
-        Assert.Contains("PaperResources.Colour(\"PaperDeep\")", settingsLine, StringComparison.Ordinal);
+        // The suite's grey, the Resolved role's two tiers, as in every other app (§9; audit W8.4, report 02 §3:
+        // Index drew muted ink on a pale cream cloth, so its inactive Settings tab was not grey at all).
+        Assert.Contains("PaperResources.Colour(\"ResolvedMark\")", settingsLine, StringComparison.Ordinal);
+        Assert.Contains("PaperResources.Colour(\"ResolvedFill\")", settingsLine, StringComparison.Ordinal);
     }
 
     [Theory]

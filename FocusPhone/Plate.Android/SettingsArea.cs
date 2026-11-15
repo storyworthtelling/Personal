@@ -40,6 +40,8 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         column.AddView(Label("Vault passphrase", gap));
         passphrase = PaperUi.MonoField(Host, "the same words in every app");
         passphrase.Text = VaultPassphraseStore.Passphrase;
+        // There is no Save (§5): stored as it is typed.
+        PaperUi.CommitsAsTyped(passphrase, text => VaultPassphraseStore.Passphrase = text);
         column.AddView(passphrase);
         column.AddView(PaperUi.Secondary(Host,
             "Shown in the clear on purpose: it is the one secret the vault cannot hold, so it "
@@ -124,22 +126,11 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         return scroll;
     }
 
-    public override View BuildBottomBar() =>
-        PaperUi.BottomBar(Host, PaperUi.PrimaryButton(Host, "Save", Save));
-
     private TextView Label(string text, int gap)
     {
         var label = PaperUi.Label(Host, text);
         label.SetPadding(0, gap, 0, 0);
         return label;
-    }
-
-    private void Save()
-    {
-        VaultPassphraseStore.Passphrase = passphrase?.Text ?? string.Empty;
-        // §7: success is an inline state change. Rebuilding the pane reads the stored value
-        // back, which is the state change — there is no toast to say so.
-        Invalidate();
     }
 
     private async void SignIn()

@@ -65,7 +65,6 @@ public class LauncherSettingsActivity : Activity
     private EditText? newShelfField;
 
     private LinearLayout? content;
-    private LinearLayout? actionBarHost;
     private ScrollView? scrollHost;
     private EditText? passphraseField;
     private InlineCountdown? restart;
@@ -92,10 +91,6 @@ public class LauncherSettingsActivity : Activity
         scroll.AddView(content);
         root.AddView(scroll, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, 0) { Weight = 1 });
-
-        actionBarHost = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        root.AddView(actionBarHost, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
         // Pads itself down by the status-bar/display-cutout inset under enforced edge-to-edge
         // (API 35+), so the page isn't drawn partly behind the battery/clock icons.
@@ -137,7 +132,6 @@ public class LauncherSettingsActivity : Activity
         }
 
         content!.RemoveAllViews();
-        actionBarHost!.RemoveAllViews();
 
         // §7: every screen opens with the Serif title + a full-width marker underline.
         // Settings takes the neutral resolved mark (like Post/Score), not Flyleaf's amber.
@@ -169,9 +163,6 @@ public class LauncherSettingsActivity : Activity
         var buildParams = MatchWrap();
         buildParams.TopMargin = Dp(DesignTokens.Space.X8);
         content.AddView(buildLine, buildParams);
-
-        var save = PaperUi.PrimaryButton(this, "Save", SaveVaultPassphrase);
-        actionBarHost.AddView(PaperUi.BottomBar(this, save));
 
         if (restart!.IsRunning)
         {
@@ -529,6 +520,9 @@ public class LauncherSettingsActivity : Activity
         // able to read and copy it is exactly what lets the owner set the same passphrase in every app.
         passphraseField = PaperUi.MonoField(this, "Choose a passphrase");
         passphraseField.Text = VaultPassphraseStore.Passphrase;
+        // There is no Save (§5): the passphrase is the one secret not in the vault, so it is only
+        // ever stored here, as it is typed. The update token is set in the admin token card.
+        PaperUi.CommitsAsTyped(passphraseField, text => VaultPassphraseStore.Passphrase = text);
         var fieldParams = MatchWrap();
         fieldParams.TopMargin = Dp(DesignTokens.Space.X2);
         block.AddView(passphraseField, fieldParams);
@@ -542,15 +536,6 @@ public class LauncherSettingsActivity : Activity
         block.AddView(helper, helperParams);
 
         card.AddView(block, MatchWrap());
-    }
-
-    private void SaveVaultPassphrase()
-    {
-        // The passphrase is the one secret NOT stored in the vault (it's the key), so saving just persists
-        // it locally — there's no Launcher section to publish from this panel (the GitHub update token, the
-        // Launcher's vault secret, is set in the admin token dialog).
-        VaultPassphraseStore.Passphrase = passphraseField?.Text ?? string.Empty;
-        Finish();
     }
 
     // ---- Advanced: the gated admin escape hatch -------------------------------

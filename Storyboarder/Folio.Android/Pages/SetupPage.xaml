@@ -4,8 +4,7 @@
              xmlns:kit="clr-namespace:Storyworthtelling.Maui.Views;assembly=Storyworthtelling.Maui"
              xmlns:local="clr-namespace:Folio.Android.Pages"
              x:Class="Folio.Android.Pages.SetupPage">
-    <Grid RowDefinitions="*,Auto">
-    <ScrollView Grid.Row="0">
+    <ScrollView>
         <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="14">
 
 
@@ -24,7 +23,7 @@
                 <Button x:Name="ClaudeReplaceButton" Grid.Column="1" Text="Replace"
                         Style="{StaticResource QuietButton}" Clicked="OnReplaceClaudeClicked" />
             </Grid>
-            <Entry x:Name="ClaudeKeyEntry" Placeholder="sk-ant-..."
+            <Entry x:Name="ClaudeKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="sk-ant-..."
                    Style="{StaticResource MonoEntry}" IsVisible="False" />
             <Label Text="Builds the design bible and storyboards the book."
                    Style="{StaticResource SecondaryLabel}" />
@@ -37,7 +36,7 @@
                 <Button x:Name="GeminiReplaceButton" Grid.Column="1" Text="Replace"
                         Style="{StaticResource QuietButton}" Clicked="OnReplaceGeminiClicked" />
             </Grid>
-            <Entry x:Name="GeminiKeyEntry" Placeholder="AIza..."
+            <Entry x:Name="GeminiKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="AIza..."
                    Style="{StaticResource MonoEntry}" IsVisible="False" />
             <Label Text="Renders the panel images."
                    Style="{StaticResource SecondaryLabel}" />
@@ -49,7 +48,7 @@
             <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
                    Style="{StaticResource SecondaryLabel}" />
             <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
+            <Entry x:Name="VaultPassphraseEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="Choose a passphrase"
                    Style="{StaticResource MonoEntry}" />
             <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
                    Style="{StaticResource SecondaryLabel}" />
@@ -146,10 +145,4 @@
             </Grid>
         </VerticalStackLayout>
     </ScrollView>
-
-    <!-- Pinned bottom bar (DESIGN.md §7). -->
-    <kit:PaperBar Grid.Row="1">
-            <Button Text="Save settings" Clicked="OnSaveClicked" />
-        </kit:PaperBar>
-    </Grid>
 </local:FolioBinderPage>

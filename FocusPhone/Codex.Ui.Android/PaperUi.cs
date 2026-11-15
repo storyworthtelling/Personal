@@ -165,6 +165,28 @@ public static class PaperUi
         return field;
     }
 
+    /// <summary>
+    /// There is no Save (DESIGN.md §5, audit W8.4): a settings field is stored as it is typed, and
+    /// <paramref name="settled"/> — the vault publish, a sync — runs when the field loses focus. Leaving
+    /// by a binder tab never blurs a field, so a screen also settles on its own pause.
+    /// </summary>
+    public static void CommitsAsTyped(EditText field, Action<string> store, Action? settled = null)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+        ArgumentNullException.ThrowIfNull(store);
+        field.TextChanged += (_, _) => store(field.Text ?? string.Empty);
+        if (settled is not null)
+        {
+            field.FocusChange += (_, args) =>
+            {
+                if (!args.HasFocus)
+                {
+                    settled();
+                }
+            };
+        }
+    }
+
     /// <summary>Machine-text input (keys, tokens, URLs): Cascadia on deep paper.</summary>
     public static EditText MonoField(Context context, string hint)
     {

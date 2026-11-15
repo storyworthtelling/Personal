@@ -27,7 +27,9 @@ public class ConnectionsTests
         {
             Assert.Equal(ConnectionStatus.Working, row.Status);
             Assert.Equal("Working ✓", row.StatusText);
-            Assert.Null(row.ButtonLabel);
+            // Audit W8.4 (report 02 §7): a working key collapses to "Working ✓" with a quiet Replace, as in
+            // every app. Health Connect has nothing to replace, so it keeps no button.
+            Assert.Equal(row.CredentialId == SettingsModel.HealthConnectId ? null : SettingsModel.ReplaceLabel, row.ButtonLabel);
             Assert.False(row.IsProblem);
             Assert.Null(row.RaisesNotice);
         });

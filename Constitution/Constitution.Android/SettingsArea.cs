@@ -437,8 +437,12 @@ public sealed class SettingsArea(Activity host)
                 }
 
                 var id = row.CredentialId;
+                // A settled key's Replace is quiet; an unset or refused one asks with a Secondary (audit W8.4).
+                var settled = !entering && row.ButtonLabel == SettingsModel.ReplaceLabel;
                 block.AddView(
-                    PaperUi.SecondaryButton(Host, entering ? EntryVerb(id) : row.ButtonLabel, () => OnConnectionButton(id)),
+                    settled
+                        ? PaperUi.QuietButton(Host, row.ButtonLabel, () => OnConnectionButton(id))
+                        : PaperUi.SecondaryButton(Host, entering ? EntryVerb(id) : row.ButtonLabel, () => OnConnectionButton(id)),
                     Spaced(DesignTokens.Space.X2));
             }
 
