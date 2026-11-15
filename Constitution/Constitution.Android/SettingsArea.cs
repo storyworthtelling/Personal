@@ -27,6 +27,7 @@ using Constitution.Settings;
 using Constitution.WorkoutsTab;
 using Storyworthtelling.Remarkable;
 using Codex.Ui.Http;
+using Storyworthtelling.Updates;
 
 namespace Constitution;
 
@@ -44,10 +45,9 @@ namespace Constitution;
 public sealed class SettingsArea(Activity host)
     : ConstitutionAreaBase(host, "settings", Resource.Drawable.area_settings), IUndoableArea
 {
-    private const string PillarsGroup = "pillars";
-    private const string EquipmentGroup = "equipment";
-    private const string HouseholdGroup = "household";
-    private const string ConnectionsGroup = "connections";
+    private const string PillarsGroup = "Pillars";
+    private const string EquipmentGroup = "Equipment";
+    private const string HouseholdGroup = "Household";
 
     private readonly PillarStore pillarStore = new(host);
     private readonly EquipmentStore equipmentStore = new(host);
@@ -57,7 +57,7 @@ public sealed class SettingsArea(Activity host)
 
     // Which group is open, which connection row is showing its entry, and the one inline sentence
     // each act leaves behind. Held here so a rebuild does not undo them.
-    private string? openGroup;
+    private SettingsAccordion? accordion;
     private string? entryOpenFor;
     private string? signInStatus;
     private string? exportStatus;
@@ -114,46 +114,32 @@ public sealed class SettingsArea(Activity host)
         var scroll = new ScrollView(Host);
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
-        AddGroup(column, PillarsGroup, "Pillars", model.PillarsSummary, BuildPillars(model));
-        AddGroup(column, EquipmentGroup, "Equipment", model.EquipmentSummary, BuildEquipment(model));
         // The roster is the household file's, as the phone's copy last read it; with none (the file has not opened, or this phone has
         // not met one) the group says so and the choices stay editable in the setup file. What the file is doing is said beneath.
         var householdFile = ConstitutionHousehold.For(Host).Service;
         var household = HouseholdGroupModel.Build(householdFile.Roster, householdFile.RosterRole, householdStore.Read());
         var householdChoices = householdStore.Read() is HouseholdSetupRead.Configured saved ? HouseholdChoices.From(saved.Setup) : new HouseholdChoices();
-        AddGroup(column, HouseholdGroup, "Household", household.Summary, HouseholdGroupView.Build(Host, household, householdChoices, householdStore, householdNote ?? HouseholdStandingNote(householdFile.Standing), note =>
+
+        // The suite's anatomy (audit W8.4b): Connections, Vault, Constitution's own, Diagnostics, then the build line.
+        accordion ??= new SettingsAccordion(Host, () =>
         {
-            householdNote = note;
+            CommitPassphrase();
+            entryOpenFor = null;
             RaiseChanged();
-        }, OpenSheet));
-        AddGroup(column, ConnectionsGroup, "Connections", model.ConnectionsSummary, BuildConnections(model));
-
-        column.AddView(Spaced(PaperUi.Label(Host, "Vault passphrase"), DesignTokens.Space.X6, DesignTokens.Space.X1));
-        column.AddView(BuildPassphrase(model.Passphrase), Spaced(DesignTokens.Space.X1));
-        column.AddView(PaperUi.Secondary(Host, model.Passphrase.Helper), Spaced(DesignTokens.Space.X1));
-        if (!VoiceGoogleAccount.IsSignedIn || GoogleSignInHealth.NeedsSignIn())
-        {
-            column.AddView(PaperUi.Secondary(Host, signInStatus ?? (VoiceGoogleAccount.IsSignedIn
-                ? "Google turned this phone's sign-in away, so the vault and the household file are waiting."
-                : "The vault needs a Google sign-in.")), Spaced(DesignTokens.Space.X3));
-            column.AddView(PaperUi.SecondaryButton(Host, GoogleSignInHealth.ButtonLabel("Sign in with Google"), () => _ = SignInAsync()), Spaced(DesignTokens.Space.X1));
-        }
-
-        // What the Body backup last did, in BodyBackupNote's words (orphan audit §41): inline, never a toast.
-        if (Constitution.Services.BodyBackups.LastNote is { } backupNote)
-        {
-            column.AddView(PaperUi.Secondary(Host, backupNote), Spaced(DesignTokens.Space.X3));
-        }
-
-        column.AddView(PaperUi.QuietButton(Host, exportStatus is null ? model.ExportLabel : "Export diagnostics again", ExportDiagnostics),
-            Spaced(DesignTokens.Space.X6));
-        if (exportStatus is not null)
-        {
-            column.AddView(PaperUi.Secondary(Host, exportStatus), Spaced(DesignTokens.Space.X1));
-        }
-
-        // The log loop's screen: the logs as they stand, and Send logs now (LOG-LOOP-PLAN.md §3).
-        column.AddView(PaperUi.QuietButton(Host, "Logs", () => LoopDiagnosticsActivity.Open(Host)), Spaced(DesignTokens.Space.X1));
+        });
+        accordion.Draw(column,
+        [
+            new SettingsSection(SettingsAnatomy.Connections, model.ConnectionsSummary, body => body.AddView(BuildConnections(model))),
+            new SettingsSection(SettingsAnatomy.Vault, null, body => FillVault(body, model)),
+            new SettingsSection(PillarsGroup, model.PillarsSummary, body => body.AddView(BuildPillars(model))),
+            new SettingsSection(EquipmentGroup, model.EquipmentSummary, body => body.AddView(BuildEquipment(model))),
+            new SettingsSection(HouseholdGroup, household.Summary, body => body.AddView(HouseholdGroupView.Build(Host, household, householdChoices, householdStore, householdNote ?? HouseholdStandingNote(householdFile.Standing), note =>
+            {
+                householdNote = note;
+                RaiseChanged();
+            }, OpenSheet))),
+            new SettingsSection(SettingsAnatomy.Diagnostics, null, body => FillDiagnostics(body, model)),
+        ]);
 
         column.AddView(PaperUi.BuildNumber(Host, "Constitution"));
 
@@ -267,7 +253,7 @@ public sealed class SettingsArea(Activity host)
             return true;
         });
         householdNote = PersonRemovalUndo.RemovedSentence(removed);
-        openGroup = HouseholdGroup;
+        accordion?.Open(HouseholdGroup);
         CloseSheet();
         handler.RemoveCallbacksAndMessages(null);
         handler.PostDelayed(() => StandRemoval(removed), (long)NoticeBoard.UndoWindow.TotalMilliseconds + 1);
@@ -310,16 +296,37 @@ public sealed class SettingsArea(Activity host)
 
     // ---- groups ----
 
-    private void AddGroup(LinearLayout column, string key, string title, string summary, View body)
+    private void FillVault(LinearLayout body, SettingsModel model)
     {
-        var group = new SettingsGroup(Host, title, summary, openGroup == key, () =>
+        body.AddView(Spaced(PaperUi.Label(Host, "Vault passphrase"), 0, DesignTokens.Space.X1));
+        body.AddView(BuildPassphrase(model.Passphrase), Spaced(DesignTokens.Space.X1));
+        body.AddView(PaperUi.Secondary(Host, model.Passphrase.Helper), Spaced(DesignTokens.Space.X1));
+        if (!VoiceGoogleAccount.IsSignedIn || GoogleSignInHealth.NeedsSignIn())
         {
-            CommitPassphrase();
-            openGroup = openGroup == key ? null : key;
-            entryOpenFor = null;
-            RaiseChanged();
-        }, body);
-        column.AddView(group, Spaced(DesignTokens.Space.X3));
+            body.AddView(PaperUi.Secondary(Host, signInStatus ?? (VoiceGoogleAccount.IsSignedIn
+                ? "Google turned this phone's sign-in away, so the vault and the household file are waiting."
+                : "The vault needs a Google sign-in.")), Spaced(DesignTokens.Space.X3));
+            body.AddView(PaperUi.SecondaryButton(Host, GoogleSignInHealth.ButtonLabel("Sign in with Google"), () => _ = SignInAsync()), Spaced(DesignTokens.Space.X1));
+        }
+
+        // What the Body backup last did, in BodyBackupNote's words (orphan audit §41): inline, never a toast.
+        if (Constitution.Services.BodyBackups.LastNote is { } backupNote)
+        {
+            body.AddView(PaperUi.Secondary(Host, backupNote), Spaced(DesignTokens.Space.X3));
+        }
+    }
+
+    private void FillDiagnostics(LinearLayout body, SettingsModel model)
+    {
+        body.AddView(PaperUi.QuietButton(Host, exportStatus is null ? model.ExportLabel : "Export diagnostics again", ExportDiagnostics),
+            Spaced(DesignTokens.Space.X1));
+        if (exportStatus is not null)
+        {
+            body.AddView(PaperUi.Secondary(Host, exportStatus), Spaced(DesignTokens.Space.X1));
+        }
+
+        // The log loop's screen: the logs as they stand, and Send logs now (LOG-LOOP-PLAN.md §3).
+        body.AddView(PaperUi.QuietButton(Host, "Logs", () => LoopDiagnosticsActivity.Open(Host)), Spaced(DesignTokens.Space.X1));
     }
 
     private View BuildPillars(SettingsModel model)

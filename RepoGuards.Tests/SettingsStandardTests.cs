@@ -51,6 +51,22 @@ public partial class SettingsStandardTests
         Assert.True(found.Count == 0, "Commit on change or blur (§5), not a Save button: " + string.Join(", ", found));
     }
 
+    /// <summary>
+    /// Owner's rulings (audit W8.4b): folding groups in every app, drawn as Pulp's ruled rows, in the suite's order.
+    /// A native screen draws its groups through the kit's accordion, which refuses any other order.
+    /// </summary>
+    [Fact]
+    public void EveryNativeSettingsScreenFoldsItsGroupsThroughTheKit()
+    {
+        var native = Screens.Where(screen => !screen.EndsWith(".xaml.cs", StringComparison.Ordinal)).ToList();
+        Assert.Equal(6, native.Count);
+        var missing = native
+            .Where(screen => !File.ReadAllText(Path.Combine(GuardScan.RepoRoot(), screen)).Contains(".Draw(", StringComparison.Ordinal)
+                || !File.ReadAllText(Path.Combine(GuardScan.RepoRoot(), screen)).Contains("new SettingsAccordion(", StringComparison.Ordinal))
+            .ToList();
+        Assert.True(missing.Count == 0, "Draw the groups through Codex.Ui.SettingsAccordion: " + string.Join(", ", missing));
+    }
+
     [Fact]
     public void AWorkingKeyDoesNotAppear()
     {

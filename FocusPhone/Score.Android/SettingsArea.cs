@@ -1,3 +1,4 @@
+using Storyworthtelling.Updates;
 using Codex.Domain.Diagnostics;
 using System.Globalization;
 using Android.Text;
@@ -44,67 +45,71 @@ public sealed class SettingsArea : ScoreArea
 
     public override BinderArea Tab => new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
 
+    private SettingsAccordion? accordion;
+
     public override View BuildView()
     {
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
-        Group(column, "Account");
-        column.AddView(AccountRow());
-        column.AddView(FolderRow());
-
-        Group(column, "Vault");
-        column.AddView(PaperUi.Secondary(Host,
-            "The one secret that isn't in the vault — set the same passphrase in every app and each " +
-            "restores its own keys. Shown in the clear on purpose, so it can be read back and copied."));
-        var passphrase = PaperUi.MonoField(Host, "Vault passphrase");
-        passphrase.Text = VaultPassphraseStore.Passphrase;
-        // Persisted as it is typed rather than on blur: there is no Save on this
-        // screen, and leaving by a binder tab never blurs a field.
-        passphrase.TextChanged += (_, _) =>
-            VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
-        column.AddView(passphrase);
-
-        Group(column, "Library");
-        column.AddView(LibraryRow());
-
-        Group(column, "Listening");
-        column.AddView(StackSizeRow());
-
-        Group(column, "TIDAL");
-        column.AddView(TidalRow());
-
-        Group(column, "Downloads");
-        column.AddView(PaperUi.SecondaryButton(Host, "Manage downloads",
-            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(DownloadsActivity)))));
+        // The suite's anatomy (audit W8.4b): Connections, Vault, Score's own, Diagnostics, then the build line.
+        var sections = new List<SettingsSection>
+        {
+            new(SettingsAnatomy.Connections, null, body =>
+            {
+                body.AddView(AccountRow());
+                body.AddView(TidalRow());
+            }),
+            new(SettingsAnatomy.Vault, null, body =>
+            {
+                body.AddView(PaperUi.Secondary(Host,
+                    "The one secret that isn't in the vault — set the same passphrase in every app and each " +
+                    "restores its own keys. Shown in the clear on purpose, so it can be read back and copied."));
+                var passphrase = PaperUi.MonoField(Host, "Vault passphrase");
+                passphrase.Text = VaultPassphraseStore.Passphrase;
+                // Persisted as it is typed rather than on blur: there is no Save on this
+                // screen, and leaving by a binder tab never blurs a field.
+                PaperUi.CommitsAsTyped(passphrase, text => VaultPassphraseStore.Passphrase = text);
+                body.AddView(passphrase);
+            }),
+            new("Library", null, body =>
+            {
+                body.AddView(FolderRow());
+                body.AddView(LibraryRow());
+            }),
+            new("Listening", null, body => body.AddView(StackSizeRow())),
+            new("Downloads", null, body => body.AddView(PaperUi.SecondaryButton(Host, "Manage downloads",
+                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(DownloadsActivity)))))),
+        };
 
         // Only where there is one. A phone with no equalizer had a Sound group whose
         // single button led to a screen that said so — a row spent telling you it is
         // useless, on the screen whose rule is that a working thing takes almost no space.
         if (AudioEffects.HasEqualizer)
         {
-            Group(column, "Sound");
-            column.AddView(PaperUi.SecondaryButton(Host, "Equalizer",
-                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(EqualizerActivity)))));
+            sections.Add(new("Sound", null, body => body.AddView(PaperUi.SecondaryButton(Host, "Equalizer",
+                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(EqualizerActivity)))))));
         }
 
-        Group(column, "Podcasts");
-        column.AddView(PaperUi.SecondaryButton(Host, "Manage subscriptions",
-            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(ManageSubscriptionsActivity)))));
-
-        Group(column, "Diagnostics");
-        column.AddView(PaperUi.Secondary(Host,
-            "There is no adb after the cutover, so failures are written here instead of to a log " +
-            "nobody can reach."));
-        column.AddView(PaperUi.SecondaryButton(Host, "Recent failures",
-            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(AudioDiagnosticsActivity)))));
-
-        // What the last update check did (orphan audit §19). Shown only once one has run: on the
-        // locked phone Flyleaf installs for the suite, and the line says so rather than staying silent.
-        if (UpdateLine() is { } updates)
+        sections.Add(new("Podcasts", null, body => body.AddView(PaperUi.SecondaryButton(Host, "Manage subscriptions",
+            () => Host.StartActivity(new Android.Content.Intent(Host, typeof(ManageSubscriptionsActivity)))))));
+        sections.Add(new(SettingsAnatomy.Diagnostics, null, body =>
         {
-            Group(column, "Updates");
-            column.AddView(PaperUi.Secondary(Host, updates));
-        }
+            body.AddView(PaperUi.Secondary(Host,
+                "There is no adb after the cutover, so failures are written here instead of to a log " +
+                "nobody can reach."));
+            body.AddView(PaperUi.SecondaryButton(Host, "Recent failures",
+                () => Host.StartActivity(new Android.Content.Intent(Host, typeof(AudioDiagnosticsActivity)))));
+
+            // What the last update check did (orphan audit §19). Shown only once one has run: on the
+            // locked phone Flyleaf installs for the suite, and the line says so rather than staying silent.
+            if (UpdateLine() is { } updates)
+            {
+                body.AddView(PaperUi.Secondary(Host, updates));
+            }
+        }));
+
+        accordion ??= new SettingsAccordion(Host, Invalidate);
+        accordion.Draw(column, sections);
 
         column.AddView(PaperUi.BuildNumber(Host, "Score"), BuildLineParams());
 
@@ -267,13 +272,5 @@ public sealed class SettingsArea : ScoreArea
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
         lp.TopMargin = PaperTheme.Dp(Host, DesignTokens.Space.X8);
         return lp;
-    }
-
-    private void Group(LinearLayout column, string name)
-    {
-        var heading = PaperUi.Label(Host, name.ToUpperInvariant());
-        heading.SetTextColor(PaperTheme.InkMuted);
-        heading.SetPadding(0, PaperTheme.Dp(Host, DesignTokens.Space.X6), 0, PaperTheme.Dp(Host, DesignTokens.Space.X1));
-        column.AddView(heading);
     }
 }

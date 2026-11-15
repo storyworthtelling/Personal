@@ -1,3 +1,4 @@
+using Storyworthtelling.Updates;
 using Storyworthtelling.Google.Android;
 using Android.Views;
 using Android.Widget;
@@ -30,33 +31,40 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
     public override BinderArea Tab =>
         new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
 
+    private SettingsAccordion? accordion;
+
     public override View BuildView()
     {
         var scroll = new ScrollView(Host);
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         var gap = PaperTheme.Dp(Host, DesignTokens.Space.X3);
+        // The suite's anatomy (audit W8.4b): Connections, Vault, Diagnostics, then the build line. Plate has no
+        // group of its own: it keeps nothing.
+        var connections = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        var vault = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        var diagnostics = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
         // The vault passphrase, in the clear on purpose.
-        column.AddView(Label("Vault passphrase", gap));
+        vault.AddView(Label("Vault passphrase", 0));
         passphrase = PaperUi.MonoField(Host, "the same words in every app");
         passphrase.Text = VaultPassphraseStore.Passphrase;
         // There is no Save (§5): stored as it is typed.
         PaperUi.CommitsAsTyped(passphrase, text => VaultPassphraseStore.Passphrase = text);
-        column.AddView(passphrase);
-        column.AddView(PaperUi.Secondary(Host,
+        vault.AddView(passphrase);
+        vault.AddView(PaperUi.Secondary(Host,
             "Shown in the clear on purpose: it is the one secret the vault cannot hold, so it "
             + "has to be read back and set identically in every app."));
 
         // The Google account, which is here for the vault and nothing else.
-        column.AddView(Label("Google account", gap));
-        column.AddView(PaperUi.Body(Host, VoiceGoogleAccount.IsSignedIn
+        connections.AddView(Label("Google account", 0));
+        connections.AddView(PaperUi.Body(Host, VoiceGoogleAccount.IsSignedIn
             ? GoogleSignInHealth.NeedsSignIn()
                 ? $"{VoiceGoogleAccount.Email} — Google turned the sign-in away"
                 : VoiceGoogleAccount.Email
             : "Not signed in."));
-        column.AddView(PaperUi.SecondaryButton(Host,
+        connections.AddView(PaperUi.SecondaryButton(Host,
             VoiceGoogleAccount.IsSignedIn ? GoogleSignInHealth.ButtonLabel("Use another account") : "Sign in", SignIn));
-        column.AddView(PaperUi.Secondary(Host,
+        connections.AddView(PaperUi.Secondary(Host,
             "Only to read the shared vault. Plate keeps no account of its own, and nothing it "
             + "captures goes to Drive by this route."));
         if (!VoiceGoogleAccount.IsSignedIn)
@@ -65,7 +73,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
             // SHA-1) in the same Google Cloud project the other apps already use. Without this,
             // "Cannot sign in" had no next step — Score and Storyboarder both surface it; Plate
             // never did.
-            column.AddView(PaperUi.Secondary(Host,
+            connections.AddView(PaperUi.Secondary(Host,
                 "If sign-in fails, register this app as an Android OAuth client (Drive API "
                 + $"enabled):\n\nPackage: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
         }
@@ -79,27 +87,34 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
             "Not paired.");
         if (pairing.NeedsPairing)
         {
-            column.AddView(Label("reMarkable", gap));
+            connections.AddView(Label("reMarkable", gap));
             if (PlateRemarkable.IsPaired)
             {
-                column.AddView(PaperUi.Body(Host, pairing.Line));
+                connections.AddView(PaperUi.Body(Host, pairing.Line));
             }
-            column.AddView(PaperUi.Secondary(Host,
+            connections.AddView(PaperUi.Secondary(Host,
                 "Open my.remarkable.com, choose to connect a device, and type the one-time code."));
             pairingCode = PaperUi.MonoField(Host, "one-time code");
-            column.AddView(pairingCode);
-            KeyConsoleLink.AddTo(column, Storyworthtelling.Voice.Health.SharedCredentialIds.Remarkable);
-            column.AddView(PaperUi.SecondaryButton(Host, pairing.Button, Pair));
+            connections.AddView(pairingCode);
+            KeyConsoleLink.AddTo(connections, Storyworthtelling.Voice.Health.SharedCredentialIds.Remarkable);
+            connections.AddView(PaperUi.SecondaryButton(Host, pairing.Button, Pair));
         }
 
         status = PaperUi.Secondary(Host, "");
         status.Visibility = ViewStates.Gone;
         status.SetPadding(0, gap, 0, gap);
-        column.AddView(status);
+        connections.AddView(status);
 
         // Diagnostics: the failure log, the weekly upload and Send logs now (LOG-LOOP-PLAN.md §3).
-        column.AddView(Label("Diagnostics", gap));
-        column.AddView(PaperUi.SecondaryButton(Host, "Open diagnostics", () => LoopDiagnosticsActivity.Open(Host)));
+        diagnostics.AddView(PaperUi.SecondaryButton(Host, "Open diagnostics", () => LoopDiagnosticsActivity.Open(Host)));
+
+        accordion ??= new SettingsAccordion(Host, Invalidate);
+        accordion.Draw(column,
+        [
+            new SettingsSection(SettingsAnatomy.Connections, null, body => body.AddView(connections)),
+            new SettingsSection(SettingsAnatomy.Vault, null, body => body.AddView(vault)),
+            new SettingsSection(SettingsAnatomy.Diagnostics, null, body => body.AddView(diagnostics)),
+        ]);
 
         var note = PaperUi.Secondary(Host,
             "Plate keeps nothing else. Photos go to your camera roll, scans to Documents.");

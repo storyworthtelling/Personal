@@ -10,6 +10,7 @@ using Codex.Ui;
 using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
+using Storyworthtelling.Updates;
 
 namespace Post;
 
@@ -42,15 +43,24 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         }
     }
 
+    private SettingsAccordion? accordion;
+
+    private LinearLayout Column() => new(Host) { Orientation = Orientation.Vertical };
+
     public override View BuildView()
     {
         var scroll = new ScrollView(Host);
         var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        // The suite's anatomy (audit W8.4b): Connections, Vault, Post's own, Diagnostics, then the build line.
+        var connections = Column();
+        var vault = Column();
+        var messages = Column();
+        var diagnosticsBody = Column();
 
         address = PaperUi.Field(Host, string.Empty);
         address.Text = account.GmailAddress;
         PaperUi.CommitsAsTyped(address, text => { account.GmailAddress = text; changed = true; }, Settle);
-        AddFieldGroup(layout, "Gmail address", address, null);
+        AddFieldGroup(connections, "Gmail address", address, null);
 
         password = PaperUi.MonoField(Host, string.Empty);
         password.Text = account.GmailAppPassword;
@@ -69,7 +79,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         // The field object is always created, and stores itself as it is typed, even while it is hidden.
         const string passwordHelper = "Make one in your Google Account, then paste it here.";
         var passwordContainer = new LinearLayout(Host) { Orientation = Orientation.Vertical };
-        layout.AddView(passwordContainer, Spaced(0, 0));
+        connections.AddView(passwordContainer, Spaced(0, 0));
         void ShowPasswordField(string helper)
         {
             passwordContainer.RemoveAllViews();
@@ -88,26 +98,26 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
 
         var enableMessages = PaperUi.SecondaryButton(Host, "Enable message sync (notification access)", () =>
             Host.StartActivity(new Intent(Android.Provider.Settings.ActionNotificationListenerSettings)));
-        layout.AddView(enableMessages, Spaced(DesignTokens.Space.X4, 0));
+        messages.AddView(enableMessages, Spaced(0, 0));
 
         var note = PaperUi.Secondary(Host,
             "Message sync reads incoming texts from Google Messages notifications and " +
             "voicemails (with transcription) from Google Phone notifications. Call and text " +
             "history require the call-log and SMS permissions, which take effect after the " +
             "device is locked down (or a whitelisted install).");
-        layout.AddView(note, Spaced(DesignTokens.Space.X6, 0));
+        messages.AddView(note, Spaced(DesignTokens.Space.X4, 0));
 
         // On a locked-down phone there is no logcat, so surface captured crashes and
         // background failures here where the owner can review and share them.
         var diagnostics = PaperUi.QuietButton(Host, "Diagnostics", () =>
             Host.StartActivity(new Intent(Host, typeof(DiagnosticsActivity))));
-        layout.AddView(diagnostics, Spaced(DesignTokens.Space.X4, 0));
+        diagnosticsBody.AddView(diagnostics, Spaced(0, 0));
 
         // Which path mail is actually taking. Worth stating plainly, because the two behave
         // differently in a way the owner will notice: only the API can really trash a
         // message or have Gmail run the search.
         var route = MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured);
-        layout.AddView(PaperUi.Secondary(Host, route switch
+        connections.AddView(PaperUi.Secondary(Host, route switch
         {
             MailTransport.GmailApi => "Mail is going through the Gmail API. Deleting really trashes, and search runs on Gmail.",
             MailTransport.AppPassword => "Mail is going through IMAP on the app password. Sign in with Google below to move to the Gmail API.",
@@ -124,16 +134,16 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
                     : $"Signed in as {VoiceGoogleAccount.Email}."
             : "Sign in with Google to move mail to the Gmail API and back up your credentials to your encrypted vault.");
         var voiceSignIn = PaperUi.SecondaryButton(Host, gmailRefused ? GoogleSignInHealth.SignInAgain : GoogleSignInHealth.ButtonLabel("Sign in with Google"), () => _ = SignInAsync(voiceStatus));
-        layout.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));
-        layout.AddView(voiceStatus, Spaced(DesignTokens.Space.X2, 0));
+        connections.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));
+        connections.AddView(voiceStatus, Spaced(DesignTokens.Space.X2, 0));
 
         // Texts: Post works through Google Messages over the Messages-for-Web bridge, so the
         // one setup step is pairing it. The line says where texting stands; the button pairs
         // (or pairs again after Messages unpaired it).
         var bridge = GmBridgeClient.Shared(Host);
-        layout.AddView(PaperUi.Secondary(Host, TextsSetting.Describe(bridge.IsPaired, bridge.IsConnected)),
+        connections.AddView(PaperUi.Secondary(Host, TextsSetting.Describe(bridge.IsPaired, bridge.IsConnected)),
             Spaced(DesignTokens.Space.X6, 0));
-        layout.AddView(PaperUi.SecondaryButton(Host,
+        connections.AddView(PaperUi.SecondaryButton(Host,
             bridge.IsPaired ? "Pair with Google Messages again" : "Connect to Google Messages",
             () => Host.StartActivity(new Intent(Host, typeof(MessagesPairingActivity)))),
             Spaced(DesignTokens.Space.X2, 0));
@@ -144,9 +154,18 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         passphrase = PaperUi.MonoField(Host, "Choose a passphrase");
         passphrase.Text = VaultPassphraseStore.Passphrase;
         PaperUi.CommitsAsTyped(passphrase, text => { VaultPassphraseStore.Passphrase = text; changed = true; }, Settle);
-        AddFieldGroup(layout, "Secrets vault passphrase", passphrase,
+        AddFieldGroup(vault, "Secrets vault passphrase", passphrase,
             "Backs up your Gmail credentials to your Google Drive, encrypted. Restores after a reset. " +
             "Shown in the clear so you can copy it into your other apps.");
+
+        accordion ??= new SettingsAccordion(Host, Invalidate);
+        accordion.Draw(layout,
+        [
+            new SettingsSection(SettingsAnatomy.Connections, null, body => body.AddView(connections)),
+            new SettingsSection(SettingsAnatomy.Vault, null, body => body.AddView(vault)),
+            new SettingsSection("Messages", null, body => body.AddView(messages)),
+            new SettingsSection(SettingsAnatomy.Diagnostics, null, body => body.AddView(diagnosticsBody)),
+        ]);
 
         // The quiet foot line: which build is actually on the phone. The channel installs
         // silently and most updates change nothing visible, so without it "did that land?"

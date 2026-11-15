@@ -8,7 +8,8 @@ public class SettingsGroupsTests
     /// <summary>D162 less TV, which waits for its own phase (D187); no Sports group (teams live on the Sports tab).</summary>
     [Fact]
     public void TheGroupsAreInTheDrawnOrder() =>
-        Assert.Equal(["Services", "Household", "Discover", "Vault", "About", "Diagnostics"], SettingsGroups.Order);
+        // The suite's anatomy (audit W8.4b): the Vault first, Pulp's own groups, Diagnostics last.
+        Assert.Equal(["Vault", "Services", "Household", "Discover", "About", "Diagnostics"], SettingsGroups.Order);
 
     [Fact]
     public void TheHouseholdLineNamesEveryone() =>

@@ -40,7 +40,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
     public const string ReadingStatus = "Reading the household…";
     public const string UnreadableStatus = "The household couldn't be read just now.";
 
-    private readonly HashSet<string> open = [SettingsGroups.Services];
+    private SettingsAccordion? accordion;
     private CancellationTokenSource? loading;
     private Snapshot? snapshot;
     private bool unreadable;
@@ -51,21 +51,24 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
     {
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         var services = PulpServices.For(Host);
+        accordion ??= new SettingsAccordion(Host, Invalidate, SettingsGroups.Services);
 
+        // The suite's order (audit W8.4b): the Vault, Pulp's own groups, Diagnostics, then the build line.
+        var sections = new List<SettingsSection> { VaultGroup() };
         if (snapshot is { } read)
         {
-            column.AddView(ServicesGroup(services, read.Household));
-            column.AddView(HouseholdGroup(read.Household));
+            sections.Add(ServicesGroup(services, read.Household));
+            sections.Add(HouseholdGroup(read.Household));
         }
         else
         {
             column.AddView(PaperUi.Secondary(Host, unreadable ? UnreadableStatus : ReadingStatus));
         }
 
-        column.AddView(DiscoverGroup());
-        column.AddView(VaultGroup());
-        column.AddView(AboutGroup());
-        column.AddView(DiagnosticsGroup(services));
+        sections.Add(DiscoverGroup());
+        sections.Add(AboutGroup());
+        sections.Add(DiagnosticsGroup(services));
+        accordion.Draw(column, sections);
 
         // The quiet foot line: which build is actually on the phone. The channel installs
         // silently and most updates change nothing visible, so without it "did that land?" has
@@ -90,7 +93,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
 
     // ---- Services (D1, D86, D248, D249) ----
 
-    private View ServicesGroup(PulpServices services, HouseholdView household)
+    private SettingsSection ServicesGroup(PulpServices services, HouseholdView household)
     {
         var had = household.Services.Distinct().ToList();
         return Group(SettingsGroups.Services, ServiceRowText.Count(had.Count), body =>
@@ -138,7 +141,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
 
     // ---- Household (D88, D166, D272) ----
 
-    private View HouseholdGroup(HouseholdView household)
+    private SettingsSection HouseholdGroup(HouseholdView household)
     {
         var people = household.Roster?.Viewers ?? [];
         var names = people.Select(viewer => household.NameOf(viewer.Id)).ToList();
@@ -163,7 +166,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
 
     // ---- Discover (D106) ----
 
-    private View DiscoverGroup()
+    private SettingsSection DiscoverGroup()
     {
         var store = new StackSizeStore(Host);
         var sizes = store.Load();
@@ -205,7 +208,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
 
     // ---- Vault (credential health) ----
 
-    private View VaultGroup()
+    private SettingsSection VaultGroup()
     {
         var meta = snapshot is { } read ? SettingsGroups.VaultMeta(read.KeysNeedingEntry) : null;
         return Group(SettingsGroups.Vault, meta, body =>
@@ -218,7 +221,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
 
     // ---- About (D140) ----
 
-    private View AboutGroup() =>
+    private SettingsSection AboutGroup() =>
         Group(SettingsGroups.About, SettingsGroups.AboutMeta(VersionName()), body =>
         {
             foreach (var credit in SettingsGroups.Credits)
@@ -239,7 +242,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
 
     // ---- Diagnostics (D125) ----
 
-    private View DiagnosticsGroup(PulpServices services) =>
+    private SettingsSection DiagnosticsGroup(PulpServices services) =>
         Group(SettingsGroups.Diagnostics, SettingsGroups.DiagnosticsMeta, body =>
         {
             body.AddView(PaperUi.Secondary(Host, "What went wrong quietly on this phone — never what anyone watched."));
@@ -249,16 +252,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
 
     // ---- reading ----
 
-    private View Group(string title, string? meta, Action<LinearLayout> fill) =>
-        SettingsViews.Group(Host, title, meta, open.Contains(title), () =>
-        {
-            if (!open.Remove(title))
-            {
-                open.Add(title);
-            }
-
-            Invalidate();
-        }, fill);
+    private static SettingsSection Group(string title, string? meta, Action<LinearLayout> fill) => new(title, meta, fill);
 
     private string? VersionName()
     {

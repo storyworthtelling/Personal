@@ -1,3 +1,4 @@
+using Storyworthtelling.Updates;
 using Codex.Domain.Diagnostics;
 using Android.App;
 using Android.App.Admin;
@@ -137,13 +138,20 @@ public class LauncherSettingsActivity : Activity
         // Settings takes the neutral resolved mark (like Post/Score), not Flyleaf's amber.
         content.AddView(PaperUi.ScreenHeader(this, "Settings", PaperTheme.ResolvedMark), MatchWrap());
 
-        RenderConnectivity();
-        RenderApps();
-        RenderShelves();
-        RenderUpdates();
-        RenderPower();
-        RenderVault();
-        RenderAdvanced();
+        // The suite's anatomy (audit W8.4b): the Vault, Flyleaf's own groups, Diagnostics, then the build line.
+        // Flyleaf has no account to connect; the update token lives with the admin controls.
+        accordion ??= new SettingsAccordion(this, Render);
+        accordion.Draw(content,
+        [
+            Section(SettingsAnatomy.Vault, RenderVault),
+            Section("Connectivity", RenderConnectivity),
+            Section("Apps", RenderApps),
+            Section("Shelves", RenderShelves),
+            Section("Updates", RenderUpdates),
+            Section("Power", RenderPower),
+            Section("Advanced", RenderAdvanced),
+            Section(SettingsAnatomy.Diagnostics, RenderDiagnostics),
+        ]);
 
         if (undoPackage is not null)
         {
@@ -183,7 +191,7 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderConnectivity()
     {
-        var card = StartGroup("Connectivity");
+        var card = StartGroup();
 
         var wifi = (WifiManager?)GetSystemService(WifiService);
         AddToggleRow(card, "Wi-Fi", null, wifi?.IsWifiEnabled ?? false, on =>
@@ -316,7 +324,7 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderApps()
     {
-        var card = StartGroup("Apps");
+        var card = StartGroup();
         AddNavRow(card, "Force-close an app", "Stop one that's misbehaving", ShowForceClosePicker);
     }
 
@@ -414,7 +422,7 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderUpdates()
     {
-        var card = StartGroup("Updates");
+        var card = StartGroup();
         // The row itself changes label and stops accepting taps while a check is running — the caption
         // below updates too, but that alone read as "nothing happening" since it's easy to miss below
         // an unchanged-looking button.
@@ -478,7 +486,7 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderPower()
     {
-        var card = StartGroup("Power");
+        var card = StartGroup();
 
         if (restart!.IsRunning)
         {
@@ -508,7 +516,7 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderVault()
     {
-        var card = StartGroup("Secrets vault");
+        var card = StartGroup();
 
         var block = new LinearLayout(this) { Orientation = Orientation.Vertical };
         block.SetPadding(Dp(DesignTokens.Space.X4), Dp(DesignTokens.Space.X3),
@@ -542,18 +550,43 @@ public class LauncherSettingsActivity : Activity
 
     private void RenderAdvanced()
     {
-        var card = StartGroup("Advanced");
+        var card = StartGroup();
         AddNavRow(card, "Admin (device-owner controls)…", null,
             () => StartActivity(new Intent(this, typeof(UnlockActivity))));
+    }
+
+    private void RenderDiagnostics()
+    {
+        var card = StartGroup();
         // The log loop's screen: what went wrong since the logs last went to Drive, and Send logs now.
         AddNavRow(card, "Diagnostics", null, () => LoopDiagnosticsActivity.Open(this));
     }
+
+    private SettingsAccordion? accordion;
+
+    // The group each Render* method is filling while the accordion draws it.
+    private LinearLayout? groupBody;
+
+    private LinearLayout GroupBody => groupBody ?? content!;
+
+    private SettingsSection Section(string title, Action render) => new(title, null, body =>
+    {
+        groupBody = body;
+        try
+        {
+            render();
+        }
+        finally
+        {
+            groupBody = null;
+        }
+    });
 
     // ---- Shelves (#11): create / rename / reorder / remove the tray categories -
 
     private void RenderShelves()
     {
-        var card = StartGroup("Shelves");
+        var card = StartGroup();
 
         var catalog = new CategoryStore(this).Load();
         var ids = catalog.Categories.Select(c => c.Id).ToList();
@@ -577,7 +610,7 @@ public class LauncherSettingsActivity : Activity
             var signIn = PaperUi.SecondaryButton(this, GoogleSignInHealth.ButtonLabel("Sign in with Google (for AI shelf glyphs)"), SignInWithGoogle);
             var lp = MatchWrap();
             lp.TopMargin = Dp(DesignTokens.Space.X2);
-            content!.AddView(signIn, lp);
+            GroupBody.AddView(signIn, lp);
         }
     }
 
@@ -743,20 +776,12 @@ public class LauncherSettingsActivity : Activity
 
     // Opens a group: a Serif group label, then an empty hairline-ruled card (paper-bright over the
     // paper grain) that the Render* methods fill with rows.
-    private LinearLayout StartGroup(string label)
+    // The rows of one group, flat under the accordion's heading (Pulp's ruled rows, audit W8.4b): no card
+    // around them, hairlines between them. The label is the accordion's, so it is not drawn twice.
+    private LinearLayout StartGroup()
     {
-        var labelView = PaperUi.Secondary(this, label);
-        labelView.TextSize = DesignTokens.TypeSp.Body;
-        labelView.Typeface = PaperTheme.SerifSemibold(this);
-        labelView.SetTextColor(PaperTheme.Ink);
-        var labelParams = MatchWrap();
-        labelParams.TopMargin = Dp(DesignTokens.Space.X6);
-        labelParams.BottomMargin = Dp(DesignTokens.Space.X2);
-        content!.AddView(labelView, labelParams);
-
         var card = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        card.Background = PaperUi.Outline(this, PaperTheme.PaperBright, PaperTheme.Hairline, DesignTokens.Shape.RadiusCard);
-        content.AddView(card, MatchWrap());
+        GroupBody.AddView(card, MatchWrap());
         return card;
     }
 
@@ -832,7 +857,7 @@ public class LauncherSettingsActivity : Activity
         }
         var lp = MatchWrap();
         lp.TopMargin = Dp(DesignTokens.Space.X2);
-        content!.AddView(view, lp);
+        GroupBody.AddView(view, lp);
     }
 
     private void ScheduleRefresh()
