@@ -108,7 +108,8 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         // Diagnostics: the failure log, the weekly upload and Send logs now (LOG-LOOP-PLAN.md §3).
         diagnostics.AddView(PaperUi.SecondaryButton(Host, "Open diagnostics", () => LoopDiagnosticsActivity.Open(Host)));
 
-        accordion ??= new SettingsAccordion(Host, Invalidate);
+        // Connections starts open: sign-in and pairing outcomes are said there, under the button that caused them.
+        accordion ??= new SettingsAccordion(Host, Invalidate, SettingsAnatomy.Connections);
         accordion.Draw(column,
         [
             new SettingsSection(SettingsAnatomy.Connections, null, body => body.AddView(connections)),
