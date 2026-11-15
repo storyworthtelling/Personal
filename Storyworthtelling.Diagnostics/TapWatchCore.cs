@@ -168,6 +168,13 @@ public sealed class TapWatchCore
     public void Touched(string control, TapPoint point, bool enabled, bool isControl) =>
         Feed(j => j.Tap(clock(), screen, control, point, enabled, isControl));
 
+    /// <summary>
+    /// A tap on something whose response the hooks cannot see (web content): never judged dead, still counted for
+    /// repeats.
+    /// </summary>
+    public void TouchedUnseen(string control, TapPoint point, bool enabled) =>
+        Feed(j => j.Tap(clock(), screen, control, point, enabled, isControl: true, resultVisible: false));
+
     public void ContentChanged() => Feed(j => j.ContentChanged(clock(), screen));
 
     public void StatusChanged() => Feed(j => j.StatusChanged(clock(), screen));

@@ -111,7 +111,14 @@ public sealed class TapJudge
     /// <summary>Whether anything is waiting to mature — the hook keeps ticking while this is true.</summary>
     public bool HasPending => pendingDead.Count > 0 || bursts.Count > 0 || actions.Count > 0;
 
-    public IReadOnlyList<TapVerdict> Tap(long atMs, string screen, string control, TapPoint point, bool enabled, bool isControl)
+    public IReadOnlyList<TapVerdict> Tap(long atMs, string screen, string control, TapPoint point, bool enabled, bool isControl) =>
+        Tap(atMs, screen, control, point, enabled, isControl, resultVisible: true);
+
+    /// <summary>
+    /// As above; with <paramref name="resultVisible"/> false the tap landed where the hooks cannot see a change
+    /// (inside a web page), so it is never judged dead, though it still counts toward a repeated burst.
+    /// </summary>
+    public IReadOnlyList<TapVerdict> Tap(long atMs, string screen, string control, TapPoint point, bool enabled, bool isControl, bool resultVisible)
     {
         var verdicts = Settle(atMs);
         lastScreen = screen;
@@ -132,7 +139,7 @@ public sealed class TapJudge
         burst.Add(atMs, enabled, isControl);
 
         var actionRunning = actions.Values.Any(a => a.DeadlineMs > atMs);
-        if (enabled && isControl && !actionRunning && (firstOfBurst || !burst.HasDeadCandidate))
+        if (resultVisible && enabled && isControl && !actionRunning && (firstOfBurst || !burst.HasDeadCandidate))
         {
             pendingDead.Add(new PendingDead(atMs, screen, control, burst, atMs));
             burst.HasDeadCandidate = true;

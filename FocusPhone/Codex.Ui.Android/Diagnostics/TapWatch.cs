@@ -161,8 +161,32 @@ public static class TapWatch
         }
         var target = control ?? hit;
         var name = Name(target, activity) + (longPress ? " (long press)" : string.Empty);
-        watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null);
+        if (InWebView(hit))
+        {
+            // A web page's response is not in the layout the watch fingerprints, so it cannot judge this tap dead.
+            watch.TouchedUnseen(name, new TapPoint(x, y), target.Enabled);
+        }
+        else
+        {
+            watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null);
+        }
         Schedule();
+    }
+
+    private static bool InWebView(View view)
+    {
+        if (view is Android.Webkit.WebView)
+        {
+            return true;
+        }
+        for (var at = view.Parent; at is not null; at = at.Parent)
+        {
+            if (at is Android.Webkit.WebView)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     // x and y are in window coordinates; a view that draws its own controls is asked in its own.
