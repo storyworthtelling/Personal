@@ -123,14 +123,14 @@ public interface IClaudeAnalysisClient
     ///
     /// <para>A section is allowed to come back silent; a reader is not.</para>
     /// </summary>
-    Task<SectionRead> ReadSection(Persona persona, string manuscript, CancellationToken cancellationToken);
+    Task<SectionRead> ReadSection(Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken);
 
     /// <summary>
     /// One reader's whole-book pass, in character. The reply must carry a verdict, a review, pros,
     /// cons and a condition — a short read is a failed pass, not a shorter one (F44, F46), so this
     /// throws rather than returning a thinner review and letting the page print it.
     /// </summary>
-    Task<Review> ReadAsReader(Persona persona, string manuscript, CancellationToken cancellationToken);
+    Task<Review> ReadAsReader(Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken);
 
     /// <summary>
     /// The two synthesis passes, which read the other fourteen rather than the manuscript: the revision

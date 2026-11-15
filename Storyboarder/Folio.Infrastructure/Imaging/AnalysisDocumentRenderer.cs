@@ -4,6 +4,8 @@ using Folio.Domain.Markup;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
 using Folio.Domain.Reading;
+using ManuscriptLength = Folio.Domain.Text.ManuscriptLength;
+using StoryLength = Folio.Domain.Text.StoryLength;
 using Folio.Domain.Report;
 using Storyworthtelling.Paper;
 
@@ -188,7 +190,12 @@ public sealed class AnalysisDocumentRenderer
 
         RenderMarkedManuscript(writer, text, marked.Marks, scenes, bodyItalic, h2);
 
-        RenderReviews(writer, analysis.Reviews, body, bodyBold, bodyItalic, h2, h3, readerFolios);
+        // The question each reader was asked depends on the manuscript's length (the Agent reads a short
+        // story for a different thing), so the page names the one actually asked.
+        // A report with no count at all keeps the questions as the catalogue words them.
+        var wordCount = analysis.WordCount > 0 ? analysis.WordCount : cover.WordCount;
+        var length = wordCount > 0 ? ManuscriptLength.Classify(wordCount) : StoryLength.Novel;
+        RenderReviews(writer, analysis.Reviews, length, body, bodyBold, bodyItalic, h2, h3, readerFolios);
 
         // What to do next: the revision plan, grouped by impact tier.
         RenderRevisionPlan(writer, analysis.RevisionPlan, body, h2, h3);
@@ -429,17 +436,17 @@ public sealed class AnalysisDocumentRenderer
     /// from where, their verdict in a clause, and the page to turn to.</para>
     /// </summary>
     private static void RenderReviews(
-        PageWriter writer, IReadOnlyList<Review> reviews, SKFont body, SKFont bodyBold, SKFont bodyItalic,
-        SKFont h2, SKFont h3, IReadOnlyList<int>? readerFolios)
+        PageWriter writer, IReadOnlyList<Review> reviews, StoryLength length, SKFont body, SKFont bodyBold,
+        SKFont bodyItalic, SKFont h2, SKFont h3, IReadOnlyList<int>? readerFolios)
     {
         if (reviews is not { Count: > 0 })
             return;
 
-        RenderReadersContents(writer, reviews, body, readerFolios);
+        RenderReadersContents(writer, reviews, length, body, readerFolios);
 
         for (var i = 0; i < reviews.Count; i++)
         {
-            RenderReader(writer, reviews[i], i + 1, reviews.Count, body, h3);
+            RenderReader(writer, reviews[i], i + 1, reviews.Count, length, body, h3);
         }
     }
 
@@ -452,7 +459,7 @@ public sealed class AnalysisDocumentRenderer
     /// kind of summary that teaches an author to stop believing the document.</para>
     /// </summary>
     private static void RenderReadersContents(
-        PageWriter writer, IReadOnlyList<Review> reviews, SKFont body, IReadOnlyList<int>? readerFolios)
+        PageWriter writer, IReadOnlyList<Review> reviews, StoryLength length, SKFont body, IReadOnlyList<int>? readerFolios)
     {
         writer.NewPage();
         writer.BeginSection(FolioSheet.Readers);
@@ -471,7 +478,7 @@ public sealed class AnalysisDocumentRenderer
         {
             var review = reviews[i];
             writer.ContentsRow(
-                i + 1, PersonaName(review.PersonaId), Lens(review.PersonaId), review.Verdict,
+                i + 1, PersonaName(review.PersonaId), Lens(review.PersonaId, length), review.Verdict,
                 readerFolios is { } measured && i < measured.Count ? measured[i] : firstReaderFolio + i);
             if (i < reviews.Count - 1)
                 writer.Hairline();
@@ -494,11 +501,11 @@ public sealed class AnalysisDocumentRenderer
     /// would learn to skip it.</para>
     /// </summary>
     private static void RenderReader(
-        PageWriter writer, Review review, int index, int of, SKFont body, SKFont h3)
+        PageWriter writer, Review review, int index, int of, StoryLength length, SKFont body, SKFont h3)
     {
         writer.NewPage();
         writer.BeginReader();
-        writer.PageLabel($"Reader {index} of {Spell(of)}", Lens(review.PersonaId));
+        writer.PageLabel($"Reader {index} of {Spell(of)}", Lens(review.PersonaId, length));
 
         writer.Heading(PersonaName(review.PersonaId), h3, Ink);
         foreach (var paragraph in Paragraphs(review.Assessment))
@@ -525,8 +532,8 @@ public sealed class AnalysisDocumentRenderer
     /// it". It is the other half of the page's own label, and it is what makes six reads read as
     /// six questions rather than six opinions.
     /// </summary>
-    private static string Lens(string personaId) =>
-        PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId)?.Question ?? string.Empty;
+    private static string Lens(string personaId, StoryLength length) =>
+        PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId)?.QuestionFor(length) ?? string.Empty;
 
     /// <summary>
     /// A long review as the paragraphs the model wrote it in. Blank lines are the break; a read that

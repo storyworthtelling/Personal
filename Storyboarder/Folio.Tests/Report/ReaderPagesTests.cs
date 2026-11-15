@@ -158,6 +158,23 @@ public class ReaderPagesTests
         }
     }
 
+    /// <summary>
+    /// A short story's Agent page names the question it was actually asked, not "Could I sell it",
+    /// which it was told not to answer.
+    /// </summary>
+    [Fact]
+    public void AShortStorysAgentPageNamesTheQuestionItWasAsked()
+    {
+        var agent = PersonaCatalogue.ById("agent");
+        var pdf = new AnalysisDocumentRenderer().Render(
+            SampleAnalysis.Of() with { Reviews = Reads(), WordCount = 1_209 },
+            Cover with { WordCount = 1_209 }, Array.Empty<SceneEvidence>());
+        var page = PagesOf(pdf).First(page => page.Contains("Reader 2 of", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Contains(agent.ShortStoryQuestion!, page, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(agent.Question, page, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static byte[] Render(IReadOnlyList<Review> reviews) =>
         new AnalysisDocumentRenderer().Render(
             SampleAnalysis.Of() with { Reviews = reviews }, Cover, Array.Empty<SceneEvidence>());

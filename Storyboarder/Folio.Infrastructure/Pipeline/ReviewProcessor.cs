@@ -1051,10 +1051,12 @@ public sealed class ReviewProcessor : IPipelineStep
                         JsonResponse.CaseInsensitive)
                     : due.Persona!.Kind == PersonaKind.Reader
                         ? JsonSerializer.Serialize(
-                            await claude.ReadAsReader(due.Persona, await Manuscript(db, novel.Id, cancellationToken), cancellationToken),
+                            await claude.ReadAsReader(due.Persona, await Manuscript(db, novel.Id, cancellationToken),
+                                Genre(analysis), cancellationToken),
                             JsonResponse.CaseInsensitive)
                         : JsonSerializer.Serialize(
-                            await claude.ReadSection(due.Persona, await Manuscript(db, novel.Id, cancellationToken), cancellationToken),
+                            await claude.ReadSection(due.Persona, await Manuscript(db, novel.Id, cancellationToken),
+                                Genre(analysis), cancellationToken),
                             JsonResponse.CaseInsensitive);
 
                 row.CompletedAtUtc = clock.UtcNow;
@@ -2008,6 +2010,19 @@ public sealed class ReviewProcessor : IPipelineStep
             .ToListAsync(cancellationToken);
 
         return ReadingPlan.Passes.FirstOrDefault(pass => !done.Contains(pass.Id));
+    }
+
+    /// <summary>
+    /// The genre the consolidation read from the text, and its market's usual length, for the
+    /// whole-book passes. A label and a range, not anyone's notes, so the readers stay independent.
+    /// </summary>
+    private static GenreFrame Genre(BookAnalysis analysis)
+    {
+        if (analysis.ConsolidatedJson is null)
+            return GenreFrame.Unknown;
+
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive);
+        return report is null ? GenreFrame.Unknown : new GenreFrame(report.Genre ?? string.Empty, report.WordCountRange ?? string.Empty);
     }
 
     private async Task<string> Manuscript(FolioDbContext db, Guid novelId, CancellationToken cancellationToken) =>

@@ -40,7 +40,9 @@ public static class PersonaCatalogue
             "Where does this book contradict the canon of the one before it?",
             PersonaKind.Section, ModelTier.Standard),
         new("length", "Length",
-            "How does this draft's length sit against its genre, and where is the slack or the gap?",
+            "Against its genre's usual length, is this draft the right size for its story: too much plot "
+            + "for the words (trim it, or split it into volumes), too little to carry them (more needs to "
+            + "happen), and where is the slack or the gap?",
             PersonaKind.Section, ModelTier.Standard),
     ];
 
@@ -59,12 +61,27 @@ public static class PersonaCatalogue
     [
         new("developmental-editor", "Developmental editor", "Structure",
             PersonaKind.Reader, ModelTier.Strong),
+        // The owner's ruling: on a short story "I can't sell a short story" is the whole of what an
+        // agent in character says, and the author already knows it. So on a short story the Agent
+        // reads for the talent and recommends a path to magazines, outside its usual purview or not.
         new("agent", "Agent", "Could I sell it",
-            PersonaKind.Reader, ModelTier.Strong),
+            PersonaKind.Reader, ModelTier.Strong)
+        {
+            ShortStoryQuestion = "What does it show of the writer, and where should it go",
+            ShortStoryBrief =
+                "The author knows an agent does not take on a single short story: do not say so, and do not "
+                + "judge the story on whether you could sell it to a publisher. Read it instead for what it "
+                + "shows of the author's talent and how marketable that talent is: the voice, the craft, what "
+                + "would make you ask to see more. Then, even though it is outside an agent's usual work, "
+                + "recommend a path toward magazine publication: the kinds of magazines and markets this story "
+                + "suits, by genre and tier, naming only markets you are confident exist and noting that their "
+                + "guidelines must be checked; whether it is ready to submit and, if not, what to do first; and "
+                + "the order to submit in. The talent goes in your verdict; the path goes in your review.",
+        },
         new("acquiring-editor", "Acquiring editor", "Would I buy it",
             PersonaKind.Reader, ModelTier.Strong),
         new("genre-fan", "Genre fan", "Would I finish it",
-            PersonaKind.Reader, ModelTier.Strong),
+            PersonaKind.Reader, ModelTier.Strong) { FanOfTheGenre = true },
         new("harsh-critic", "Harsh but fair critic", "What is wrong with it",
             PersonaKind.Reader, ModelTier.Strong),
         new("literature-professor", "Graduate literature professor", "What is it doing",
