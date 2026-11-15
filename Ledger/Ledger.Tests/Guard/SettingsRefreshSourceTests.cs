@@ -147,7 +147,7 @@ public class SettingsRefreshSourceTests
         // And the bar stays inside the Connected accounts section, not at page level.
         var bar = xaml.IndexOf("x:Name=\"UndoBar\"", StringComparison.Ordinal);
         var sectionStart = xaml.IndexOf("x:Name=\"ConnectedAccountsSection\"", StringComparison.Ordinal);
-        var sectionEnd = xaml.IndexOf("ConnectedAccountsDivider", StringComparison.Ordinal);
+        var sectionEnd = xaml.IndexOf("Google account ====", StringComparison.Ordinal);
         Assert.True(bar > sectionStart && bar < sectionEnd);
     }
 

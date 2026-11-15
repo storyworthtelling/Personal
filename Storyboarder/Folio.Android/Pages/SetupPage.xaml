@@ -12,127 +12,131 @@
                 <Label x:Name="MigrationErrorLabel" FontSize="{StaticResource SecondarySize}" />
             </kit:PaperWarningCard>
 
-            <!-- A key appears only when it is missing or a call with it was just rejected; a working one is
-                 not on the screen at all (owner's ruling, audit W8.4b). With neither needing work, the
-                 whole section goes. -->
-            <VerticalStackLayout x:Name="ApiKeysSection" Spacing="14" IsVisible="False">
-            <Label Text="API keys" Style="{StaticResource TitleLabel}" Margin="0,8,0,0" />
+            <!-- The suite's Settings anatomy (audit W8.4b; owner's rulings): folding groups drawn as Pulp's ruled rows,
+                 in the order Connections, Vault, Folio's own, Diagnostics, then the build line. -->
+            <kit:SettingsGroup Title="Connections" IsOpen="True">
+                <VerticalStackLayout Spacing="14">
+                    <!-- A key appears only when it is missing or a call with it was just rejected; a working one is
+                         not on the screen at all (owner's ruling, audit W8.4b). -->
+                    <VerticalStackLayout x:Name="ApiKeysSection" Spacing="14" IsVisible="False">
+                        <VerticalStackLayout x:Name="ClaudeKeyBlock" Spacing="14" IsVisible="False">
+                            <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" />
+                            <Label x:Name="ClaudeStatusLabel" IsVisible="False" Style="{StaticResource ErrorLabel}" />
+                            <Entry x:Name="ClaudeKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="sk-ant-..."
+                                   Style="{StaticResource MonoEntry}" />
+                            <Label Text="Builds the design bible and storyboards the book."
+                                   Style="{StaticResource SecondaryLabel}" />
+                            <ContentView x:Name="ClaudeConsoleLink" />
+                        </VerticalStackLayout>
 
-            <VerticalStackLayout x:Name="ClaudeKeyBlock" Spacing="14" IsVisible="False">
-            <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Label x:Name="ClaudeStatusLabel" IsVisible="False" Style="{StaticResource ErrorLabel}" />
-            <Entry x:Name="ClaudeKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="sk-ant-..."
-                   Style="{StaticResource MonoEntry}" />
-            <Label Text="Builds the design bible and storyboards the book."
-                   Style="{StaticResource SecondaryLabel}" />
-            <ContentView x:Name="ClaudeConsoleLink" />
-            </VerticalStackLayout>
+                        <VerticalStackLayout x:Name="GeminiKeyBlock" Spacing="14" IsVisible="False">
+                            <Label Text="Gemini API key" Style="{StaticResource FieldLabel}" />
+                            <Label x:Name="GeminiStatusLabel" IsVisible="False" Style="{StaticResource ErrorLabel}" />
+                            <Entry x:Name="GeminiKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="AIza..."
+                                   Style="{StaticResource MonoEntry}" />
+                            <Label Text="Renders the panel images."
+                                   Style="{StaticResource SecondaryLabel}" />
+                            <ContentView x:Name="GeminiConsoleLink" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
 
-            <VerticalStackLayout x:Name="GeminiKeyBlock" Spacing="14" IsVisible="False">
-            <Label Text="Gemini API key" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Label x:Name="GeminiStatusLabel" IsVisible="False" Style="{StaticResource ErrorLabel}" />
-            <Entry x:Name="GeminiKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="AIza..."
-                   Style="{StaticResource MonoEntry}" />
-            <Label Text="Renders the panel images."
-                   Style="{StaticResource SecondaryLabel}" />
-            <ContentView x:Name="GeminiConsoleLink" />
-            </VerticalStackLayout>
+                    <Label Text="Google account" Style="{StaticResource FieldLabel}" />
+                    <Label Text="Sign in with the Google account on this phone to pick a Doc to convert. Grant the documents and Drive read permissions when prompted."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Button x:Name="GoogleSignInButton" Text="Sign in with Google"
+                            Clicked="OnGoogleSignInClicked" Style="{StaticResource SecondaryButton}" />
+                    <Label x:Name="GoogleStatusLabel" Style="{StaticResource SecondaryLabel}" />
 
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
-            </VerticalStackLayout>
+                    <kit:PaperWarningCard>
+                        <Label Text="One-time setup in Google Cloud Console: create an Android OAuth client with the package and SHA-1 below, enable the Google Docs &amp; Drive APIs, and add your account as a test user."
+                               FontSize="{StaticResource SecondarySize}" />
+                    </kit:PaperWarningCard>
+                    <ContentView x:Name="GoogleCloudConsoleLink" />
+                    <Label x:Name="SigningInfoLabel" Style="{StaticResource MonoLabel}"
+                           FontSize="{StaticResource LabelSize}" />
+                    <Button Text="Copy package + SHA-1"
+                            Clicked="OnCopySigningInfoClicked" Style="{StaticResource SecondaryButton}" />
+                    <Label x:Name="CopyStatusLabel" Style="{StaticResource StatusLine}" />
 
+                    <!-- The pairing appears only when it needs doing; a working one is not on the screen (audit W8.4b). -->
+                    <VerticalStackLayout x:Name="RemarkablePairingBlock" Spacing="14">
+                        <Label Text="reMarkable" Style="{StaticResource FieldLabel}" />
+                        <Label Text="Register the tablet once with a one-time code from my.remarkable.com/device/mobile/connect."
+                               Style="{StaticResource SecondaryLabel}" />
+                        <Button x:Name="RegisterRemarkableButton" Text="Register reMarkable"
+                                Clicked="OnRegisterRemarkableClicked" Style="{StaticResource SecondaryButton}" />
+                        <ContentView x:Name="RemarkableConsoleLink" />
+                        <Label x:Name="RemarkableStatusLabel" Style="{StaticResource StatusLine}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </kit:SettingsGroup>
 
-            <Label Text="Secrets vault" Style="{StaticResource TitleLabel}" />
-            <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
-                   Style="{StaticResource SecondaryLabel}" />
-            <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-            <Entry x:Name="VaultPassphraseEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="Choose a passphrase"
-                   Style="{StaticResource MonoEntry}" />
-            <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
-                   Style="{StaticResource SecondaryLabel}" />
-            <Label x:Name="VaultStatusLabel" Style="{StaticResource StatusLine}" />
+            <kit:SettingsGroup Title="Vault">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" />
+                    <Entry x:Name="VaultPassphraseEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="Choose a passphrase"
+                           Style="{StaticResource MonoEntry}" />
+                    <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Label x:Name="VaultStatusLabel" Style="{StaticResource StatusLine}" />
+                </VerticalStackLayout>
+            </kit:SettingsGroup>
 
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
+            <kit:SettingsGroup Title="Delivery">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="When a book finishes, copy its volume PDFs and revision report into a folder beside the manuscript in your Google Drive. Needs the Drive permission — sign in again after turning this on, and if Google doesn't ask for it, the app's OAuth client still needs the drive.file scope added."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Archive finished books" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" x:Name="ArchiveSwitch" Toggled="OnArchiveToggled" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Free up space after archiving" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" x:Name="FreeSpaceSwitch" Toggled="OnFreeSpaceToggled" />
+                    </Grid>
+                    <Label Text="Freeing space deletes the panel and page images once the upload is confirmed. The PDFs are always kept."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Label Text="Also send the finished report to your reMarkable tablet, to read and annotate by hand."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0" Text="Deliver reports to reMarkable" VerticalOptions="Center" />
+                        <Switch Grid.Column="1" x:Name="RemarkableSwitch" Toggled="OnRemarkableToggled" />
+                    </Grid>
+                </VerticalStackLayout>
+            </kit:SettingsGroup>
 
-            <Label Text="Google account" Style="{StaticResource TitleLabel}" />
-            <Label Text="Sign in with the Google account on this phone to pick a Doc to convert. Grant the documents and Drive read permissions when prompted."
-                   Style="{StaticResource SecondaryLabel}" />
-            <Button x:Name="GoogleSignInButton" Text="Sign in with Google"
-                    Clicked="OnGoogleSignInClicked" Style="{StaticResource SecondaryButton}" />
-            <Label x:Name="GoogleStatusLabel" Style="{StaticResource SecondaryLabel}" />
+            <kit:SettingsGroup Title="Progress backup">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Save your whole library — every conversion and rendered page — to a file you choose. If you reinstall the app or move to a new phone, restore the file to pick up a long conversion where you left off."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Button x:Name="BackupButton" Text="Back up progress"
+                            Clicked="OnBackupClicked" Style="{StaticResource SecondaryButton}" />
+                    <Button x:Name="RestoreButton" Text="Restore from a backup"
+                            Clicked="OnRestoreClicked" Style="{StaticResource SecondaryButton}" />
+                    <Label Text="Restoring replaces the current library with the backup you pick. Anything not in that backup is lost."
+                           Style="{StaticResource CardCaption}" />
+                    <Label x:Name="BackupStatusLabel" Style="{StaticResource StatusLine}" />
+                </VerticalStackLayout>
+            </kit:SettingsGroup>
 
-            <kit:PaperWarningCard Margin="0,8,0,0">
-                <Label Text="One-time setup in Google Cloud Console: create an Android OAuth client with the package and SHA-1 below, enable the Google Docs &amp; Drive APIs, and add your account as a test user."
-                       FontSize="{StaticResource SecondarySize}" />
-            </kit:PaperWarningCard>
-            <ContentView x:Name="GoogleCloudConsoleLink" />
-            <Label x:Name="SigningInfoLabel" Style="{StaticResource MonoLabel}"
-                   FontSize="{StaticResource LabelSize}" />
-            <Button Text="Copy package + SHA-1"
-                    Clicked="OnCopySigningInfoClicked" Style="{StaticResource SecondaryButton}" />
-            <Label x:Name="CopyStatusLabel" Style="{StaticResource StatusLine}" />
-
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
-
-            <Label Text="Archive to Drive" Style="{StaticResource TitleLabel}" />
-            <Label Text="When a book finishes, copy its volume PDFs and revision report into a folder beside the manuscript in your Google Drive. Needs the Drive permission — sign in again after turning this on, and if Google doesn't ask for it, the app's OAuth client still needs the drive.file scope added."
-                   Style="{StaticResource SecondaryLabel}" />
-            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
-                <Label Grid.Column="0" Text="Archive finished books" VerticalOptions="Center" />
-                <Switch Grid.Column="1" x:Name="ArchiveSwitch" Toggled="OnArchiveToggled" />
-            </Grid>
-            <Grid ColumnDefinitions="*,Auto">
-                <Label Grid.Column="0" Text="Free up space after archiving" VerticalOptions="Center" />
-                <Switch Grid.Column="1" x:Name="FreeSpaceSwitch" Toggled="OnFreeSpaceToggled" />
-            </Grid>
-            <Label Text="Freeing space deletes the panel and page images once the upload is confirmed. The PDFs are always kept."
-                   Style="{StaticResource SecondaryLabel}" />
-
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
-
-            <Label Text="Deliver to reMarkable" Style="{StaticResource TitleLabel}" />
-            <Label Text="Also send the finished report to your reMarkable tablet, to read and annotate by hand. Register the tablet once with a one-time code from my.remarkable.com/device/mobile/connect."
-                   Style="{StaticResource SecondaryLabel}" />
-            <!-- The pairing appears only when it needs doing; a working one is not on the screen (audit W8.4b). -->
-            <VerticalStackLayout x:Name="RemarkablePairingBlock" Spacing="14">
-            <Button x:Name="RegisterRemarkableButton" Text="Register reMarkable"
-                    Clicked="OnRegisterRemarkableClicked" Style="{StaticResource SecondaryButton}" />
-            <ContentView x:Name="RemarkableConsoleLink" />
-            <Label x:Name="RemarkableStatusLabel" Style="{StaticResource StatusLine}" />
-            </VerticalStackLayout>
-            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
-                <Label Grid.Column="0" Text="Deliver reports to reMarkable" VerticalOptions="Center" />
-                <Switch Grid.Column="1" x:Name="RemarkableSwitch" Toggled="OnRemarkableToggled" />
-            </Grid>
-
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
-
-            <Label Text="Progress backup" Style="{StaticResource TitleLabel}" />
-            <Label Text="Save your whole library — every conversion and rendered page — to a file you choose. If you reinstall the app or move to a new phone, restore the file to pick up a long conversion where you left off."
-                   Style="{StaticResource SecondaryLabel}" />
-            <Button x:Name="BackupButton" Text="Back up progress"
-                    Clicked="OnBackupClicked" Style="{StaticResource SecondaryButton}" />
-            <Button x:Name="RestoreButton" Text="Restore from a backup"
-                    Clicked="OnRestoreClicked" Style="{StaticResource SecondaryButton}" />
-            <Label Text="Restoring replaces the current library with the backup you pick. Anything not in that backup is lost."
-                   Style="{StaticResource CardCaption}" />
-            <Label x:Name="BackupStatusLabel" Style="{StaticResource StatusLine}" />
-
-            <BoxView HeightRequest="1" Color="{StaticResource Hairline}" Margin="0,12" />
-
-            <Label Text="Diagnostics" Style="{StaticResource TitleLabel}" />
-            <Label Text="See what each project is doing and what's gone wrong. Status snapshot is the quickest read; Export bundles the snapshot and both logs into one file to share."
-                   Style="{StaticResource SecondaryLabel}" />
-            <Button x:Name="StatusSnapshotButton" Text="Status snapshot"
-                    Clicked="OnStatusSnapshotClicked" Style="{StaticResource SecondaryButton}" />
-            <Button x:Name="PipelineLogButton" Text="Pipeline log"
-                    Clicked="OnPipelineLogClicked" Style="{StaticResource SecondaryButton}" />
-            <Button x:Name="CrashLogButton" Text="Crash log"
-                    Clicked="OnCrashLogClicked" Style="{StaticResource SecondaryButton}" />
-            <Button x:Name="ExportDiagnosticsButton" Text="Export diagnostics"
-                    Clicked="OnExportDiagnosticsClicked" Style="{StaticResource SecondaryButton}" />
-            <Button Text="Send logs now" Clicked="OnSendLogsNowClicked" Style="{StaticResource SecondaryButton}" />
-            <Label x:Name="DiagnosticsStatusLabel" Style="{StaticResource StatusLine}" />
+            <kit:SettingsGroup Title="Diagnostics">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="See what each project is doing and what's gone wrong. Status snapshot is the quickest read; Export bundles the snapshot and both logs into one file to share."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Button x:Name="StatusSnapshotButton" Text="Status snapshot"
+                            Clicked="OnStatusSnapshotClicked" Style="{StaticResource SecondaryButton}" />
+                    <Button x:Name="PipelineLogButton" Text="Pipeline log"
+                            Clicked="OnPipelineLogClicked" Style="{StaticResource SecondaryButton}" />
+                    <Button x:Name="CrashLogButton" Text="Crash log"
+                            Clicked="OnCrashLogClicked" Style="{StaticResource SecondaryButton}" />
+                    <Button x:Name="ExportDiagnosticsButton" Text="Export diagnostics"
+                            Clicked="OnExportDiagnosticsClicked" Style="{StaticResource SecondaryButton}" />
+                    <Button Text="Send logs now" Clicked="OnSendLogsNowClicked" Style="{StaticResource SecondaryButton}" />
+                    <Label x:Name="DiagnosticsStatusLabel" Style="{StaticResource StatusLine}" />
+                </VerticalStackLayout>
+            </kit:SettingsGroup>
 
             <!-- Build number at the foot: version name + code + package id, so it's readable which build is
                  installed even on a locked-down phone with no access to system app info. The update channel

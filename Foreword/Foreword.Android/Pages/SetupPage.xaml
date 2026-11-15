@@ -2,6 +2,7 @@
 <pages:BinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pages="clr-namespace:Foreword.Android.Pages"
+             xmlns:kit="clr-namespace:Storyworthtelling.Maui.Views;assembly=Storyworthtelling.Maui"
              x:Class="Foreword.Android.Pages.SetupPage"
              Title="Settings">
     <!--
@@ -27,9 +28,63 @@
     <ScrollView>
         <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
 
+            <!-- ==== Connections ======================================================
+                 The suite's Settings anatomy (audit W8.4b; owner's rulings): folding groups drawn as
+                 Pulp's ruled rows, in the order Connections, Vault, Foreword's own, Diagnostics, then the
+                 build line. Connections holds the keys that need work (none, on a good morning), the
+                 tablet's pairing when it needs doing, and the Google account. -->
+            <kit:SettingsGroup x:Name="ConnectionsGroup" Title="Connections" IsOpen="True">
+                <VerticalStackLayout>
+                    <VerticalStackLayout x:Name="NeedsYouCard" IsVisible="False">
+                        <VerticalStackLayout x:Name="NeedsYouRows" />
+                    </VerticalStackLayout>
+                        <!-- A working pairing is not on the screen (owner's ruling, audit W8.4b). -->
+                        <Grid x:Name="RemarkableRow" Padding="16,12" ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="reMarkable" Style="{StaticResource CardRowTitle}" />
+                                <Label x:Name="RemarkableStatusLabel" Style="{StaticResource CardRowDescription}" />
+                            </VerticalStackLayout>
+                            <Button x:Name="RemarkableReplaceButton" Grid.Column="1" Text="Pair"
+                                    Style="{StaticResource QuietButton}" Clicked="OnReplaceRemarkableClicked" />
+                        </Grid>
+                        <VerticalStackLayout x:Name="RemarkableFields" Padding="16,0,16,12" Spacing="8"
+                                             IsVisible="False">
+                            <Entry x:Name="RemarkableTokenEntry" Placeholder="One-time code"
+                                   Style="{StaticResource MonoEntry}" />
+                            <Label Text="Visit my.remarkable.com/device/mobile/connect for a one-time code, then tap Register."
+                                   Style="{StaticResource SecondaryLabel}" />
+                            <ContentView x:Name="RemarkableConsoleLink" />
+                            <Button Text="Register reMarkable device" Style="{StaticResource SecondaryButton}"
+                                    Clicked="OnRegisterRemarkableClicked" />
+                        </VerticalStackLayout>
+                        <BoxView x:Name="RemarkableDivider" HeightRequest="1" Color="{StaticResource Hairline}" />
+                        <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="Google" Style="{StaticResource CardRowTitle}" />
+                                <Label x:Name="GoogleStatusLabel" Style="{StaticResource CardRowDescription}" />
+                            </VerticalStackLayout>
+                            <Button x:Name="GoogleSignInButton" Grid.Column="1" Text="Sign in" Style="{StaticResource QuietButton}"
+                                    Clicked="OnGoogleSignInClicked" />
+                        </Grid>
+                    </VerticalStackLayout>
+            </kit:SettingsGroup>
+
+            <!-- ==== Secrets vault ====================================================== -->
+            <kit:SettingsGroup Title="Vault">
+                <VerticalStackLayout Padding="16,12,16,16" Spacing="8">
+                    <Label Text="Vault passphrase" Style="{StaticResource CardRowTitle}" />
+                    <Label Text="The one secret that is not in the vault — set the same passphrase in every app and each restores its own keys. Shown in the clear on purpose, so it can be read back and copied."
+                           Style="{StaticResource CardRowDescription}" />
+                    <!-- Shown in the clear, never a password field: it has to be read back into the
+                         other apps, and Android blocks clipboard copy on a password-typed entry. -->
+                    <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
+                           Style="{StaticResource MonoEntry}" TextChanged="OnVaultPassphraseChanged" />
+                    <Label x:Name="VaultProblemLabel" Style="{StaticResource ErrorLabel}" IsVisible="False" />
+                </VerticalStackLayout>
+            </kit:SettingsGroup>
+
             <!-- ==== Delivery ========================================================== -->
-            <Label Text="Delivery" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
+            <kit:SettingsGroup Title="Delivery">
                 <VerticalStackLayout>
                     <Grid Padding="16,12" ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0" Text="Every morning at" Style="{StaticResource CardRowTitle}"
@@ -44,16 +99,9 @@
                         </VerticalStackLayout>
                         <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
                     </Grid>
+                    <Label x:Name="LastDeliveryCaption" Style="{StaticResource CardCaption}" />
                 </VerticalStackLayout>
-            </Border>
-            <Label x:Name="LastDeliveryCaption" Style="{StaticResource CardCaption}" />
-
-            <!-- ==== Needs you: absent unless something is actually broken ============== -->
-            <Label x:Name="NeedsYouLabel" Text="Needs you" Style="{StaticResource GroupLabelProblem}"
-                   IsVisible="False" />
-            <Border x:Name="NeedsYouCard" Style="{StaticResource GroupCard}" IsVisible="False">
-                <VerticalStackLayout x:Name="NeedsYouRows" />
-            </Border>
+            </kit:SettingsGroup>
 
             <!-- ==== Calendars ========================================================= -->
             <!--
@@ -63,8 +111,7 @@
                 cost no new API work: ListCalendars() already returned them and nothing had ever
                 called it.
             -->
-            <Label Text="Calendars" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
+            <kit:SettingsGroup Title="Calendars">
                 <Grid Padding="16,12" ColumnDefinitions="*,Auto">
                     <Grid.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCalendarsClicked" />
@@ -75,11 +122,10 @@
                     </VerticalStackLayout>
                     <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
                 </Grid>
-            </Border>
+            </kit:SettingsGroup>
 
             <!-- ==== Sources ========================================================== -->
-            <Label Text="The brief" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
+            <kit:SettingsGroup Title="The brief">
                 <Grid Padding="16,12" ColumnDefinitions="*,Auto">
                     <Grid.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnSourcesClicked" />
@@ -90,7 +136,7 @@
                     </VerticalStackLayout>
                     <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
                 </Grid>
-            </Border>
+            </kit:SettingsGroup>
 
             <!-- ==== This install =====================================================
                  Whose phone this is (Release I). INFERRED, NEVER ASKED: the signed-in account
@@ -101,14 +147,13 @@
                  The mark the documents sign off with is no longer set here: it is the owner's
                  drawn mark, the one Folio's report covers carry, not a photograph.
             -->
-            <Label Text="This install" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
+            <kit:SettingsGroup Title="This install">
                 <VerticalStackLayout Padding="16,12">
                     <Label Text="Whose phone this is" Style="{StaticResource CardRowTitle}" />
                     <Label x:Name="OwnerLabel" Style="{StaticResource CardRowDescription}" />
+                    <Label x:Name="InstallCaption" Style="{StaticResource CardCaption}" />
                 </VerticalStackLayout>
-            </Border>
-            <Label x:Name="InstallCaption" Style="{StaticResource CardCaption}" />
+            </kit:SettingsGroup>
 
             <!-- ==== Prayer ===========================================================
                  The third document's one setting: the standing lists prayed through one a day.
@@ -117,8 +162,7 @@
                  fail on its own — it reads a Drive file the rest of the morning does not, behind
                  a passphrase the rest of the morning does not need.
             -->
-            <Label Text="Prayer" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
+            <kit:SettingsGroup Title="Prayer">
                 <Grid Padding="16,12" ColumnDefinitions="*,Auto">
                     <Grid.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnRotationsClicked" />
@@ -129,7 +173,7 @@
                     </VerticalStackLayout>
                     <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
                 </Grid>
-            </Border>
+            </kit:SettingsGroup>
 
             <!-- ==== Weather & drives =================================================
                  One key for the Maps Platform APIs — routes, weather, pollen, air quality, geocoding —
@@ -138,8 +182,7 @@
                  and where the forecast is. Shown in the clear rather than masked only for the
                  vault passphrase; this is a key, so it follows the masked rule.
             -->
-            <Label Text="Weather &amp; drives" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
+            <kit:SettingsGroup Title="Weather &amp; drives">
                 <VerticalStackLayout>
                     <VerticalStackLayout x:Name="MapsKeyBlock" Padding="16,12" Spacing="8">
                         <Label Text="Google Maps Platform key" Style="{StaticResource CardRowTitle}" />
@@ -172,61 +215,10 @@
                                Style="{StaticResource CardRowDescription}" />
                     </VerticalStackLayout>
                 </VerticalStackLayout>
-            </Border>
-
-            <!-- ==== Where it goes ===================================================== -->
-            <Label Text="Where it goes" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
-                <VerticalStackLayout>
-                    <!-- A working pairing is not on the screen (owner's ruling, audit W8.4b). -->
-                    <Grid x:Name="RemarkableRow" Padding="16,12" ColumnDefinitions="*,Auto">
-                        <VerticalStackLayout Grid.Column="0">
-                            <Label Text="reMarkable" Style="{StaticResource CardRowTitle}" />
-                            <Label x:Name="RemarkableStatusLabel" Style="{StaticResource CardRowDescription}" />
-                        </VerticalStackLayout>
-                        <Button x:Name="RemarkableReplaceButton" Grid.Column="1" Text="Pair"
-                                Style="{StaticResource QuietButton}" Clicked="OnReplaceRemarkableClicked" />
-                    </Grid>
-                    <VerticalStackLayout x:Name="RemarkableFields" Padding="16,0,16,12" Spacing="8"
-                                         IsVisible="False">
-                        <Entry x:Name="RemarkableTokenEntry" Placeholder="One-time code"
-                               Style="{StaticResource MonoEntry}" />
-                        <Label Text="Visit my.remarkable.com/device/mobile/connect for a one-time code, then tap Register."
-                               Style="{StaticResource SecondaryLabel}" />
-                        <ContentView x:Name="RemarkableConsoleLink" />
-                        <Button Text="Register reMarkable device" Style="{StaticResource SecondaryButton}"
-                                Clicked="OnRegisterRemarkableClicked" />
-                    </VerticalStackLayout>
-                    <BoxView x:Name="RemarkableDivider" HeightRequest="1" Color="{StaticResource Hairline}" />
-                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
-                        <VerticalStackLayout Grid.Column="0">
-                            <Label Text="Google" Style="{StaticResource CardRowTitle}" />
-                            <Label x:Name="GoogleStatusLabel" Style="{StaticResource CardRowDescription}" />
-                        </VerticalStackLayout>
-                        <Button x:Name="GoogleSignInButton" Grid.Column="1" Text="Sign in" Style="{StaticResource QuietButton}"
-                                Clicked="OnGoogleSignInClicked" />
-                    </Grid>
-                </VerticalStackLayout>
-            </Border>
-
-            <!-- ==== Secrets vault ====================================================== -->
-            <Label Text="Secrets vault" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
-                <VerticalStackLayout Padding="16,12,16,16" Spacing="8">
-                    <Label Text="Vault passphrase" Style="{StaticResource CardRowTitle}" />
-                    <Label Text="The one secret that is not in the vault — set the same passphrase in every app and each restores its own keys. Shown in the clear on purpose, so it can be read back and copied."
-                           Style="{StaticResource CardRowDescription}" />
-                    <!-- Shown in the clear, never a password field: it has to be read back into the
-                         other apps, and Android blocks clipboard copy on a password-typed entry. -->
-                    <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
-                           Style="{StaticResource MonoEntry}" TextChanged="OnVaultPassphraseChanged" />
-                    <Label x:Name="VaultProblemLabel" Style="{StaticResource ErrorLabel}" IsVisible="False" />
-                </VerticalStackLayout>
-            </Border>
+            </kit:SettingsGroup>
 
             <!-- ==== Advanced =========================================================== -->
-            <Label Text="Advanced" Style="{StaticResource GroupLabel}" />
-            <Border Style="{StaticResource GroupCard}">
+            <kit:SettingsGroup Title="Diagnostics">
                 <VerticalStackLayout>
                     <Grid Padding="16,12" ColumnDefinitions="*,Auto">
                         <VerticalStackLayout Grid.Column="0">
@@ -248,7 +240,7 @@
                         <Label Grid.Column="1" Text="›" Style="{StaticResource CardRowChevron}" />
                     </Grid>
                 </VerticalStackLayout>
-            </Border>
+            </kit:SettingsGroup>
 
             <!-- The quiet foot line: which build is actually on the phone, now with the owner's
                  mark standing beside it. The update channel installs silently and most updates

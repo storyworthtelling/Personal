@@ -411,7 +411,8 @@ public partial class SetupPage : BinderPage
             shown++;
         }
 
-        NeedsYouLabel.IsVisible = shown > 0;
+        // The Connections line says how many keys need the owner; nothing on a good morning.
+        ConnectionsGroup.Meta = shown switch { 0 => null, 1 => "1 needs you", _ => $"{shown} need you" };
         NeedsYouCard.IsVisible = shown > 0;
     }
 
