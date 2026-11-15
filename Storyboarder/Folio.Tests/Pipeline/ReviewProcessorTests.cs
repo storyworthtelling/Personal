@@ -596,6 +596,39 @@ public class ReviewProcessorTests : IDisposable
         Assert.True(result.Wait > TimeSpan.FromSeconds(30), $"Waited only {result.Wait}");
     }
 
+    [Fact]
+    public async Task AnOfflinePhoneNeverSpendsTheTabletsAttempts()
+    {
+        var id = SeedManuscript();
+        var calls = 0;
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ++calls <= 10 ? Task.FromException(Offline()) : Task.CompletedTask);
+
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        Assert.Equal(11, calls);
+        var analysis = AnalysisOf(id);
+        Assert.True(analysis.DeliveredToRemarkable);
+        Assert.Null(analysis.RemarkableNote);
+        Assert.Equal(ProjectStage.Completed, LoadNovel(id).Stage);
+    }
+
+    [Fact]
+    public async Task ATabletThatTurnsTheUploadAwayIsNamedNotClaude()
+    {
+        var id = SeedManuscript();
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Response status code does not indicate success: 401 (Unauthorized)."));
+
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        var note = AnalysisOf(id).RemarkableNote;
+        Assert.DoesNotContain("Claude", note);
+        Assert.Contains("reMarkable refused the request", note);
+    }
+
 
     // A reply cut off at the output limit comes back cut off again: it is the same request with the same
     // limit. Five repeats of a whole-book read bought nothing five times, so the book is parked after two.
