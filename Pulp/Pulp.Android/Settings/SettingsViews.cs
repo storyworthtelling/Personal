@@ -21,53 +21,9 @@ namespace Pulp.Settings;
 /// </summary>
 internal static class SettingsViews
 {
-    /// <summary>
-    /// One folding group. <paramref name="isOpen"/> and <paramref name="toggle"/> let the area keep
-    /// which groups are open across repaints; the body is built only while the group is open.
-    /// </summary>
-    public static View Group(Context context, string title, string? meta, bool isOpen, Action toggle, Action<LinearLayout>? fill)
-    {
-        var group = new LinearLayout(context) { Orientation = Orientation.Vertical };
-
-        var header = new LinearLayout(context) { Orientation = Orientation.Horizontal };
-        header.SetGravity(GravityFlags.CenterVertical);
-        header.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.ListRowMinHeightDp));
-        header.AddView(PaperUi.Heading(context, title), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-
-        if (!string.IsNullOrWhiteSpace(meta))
-        {
-            var line = PaperUi.Label(context, meta);
-            line.Typeface = PaperTheme.SansRegular(context);
-            line.SetTextColor(PaperTheme.InkMuted);
-            line.SetSingleLine(true);
-            line.Ellipsize = Android.Text.TextUtils.TruncateAt.End;
-            header.AddView(line, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
-            {
-                MarginStart = PaperTheme.Dp(context, DesignTokens.Space.X3),
-            });
-        }
-
-        var size = PaperTheme.Dp(context, DesignTokens.Space.X4);
-        header.AddView(new ChevronView(context, up: isOpen), new LinearLayout.LayoutParams(size, size)
-        {
-            MarginStart = PaperTheme.Dp(context, DesignTokens.Space.X2),
-        });
-        header.ContentDescription = $"{title}{(string.IsNullOrWhiteSpace(meta) ? string.Empty : ", " + meta)}, {(isOpen ? "open" : "closed")}";
-        header.Clickable = true;
-        header.Click += (_, _) => toggle();
-        group.AddView(header);
-
-        if (isOpen && fill is not null)
-        {
-            var body = new LinearLayout(context) { Orientation = Orientation.Vertical };
-            body.SetPadding(0, 0, 0, PaperTheme.Dp(context, DesignTokens.Space.X3));
-            fill(body);
-            group.AddView(body);
-        }
-
-        group.AddView(Rule(context, PaperTheme.Hairline));
-        return group;
-    }
+    /// <summary>One folding group: the kit's, which every app's Settings now shares (audit W8.4b).</summary>
+    public static View Group(Context context, string title, string? meta, bool isOpen, Action toggle, Action<LinearLayout>? fill) =>
+        SettingsAccordion.Group(context, title, meta, isOpen, toggle, fill);
 
     /// <summary>A two-line row: the name (with an optional tick and badge) over its quiet detail. Tappable when given an action.</summary>
     public static LinearLayout Row(Context context, string name, string? detail, bool ticked = false, string? badge = null, Action? onTap = null)
@@ -229,33 +185,6 @@ internal static class SettingsViews
             path.MoveTo(Width * 0.22f, Height * 0.53f);
             path.LineTo(Width * 0.41f, Height * 0.72f);
             path.LineTo(Width * 0.78f, Height * 0.28f);
-            canvas.DrawPath(path, paint);
-        }
-    }
-
-    /// <summary>The fold's chevron in the muted ink: up when the group is open, down when it is closed.</summary>
-    private sealed class ChevronView : View
-    {
-        private readonly Paint paint = new() { AntiAlias = true };
-        private readonly bool up;
-
-        public ChevronView(Context context, bool up) : base(context)
-        {
-            this.up = up;
-            paint.SetStyle(Paint.Style.Stroke);
-            paint.StrokeWidth = PaperTheme.Dp(context, 2);
-            paint.StrokeCap = Paint.Cap.Round;
-            paint.Color = PaperTheme.InkMuted;
-        }
-
-        protected override void OnDraw(Canvas canvas)
-        {
-            base.OnDraw(canvas);
-            var (from, to) = up ? (0.62f, 0.4f) : (0.4f, 0.62f);
-            using var path = new Path();
-            path.MoveTo(Width * 0.28f, Height * from);
-            path.LineTo(Width * 0.5f, Height * to);
-            path.LineTo(Width * 0.72f, Height * from);
             canvas.DrawPath(path, paint);
         }
     }

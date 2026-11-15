@@ -12,13 +12,15 @@ public static class SettingsGroups
     public const string Services = "Services";
     public const string Household = "Household";
     public const string Discover = "Discover";
+    // The suite's shared names (Storyworthtelling.Updates.SettingsAnatomy), spelled here because Domain stays free of it.
     public const string Vault = "Vault";
     public const string About = "About";
     public const string Diagnostics = "Diagnostics";
 
     public const string DiagnosticsMeta = "Export the log";
 
-    public static IReadOnlyList<string> Order { get; } = [Services, Household, Discover, Vault, About, Diagnostics];
+    /// <summary>The suite's order (audit W8.4b): the Vault first, Pulp's own groups, Diagnostics last.</summary>
+    public static IReadOnlyList<string> Order { get; } = [Vault, Services, Household, Discover, About, Diagnostics];
 
     /// <summary>"Sam, Alex, Robin" — everyone on the roster, by the name they go by.</summary>
     public static string HouseholdMeta(IEnumerable<string> names)

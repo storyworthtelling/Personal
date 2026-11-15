@@ -21,12 +21,17 @@ public class HouseholdWiringSourceTests
     }
 
     [Fact]
-    public void HouseholdGroupIsBetweenEquipmentAndConnections()
+    public void HouseholdGroupFollowsEquipmentAmongTheAppsOwn()
     {
+        // The suite's anatomy (audit W8.4b): Connections and the Vault first, Diagnostics last, the app's own between.
         var area = Source("Constitution.Android/SettingsArea.cs");
+        var connections = area.IndexOf("new SettingsSection(SettingsAnatomy.Connections", StringComparison.Ordinal);
+        var vault = area.IndexOf("new SettingsSection(SettingsAnatomy.Vault", StringComparison.Ordinal);
+        var equipment = area.IndexOf("new SettingsSection(EquipmentGroup", StringComparison.Ordinal);
+        var household = area.IndexOf("new SettingsSection(HouseholdGroup", StringComparison.Ordinal);
+        var diagnostics = area.IndexOf("new SettingsSection(SettingsAnatomy.Diagnostics", StringComparison.Ordinal);
 
-        Assert.True(area.IndexOf("EquipmentGroup, \"Equipment\"") < area.IndexOf("HouseholdGroup, \"Household\""));
-        Assert.True(area.IndexOf("HouseholdGroup, \"Household\"") < area.IndexOf("ConnectionsGroup, \"Connections\""));
+        Assert.True(connections >= 0 && connections < vault && vault < equipment && equipment < household && household < diagnostics);
     }
 
     [Fact]
