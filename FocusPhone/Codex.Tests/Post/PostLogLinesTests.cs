@@ -64,10 +64,40 @@ public class PostLogLinesTests
     [Fact]
     public void AFilingDeleteThatKeepsFailingSaysHowManyTimes()
     {
-        Assert.Null(PostLogLines.OwedDeleteFailing(Tombstones.QuietAttempts - 1));
+        Assert.Null(PostLogLines.OwedDeleteFailing(Tombstones.QuietAttempts - 1, SourceDeleteFailure.StillAtSource));
         Assert.Equal(
-            "FILING the delete at the source has failed 3 times; the item stays filed",
-            PostLogLines.OwedDeleteFailing(3));
+            "FILING the delete at the source has failed 3 times (still at the source); the item stays filed",
+            PostLogLines.OwedDeleteFailing(3, SourceDeleteFailure.StillAtSource));
+    }
+
+    // The bridge's own delete no longer writes a warning of its own on every failure, so this line is the
+    // only record of why a filed text is still in Google Messages: it names the kind, never the message.
+    [Theory]
+    [InlineData(SourceDeleteFailure.NotConnected, "not connected")]
+    [InlineData(SourceDeleteFailure.BridgeRefused, "the bridge refused")]
+    [InlineData(SourceDeleteFailure.NotPermitted, "not permitted")]
+    [InlineData(SourceDeleteFailure.StillAtSource, "still at the source")]
+    [InlineData(SourceDeleteFailure.Unaddressable, "no address to delete")]
+    [InlineData(SourceDeleteFailure.Threw, "an error")]
+    public void TheOwedDeleteLineNamesWhyItFailed(SourceDeleteFailure reason, string words)
+    {
+        Assert.Equal(
+            $"FILING the delete at the source has failed 3 times ({words}); the item stays filed",
+            PostLogLines.OwedDeleteFailing(3, reason));
+    }
+
+    [Theory]
+    [InlineData(BridgeDeleteResult.NotConnected, SourceDeleteFailure.NotConnected)]
+    [InlineData(BridgeDeleteResult.Refused, SourceDeleteFailure.BridgeRefused)]
+    public void ABridgeDeleteThatDidNotLandIsNamedForTheLine(BridgeDeleteResult result, SourceDeleteFailure reason)
+    {
+        Assert.Equal(reason, SourceDeleteFailures.FromBridge(result));
+    }
+
+    [Fact]
+    public void ABridgeDeleteThatLandedOwesNoLine()
+    {
+        Assert.Null(SourceDeleteFailures.FromBridge(BridgeDeleteResult.Deleted));
     }
 
     [Theory]
@@ -78,6 +108,6 @@ public class PostLogLinesTests
     [InlineData(20, true)]
     public void AfterTheFirstLineItRepeatsOnlyEveryTenthTrySoHalfHourlySyncsDoNotFloodTheLog(int attempts, bool speaks)
     {
-        Assert.Equal(speaks, PostLogLines.OwedDeleteFailing(attempts) is not null);
+        Assert.Equal(speaks, PostLogLines.OwedDeleteFailing(attempts, SourceDeleteFailure.NotConnected) is not null);
     }
 }

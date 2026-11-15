@@ -155,9 +155,18 @@ public static class TapWatch
             return;
         }
         var control = hit;
-        while (control is not null && !IsControl(control, longPress, x, y))
+        while (control is not null && control is not ITouchSink && !IsControl(control, longPress, x, y))
         {
             control = control.Parent as View;
+        }
+        if (control is ITouchSink)
+        {
+            // A touch sink only keeps taps from falling through: not a control, and named by its type alone,
+            // since its first text is a card's title (often a person).
+            var sink = TapWatchCore.ControlName(null, null, control.GetType().Name) + (longPress ? " (long press)" : string.Empty);
+            watch.Touched(sink, new TapPoint(x, y), control.Enabled, false);
+            Schedule();
+            return;
         }
         var target = control ?? hit;
         var name = Name(target, activity) + (longPress ? " (long press)" : string.Empty);

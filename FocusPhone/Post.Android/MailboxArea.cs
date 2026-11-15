@@ -1831,7 +1831,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 var bridge = GmBridgeClient.Shared(Host);
                 Task.Run(() =>
                 {
-                    if (!messageId.Contains(':') && !bridge.TryDelete(messageId))
+                    if (!messageId.Contains(':') && bridge.TryDelete(messageId) != BridgeDeleteResult.Deleted)
                     {
                         PostDiagnostics.LogWarning("Bridge", "A message was hidden here but could not be deleted in Google Messages");
                     }

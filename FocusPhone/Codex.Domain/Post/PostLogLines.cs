@@ -57,12 +57,12 @@ public static class PostLogLines
     /// Null until the delete has failed often enough to be worth a line (the fold's own threshold), then on
     /// every tenth try after it — the sync retries every half hour, and a line each time would bury the log.
     /// </summary>
-    public static string? OwedDeleteFailing(int failedAttempts) =>
+    public static string? OwedDeleteFailing(int failedAttempts, SourceDeleteFailure reason) =>
         failedAttempts < Tombstones.QuietAttempts
         || (failedAttempts > Tombstones.QuietAttempts && failedAttempts % 10 != 0)
             ? null
             : string.Create(CultureInfo.InvariantCulture,
-                $"FILING the delete at the source has failed {failedAttempts} times; the item stays filed");
+                $"FILING the delete at the source has failed {failedAttempts} times ({SourceDeleteFailures.Words(reason)}); the item stays filed");
 
     private static string MmsOutcome(int resultCode) =>
         resultCode == ResultOk ? "ok" : "FAILED: " + Named(MmsErrors, resultCode);

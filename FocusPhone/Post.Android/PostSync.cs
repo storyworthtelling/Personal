@@ -209,14 +209,14 @@ public static class PostSync
 
             try
             {
-                if (await DeleteAtSourceAsync(context, account, route, item))
+                if (await DeleteAtSourceAsync(context, account, route, item) is { } failure)
                 {
-                    tombstones.SourceConfirmed(sourceId);
+                    tombstones.AttemptFailed(sourceId, DateTimeOffset.UtcNow);
+                    LogIfStillFailing(tombstones, sourceId, failure);
                 }
                 else
                 {
-                    tombstones.AttemptFailed(sourceId, DateTimeOffset.UtcNow);
-                    LogIfStillFailing(tombstones, sourceId);
+                    tombstones.SourceConfirmed(sourceId);
                 }
             }
             catch (Exception e)
@@ -224,7 +224,7 @@ public static class PostSync
                 tombstones.AttemptFailed(sourceId, DateTimeOffset.UtcNow);
                 Android.Util.Log.Warn("Post", $"Owed delete of {sourceId} failed: {e}");
                 PostDiagnostics.LogWarning("Filing", $"Owed delete of {sourceId} failed", e);
-                LogIfStillFailing(tombstones, sourceId);
+                LogIfStillFailing(tombstones, sourceId, SourceDeleteFailure.Threw);
             }
         }
 
@@ -233,9 +233,9 @@ public static class PostSync
 
     // A filing delete that keeps failing (LOG-LOOP-PLAN.md §4.5), at the fold's own threshold and then
     // every tenth try, so the half-hourly retry does not bury the log.
-    private static void LogIfStillFailing(Tombstones tombstones, string sourceId)
+    private static void LogIfStillFailing(Tombstones tombstones, string sourceId, SourceDeleteFailure reason)
     {
-        if (PostLogLines.OwedDeleteFailing(tombstones.FailedAttempts(sourceId)) is { } line)
+        if (PostLogLines.OwedDeleteFailing(tombstones.FailedAttempts(sourceId), reason) is { } line)
         {
             PostDiagnostics.LogWarning("Filing", $"{line} ({sourceId})");
         }
@@ -256,7 +256,8 @@ public static class PostSync
 
     private const string LoggedRouteKey = "loggedMailRoute";
 
-    private static async Task<bool> DeleteAtSourceAsync(
+    // Null once the source agrees the item is gone; otherwise why it is not, for the throttled line.
+    private static async Task<SourceDeleteFailure?> DeleteAtSourceAsync(
         Context context, AccountStore account, MailTransport route, TimelineItem item)
     {
         // Texts, calls and voicemail are local — the provider and the call log do not need a
@@ -276,38 +277,42 @@ public static class PostSync
         }
         if (item.MessageId is null)
         {
-            return true; // nothing to address the delete to
+            return null; // nothing to address the delete to
         }
 
         return route switch
         {
-            MailTransport.GmailApi => await MailAccess.Api(context, account).TrashAsync(item.MessageId),
+            MailTransport.GmailApi => await MailAccess.Api(context, account).TrashAsync(item.MessageId)
+                ? null
+                : SourceDeleteFailure.StillAtSource,
             MailTransport.AppPassword => await DeleteWithAppPasswordAsync(account, item.MessageId),
-            _ => false,
+            _ => SourceDeleteFailure.NotConnected,
         };
     }
 
-    private static bool DeleteCallAtSource(Context context, TimelineItem item)
+    private static SourceDeleteFailure? DeleteCallAtSource(Context context, TimelineItem item)
     {
         if (!item.SourceId.All(char.IsAsciiDigit))
         {
-            return true; // not a live call-log row; nothing to delete
+            return null; // not a live call-log row; nothing to delete
         }
         try
         {
             var uri = Android.Provider.CallLog.Calls.ContentUri!;
             var deleted = context.ContentResolver!.Delete(uri, "_id = ?", [item.SourceId]);
-            return ProviderDeleteOutcome.Settled(deleted, () => RowExists(context, uri, item.SourceId));
+            return ProviderDeleteOutcome.Settled(deleted, () => RowExists(context, uri, item.SourceId))
+                ? null
+                : SourceDeleteFailure.StillAtSource;
         }
         catch (Java.Lang.SecurityException)
         {
-            return false; // WRITE_CALL_LOG not granted yet; retried on the next sync
+            return SourceDeleteFailure.NotPermitted; // WRITE_CALL_LOG not granted yet; retried on the next sync
         }
     }
 
     // The same routing MailboxArea's per-message delete (of the open correspondence) uses,
     // so filing and an outright delete agree on where a text actually lives.
-    private static bool DeleteMessageAtSource(Context context, TimelineItem item)
+    private static SourceDeleteFailure? DeleteMessageAtSource(Context context, TimelineItem item)
     {
         var holdsSmsRole = HoldsSmsRole(context);
         switch (TextDelete.Choose(item.SourceId, holdsSmsRole, GmBridgeClient.Shared(context).IsConnected))
@@ -318,24 +323,28 @@ public static class PostSync
                 return DeleteProviderRow(context, Android.Provider.Telephony.Mms.ContentUri!, item, "mms:");
             case TextDeletePath.Bridge:
                 var messageId = item.SourceId["gm:".Length..];
-                return !messageId.Contains(':') && GmBridgeClient.Shared(context).TryDelete(messageId);
+                return messageId.Contains(':')
+                    ? SourceDeleteFailure.Unaddressable
+                    : SourceDeleteFailures.FromBridge(GmBridgeClient.Shared(context).TryDelete(messageId));
             default:
                 // Already suppressed locally by Filing.File's Hidden.Hide; nothing more owed.
-                return true;
+                return null;
         }
     }
 
-    private static bool DeleteProviderRow(Context context, Android.Net.Uri contentUri, TimelineItem item, string prefix)
+    private static SourceDeleteFailure? DeleteProviderRow(Context context, Android.Net.Uri contentUri, TimelineItem item, string prefix)
     {
         try
         {
             var rowId = item.SourceId[prefix.Length..];
             var deleted = context.ContentResolver!.Delete(contentUri, "_id = ?", [rowId]);
-            return ProviderDeleteOutcome.Settled(deleted, () => RowExists(context, contentUri, rowId));
+            return ProviderDeleteOutcome.Settled(deleted, () => RowExists(context, contentUri, rowId))
+                ? null
+                : SourceDeleteFailure.StillAtSource;
         }
         catch (Java.Lang.SecurityException)
         {
-            return false;
+            return SourceDeleteFailure.NotPermitted;
         }
     }
 
@@ -352,10 +361,10 @@ public static class PostSync
             && roles.IsRoleHeld(Android.App.Roles.RoleManager.RoleSms!);
     }
 
-    private static async Task<bool> DeleteWithAppPasswordAsync(AccountStore account, string messageId)
+    private static async Task<SourceDeleteFailure?> DeleteWithAppPasswordAsync(AccountStore account, string messageId)
     {
         await new GmailClient(account.GmailAddress!, account.GmailAppPassword!).DeleteAsync(messageId);
-        return true;
+        return null;
     }
 
     // The path Post is leaving. It stays only until the API is proven on a device: an

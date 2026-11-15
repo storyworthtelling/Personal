@@ -209,16 +209,16 @@ public static class ActionCard
         Dismiss(host);
 
         // The haze: a dimmed PaperDeep, not a black scrim. Paper does not go dark.
-        var scrim = new FrameLayout(context) { Tag = HostTag };
+        var scrim = new TouchSinkFrame(context) { Tag = HostTag };
         scrim.SetBackgroundColor(new Color(
             PaperTheme.PaperDeep.R, PaperTheme.PaperDeep.G, PaperTheme.PaperDeep.B, HazeAlpha));
         scrim.Click += (_, _) => Dismiss(host);
 
-        var card = new LinearLayout(context) { Orientation = Orientation.Vertical };
+        // A touch sink: taps on the card are swallowed so they do not fall through and dismiss it, without
+        // a click handler that would make the tap watch take the whole card for a control.
+        var card = new TouchSinkColumn(context);
         card.Background = PaperUi.Outline(
             context, PaperTheme.PaperBright, PaperTheme.Hairline, DesignTokens.Shape.RadiusCard);
-        // Swallow taps on the card so they do not fall through and dismiss it.
-        card.Click += (_, _) => { };
 
         var pad = PaperTheme.Dp(context, DesignTokens.Space.X4);
         card.SetPadding(0, pad, 0, PaperTheme.Dp(context, DesignTokens.Space.X2));
