@@ -41,7 +41,7 @@ public class UsageReceiver : BroadcastReceiver
         }
 
         var version = ContractBroadcast.ReadVersion(intent.GetIntExtra(ContractBroadcast.VersionExtra, 0));
-        Log(ContractBroadcast.ReceiptLine("usage", version));
+        LogReceipt(ContractBroadcast.ReceiptLine("usage", version));
         if (!ContractBroadcast.Accepts(version))
         {
             return; // a newer Pulp may count differently; a guessed count would be a number nobody can vouch for
@@ -64,6 +64,10 @@ public class UsageReceiver : BroadcastReceiver
             logger?.LogWarning(e, "UsageReceiver: failed to store a usage receipt");
         }
     }
+
+    // A receipt is the ordinary case, so it is Information; Log below is for a receipt that went wrong.
+    private static void LogReceipt(string line) =>
+        IPlatformApplication.Current?.Services.GetService<ILogger<UsageReceiver>>()?.LogInformation("{Line}", line);
 
     private static void Log(string reason)
     {
