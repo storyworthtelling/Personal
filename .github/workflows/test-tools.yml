@@ -43,5 +43,8 @@ jobs:
       - name: Test IconStudio
         run: dotnet test Tools/IconStudio.Tests/IconStudio.Tests.csproj
 
+      # The tool references Ledger.Infrastructure with AdditionalProperties="LedgerTfms=net10.0", but NuGet
+      # restore ignores AdditionalProperties and restores every TFM, so without the global switch it asks for
+      # the android workload (NETSDK1147) this job does not install. build-index.yml passes the same switch.
       - name: Test IndexHistorySeal
-        run: dotnet test Tools/IndexHistorySeal.Tests/IndexHistorySeal.Tests.csproj
+        run: dotnet test Tools/IndexHistorySeal.Tests/IndexHistorySeal.Tests.csproj -p:LedgerTfms=net10.0
