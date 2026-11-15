@@ -807,9 +807,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     ///
     /// <para>It does not go through <see cref="SendMessage"/>, and that is the point. SendMessage puts
     /// its instruction in the first cached block, which is right when the instruction is constant for
-    /// a call type and catastrophic here: the instruction names the persona, so seventeen passes would
-    /// be seventeen different cache prefixes and the manuscript would be written seventeen times
-    /// instead of read fifteen — measured at roughly $17 a draft against $2 (F50), with nothing
+    /// a call type and catastrophic here: the instruction names the persona, so fourteen passes would
+    /// be fourteen different cache prefixes and the manuscript would be written fourteen times
+    /// instead of twice (once per model) — measured at roughly $17 a draft against $2 (F50), with nothing
     /// visible wrong. <c>ReadingPrompt</c> decides the order and a guard holds it.</para>
     /// </summary>
     private Task<string> SendPass(

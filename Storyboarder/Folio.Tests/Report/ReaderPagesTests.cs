@@ -9,7 +9,7 @@ using UglyToad.PdfPig;
 namespace Folio.Tests.Report;
 
 /// <summary>
-/// The readers' contents page and the seven sheets it maps.
+/// The readers' contents page and the six sheets it maps.
 ///
 /// <para><b>The pointer is the whole of a contents page.</b> "p. 9" against the agent is a claim
 /// about a sheet forty pages away, and nothing about the page it is printed on can be wrong in a way

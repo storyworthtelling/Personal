@@ -1017,7 +1017,7 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 2g) The sixteen reads. Eight whole-book sections on the standard model, then six readers
+        // 2g) The sixteen passes. Eight whole-book sections on the standard model, then six readers
         // on the strong one, then the two synthesis passes that read the other fourteen.
         //
         // One pass per turn, each persisted the moment it succeeds, because each is a separate model
@@ -1137,7 +1137,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
-                // The sixteen reads, folded last so the readers replace the omnibus reduce's reviews
+                // The sixteen passes, folded last so the readers replace the omnibus reduce's reviews
                 // rather than sitting beside them.
                 var sections = await ReadSections(db, novel.Id, cancellationToken);
                 var readers = await ReadReaders(db, novel.Id, cancellationToken);
@@ -1433,7 +1433,7 @@ public sealed class ReviewProcessor : IPipelineStep
         return ProcessResult.Waiting(delay, novel.Id);
     }
 
-    // Records a failed once-per-manuscript call (a reduction, one of the sixteen reads, the jacket) and
+    // Records a failed once-per-manuscript call (a reduction, one of the sixteen passes, the jacket) and
     // decides what happens next. These calls each send the whole book, so a failure that is simply
     // retried is a failure that is simply re-billed:
     //  - it is LOGGED, by name, with the attempt it was and the cause all the way down the inner chain;

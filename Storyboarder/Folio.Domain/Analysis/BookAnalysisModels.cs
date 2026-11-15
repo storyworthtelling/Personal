@@ -340,7 +340,7 @@ public sealed record BookAnalysisResult(
         this with { SeriesContinuity = seriesContinuity };
 
     /// <summary>
-    /// Folds the sixteen reads over the consolidated report.
+    /// Folds the fourteen reads and the two synthesis passes over the consolidated report.
     ///
     /// <para>The readers <b>replace</b> whatever the omnibus reduce produced rather than joining it:
     /// the whole point of a persona pass is that one voice read the whole book, and a page carrying

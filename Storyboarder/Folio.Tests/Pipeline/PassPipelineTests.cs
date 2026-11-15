@@ -6,7 +6,7 @@ using Folio.Tests.Support;
 namespace Folio.Tests.Pipeline;
 
 /// <summary>
-/// The seventeen reads actually run, in the order the plan sets, and each is recorded once.
+/// The sixteen passes actually run, in the order the plan sets, and each is recorded once.
 ///
 /// <para>The bug this reintroduces is a step that never runs. It is the quietest failure in the
 /// pipeline: the report still renders, from whatever the omnibus reduce produced, and every test

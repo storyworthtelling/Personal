@@ -53,7 +53,7 @@ public class ReviewProcessorTests : IDisposable
         claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("ink-wash watercolor, muted palette");
 
-        // The sixteen reads. Stubbed for real rather than left to Moq's defaults: a default-valued
+        // The sixteen passes. Stubbed for real rather than left to Moq's defaults: a default-valued
         // Task<T> completes with null, which the pipeline records as a finished pass — so the step
         // would appear to work while reading nothing, which is the failure PassPipelineTests names.
         claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
@@ -228,7 +228,7 @@ public class ReviewProcessorTests : IDisposable
     // Drains the pipeline the way the worker does, advancing the clock past any backoff wait so a
     // rescheduled unit becomes due. Bails out after a generous cycle cap so a stuck test fails fast.
     /// <summary>
-    /// End to end: all sixteen reads run, each once, in plan order — and the synthesis passes see
+    /// End to end: all sixteen passes run, each once, in plan order — and the synthesis passes see
     /// the other fourteen, which is the only thing that makes them synthesis rather than a
     /// fifteenth opinion.
     /// </summary>
@@ -290,7 +290,7 @@ public class ReviewProcessorTests : IDisposable
 
     // ---- A failing whole-manuscript call must be visible, paced, and capped --------------------------
     //
-    // The sixteen reads and the reduce calls each send the whole book to Claude. A failure used to be
+    // The fourteen whole-book passes and the reduce calls each send the whole book to Claude. A failure used to be
     // recorded nowhere but the manuscript's one-line error, was retried four seconds later with no limit
     // (StageAttempts documented a cap that nothing applied), and the next worker cycle started again
     // immediately — so a call that kept dying mid-stream was re-billed all day with nothing in the log.

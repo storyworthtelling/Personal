@@ -21,7 +21,7 @@ public sealed record SectionRead(string PersonaId, string Summary, IReadOnlyList
 
 /// <summary>
 /// What the two synthesis passes come back with. They are the only passes that read the other
-/// fifteen rather than the manuscript, which is why they run last.
+/// fourteen rather than the manuscript, which is why they run last.
 /// </summary>
 public sealed record SynthesisRead(IReadOnlyList<RevisionItem> RevisionPlan, Verdict Verdict)
 {

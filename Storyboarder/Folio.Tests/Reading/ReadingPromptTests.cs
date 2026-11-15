@@ -9,7 +9,7 @@ namespace Folio.Tests.Reading;
 /// <para>The bug this reintroduces is naming the persona ahead of the manuscript — and it was
 /// reintroduced by accident, in the harness that measured the passes, which is how it was found.
 /// Prompt caching matches an exact prefix, so a persona in front of the manuscript makes each of
-/// the seventeen passes a different prefix: measured at <c>cache_creation: 167187</c> and
+/// the fourteen passes a different prefix: measured at <c>cache_creation: 167187</c> and
 /// <c>cache_read: 0</c> on every pass, roughly $17 a draft on the strong model against $2.</para>
 ///
 /// <para>Nothing about it is visible. Every request succeeds, every reply is right, every other test
@@ -28,7 +28,7 @@ public class ReadingPromptTests
         Assert.Contains(Manuscript, blocks[0].Text, StringComparison.Ordinal);
     }
 
-    /// <summary>The invariant itself, over every pair of the fifteen personas.</summary>
+    /// <summary>The invariant itself, over every pair of the fourteen personas.</summary>
     [Fact]
     public void EveryPersonaSharesByteIdenticalCachedPrefix()
     {

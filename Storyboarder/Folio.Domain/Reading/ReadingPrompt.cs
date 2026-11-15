@@ -11,8 +11,8 @@ public sealed record PromptBlock(string Text, bool Cached);
 ///
 /// <para><b>The manuscript comes first and the persona after it.</b> That ordering is the whole
 /// reason this file exists, and it is not a style choice: prompt caching matches an exact
-/// <i>prefix</i>, so a persona named ahead of the manuscript makes every one of the seventeen passes
-/// a different prefix, and the manuscript behind it is cached seventeen times over instead of once.
+/// <i>prefix</i>, so a persona named ahead of the manuscript makes every one of the fourteen passes
+/// a different prefix, and the manuscript behind it is cached fourteen times over instead of once per model.
 /// Measured: writing the persona first produced <c>cache_creation_input_tokens: 167187</c> and
 /// <c>cache_read: 0</c> on every pass, which on the strong model is roughly $17 a draft against
 /// $2.</para>
