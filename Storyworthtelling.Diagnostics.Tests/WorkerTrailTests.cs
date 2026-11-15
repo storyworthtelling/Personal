@@ -12,6 +12,10 @@ public class WorkerTrailTests
     [InlineData(3, "WORKER RefreshWorker stopped: reason 3 (timeout)")]
     [InlineData(7, "WORKER RefreshWorker stopped: reason 7 (no network)")]
     [InlineData(10, "WORKER RefreshWorker stopped: reason 10 (quota)")]
+    [InlineData(15, "WORKER RefreshWorker stopped: reason 15 (estimated app launch time changed)")]
+    [InlineData(-128, "WORKER RefreshWorker stopped: reason -128 (foreground service timeout)")]
+    [InlineData(-256, "WORKER RefreshWorker stopped: reason -256 (not stopped)")]
+    [InlineData(-512, "WORKER RefreshWorker stopped: reason -512 (unknown)")]
     [InlineData(99, "WORKER RefreshWorker stopped: reason 99")]
     public void AStopNamesItsReason(int reason, string line) =>
         Assert.Equal(line, WorkerTrail.StoppedLine("RefreshWorker", reason));

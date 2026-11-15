@@ -54,8 +54,12 @@ public static class WorkerTrail
     /// <summary>The run had nothing to do, and says why, so a skip does not read as work done (audit 08 §37).</summary>
     public static string SkippedLine(string worker, string why) => $"WORKER {worker} skipped: {why}";
 
+    // WorkInfo.STOP_REASON_* as androidx.work 2.10.2 (the binding every head uses) declares them, read from its classes.
     private static readonly Dictionary<int, string> StopReasons = new()
     {
+        [-512] = "unknown",
+        [-256] = "not stopped",
+        [-128] = "foreground service timeout",
         [1] = "cancelled by the app",
         [2] = "preempted",
         [3] = "timeout",
@@ -70,6 +74,7 @@ public static class WorkerTrail
         [12] = "app standby",
         [13] = "user",
         [14] = "system processing",
+        [15] = "estimated app launch time changed",
     };
 
     public static string ThrewLine(string worker, TimeSpan duration, Exception exception) =>

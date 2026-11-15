@@ -544,6 +544,91 @@ public class ReviewProcessorTests : IDisposable
         Assert.True(result.Wait > TimeSpan.FromSeconds(30), $"Waited only {result.Wait}");
     }
 
+    // The archive to Drive and the delivery to the tablet are the last steps, and the phone is as likely
+    // to be offline then as at any other. Counting each offline failure as a try spent the whole budget
+    // in seconds and settled the book as "not archived" / "did not reach the tablet".
+
+    private static Mock<IPaperDriveArchive> DriveFailingOffline(int offlineTimes, List<int> calls)
+    {
+        var drive = new Mock<IPaperDriveArchive>();
+        drive.Setup(d => d.FindParentFolder(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("folder-one");
+        drive.Setup(d => d.UploadFile(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                calls.Add(calls.Count + 1);
+                return calls.Count <= offlineTimes
+                    ? Task.FromException<string>(Offline())
+                    : Task.FromResult("archived-file-one");
+            });
+        return drive;
+    }
+
+    [Fact]
+    public async Task AnOfflinePhoneNeverSpendsTheArchivesAttempts()
+    {
+        var id = SeedManuscript();
+        var calls = new List<int>();
+        var drive = DriveFailingOffline(10, calls);
+
+        await DriveToCompletion(NewProcessor(driveArchive: drive.Object));
+
+        Assert.Equal(11, calls.Count);
+        Assert.Equal(ProjectStage.Completed, LoadNovel(id).Stage);
+        Assert.Equal("archived-file-one", AnalysisOf(id).ArchivedDriveFileId);
+    }
+
+    [Fact]
+    public async Task AnOfflineArchiveWaitsBeforeAskingAgain()
+    {
+        SeedManuscript();
+        var calls = new List<int>();
+        var drive = DriveFailingOffline(int.MaxValue, calls);
+
+        await DriveToFirstCall(NewProcessor(driveArchive: drive.Object), calls);
+        var result = ProcessResult.Idle;
+        for (var cycle = 0; cycle < 5; cycle++)
+            result = await NewProcessor(driveArchive: drive.Object).ProcessNextAsync(CancellationToken.None);
+
+        Assert.Single(calls);
+        Assert.Equal(ProcessOutcome.Waiting, result.Outcome);
+        Assert.True(result.Wait > TimeSpan.FromSeconds(30), $"Waited only {result.Wait}");
+    }
+
+    [Fact]
+    public async Task AnOfflinePhoneNeverSpendsTheTabletsAttempts()
+    {
+        var id = SeedManuscript();
+        var calls = 0;
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ++calls <= 10 ? Task.FromException(Offline()) : Task.CompletedTask);
+
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        Assert.Equal(11, calls);
+        var analysis = AnalysisOf(id);
+        Assert.True(analysis.DeliveredToRemarkable);
+        Assert.Null(analysis.RemarkableNote);
+        Assert.Equal(ProjectStage.Completed, LoadNovel(id).Stage);
+    }
+
+    [Fact]
+    public async Task ATabletThatTurnsTheUploadAwayIsNamedNotClaude()
+    {
+        var id = SeedManuscript();
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<long>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Response status code does not indicate success: 401 (Unauthorized)."));
+
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        var note = AnalysisOf(id).RemarkableNote;
+        Assert.DoesNotContain("Claude", note);
+        Assert.Contains("reMarkable refused the request", note);
+    }
+
 
     // A reply cut off at the output limit comes back cut off again: it is the same request with the same
     // limit. Five repeats of a whole-book read bought nothing five times, so the book is parked after two.
