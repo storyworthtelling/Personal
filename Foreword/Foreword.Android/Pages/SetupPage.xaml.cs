@@ -63,6 +63,9 @@ public partial class SetupPage : BinderPage
             "Not paired — documents are built and held until it is");
         RemarkableStatusLabel.Text = pairing.Line;
         RemarkableReplaceButton.Text = pairing.Button;
+        // A pairing that works needs nothing, so it is not on the screen (owner's ruling, audit W8.4b).
+        RemarkableRow.IsVisible = pairing.NeedsPairing || RemarkableFields.IsVisible;
+        RemarkableDivider.IsVisible = RemarkableRow.IsVisible;
 
         GoogleStatusLabel.Text = CredentialStore.IsGoogleConfigured
             ? CredentialStore.GoogleAccountEmail
@@ -167,8 +170,8 @@ public partial class SetupPage : BinderPage
             !string.IsNullOrEmpty(CredentialStore.MapsApiKey),
             CredentialHealth().Get(CredentialIds.Maps));
 
-        MapsKeyBlock.IsVisible = state.ShowEntry || replacingMapsKey;
-        MapsKeyWorkingRow.IsVisible = !state.ShowEntry && !replacingMapsKey;
+        // A working key is not on the screen at all (owner's ruling, audit W8.4b).
+        MapsKeyBlock.IsVisible = state.Appears;
 
         if (MapsKeyBlock.IsVisible)
         {
@@ -176,13 +179,6 @@ public partial class SetupPage : BinderPage
         }
 
         RenderHome();
-    }
-
-    private void OnReplaceMapsKey(object sender, EventArgs e)
-    {
-        replacingMapsKey = true;
-        RenderMaps();
-        MapsKeyEntry.Focus();
     }
 
     /// <summary>
@@ -370,20 +366,16 @@ public partial class SetupPage : BinderPage
         }
     }
 
-    private bool replacingMapsKey;
-
     // ---- Needs you =========================================================
 
     /// <summary>
-    /// One row per credential that is missing or was just rejected under Needs you, and one
-    /// "Working ✓" line with a quiet Replace under Connections for each that works — the suite's
-    /// one rule (audit W8.4). <see cref="CredentialFieldState.Decide"/> decides which.
+    /// One row per credential that is missing or was just rejected, and nothing at all when none
+    /// is: a working key is not on the screen (owner's ruling, audit W8.4b).
+    /// <see cref="CredentialFieldState.Decide"/> decides which.
     /// </summary>
     private void BuildNeedsYou()
     {
         NeedsYouRows.Clear();
-        ConnectionsRows.Clear();
-        var working = 0;
         var report = CredentialHealth();
 
         var wanted = new (string Id, string Title, string Hint, Func<string> Read, Action<string> Write)[]
@@ -401,15 +393,8 @@ public partial class SetupPage : BinderPage
         foreach (var (id, title, hint, read, write) in wanted)
         {
             var state = CredentialFieldState.Decide(!string.IsNullOrEmpty(read()), report.Get(id));
-            if (!state.ShowEntry && !replacing.Contains(id))
+            if (!state.Appears)
             {
-                if (working > 0)
-                {
-                    ConnectionsRows.Add(new BoxView { HeightRequest = 1, Color = LookupColor("Hairline") });
-                }
-
-                ConnectionsRows.Add(BuildWorkingRow(id, title));
-                working++;
                 continue;
             }
 
@@ -428,38 +413,6 @@ public partial class SetupPage : BinderPage
 
         NeedsYouLabel.IsVisible = shown > 0;
         NeedsYouCard.IsVisible = shown > 0;
-        ConnectionsLabel.IsVisible = working > 0;
-        ConnectionsCard.IsVisible = working > 0;
-    }
-
-    // Keys the owner asked to replace: shown as a field again until the screen is next built.
-    private readonly HashSet<string> replacing = [];
-
-    private View BuildWorkingRow(string id, string title)
-    {
-        var replace = new Button { Text = "Replace", Style = LookupStyle("QuietButton") };
-        replace.Clicked += (_, _) =>
-        {
-            replacing.Add(id);
-            BuildNeedsYou();
-        };
-
-        var words = new VerticalStackLayout
-        {
-            Children =
-            {
-                new Label { Text = title, Style = LookupStyle("CardRowTitle") },
-                new Label { Text = "Working ✓", Style = LookupStyle("CardRowDescription") },
-            },
-        };
-        var row = new Grid
-        {
-            Padding = new Thickness(16, 12),
-            ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto)],
-        };
-        row.Add(words, 0);
-        row.Add(replace, 1);
-        return row;
     }
 
     private View BuildNeedsYouRow(

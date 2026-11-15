@@ -34,7 +34,6 @@ public class VaultActivity : Activity
 {
     private readonly CancellationTokenSource lifetime = new();
     private readonly Dictionary<string, EditText> keyFields = [];
-    private readonly HashSet<string> replacing = [];
 
     private PulpServices services = null!;
     private PulpVault vault = null!;
@@ -145,61 +144,57 @@ public class VaultActivity : Activity
         body.AddView(passphrase, Spaced(0, DesignTokens.Space.X2));
         body.AddView(PaperUi.Secondary(this, VaultPageText.PassphraseHelper), Spaced(0, DesignTokens.Space.X6));
 
-        // The keys.
-        body.AddView(PaperUi.Heading(this, VaultPageText.KeysHeading), Spaced(0, DesignTokens.Space.X2));
+        // The keys that need work. A working key is not on the page at all (owner's ruling, audit W8.4b), and
+        // with none needing work the heading goes too.
         var report = HeadCredentialHealth.Store().Load();
-        foreach (var key in VaultKeys.All)
+        var wanted = VaultKeys.All
+            .Select(key => (Key: key, State: StateOf(key, report.Get(key.CredentialId))))
+            .Where(pair => pair.State.Appears)
+            .ToList();
+        if (wanted.Count > 0)
         {
-            PaintKey(key, report.Get(key.CredentialId));
+            body.AddView(PaperUi.Heading(this, VaultPageText.KeysHeading), Spaced(0, DesignTokens.Space.X2));
+        }
+
+        foreach (var (key, state) in wanted)
+        {
+            PaintKey(key, state);
         }
     }
 
-    private void PaintKey(VaultKey key, CredentialHealth health)
+    private CredentialFieldState StateOf(VaultKey key, CredentialHealth health)
     {
         var rejected = VaultKeys.StillRejected(
             health.Status == CredentialStatus.Failing, health.CheckedAtUtc, PulpVault.ReplacedAt(key.CredentialId));
 
         // A key replaced since its rejection is simply not checked yet, which the shared rule reads as Unknown.
         var effective = health.Status == CredentialStatus.Failing && !rejected ? CredentialHealth.Unknown : health;
-        var state = CredentialFieldState.Decide(!string.IsNullOrEmpty(vault.ValueOf(key.CredentialId)), effective);
+        return CredentialFieldState.Decide(!string.IsNullOrEmpty(vault.ValueOf(key.CredentialId)), effective);
+    }
 
+    private void PaintKey(VaultKey key, CredentialFieldState state)
+    {
         body.AddView(PaperUi.Label(this, key.Name), Spaced(DesignTokens.Space.X2, DesignTokens.Space.X1));
 
-        if (state.ShowEntry || replacing.Contains(key.CredentialId))
+        var field = FieldFor(key);
+        body.AddView(field, Spaced(0, DesignTokens.Space.X1));
+
+        // The shared rule's own wording for a rejection carries the service's message; the page
+        // says it in one plain sentence instead.
+        var helper = state.IsWarning ? VaultKeys.Rejected(key.Name) : VaultPageText.KeyHelper;
+        var line = PaperUi.Secondary(this, helper);
+        if (state.IsWarning)
         {
-            var field = FieldFor(key);
-            body.AddView(field, Spaced(0, DesignTokens.Space.X1));
-
-            // The shared rule's own wording for a rejection carries the service's message; the page
-            // says it in one plain sentence instead.
-            var helper = state.IsWarning ? VaultKeys.Rejected(key.Name) : VaultPageText.KeyHelper;
-            var line = PaperUi.Secondary(this, helper);
-            if (state.IsWarning)
-            {
-                line.SetTextColor(PaperTheme.ProblemMark);
-            }
-
-            body.AddView(line, Spaced(0, DesignTokens.Space.X2));
-
-            // Where the key is made: the service's own console, from the suite's one table.
-            if (KeyConsoleLink.For(this, key.CredentialId) is { } link)
-            {
-                body.AddView(link, Spaced(0, DesignTokens.Space.X4));
-            }
-
-            return;
+            line.SetTextColor(PaperTheme.ProblemMark);
         }
 
-        var row = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        row.SetGravity(GravityFlags.CenterVertical);
-        row.AddView(PaperUi.Body(this, state.StatusText), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        row.AddView(PaperUi.QuietButton(this, VaultPageText.Replace, () =>
+        body.AddView(line, Spaced(0, DesignTokens.Space.X2));
+
+        // Where the key is made: the service's own console, from the suite's one table.
+        if (KeyConsoleLink.For(this, key.CredentialId) is { } link)
         {
-            replacing.Add(key.CredentialId);
-            Paint();
-            FieldFor(key).RequestFocus();
-        }));
-        body.AddView(row, Spaced(0, DesignTokens.Space.X4));
+            body.AddView(link, Spaced(0, DesignTokens.Space.X4));
+        }
     }
 
     // One field per key for the page's life, so a typed key survives a repaint. Masked like the suite's
@@ -302,7 +297,6 @@ public class VaultActivity : Activity
                 foreach (var id in entered.Keys)
                 {
                     keyFields[id].Text = string.Empty;
-                    replacing.Remove(id);
                     PulpNotices.Withdraw(this, overlay, KeyNoticeKey(id));
                 }
             }

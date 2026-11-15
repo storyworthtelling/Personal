@@ -432,37 +432,18 @@ public class UnlockActivity : Activity
         var input = PaperUi.MonoField(this, "GitHub token with repo read access");
         input.Text = new UpdateSettingsStore(this).GitHubToken;
 
-        // Show the token field only when it's missing or GitHub just rejected it; a working token collapses to
-        // a status line with Replace — it's backed up to the vault and restored automatically. Both views are
-        // built and toggled by visibility so Replace needn't rebuild the dialog, and Save reads input.Text
-        // whether or not the field is visible.
+        // The token field appears only when the token is missing or GitHub just rejected it; a working token is not
+        // on the card at all (owner's ruling, audit W8.4b) — the vault backs it up and restores it. Save reads
+        // input.Text either way, and a blank never overwrites the stored token.
         var tokenState = CredentialFieldState.Decide(
             !string.IsNullOrEmpty(input.Text),
             HeadCredentialHealth.Store().Load().Get(CredentialIds.GitHubUpdateToken));
         // Where the token is made, shown with the field: a fine-grained token with read access to the repository's contents.
         var tokenConsole = KeyConsoleLink.For(this, CredentialIds.GitHubUpdateToken);
-        var tokenStatusRow = new LinearLayout(this) { Orientation = Orientation.Horizontal };
-        tokenStatusRow.SetGravity(GravityFlags.CenterVertical);
-        tokenStatusRow.AddView(PaperUi.Secondary(this, "Update token: " + tokenState.StatusText),
-            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        tokenStatusRow.AddView(PaperUi.QuietButton(this, "Replace", () =>
+        if (tokenState.IsWarning)
         {
-            input.Text = string.Empty;
-            input.Visibility = ViewStates.Visible;
-            if (tokenConsole is not null)
-            {
-                tokenConsole.Visibility = ViewStates.Visible;
-            }
-
-            tokenStatusRow.Visibility = ViewStates.Gone;
-        }));
-        input.Visibility = tokenState.ShowEntry ? ViewStates.Visible : ViewStates.Gone;
-        if (tokenConsole is not null)
-        {
-            tokenConsole.Visibility = input.Visibility;
+            input.Hint = tokenState.StatusText;
         }
-
-        tokenStatusRow.Visibility = tokenState.ShowEntry ? ViewStates.Gone : ViewStates.Visible;
 
         // The secrets-vault passphrase lives with the other admin secret: it encrypts the shared Drive file
         // that backs up the update token (and every app's keys) so a factory reset can restore them.
@@ -472,11 +453,13 @@ public class UnlockActivity : Activity
         passphrase.Text = VaultPassphraseStore.Passphrase;
 
         var fields = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        fields.AddView(tokenStatusRow);
-        fields.AddView(input);
-        if (tokenConsole is not null)
+        if (tokenState.Appears)
         {
-            fields.AddView(tokenConsole);
+            fields.AddView(input);
+            if (tokenConsole is not null)
+            {
+                fields.AddView(tokenConsole);
+            }
         }
 
         fields.AddView(passphrase);
@@ -485,10 +468,15 @@ public class UnlockActivity : Activity
             new CardButton("Cancel", () => { }),
             new CardButton("Save", () =>
             {
-                new UpdateSettingsStore(this).GitHubToken = input.Text;
+                var token = input.Text?.Trim() ?? string.Empty;
                 VaultPassphraseStore.Passphrase = passphrase.Text ?? string.Empty;
-                PublishTokenToVault(input.Text);
-                inlineStatus = "Update token set.";
+                if (token.Length > 0)
+                {
+                    new UpdateSettingsStore(this).GitHubToken = token;
+                    PublishTokenToVault(token);
+                }
+
+                inlineStatus = token.Length > 0 ? "Update token set." : null;
                 Render();
             }, Primary: true));
     }

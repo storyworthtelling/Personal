@@ -64,54 +64,31 @@ public partial class SetupPage : FolioBinderPage
     }
 
     // Shows each API-key field only when there's something to do: no key stored yet, or a live call with
-    // the stored key was just rejected. A working key collapses to a "Working ✓" line with a Replace button,
-    // so the screen stays quiet and the raw key isn't left on display (the vault keeps the backup).
+    // the stored key was just rejected. A working key is not on the screen at all (owner's ruling, audit
+    // W8.4b): the vault keeps the backup.
     private void ApplyCredentialFields()
     {
         var report = CredentialHealth();
-        ApplyCredentialField(
-            CredentialIds.Claude, report, SettingsStore.ClaudeApiKey,
-            ClaudeStatusRow, ClaudeStatusLabel, ClaudeReplaceButton, ClaudeKeyEntry);
-        ApplyCredentialField(
-            CredentialIds.Gemini, report, SettingsStore.GeminiApiKey,
-            GeminiStatusRow, GeminiStatusLabel, GeminiReplaceButton, GeminiKeyEntry);
+        var claude = ApplyCredentialField(
+            CredentialIds.Claude, report, SettingsStore.ClaudeApiKey, ClaudeKeyBlock, ClaudeStatusLabel);
+        var gemini = ApplyCredentialField(
+            CredentialIds.Gemini, report, SettingsStore.GeminiApiKey, GeminiKeyBlock, GeminiStatusLabel);
+        ApiKeysSection.IsVisible = claude || gemini;
     }
 
     private static CredentialHealthReport CredentialHealth() =>
         IPlatformApplication.Current!.Services.GetRequiredService<Storyworthtelling.Voice.Health.CredentialHealthStore>().Load();
 
-    private void ApplyCredentialField(
-        string credentialId, CredentialHealthReport report, string storedValue,
-        Grid statusRow, Label statusLabel, Button replaceButton, Entry entry)
+    // Returns whether the key is on the screen. A refusal says so above the field; a key never entered
+    // needs no line, since the empty field with its placeholder says it.
+    private static bool ApplyCredentialField(
+        string credentialId, CredentialHealthReport report, string storedValue, View block, Label statusLabel)
     {
         var state = CredentialFieldState.Decide(!string.IsNullOrEmpty(storedValue), report.Get(credentialId));
-        entry.IsVisible = state.ShowEntry;
-        // The status row carries either the "Working ✓ / Replace" affordance (entry hidden) or the failure
-        // warning that sits above the revealed entry. A brand-new "Not set" needs neither — the empty entry
-        // with its placeholder says it.
-        statusRow.IsVisible = !state.ShowEntry || state.IsWarning;
-        replaceButton.IsVisible = !state.ShowEntry;
+        block.IsVisible = state.Appears;
+        statusLabel.IsVisible = state.IsWarning;
         statusLabel.Text = state.StatusText;
-        statusLabel.Style = LookupStyle(state.IsWarning ? "ErrorLabel" : "SecondaryLabel");
-    }
-
-    // Styles live in the app-wide merged dictionaries, which a page's own Resources indexer doesn't search;
-    // TryGetValue on the application resources walks the merged dictionaries.
-    private static Style? LookupStyle(string key) =>
-        Application.Current?.Resources.TryGetValue(key, out var value) == true ? value as Style : null;
-
-    private void OnReplaceClaudeClicked(object sender, EventArgs e) => RevealEntry(ClaudeStatusRow, ClaudeKeyEntry);
-
-    private void OnReplaceGeminiClicked(object sender, EventArgs e) => RevealEntry(GeminiStatusRow, GeminiKeyEntry);
-
-    // Deliberate rotation of a working key: hide the status row and open the entry (kept empty so the new
-    // value is typed fresh rather than edited over the old one).
-    private static void RevealEntry(Grid statusRow, Entry entry)
-    {
-        statusRow.IsVisible = false;
-        entry.Text = string.Empty;
-        entry.IsVisible = true;
-        entry.Focus();
+        return state.Appears;
     }
 
     private static ProjectBackupService BackupService() =>
@@ -410,7 +387,7 @@ public partial class SetupPage : FolioBinderPage
             return;
         }
 
-        // Replace empties a key's field for a paste; a blank never overwrites the working key.
+        // A blank never overwrites the stored key.
         if (text.Length == 0)
             return;
 
@@ -528,16 +505,19 @@ public partial class SetupPage : FolioBinderPage
         }
     }
 
-    // The reMarkable field/toggle mirror the credential-field pattern: once paired, the status collapses to a
-    // "Registered ✓" line and the delivery toggle is enabled; unpaired, the toggle is off and disabled.
+    // The reMarkable pairing mirrors the credential-field rule: it appears only when it needs doing (never
+    // paired, or the tablet turned the pairing away), and a working one is not on the screen (audit W8.4b).
+    // The delivery toggle is a real choice, so it stays; unpaired, it is off and disabled.
     private void UpdateRemarkableStatus()
     {
         var paired = !string.IsNullOrEmpty(SettingsStore.RemarkableDeviceToken);
-        // The pairing's health, not the token's presence: a revoked pairing used to read "Registered ✓" (audit 11 §11).
-        RemarkableStatusLabel.Text = Storyworthtelling.Remarkable.RemarkablePairingStatus.Describe(
+        // The pairing's health, not the token's presence (audit 11 §11).
+        var pairing = Storyworthtelling.Remarkable.RemarkablePairingStatus.Describe(
             paired,
             Storyworthtelling.Maui.Health.MauiCredentialHealth.Store().Load().Get(Storyworthtelling.Remarkable.RemarkableCredentialId.Value),
-            "Not registered yet.").Line;
+            "Not registered yet.");
+        RemarkableStatusLabel.Text = pairing.Line;
+        RemarkablePairingBlock.IsVisible = pairing.NeedsPairing;
         RemarkableSwitch.IsEnabled = paired;
         if (!paired && RemarkableSwitch.IsToggled)
         {

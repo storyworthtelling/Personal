@@ -18,9 +18,10 @@ public class SettingsGroupsTests
     public void AnEmptyHouseholdSaysSo() => Assert.Equal("Nobody yet", SettingsGroups.HouseholdMeta([]));
 
     [Fact]
-    public void TheVaultIsWorkingOnlyWhenNoKeyWantsEntering()
+    public void TheVaultSaysNothingWhenNoKeyWantsEntering()
     {
-        Assert.Equal("Working ✓", SettingsGroups.VaultMeta([false, false, false]));
+        // A working key is not on the screen (owner's ruling, audit W8.4b), and neither is a line saying so.
+        Assert.Null(SettingsGroups.VaultMeta([false, false, false]));
         Assert.Equal("1 key needed", SettingsGroups.VaultMeta([false, true, false]));
         Assert.Equal("3 keys needed", SettingsGroups.VaultMeta([true, true, true]));
     }

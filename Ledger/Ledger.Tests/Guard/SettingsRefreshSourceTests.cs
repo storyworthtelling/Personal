@@ -165,7 +165,7 @@ public class SettingsRefreshSourceTests
     }
 
     [Fact]
-    public void TheSharedKeysRowReadsWorkingOnTheLeftAndSetInFolioAloneOnTheRight()
+    public void TheSharedKeysRowSaysNotSetOnTheLeftAndSetInFolioAloneOnTheRight()
     {
         var xaml = Source(SetupXaml);
         var doc = XDocument.Parse(xaml);
@@ -183,8 +183,10 @@ public class SettingsRefreshSourceTests
         var folio = labels.Single(l => (string?)l.Attribute("Text") == "Set in Folio");
         Assert.Equal("1", (string?)folio.Attribute("Grid.Column"));
 
+        // The row exists only for a key that is not there; a present key is not on the screen (audit W8.4b).
         var apply = NoDoubleLinkTests.ExtractMethod(Source(SetupCode), "private async Task ApplySharedKeyStatusAsync()");
-        Assert.Contains("\"✓ Working\"", apply, StringComparison.Ordinal);
+        Assert.Contains("\"Not set.\"", apply, StringComparison.Ordinal);
+        Assert.DoesNotContain("Working", apply, StringComparison.Ordinal);
     }
 
     // ---- finding 6: her Settings is mockup 11 ----

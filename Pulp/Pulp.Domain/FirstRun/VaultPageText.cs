@@ -26,8 +26,6 @@ public static class VaultPageText
 
     public const string KeyHelper = "Not set. Paste the key, then Save; the vault keeps it from then on.";
 
-    public const string Replace = "Replace";
-
     public const string Save = "Save";
 
     public const string Saving = "Saving to the vault…";

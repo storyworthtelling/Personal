@@ -56,7 +56,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         password.Text = account.GmailAppPassword;
         password.InputType = Android.Text.InputTypes.ClassText | Android.Text.InputTypes.TextVariationPassword;
         password.Typeface = PaperTheme.Mono(Host); // setting InputType resets the typeface
-        // Replace empties the field for a paste; a blank never overwrites the working password.
+        // A blank never overwrites the stored password.
         PaperUi.CommitsAsTyped(password, text =>
         {
             if (text.Trim().Length > 0)
@@ -76,26 +76,14 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
             AddFieldGroup(passwordContainer, "App password", password, helper);
             KeyConsoleLink.AddTo(passwordContainer, CredentialIds.GmailAppPassword);
         }
-        void ShowPasswordStatus(string statusText)
-        {
-            passwordContainer.RemoveAllViews();
-            AddCredentialStatus(passwordContainer, "App password", statusText, () =>
-            {
-                password.Text = string.Empty;
-                ShowPasswordField(passwordHelper);
-                password.RequestFocus();
-            });
-        }
+        // A working app password is not on the screen at all (owner's ruling, audit W8.4b): it appears only when
+        // it is missing or Gmail just refused it.
         var passwordState = CredentialFieldState.Decide(
             !string.IsNullOrEmpty(account.GmailAppPassword),
             HeadCredentialHealth.Store().Load().Get(CredentialIds.GmailAppPassword));
-        if (passwordState.ShowEntry)
+        if (passwordState.Appears)
         {
             ShowPasswordField(passwordState.IsWarning ? passwordState.StatusText : passwordHelper);
-        }
-        else
-        {
-            ShowPasswordStatus(passwordState.StatusText);
         }
 
         var enableMessages = PaperUi.SecondaryButton(Host, "Enable message sync (notification access)", () =>
@@ -255,25 +243,6 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         {
             layout.AddView(PaperUi.Secondary(Host, helper), Spaced(0, DesignTokens.Space.X4));
         }
-    }
-
-    // The collapsed form of a healthy credential: the same field label, then a status line
-    // ("Working ✓") with a Replace button that swaps the real field back in for a
-    // deliberate rotation.
-    private void AddCredentialStatus(LinearLayout layout, string label, string statusText, Action onReplace)
-    {
-        var labelView = PaperUi.Secondary(Host, label);
-        labelView.TextSize = DesignTokens.TypeSp.Label;
-        labelView.Typeface = PaperTheme.SansSemibold(Host);
-        labelView.SetTextColor(PaperTheme.Ink);
-        layout.AddView(labelView, Spaced(0, DesignTokens.Space.X1));
-
-        var row = new LinearLayout(Host) { Orientation = Orientation.Horizontal };
-        row.SetGravity(GravityFlags.CenterVertical);
-        row.AddView(PaperUi.Secondary(Host, statusText),
-            new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        row.AddView(PaperUi.QuietButton(Host, "Replace", onReplace));
-        layout.AddView(row, Spaced(0, DesignTokens.Space.X4));
     }
 
     private LinearLayout.LayoutParams Spaced(int topDp, int bottomDp) =>

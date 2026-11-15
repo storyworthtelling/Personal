@@ -12,11 +12,10 @@
 
         Two rules shape what is here at all:
 
-        A WORKING CREDENTIAL IS ONE QUIET LINE. "Working ✓" and a quiet Replace, as in every app
-        of the suite (audit W8.4): the vault backs a key up and restores it, so a healthy one has
-        nothing to ask, and its field is shown again only when it is missing, was just refused,
-        or the owner asks to replace it. "Needs you" is a whole group that does not exist on a
-        good morning.
+        A WORKING CREDENTIAL DOES NOT APPEAR (owner's ruling, audit W8.4b, in every app of the
+        suite). Not collapsed to a line — absent. The vault backs a key up and restores it, so a
+        healthy one has nothing to ask and nothing to show; the row itself is the clutter. "Needs
+        you" is a whole group that does not exist on a good morning.
 
         THERE IS NO SAVE. Every value commits as it changes, which is §5's inline state change
         and the rule Score gives for its own vault field: leaving by a tab never blurs anything,
@@ -54,13 +53,6 @@
                    IsVisible="False" />
             <Border x:Name="NeedsYouCard" Style="{StaticResource GroupCard}" IsVisible="False">
                 <VerticalStackLayout x:Name="NeedsYouRows" />
-            </Border>
-
-            <!-- ==== Connections: the keys that work, one quiet line each =============== -->
-            <Label x:Name="ConnectionsLabel" Text="Connections" Style="{StaticResource GroupLabel}"
-                   IsVisible="False" />
-            <Border x:Name="ConnectionsCard" Style="{StaticResource GroupCard}" IsVisible="False">
-                <VerticalStackLayout x:Name="ConnectionsRows" />
             </Border>
 
             <!-- ==== Calendars ========================================================= -->
@@ -158,16 +150,6 @@
                         <ContentView x:Name="MapsConsoleLink" />
                     </VerticalStackLayout>
 
-                    <Grid x:Name="MapsKeyWorkingRow" Padding="16,12" ColumnDefinitions="*,Auto"
-                          IsVisible="False">
-                        <VerticalStackLayout Grid.Column="0">
-                            <Label Text="Maps key" Style="{StaticResource CardRowTitle}" />
-                            <Label Text="Working ✓" Style="{StaticResource CardRowDescription}" />
-                        </VerticalStackLayout>
-                        <Button Grid.Column="1" Text="Replace" Clicked="OnReplaceMapsKey"
-                                Style="{StaticResource QuietButton}" />
-                    </Grid>
-
                     <!-- Home is FOUND, not asked: the Google account's own home address (the one
                          Maps labels Home), geocoded to the point the forecast needs. The fields
                          appear only when a lookup comes back empty. -->
@@ -196,7 +178,8 @@
             <Label Text="Where it goes" Style="{StaticResource GroupLabel}" />
             <Border Style="{StaticResource GroupCard}">
                 <VerticalStackLayout>
-                    <Grid Padding="16,12" ColumnDefinitions="*,Auto">
+                    <!-- A working pairing is not on the screen (owner's ruling, audit W8.4b). -->
+                    <Grid x:Name="RemarkableRow" Padding="16,12" ColumnDefinitions="*,Auto">
                         <VerticalStackLayout Grid.Column="0">
                             <Label Text="reMarkable" Style="{StaticResource CardRowTitle}" />
                             <Label x:Name="RemarkableStatusLabel" Style="{StaticResource CardRowDescription}" />
@@ -214,7 +197,7 @@
                         <Button Text="Register reMarkable device" Style="{StaticResource SecondaryButton}"
                                 Clicked="OnRegisterRemarkableClicked" />
                     </VerticalStackLayout>
-                    <BoxView HeightRequest="1" Color="{StaticResource Hairline}" />
+                    <BoxView x:Name="RemarkableDivider" HeightRequest="1" Color="{StaticResource Hairline}" />
                     <Grid Padding="16,12" ColumnDefinitions="*,Auto">
                         <VerticalStackLayout Grid.Column="0">
                             <Label Text="Google" Style="{StaticResource CardRowTitle}" />

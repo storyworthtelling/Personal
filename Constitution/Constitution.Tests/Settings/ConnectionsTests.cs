@@ -7,7 +7,7 @@ using Storyworthtelling.Voice.Health;
 
 namespace Constitution.Tests.Settings;
 
-/// <summary>C-8.1.3: a working connection collapses; a broken one says what to do (book p.17).</summary>
+/// <summary>C-8.1.3: a working connection is not on the screen (owner's ruling, audit W8.4b); a broken one says what to do (book p.17).</summary>
 public class ConnectionsTests
 {
     private static readonly DateTimeOffset Now = new(2026, 3, 14, 7, 30, 0, TimeSpan.Zero);
@@ -16,23 +16,14 @@ public class ConnectionsTests
         SettingsModel.Build(new Pillars(true, true, true), EquipmentSet.Of([]), inputs);
 
     [Fact]
-    public void WorkingCollapses()
+    public void AWorkingConnectionDoesNotAppear()
     {
         var model = Build(
             new ConnectionInput(SettingsModel.HealthConnectId, IsSet: true, ConnectionHealth.Working),
             new ConnectionInput(CredentialIds.SleepNumber, IsSet: true, ConnectionHealth.Working),
-            new ConnectionInput(CredentialIds.Remarkable, IsSet: true, ConnectionHealth.Working));
+            new ConnectionInput(CredentialIds.Remarkable, IsSet: true, ConnectionHealth.Unknown));
 
-        Assert.All(model.Connections, row =>
-        {
-            Assert.Equal(ConnectionStatus.Working, row.Status);
-            Assert.Equal("Working ✓", row.StatusText);
-            // Audit W8.4 (report 02 §7): a working key collapses to "Working ✓" with a quiet Replace, as in
-            // every app. Health Connect has nothing to replace, so it keeps no button.
-            Assert.Equal(row.CredentialId == SettingsModel.HealthConnectId ? null : SettingsModel.ReplaceLabel, row.ButtonLabel);
-            Assert.False(row.IsProblem);
-            Assert.Null(row.RaisesNotice);
-        });
+        Assert.Empty(model.Connections);
         Assert.Equal("Connections", model.ConnectionsHeader);
     }
 
@@ -96,7 +87,13 @@ public class ConnectionsTests
         };
 
         var row = Build(new ConnectionInput(CredentialIds.Remarkable, isSet, domainHealth)).Connections
-            .Single(r => r.CredentialId == CredentialIds.Remarkable);
+            .SingleOrDefault(r => r.CredentialId == CredentialIds.Remarkable);
+
+        Assert.Equal(shared.Appears, row is not null);
+        if (row is null)
+        {
+            return;
+        }
 
         Assert.Equal(shared.ShowEntry, row.EntryWanted);
         Assert.Equal(shared.IsWarning, row.IsProblem);

@@ -206,7 +206,8 @@ public class SettingsWiringSourceTests
 
         Assert.Contains("model.OvernightReads", text, StringComparison.Ordinal);
         Assert.Contains("new ActivityHealthPermissionRequester(Host).OpenHealthConnectSettings(", text, StringComparison.Ordinal);
-        Assert.Contains("SettingsModel.HealthConnectId", BodyOf(text, "BuildConnections") ?? string.Empty, StringComparison.Ordinal);
+        // In Connections, and drawn even when Health Connect itself needs nothing (audit W8.4b).
+        Assert.Contains("model.OvernightReads", BodyOf(text, "BuildConnections") ?? string.Empty, StringComparison.Ordinal);
     }
 
     // ---- review S8: the trails could never be read off the device ----

@@ -437,28 +437,22 @@ public sealed class SettingsArea(Activity host)
                 }
 
                 var id = row.CredentialId;
-                // A settled key's Replace is quiet; an unset or refused one asks with a Secondary (audit W8.4).
-                var settled = !entering && row.ButtonLabel == SettingsModel.ReplaceLabel;
                 block.AddView(
-                    settled
-                        ? PaperUi.QuietButton(Host, row.ButtonLabel, () => OnConnectionButton(id))
-                        : PaperUi.SecondaryButton(Host, entering ? EntryVerb(id) : row.ButtonLabel, () => OnConnectionButton(id)),
-                    Spaced(DesignTokens.Space.X2));
-            }
-
-            if (row.CredentialId == SettingsModel.HealthConnectId)
-            {
-                // Review S10: the overnight permission can only be given from Health Connect's own page.
-                var overnight = model.OvernightReads;
-                block.AddView(PaperUi.Body(Host, overnight.Name), Spaced(DesignTokens.Space.X2));
-                block.AddView(PaperUi.Secondary(Host, overnight.Sentence));
-                block.AddView(
-                    PaperUi.SecondaryButton(Host, overnight.ButtonLabel, OpenOvernightSettings),
+                    PaperUi.SecondaryButton(Host, entering ? EntryVerb(id) : row.ButtonLabel, () => OnConnectionButton(id)),
                     Spaced(DesignTokens.Space.X2));
             }
 
             body.AddView(block, Spaced(DesignTokens.Space.X3));
         }
+
+        // Review S10: the overnight permission can only be given from Health Connect's own page. It stays on the
+        // screen whether or not Health Connect itself needs anything, since nothing here can tell it was given.
+        var overnight = model.OvernightReads;
+        var reads = new LinearLayout(Host) { Orientation = Orientation.Vertical };
+        reads.AddView(PaperUi.Body(Host, overnight.Name));
+        reads.AddView(PaperUi.Secondary(Host, overnight.Sentence));
+        reads.AddView(PaperUi.SecondaryButton(Host, overnight.ButtonLabel, OpenOvernightSettings), Spaced(DesignTokens.Space.X2));
+        body.AddView(reads, Spaced(DesignTokens.Space.X3));
 
         // Review S7: the household shares one bed login, so which side is mine is chosen here, once a login is set.
         var loginSet = connections.SleepNumberLogin.Length > 0 && connections.SleepNumberPassword.Length > 0;
