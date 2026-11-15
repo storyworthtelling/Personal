@@ -166,7 +166,7 @@ public static class MauiTapWatch
         }
         var target = control ?? hit;
         var name = Name(target, activity) + (longPress ? " (long press)" : string.Empty);
-        watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null);
+        watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null, textEntry: IsTextEntry(target));
         Schedule();
     }
 
@@ -195,7 +195,12 @@ public static class MauiTapWatch
             }
         }
         var inList = InList(view);
-        var text = inList ? null : view is TextView own ? own.Text : FirstText(view);
+        if (view is TextView field && IsTextEntry(field))
+        {
+            // Its text is whatever was typed into it; only the hint or the id may name it.
+            return TapWatchCore.TextEntryName(field.Hint, id, inList: inList);
+        }
+        var text = inList ? null : view is TextView own && !IsTextEntry(own) ? own.Text : FirstText(view);
         if (!inList && string.IsNullOrWhiteSpace(text))
         {
             text = view.ContentDescription;
@@ -229,12 +234,15 @@ public static class MauiTapWatch
         return false;
     }
 
+    /// <summary>An editable text field (an EditText, or any TextView that takes typing), whose text is never a label.</summary>
+    private static bool IsTextEntry(AView view) => view is TextView text && (text is EditText || text.OnCheckIsTextEditor());
+
     private static bool IsList(object view) =>
         view is AdapterView || view.GetType().Name.EndsWith("RecyclerView", StringComparison.Ordinal);
 
     private static string? FirstText(AView view)
     {
-        if (view is TextView textView && !string.IsNullOrWhiteSpace(textView.Text))
+        if (view is TextView textView && !IsTextEntry(textView) && !string.IsNullOrWhiteSpace(textView.Text))
         {
             return textView.Text;
         }

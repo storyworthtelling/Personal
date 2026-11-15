@@ -88,6 +88,27 @@ public class BodyScreensSourceTests
         Assert.DoesNotContain("WRITE", source, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// MANAGE_HEALTH_PERMISSIONS is guarded by a permission only system apps hold, so starting it throws a
+    /// SecurityException on some phones. Opening Health Connect's page must survive that and try a public route.
+    /// </summary>
+    [Fact]
+    public void OpeningHealthConnectSurvivesARefusalAndTriesAPublicRoute()
+    {
+        var source = Read("Constitution.Android/Health/ActivityHealthPermissionRequester.cs");
+        var start = source.IndexOf("public bool OpenHealthConnectSettings(", StringComparison.Ordinal);
+        Assert.True(start >= 0, "OpenHealthConnectSettings is gone; this guard is not reading it.");
+        var method = source[start..];
+
+        Assert.Contains("catch (Java.Lang.SecurityException", method, StringComparison.Ordinal);
+        var actions = Regex.Matches(source, @"""(android\.[a-z.]+\.action\.[A-Z_]+|android\.settings\.[A-Z_]+)""")
+            .Select(match => match.Groups[1].Value)
+            .Where(action => action != "android.health.connect.action.MANAGE_HEALTH_PERMISSIONS")
+            .ToList();
+        Assert.True(actions.Count > 0, "No fallback route other than MANAGE_HEALTH_PERMISSIONS is named.");
+        Assert.Contains("android.health.connect.action.HEALTH_HOME_SETTINGS", actions);
+    }
+
     [Fact]
     public void TheRequestCodeIsNotTheAccountPickers()
     {

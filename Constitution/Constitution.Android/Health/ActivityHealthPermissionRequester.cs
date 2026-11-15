@@ -28,6 +28,12 @@ public sealed class ActivityHealthPermissionRequester(Activity activity) : IHeal
 
     private const string ManageHealthPermissionsAction = "android.health.connect.action.MANAGE_HEALTH_PERMISSIONS";
 
+    /// <summary>Health Connect's home page, open to any app; the first fallback when the permissions page is refused.</summary>
+    private const string HealthHomeSettingsAction = "android.health.connect.action.HEALTH_HOME_SETTINGS";
+
+    /// <summary>This app's details page in Settings, where its permissions can be reached; the last route.</summary>
+    private const string AppDetailsSettingsAction = "android.settings.APPLICATION_DETAILS_SETTINGS";
+
     private TaskCompletionSource<bool>? pending;
     private BodySignal pendingSignal;
     private KeyAction? asking;
@@ -74,21 +80,37 @@ public sealed class ActivityHealthPermissionRequester(Activity activity) : IHeal
 
     /// <summary>
     /// Opens Health Connect's own page for this app's permissions, for when the dialog will no longer appear.
-    /// Returns false, and says why to the Body trail by the exception's type only, when the platform has no such page.
+    /// MANAGE_HEALTH_PERMISSIONS is guarded on some phones by a permission only system apps hold, so the platform
+    /// refuses it with a SecurityException; then Health Connect's home page is tried, then this app's details page
+    /// in Settings. Each refusal is said to the Body trail by the exception's type only. Returns false only when
+    /// every route fails.
     /// </summary>
     public bool OpenHealthConnectSettings(IBodyLog log)
     {
         ArgumentNullException.ThrowIfNull(log);
-        try
+        var routes = new Func<Intent>[]
         {
-            var intent = new Intent(ManageHealthPermissionsAction).PutExtra(Intent.ExtraPackageName, activity.PackageName);
-            activity.StartActivity(intent);
-            return true;
-        }
-        catch (ActivityNotFoundException e)
+            () => new Intent(ManageHealthPermissionsAction).PutExtra(Intent.ExtraPackageName, activity.PackageName),
+            () => new Intent(HealthHomeSettingsAction),
+            () => new Intent(AppDetailsSettingsAction, Android.Net.Uri.FromParts("package", activity.PackageName, null)),
+        };
+        foreach (var route in routes)
         {
-            log.Outcome($"health settings page not opened: {e.GetType().Name}");
-            return false;
+            try
+            {
+                activity.StartActivity(route());
+                return true;
+            }
+            catch (ActivityNotFoundException e)
+            {
+                log.Outcome($"health settings page not opened: {e.GetType().Name}");
+            }
+            catch (Java.Lang.SecurityException e)
+            {
+                log.Outcome($"health settings page not opened: {e.GetType().Name}");
+            }
         }
+
+        return false;
     }
 }

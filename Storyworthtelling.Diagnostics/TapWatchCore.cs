@@ -87,6 +87,19 @@ public sealed class TapWatchCore
         return id.Length > 0 ? id : typeName;
     }
 
+    /// <summary>
+    /// How an editable text field is named: never by its text, which is whatever was typed into it (a recipe, a
+    /// search, a password), but by its hint, then <c>#id</c>, else "text field". Inside a list it is a row, as above.
+    /// </summary>
+    public static string TextEntryName(string? hint, string? idEntryName, bool inList = false)
+    {
+        if (inList)
+        {
+            return ControlName(null, idEntryName, "text field", inList: true);
+        }
+        return ControlName(hint, idEntryName, "text field", inList: false);
+    }
+
     /// <summary>How often the hook ticks while anything is pending.</summary>
     public const long TickAfterTapMs = 500;
 
@@ -166,7 +179,14 @@ public sealed class TapWatchCore
     });
 
     public void Touched(string control, TapPoint point, bool enabled, bool isControl) =>
-        Feed(j => j.Tap(clock(), screen, control, point, enabled, isControl));
+        Touched(control, point, enabled, isControl, textEntry: false);
+
+    /// <summary>
+    /// As above; a tap on a text field (<paramref name="textEntry"/>) is never a dead candidate, since placing the
+    /// cursor or raising the keyboard changes nothing the layout fingerprint sees.
+    /// </summary>
+    public void Touched(string control, TapPoint point, bool enabled, bool isControl, bool textEntry) =>
+        Feed(j => j.Tap(clock(), screen, control, point, enabled, isControl, resultVisible: !textEntry));
 
     /// <summary>
     /// A tap on something whose response the hooks cannot see (web content): never judged dead, still counted for
