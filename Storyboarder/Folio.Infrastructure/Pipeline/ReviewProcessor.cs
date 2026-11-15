@@ -1322,8 +1322,11 @@ public sealed class ReviewProcessor : IPipelineStep
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            novel.StageAttempts++;
             novel.LastError = $"Could not deliver to reMarkable: {ex.Message}";
+            if (NetworkFailure.IsOffline(ex))
+                return await WaitForNetwork(db, novel, ex, "Delivering to the reMarkable", cancellationToken);
+
+            novel.StageAttempts++;
             if (novel.StageAttempts >= rateLimits.MaxAttempts)
             {
                 // Give up so the review can still finish (the report is on the device and, if enabled, Drive).
@@ -1333,7 +1336,7 @@ public sealed class ReviewProcessor : IPipelineStep
                     "was delivered to the tablet, continuing (the report remains available elsewhere)",
                     novel.Id, novel.StageAttempts);
                 var attempts = novel.StageAttempts;
-                var cause = Storyworthtelling.Diagnostics.PlainError.Describe(ex.Message, "Claude");
+                var cause = Storyworthtelling.Diagnostics.PlainError.Describe(ex.Message, "reMarkable");
                 return await SettleWithoutTablet(db, novel, analysis,
                     $"It did not reach the reMarkable after {attempts} tries" +
                     (cause.Length == 0 ? "." : $": {cause}."), cancellationToken);
