@@ -352,7 +352,7 @@ public partial class SetupPage : FolioBinderPage
             return Storyworthtelling.Updates.BuildLine.Format(
                 FolioIdentity.DisplayName, AppInfo.Current.VersionString, AppInfo.Current.PackageName);
         }
-        catch (Exception ex) when (ex is NotImplementedInReferenceAssemblyException or InvalidOperationException)
+        catch (Exception)
         {
             return Storyworthtelling.Updates.BuildLine.Format(FolioIdentity.DisplayName, null, AppSigningInfo.PackageName);
         }
