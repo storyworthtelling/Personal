@@ -57,6 +57,26 @@ public partial class RuntimeLogsCarryNoValuesTests
         Assert.Matches(new Regex(@"TapWatchCore\.ControlName\([^;]*inList:\s*inList\)"), source);
     }
 
+    /// <summary>
+    /// Log loop: a tapped text field was named by its Text, so what had been typed into it became the control's name
+    /// in an uploaded tap line, and a tap that only placed the cursor was judged dead. Both watches must recognise an
+    /// editable view, name it by its hint through <c>TapWatchCore.TextEntryName</c>, never read an editable view's text
+    /// for a label (itself or as a child), and tell the core the tap was text entry.
+    /// </summary>
+    [Theory]
+    [InlineData("FocusPhone/Codex.Ui.Android/Diagnostics/TapWatch.cs")]
+    [InlineData("Storyworthtelling.Maui/Diagnostics/MauiTapWatch.cs")]
+    public void BothTapWatchesNeverNameAnEditableViewByItsText(string file)
+    {
+        var source = Read(file);
+
+        Assert.Matches(new Regex(@"static bool IsTextEntry\([^)]*\)\s*=>[^;]*OnCheckIsTextEditor\(\)"), source);
+        Assert.Matches(new Regex(@"TapWatchCore\.TextEntryName\([^;]*\.Hint"), source);
+        Assert.Matches(new Regex(@"watch\.Touched\([^;]*textEntry:"), source);
+        Assert.Matches(new Regex(@"view is TextView textView && !IsTextEntry\(textView\)"), source);
+        Assert.DoesNotMatch(new Regex(@"view is TextView own \? own\.Text"), source);
+    }
+
     [Fact]
     public void TheGuardSeesAnInterpolatedValue()
     {
