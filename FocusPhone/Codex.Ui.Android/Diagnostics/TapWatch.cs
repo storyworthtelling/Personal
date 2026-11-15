@@ -46,9 +46,11 @@ public static class TapWatch
         }
         try
         {
-            window.Callback = new WatchedCallback(window.Callback, activity);
+            var callback = new WatchedCallback(window.Callback, activity);
+            window.Callback = callback;
             window.DecorView.ViewTreeObserver?.AddOnGlobalLayoutListener(new LayoutListener(window));
-            watch.ScreenShown(screen ?? activity.GetType().Name);
+            // Announced as this callback's, so it can say so again when the activity is resumed, not recreated.
+            watch.ScreenShown(screen ?? activity.GetType().Name, callback);
             Schedule();
         }
         catch (Exception e)
@@ -153,18 +155,54 @@ public static class TapWatch
             return;
         }
         var control = hit;
-        while (control is not null && !IsControl(control, longPress))
+        while (control is not null && !IsControl(control, longPress, x, y))
         {
             control = control.Parent as View;
         }
         var target = control ?? hit;
         var name = Name(target, activity) + (longPress ? " (long press)" : string.Empty);
-        watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null);
+        if (InWebView(hit))
+        {
+            // A web page's response is not in the layout the watch fingerprints, so it cannot judge this tap dead.
+            watch.TouchedUnseen(name, new TapPoint(x, y), target.Enabled);
+        }
+        else
+        {
+            watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null);
+        }
         Schedule();
     }
 
-    private static bool IsControl(View view, bool longPress) =>
-        longPress ? view.LongClickable : view.Clickable || view.HasOnClickListeners;
+    private static bool InWebView(View view)
+    {
+        if (view is Android.Webkit.WebView)
+        {
+            return true;
+        }
+        for (var at = view.Parent; at is not null; at = at.Parent)
+        {
+            if (at is Android.Webkit.WebView)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // x and y are in window coordinates; a view that draws its own controls is asked in its own.
+    private static bool IsControl(View view, bool longPress, float x, float y)
+    {
+        if (view is IDrawnControls drawn)
+        {
+            var origin = new int[2];
+            view.GetLocationInWindow(origin);
+            if (drawn.HasControlAt(x - origin[0], y - origin[1]))
+            {
+                return true;
+            }
+        }
+        return longPress ? view.LongClickable : view.Clickable || view.HasOnClickListeners;
+    }
 
     private static string Name(View view, Activity activity)
     {
@@ -369,7 +407,25 @@ public static class TapWatch
         public bool OnSearchRequested() => inner.OnSearchRequested();
         public bool OnSearchRequested(SearchEvent? searchEvent) => inner.OnSearchRequested(searchEvent);
         public void OnWindowAttributesChanged(WindowManagerLayoutParams? attrs) => inner.OnWindowAttributesChanged(attrs);
-        public void OnWindowFocusChanged(bool hasFocus) => inner.OnWindowFocusChanged(hasFocus);
+        // Back on this activity without it being created again (home from the browser it opened): its screen is
+        // the one showing again, or every tap here would be judged on the screen created last.
+        public void OnWindowFocusChanged(bool hasFocus)
+        {
+            if (hasFocus)
+            {
+                try
+                {
+                    core?.ScreenReturned(this);
+                    Schedule();
+                }
+                catch (Exception ex)
+                {
+                    Android.Util.Log.Warn("TapWatch", $"Screen return failed: {ex.Message}");
+                }
+            }
+            inner.OnWindowFocusChanged(hasFocus);
+        }
+
         public ActionMode? OnWindowStartingActionMode(ActionMode.ICallback? callback) => inner.OnWindowStartingActionMode(callback);
         public ActionMode? OnWindowStartingActionMode(ActionMode.ICallback? callback, ActionModeType type) => inner.OnWindowStartingActionMode(callback, type);
         public void OnPointerCaptureChanged(bool hasCapture) => inner.OnPointerCaptureChanged(hasCapture);

@@ -95,6 +95,11 @@ public sealed class TapWatchCore
     private readonly TapJudge judge = new();
     private readonly object gate = new();
     private string screen = "(none)";
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, OwnedScreen> owners = new();
+    // Weak too: the owner is an activity's window hook, which holds the activity.
+    private WeakReference<object>? currentOwner;
+
+    private sealed record OwnedScreen(string Name);
 
     public TapWatchCore(Func<long> clock, Action<TapVerdict> report)
     {
@@ -113,14 +118,62 @@ public sealed class TapWatchCore
         }
     }
 
+    /// <summary>
+    /// The screen changed. With no owner it is an area or tab switching inside whatever owns the screen now,
+    /// and that owner comes back to it (<see cref="ScreenReturned"/>).
+    /// </summary>
     public void ScreenShown(string name) => Feed(j =>
     {
         screen = name;
+        if (currentOwner is not null && currentOwner.TryGetTarget(out var owner))
+        {
+            owners.AddOrUpdate(owner, new OwnedScreen(name));
+        }
         return j.ScreenChanged(clock(), name);
+    });
+
+    /// <summary>
+    /// <paramref name="owner"/> (an activity's window hook) is showing <paramref name="name"/>. Held weakly, so a
+    /// destroyed activity is not kept alive by the watch.
+    /// </summary>
+    public void ScreenShown(string name, object owner)
+    {
+        lock (gate)
+        {
+            currentOwner = new WeakReference<object>(owner);
+        }
+        ScreenShown(name);
+    }
+
+    /// <summary>
+    /// <paramref name="owner"/> is showing again without being created again (its window regained focus): its last
+    /// screen is shown once more. Regaining focus on the screen already showing — a system dialog closing over it —
+    /// is not a change, so a tap waiting to be judged dead there is still judged.
+    /// </summary>
+    public void ScreenReturned(object owner) => Feed(j =>
+    {
+        if (!owners.TryGetValue(owner, out var owned))
+        {
+            return [];
+        }
+        currentOwner = new WeakReference<object>(owner);
+        if (owned.Name == screen)
+        {
+            return [];
+        }
+        screen = owned.Name;
+        return j.ScreenChanged(clock(), owned.Name);
     });
 
     public void Touched(string control, TapPoint point, bool enabled, bool isControl) =>
         Feed(j => j.Tap(clock(), screen, control, point, enabled, isControl));
+
+    /// <summary>
+    /// A tap on something whose response the hooks cannot see (web content): never judged dead, still counted for
+    /// repeats.
+    /// </summary>
+    public void TouchedUnseen(string control, TapPoint point, bool enabled) =>
+        Feed(j => j.Tap(clock(), screen, control, point, enabled, isControl: true, resultVisible: false));
 
     public void ContentChanged() => Feed(j => j.ContentChanged(clock(), screen));
 

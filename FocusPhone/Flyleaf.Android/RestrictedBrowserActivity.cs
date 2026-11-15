@@ -172,7 +172,12 @@ public class RestrictedBrowserActivity : Activity
         base.OnDestroy();
     }
 
-    public void ShowAddress(string url) => addressDisplay!.Text = url;
+    public void ShowAddress(string url)
+    {
+        addressDisplay!.Text = url;
+        // A one-line text change need not lay anything out, so the tap watch is told the page moved.
+        TapWatch.Status();
+    }
 
     private void ShowStatus(string message) => addressDisplay!.Text = message;
 
@@ -344,6 +349,16 @@ public class RestrictedBrowserActivity : Activity
                 activity.ShowBlockedPage(target ?? "(unparseable URL)");
             }
             return true;
+        }
+
+        // Said when the navigation begins, not only once it has loaded: the tap that started it was answered.
+        public override void OnPageStarted(WebView? view, string? url, Android.Graphics.Bitmap? favicon)
+        {
+            base.OnPageStarted(view, url, favicon);
+            if (url is not null)
+            {
+                activity.ShowAddress(url);
+            }
         }
 
         public override void OnPageFinished(WebView? view, string? url)

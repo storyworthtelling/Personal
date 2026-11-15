@@ -21,7 +21,7 @@ namespace Flyleaf;
 /// the first pass); the math underneath is verified in Codex.Tests.
 /// </para>
 /// </summary>
-public class BookshelfView : View
+public class BookshelfView : View, IDrawnControls
 {
     private readonly IShelfArt art;
     private readonly float density;
@@ -720,6 +720,9 @@ public class BookshelfView : View
     }
 
     // ---- Hit testing ----
+
+    /// <summary>A book is a control the tap watch cannot see by its flags (it is painted, not a view).</summary>
+    public bool HasControlAt(float x, float y) => HitTest(x, y) is not null;
 
     private PlacedItem? HitTest(float x, float y)
     {
