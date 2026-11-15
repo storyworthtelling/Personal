@@ -1,3 +1,4 @@
+using Folio.Domain.Reading;
 using Folio.Domain.Analysis;
 using Folio.Domain.Readiness;
 
@@ -47,4 +48,14 @@ public sealed record BookRecord(
     /// The latest draft's length against its genre norm, from the expansion read. Empty until that
     /// read has run, which is the ordinary state of a book still being reviewed.
     /// </summary>
-    LengthAssessment Length);
+    LengthAssessment Length)
+{
+    /// <summary>
+    /// The six readers' scores on the newest draft that has any, each beside the same reader's score
+    /// on the draft before it. Empty until a draft has been read with scores.
+    /// </summary>
+    public IReadOnlyList<ReaderScore> ReaderScores { get; init; } = [];
+
+    /// <summary>Which draft <see cref="ReaderScores"/> are from; null when there are none.</summary>
+    public int? ScoredDraftNumber { get; init; }
+}

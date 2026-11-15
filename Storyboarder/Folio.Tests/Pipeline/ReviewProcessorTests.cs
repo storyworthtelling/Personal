@@ -72,7 +72,8 @@ public class ReviewProcessorTests : IDisposable
                 readerGenres.Add(genre);
                 return Task.FromResult(new Review(
                     persona.Id, "A verdict in one clause.", "A sustained read in character.",
-                    ["what works"], ["what does not"], "what it would need"));
+                    ["what works"], ["what does not"], "what it would need")
+                { Score = 7, ScoreReason = "One clause on why." });
             });
 
         claude.Setup(c => c.Synthesise(
@@ -816,6 +817,33 @@ public class ReviewProcessorTests : IDisposable
         context.Novels.Add(draft);
         context.SaveChanges();
         return draft.Id;
+    }
+
+    /// <summary>
+    /// A second draft's report says how each reader's score moved, against that reader's score on the
+    /// draft it was made from — read back from the first draft's own stored reads.
+    /// </summary>
+    [Fact]
+    public async Task SecondDraft_ReportSaysHowEachReadersScoreMoved()
+    {
+        const string text = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        var firstId = SeedManuscript(text);
+        await DriveToCompletion(NewProcessor());
+        Assert.DoesNotContain("last draft", ReportText(firstId), StringComparison.Ordinal);
+
+        var secondId = SeedNextDraft(firstId, text);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Contains("unchanged from last draft", ReportText(secondId), StringComparison.Ordinal);
+    }
+
+    private string ReportText(Guid draftId)
+    {
+        using var context = database.NewContext();
+        var path = context.BookAnalyses.Single(a => a.NovelId == draftId).PdfPath;
+        Assert.NotNull(path);
+        using var pdf = UglyToad.PdfPig.PdfDocument.Open(path);
+        return string.Join("\n", pdf.GetPages().Select(page => page.Text));
     }
 
     [Fact]

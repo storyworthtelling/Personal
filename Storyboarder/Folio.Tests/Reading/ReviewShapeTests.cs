@@ -21,7 +21,8 @@ public class ReviewShapeTests
         "A sustained assessment in character.",
         ["The marsh and the inquest are the pitch."],
         ["The middle is where I would lose an editor."],
-        "The middle tightened before I sent it out.");
+        "The middle tightened before I sent it out.")
+    { Score = 7, ScoreReason = "I would ask for the full." };
 
     /// <summary>The record still carries all six parts — the four printed plus who and the verdict.</summary>
     [Fact]

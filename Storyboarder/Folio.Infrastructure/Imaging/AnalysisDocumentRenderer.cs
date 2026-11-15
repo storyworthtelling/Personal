@@ -195,7 +195,7 @@ public sealed class AnalysisDocumentRenderer
         // A report with no count at all keeps the questions as the catalogue words them.
         var wordCount = analysis.WordCount > 0 ? analysis.WordCount : cover.WordCount;
         var length = wordCount > 0 ? ManuscriptLength.Classify(wordCount) : StoryLength.Novel;
-        RenderReviews(writer, analysis.Reviews, length, body, bodyBold, bodyItalic, h2, h3, readerFolios);
+        RenderReviews(writer, analysis.Reviews, length, review.PreviousReaderScores, body, bodyBold, bodyItalic, h2, h3, readerFolios);
 
         // What to do next: the revision plan, grouped by impact tier.
         RenderRevisionPlan(writer, analysis.RevisionPlan, body, h2, h3);
@@ -436,7 +436,8 @@ public sealed class AnalysisDocumentRenderer
     /// from where, their verdict in a clause, and the page to turn to.</para>
     /// </summary>
     private static void RenderReviews(
-        PageWriter writer, IReadOnlyList<Review> reviews, StoryLength length, SKFont body, SKFont bodyBold,
+        PageWriter writer, IReadOnlyList<Review> reviews, StoryLength length,
+        IReadOnlyDictionary<string, int> previousScores, SKFont body, SKFont bodyBold,
         SKFont bodyItalic, SKFont h2, SKFont h3, IReadOnlyList<int>? readerFolios)
     {
         if (reviews is not { Count: > 0 })
@@ -446,7 +447,8 @@ public sealed class AnalysisDocumentRenderer
 
         for (var i = 0; i < reviews.Count; i++)
         {
-            RenderReader(writer, reviews[i], i + 1, reviews.Count, length, body, h3);
+            RenderReader(writer, reviews[i], i + 1, reviews.Count, length,
+                previousScores.TryGetValue(reviews[i].PersonaId, out var before) ? before : null, body, bodyBold, h3);
         }
     }
 
@@ -501,13 +503,25 @@ public sealed class AnalysisDocumentRenderer
     /// would learn to skip it.</para>
     /// </summary>
     private static void RenderReader(
-        PageWriter writer, Review review, int index, int of, StoryLength length, SKFont body, SKFont h3)
+        PageWriter writer, Review review, int index, int of, StoryLength length, int? previousScore,
+        SKFont body, SKFont bodyBold, SKFont h3)
     {
         writer.NewPage();
         writer.BeginReader();
         writer.PageLabel($"Reader {index} of {Spell(of)}", Lens(review.PersonaId, length));
 
         writer.Heading(PersonaName(review.PersonaId), h3, Ink);
+
+        // The reader's own score on its own question (the owner's ruling), the sentence that explains
+        // it, and on a later draft how it moved. Under the name rather than over it: the read is the
+        // page, and the number is that reader's summary of it. A read stored before scores has none.
+        if (review.Score is >= 1 and <= 10)
+        {
+            writer.Paragraph(ReaderScores.Line(review.Score, previousScore), bodyBold, Ink);
+            if (!string.IsNullOrWhiteSpace(review.ScoreReason))
+                writer.Paragraph(review.ScoreReason, body, Muted);
+            writer.Gap(PageGeometry.TightGap);
+        }
         foreach (var paragraph in Paragraphs(review.Assessment))
         {
             writer.Paragraph(paragraph, body, Ink);

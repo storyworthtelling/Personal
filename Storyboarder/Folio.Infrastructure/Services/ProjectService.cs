@@ -822,6 +822,8 @@ public sealed class ProjectService
         }
 
         var latestReport = reports.FirstOrDefault(report => report.NovelId == latest.Id);
+        var (scores, scoredDraft) = await ReaderScoresAsync(
+            db, [.. drafts.Select(d => (d.Id, d.DraftNumber, d.WordCount))], cancellationToken);
 
         // Books, not drafts: a series of one trilogy-in-progress holds one book however many times
         // its author has revised it.
@@ -851,7 +853,53 @@ public sealed class ProjectService
             readiness,
             latestReport is { PdfStatus: WorkStatus.Completed, PdfPath: not null },
             genre,
-            length);
+            length)
+        {
+            ReaderScores = scores,
+            ScoredDraftNumber = scoredDraft,
+        };
+    }
+
+    /// <summary>
+    /// The readers' scores on the newest draft that has any, against the draft before that one. A
+    /// read stored before scores existed, or one that will not parse, simply has no score.
+    /// </summary>
+    private static async Task<(IReadOnlyList<ReaderScore> Scores, int? Draft)> ReaderScoresAsync(
+        FolioDbContext db, IReadOnlyList<(Guid Id, int DraftNumber, int WordCount)> drafts,
+        CancellationToken cancellationToken)
+    {
+        var draftIds = drafts.Select(draft => draft.Id).ToList();
+        var readerIds = PersonaCatalogue.Readers.Select(persona => persona.Id).ToList();
+        var rows = await db.PassReads
+            .Where(pass => draftIds.Contains(pass.NovelId) && pass.Json != null && readerIds.Contains(pass.PassId))
+            .Select(pass => new { pass.NovelId, pass.Json })
+            .ToListAsync(cancellationToken);
+
+        var reads = rows
+            .Select(row => (row.NovelId, Review: TryReview(row.Json!)))
+            .Where(row => row.Review is { Score: >= 1 and <= 10 })
+            .ToLookup(row => row.NovelId, row => row.Review!);
+
+        var scored = drafts.Where(draft => reads[draft.Id].Any()).ToList();
+        if (scored.Count == 0)
+            return ([], null);
+
+        var current = scored[^1];
+        var previous = scored.Count > 1 ? reads[scored[^2].Id] : [];
+        return (ReaderScores.Compare(reads[current.Id], previous, ManuscriptLength.Classify(current.WordCount)),
+            current.DraftNumber);
+    }
+
+    private static Review? TryReview(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Review>(json, JsonResponse.CaseInsensitive);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

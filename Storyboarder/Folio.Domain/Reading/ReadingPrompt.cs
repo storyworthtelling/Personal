@@ -76,12 +76,13 @@ public static class ReadingPrompt
         var brief = length == StoryLength.ShortStory && persona.ShortStoryBrief is { } own ? own + " " : string.Empty;
         var genreLine = GenreLine(genre, length);
         var fan = persona.FanOfTheGenre ? FanBrief(genre) : string.Empty;
+        var score = ScoreBrief(persona, length);
 
         return persona.Kind switch
         {
             PersonaKind.Reader =>
                 $"You are {Article(persona.Name)} {persona.Name} reading the complete {noun} manuscript above, in character. "
-                + words + genreLine + scale + fan + brief
+                + words + genreLine + scale + fan + brief + score
                 + "Nobody else's notes are available to you, and you are not summarising the book.",
             PersonaKind.Section =>
                 $"You are reading the complete {noun} manuscript above for one thing only: {persona.Name}. "
@@ -124,6 +125,22 @@ public static class ReadingPrompt
             + $"want to like it; but you have read a great deal of {(genre.IsKnown ? name : "it")} and you are "
             + "particular about how it is done: you know its conventions and its tropes, what has been done "
             + "well before, and where this one is fresh, where it is tired, and where it lets a fan down. ";
+    }
+
+    /// <summary>
+    /// The owner's ruling: each reader scores the manuscript from 1 to 10 on its own question, against
+    /// its own written anchors, and says in a sentence why. A section has no anchors and is not asked.
+    /// </summary>
+    private static string ScoreBrief(Persona persona, StoryLength length)
+    {
+        var anchors = persona.AnchorsFor(length);
+        if (anchors.Count == 0)
+            return string.Empty;
+
+        var points = string.Join("; ", anchors.Select((anchor, i) => $"{(i + 1) * 2}: {anchor}"));
+        return $"Score the {ManuscriptLength.Noun(length)} from 1 to 10 on your own question, in your own terms, "
+            + $"against these anchors — {points}. The odd numbers fall between them. Use the whole scale, "
+            + "and give one sentence saying why the score is that number. ";
     }
 
     private static string Article(string name) =>

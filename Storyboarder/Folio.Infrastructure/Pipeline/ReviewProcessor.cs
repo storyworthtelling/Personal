@@ -1805,7 +1805,13 @@ public sealed class ReviewProcessor : IPipelineStep
             .Select(f => new ReportFindingView(f.Category, f.Chapter, f.Detail, FindingStatus.Carried))
             .ToList();
 
-        return new DraftReview(novel.DraftNumber, findings, resolved);
+        // Each reader's score on the draft this was made from, so its page can say how it moved.
+        var previousScores = (await ReadReaders(db, previousId, cancellationToken))
+            .Where(read => read.Score is >= 1 and <= 10)
+            .GroupBy(read => read.PersonaId)
+            .ToDictionary(group => group.Key, group => group.Last().Score);
+
+        return new DraftReview(novel.DraftNumber, findings, resolved) { PreviousReaderScores = previousScores };
     }
 
     // Builds each scene's evidence for the report: the rendered image (if any), cited "Ch. N · Scene M",

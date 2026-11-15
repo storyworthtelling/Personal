@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
@@ -426,7 +427,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                     r.Strengths ?? [],
                     r.Weaknesses ?? [],
                     r.Condition ?? r.Recommendation ?? string.Empty))
-                .Where(ReaderRead.IsWhole).ToList(),
+                // The omnibus reduce's reviews are never scored; the six readers replace them.
+                .Where(review => ReaderRead.IsWhole(review, scored: false)).ToList(),
             (dto.RevisionPlan ?? []).Select(r =>
                 new RevisionItem(r.Priority ?? string.Empty, r.Chapter ?? string.Empty,
                     r.Issue ?? string.Empty, r.SuggestedFix ?? string.Empty)).ToList(),
@@ -688,7 +690,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "Reply with JSON only: {\"verdict\": \"your answer in one clause\", \"assessment\": \"your full "
         + "review in character, several hundred words\", \"strengths\": [\"what works, in your terms\"], "
         + "\"weaknesses\": [\"what does not, in your terms\"], \"condition\": \"what would have to change "
-        + "before your verdict changed\"}. Every field is required. If you cannot fill one of them you "
+        + "before your verdict changed\", \"score\": a whole number from 1 to 10 against your anchors, "
+        + "\"scoreReason\": \"one sentence on why the score is that number\"}. Every field is required. If you cannot fill one of them you "
         + "have not finished reading: a short answer is worse than none, because the page prints it.";
 
     // Built rather than a const: the noun has to name what this manuscript actually is (a 1,200-word
@@ -756,7 +759,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             dto?.Assessment ?? string.Empty,
             dto?.Strengths ?? [],
             dto?.Weaknesses ?? [],
-            dto?.Condition ?? dto?.Recommendation ?? string.Empty);
+            dto?.Condition ?? dto?.Recommendation ?? string.Empty)
+        {
+            Score = ScoreOf(dto?.Score),
+            ScoreReason = dto?.ScoreReason ?? string.Empty,
+        };
 
         // A short read is a failed pass, not a shorter one (F44, F46). Throwing here is what makes
         // that true: the pipeline retries the pass, where swallowing it would print the gap.
@@ -1334,6 +1341,25 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? Weaknesses { get; set; }
         public string? Condition { get; set; }
         public string? Recommendation { get; set; }
+        public JsonElement? Score { get; set; }
+        public string? ScoreReason { get; set; }
+    }
+
+    // A score as the model wrote it: a number, a number in quotes, or a half point, rounded to the
+    // whole number the page prints. Anything else is zero, which ReaderRead calls a short read.
+    private static int ScoreOf(JsonElement? score)
+    {
+        if (score is not { } element)
+            return 0;
+
+        double value;
+        if (element.ValueKind == JsonValueKind.Number)
+            value = element.GetDouble();
+        else if (element.ValueKind != JsonValueKind.String
+                 || !double.TryParse(element.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+            return 0;
+
+        return (int)Math.Round(value, MidpointRounding.AwayFromZero);
     }
 
     private sealed class RevisionItemDto

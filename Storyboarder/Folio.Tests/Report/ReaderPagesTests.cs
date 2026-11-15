@@ -175,6 +175,40 @@ public class ReaderPagesTests
         Assert.DoesNotContain(agent.Question, page, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Each reader's page carries its score out of ten and the sentence that explains it.</summary>
+    [Fact]
+    public void EveryReadersPageCarriesItsScoreAndWhy()
+    {
+        var pages = PagesOf(Render(Reads()));
+
+        foreach (var persona in PersonaCatalogue.Readers)
+        {
+            var page = pages.First(page => page.Contains(persona.Name, StringComparison.Ordinal)
+                && page.Contains($"{persona.Name} gives the reason", StringComparison.Ordinal));
+            Assert.Contains("7/10", page, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>On a later draft the page says how the score moved since the last one.</summary>
+    [Fact]
+    public void ALaterDraftSaysHowEachScoreMoved()
+    {
+        var previous = PersonaCatalogue.Readers.ToDictionary(persona => persona.Id, _ => 5);
+        var review = new DraftReview(2, [], []) { PreviousReaderScores = previous };
+        var pdf = new AnalysisDocumentRenderer().Render(
+            SampleAnalysis.Of() with { Reviews = Reads() }, Cover, Array.Empty<SceneEvidence>(), review);
+
+        var agentPage = PagesOf(pdf).First(page => page.Contains("Agent gives the reason", StringComparison.Ordinal));
+        Assert.Contains("up from 5 last draft", agentPage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AFirstDraftSaysNothingAboutMovement()
+    {
+        Assert.All(PagesOf(Render(Reads())), page =>
+            Assert.DoesNotContain("last draft", page, StringComparison.Ordinal));
+    }
+
     private static byte[] Render(IReadOnlyList<Review> reviews) =>
         new AnalysisDocumentRenderer().Render(
             SampleAnalysis.Of() with { Reviews = reviews }, Cover, Array.Empty<SceneEvidence>());
@@ -189,7 +223,11 @@ public class ReaderPagesTests
             + "A second paragraph, so the split is exercised too.",
             [$"{persona.Name} found something that works.", "And a second thing."],
             [$"{persona.Name} found something that does not.", "And a second thing."],
-            "Something specific would have to change before this reader changed their mind."))
+            "Something specific would have to change before this reader changed their mind.")
+        {
+            Score = 7,
+            ScoreReason = $"{persona.Name} gives the reason for the number.",
+        })
     ];
 
     private static List<string> PagesOf(byte[] pdf)

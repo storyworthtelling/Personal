@@ -59,8 +59,20 @@ public static class PersonaCatalogue
     /// </summary>
     public static IReadOnlyList<Persona> Readers { get; } =
     [
+        // Each reader's anchors are its own scale, in its own terms (the owner's ruling): a 2, 4, 6, 8
+        // and 10 written down so the number means the same from one read to the next.
         new("developmental-editor", "Developmental editor", "Structure",
-            PersonaKind.Reader, ModelTier.Strong),
+            PersonaKind.Reader, ModelTier.Strong)
+        {
+            ScoreAnchors =
+            [
+                "the structure does not hold; it needs rebuilding from the outline",
+                "the bones are there, but it needs major structural work: parts reordered, arcs rebuilt",
+                "sound structure with real soft spots; a substantive revision pass",
+                "structurally solid; only targeted fixes",
+                "there is nothing structural I would touch",
+            ],
+        },
         // The owner's ruling: on a short story "I can't sell a short story" is the whole of what an
         // agent in character says, and the author already knows it. So on a short story the Agent
         // reads for the talent and recommends a path to magazines, outside its usual purview or not.
@@ -77,15 +89,73 @@ public static class PersonaCatalogue
                 + "suits, by genre and tier, naming only markets you are confident exist and noting that their "
                 + "guidelines must be checked; whether it is ready to submit and, if not, what to do first; and "
                 + "the order to submit in. The talent goes in your verdict; the path goes in your review.",
+            ScoreAnchors =
+            [
+                "I would pass on the query",
+                "I would pass with a personal note; the writer is not there yet",
+                "I would request the full manuscript, and probably pass after reading it",
+                "I would offer representation, with revisions before it goes out",
+                "I would offer today and expect more than one publisher to bid",
+            ],
+            ShortStoryScoreAnchors =
+            [
+                "nothing here yet that I would ask to see more of",
+                "flashes of ability, but the craft is not yet professional",
+                "a competent, professional writer without a distinctive voice yet",
+                "a distinctive voice I would want to follow; I would ask what else they are writing",
+                "a writer I would chase now, with a story ready for the top magazines",
+            ],
         },
         new("acquiring-editor", "Acquiring editor", "Would I buy it",
-            PersonaKind.Reader, ModelTier.Strong),
+            PersonaKind.Reader, ModelTier.Strong)
+        {
+            ScoreAnchors =
+            [
+                "I would not take it to the acquisitions meeting",
+                "I would decline, but I would look at this author's next book",
+                "I would take it to acquisitions only with heavy revision conditions",
+                "I would fight for it at acquisitions, with an ordinary editorial pass",
+                "I would pre-empt to keep it from going to auction",
+            ],
+        },
         new("genre-fan", "Genre fan", "Would I finish it",
-            PersonaKind.Reader, ModelTier.Strong) { FanOfTheGenre = true },
+            PersonaKind.Reader, ModelTier.Strong)
+        {
+            FanOfTheGenre = true,
+            ScoreAnchors =
+            [
+                "I would put it down in the opening pages",
+                "I would push through out of loyalty to the genre, and not recommend it",
+                "I would finish it, satisfied but not excited",
+                "I would finish it fast and press it on other fans",
+                "an instant favourite; I would buy this author's next on release day",
+            ],
+        },
         new("harsh-critic", "Harsh but fair critic", "What is wrong with it",
-            PersonaKind.Reader, ModelTier.Strong),
+            PersonaKind.Reader, ModelTier.Strong)
+        {
+            // A higher score is less wrong, so a 10 here means the same direction as everyone else's.
+            ScoreAnchors =
+            [
+                "fundamentally broken, with problems on every page",
+                "serious flaws that undermine what it does well",
+                "real flaws a careful reader will notice, but it works",
+                "minor flaws I had to go looking for",
+                "I tried to find fault and found nothing worth printing",
+            ],
+        },
         new("literature-professor", "Graduate literature professor", "What is it doing",
-            PersonaKind.Reader, ModelTier.Strong),
+            PersonaKind.Reader, ModelTier.Strong)
+        {
+            ScoreAnchors =
+            [
+                "it does nothing beyond telling its story; there is nothing to discuss",
+                "it gestures at ideas it does not develop",
+                "coherent intentions, carried out unevenly",
+                "it does something deliberate and does it well; it would reward a seminar",
+                "it does something with the form that I would teach",
+            ],
+        },
     ];
 
     public static IReadOnlyList<Persona> All { get; } = [.. Sections, .. Readers];

@@ -182,7 +182,7 @@ public class ClaudeAnalysisClientTests
     {
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"verdict\":\"v\",\"assessment\":\"a\",\"strengths\":[\"s\"],"
-            + "\"weaknesses\":[\"w\"],\"condition\":\"c\"}"));
+            + "\"weaknesses\":[\"w\"],\"condition\":\"c\",\"score\":7,\"scoreReason\":\"r\"}"));
         var persona = PersonaCatalogue.ById("genre-fan");
         const string manuscript = "The tide was out and the wall was down.";
         var genre = new GenreFrame("Cozy mystery", "70,000-90,000");
@@ -200,6 +200,38 @@ public class ClaudeAnalysisClientTests
         Assert.StartsWith(ReadingPrompt.Question(persona, StoryLength.ShortStory),
             message.GetProperty("content").GetString(), StringComparison.Ordinal);
         Assert.Contains("Cozy mystery", system[^1], StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("7", 7)]
+    [InlineData("\"8\"", 8)]
+    [InlineData("6.6", 7)]
+    public async Task AReadersScoreIsReadAsAWholeNumber(string score, int expected)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"verdict\":\"v\",\"assessment\":\"a\",\"strengths\":[\"s\"],"
+            + "\"weaknesses\":[\"w\"],\"condition\":\"c\",\"score\":" + score + ",\"scoreReason\":\"Because.\"}"));
+
+        var review = await client.ReadAsReader(PersonaCatalogue.ById("agent"), "the manuscript", GenreFrame.Unknown, CancellationToken.None);
+
+        Assert.Equal(expected, review.Score);
+        Assert.Equal("Because.", review.ScoreReason);
+    }
+
+    /// <summary>A read with no score is a short read, retried like any other.</summary>
+    [Theory]
+    [InlineData(",\"scoreReason\":\"r\"")]
+    [InlineData(",\"score\":0,\"scoreReason\":\"r\"")]
+    [InlineData(",\"score\":12,\"scoreReason\":\"r\"")]
+    [InlineData(",\"score\":7")]
+    public async Task AReadWithoutAUsableScoreIsAFailedPass(string tail)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"verdict\":\"v\",\"assessment\":\"a\",\"strengths\":[\"s\"],"
+            + "\"weaknesses\":[\"w\"],\"condition\":\"c\"" + tail + "}"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.ReadAsReader(PersonaCatalogue.ById("agent"), "the manuscript", GenreFrame.Unknown, CancellationToken.None));
     }
 
     [Fact]

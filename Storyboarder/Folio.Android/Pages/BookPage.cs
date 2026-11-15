@@ -4,6 +4,7 @@ using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Folio.Domain.Analysis;
 using Folio.Domain.Readiness;
+using Folio.Domain.Reading;
 using Folio.Domain.Shelf;
 using Folio.Infrastructure.Services;
 using Storyworthtelling.Maui;
@@ -12,6 +13,9 @@ namespace Folio.Android.Pages;
 
 /// <summary>One draft in the list under the chart.</summary>
 public sealed record DraftRow(Guid Id, int Number, string Date, string Words, bool ReportReady);
+
+/// <summary>One reader's score on the book page: who, on what question, the number and why.</summary>
+public sealed record ScoreRow(string Name, string Question, string Line, string Reason);
 
 /// <summary>What the book page needs to draw itself.</summary>
 public sealed record BookPageModel(
@@ -23,6 +27,12 @@ public sealed record BookPageModel(
     IReadOnlyList<DraftFindings> Readiness,
     IReadOnlyList<DraftRow> Rows)
 {
+    /// <summary>"Readers · draft 3", or null when no draft has been read with scores yet.</summary>
+    public string? ScoresHeading { get; init; }
+
+    /// <summary>The newest scored draft's readers, in reading order, each with how it moved.</summary>
+    public IReadOnlyList<ScoreRow> Scores { get; init; } = [];
+
     /// <summary>
     /// The read, phrased. Every sentence here is assembled by a tested function in Domain
     /// (<see cref="BookLines"/>, <see cref="LengthGap"/>) and this only puts the pieces on the page —
@@ -38,7 +48,12 @@ public sealed record BookPageModel(
         // Newest first, which is the opposite of the chart beneath which it sits — and deliberately:
         // the chart is a history and reads left to right, the list is a record and the draft the
         // author is working on belongs at the top of it.
-        [.. book.Drafts.OrderByDescending(draft => draft.Number).Select(Row)]);
+        [.. book.Drafts.OrderByDescending(draft => draft.Number).Select(Row)])
+    {
+        ScoresHeading = book.ScoredDraftNumber is { } number ? $"Readers · draft {number}" : null,
+        Scores = [.. book.ReaderScores.Select(score => new ScoreRow(
+            score.Name, score.Question, ReaderScores.Line(score.Score, score.Previous), score.Reason))],
+    };
 
     private static DraftRow Row(BookDraft draft) => new(
         draft.Id,
@@ -64,8 +79,9 @@ public sealed record BookPageModel(
 /// being handled, and this is a record of one.</para>
 ///
 /// <para><b>Readiness is counts, never a score.</b> Musts falling and Greats rising is what getting
-/// better looks like, drawn from findings the report already produced, so nothing about the book is
-/// ever compressed into a number.</para>
+/// better looks like, drawn from findings the report already produced, so the chart never
+/// compresses the book into a number. The readers' scores below it are a different thing (the
+/// owner's ruling): six numbers, each one reader's answer to its own question, never added up.</para>
 ///
 /// <para>The bar carries the primary and one secondary that §7 allows: <b>Open report</b>, which is
 /// what closes the risk that dropping the in-app reader left the product with no way to reach its
@@ -185,6 +201,15 @@ public class BookPage : FolioBinderPage
         body.Add(Chart(book.Readiness));
         body.Add(Legend(book.Readiness));
 
+        if (book.ScoresHeading is { } heading && book.Scores.Count > 0)
+        {
+            body.Add(SectionLabel(heading));
+            foreach (var score in book.Scores)
+            {
+                body.Add(Score(score, last: ReferenceEquals(score, book.Scores[^1])));
+            }
+        }
+
         body.Add(SectionLabel("Drafts"));
         foreach (var row in book.Rows)
         {
@@ -296,6 +321,57 @@ public class BookPage : FolioBinderPage
         }
 
         return row;
+    }
+
+    // One reader: the name and its question, the score and how it moved, and the sentence saying why.
+    private static View Score(ScoreRow row, bool last)
+    {
+        var line = new Grid
+        {
+            ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto)],
+            ColumnSpacing = 10,
+        };
+        var who = new Label { Text = row.Name, FontFamily = "SerifSemibold", FontSize = 17 };
+        var number = new Label
+        {
+            Text = row.Line,
+            Style = PaperResources.Token<Style>("MonoLabel"),
+            FontSize = 13,
+            HorizontalOptions = LayoutOptions.End,
+            VerticalOptions = LayoutOptions.Center,
+        };
+        line.Children.Add(who);
+        line.Children.Add(number);
+        Grid.SetColumn(who, 0);
+        Grid.SetColumn(number, 1);
+
+        var stack = new VerticalStackLayout
+        {
+            Padding = new Thickness(0, 12),
+            Children =
+            {
+                line,
+                new Label { Text = row.Question, FontSize = 13, TextColor = PaperResources.Colour("InkMuted") },
+                new Label
+                {
+                    Text = row.Reason,
+                    FontSize = 14,
+                    TextColor = PaperResources.Colour("InkSoft"),
+                    Margin = new Thickness(0, 4, 0, 0),
+                },
+            },
+        };
+
+        return last
+            ? stack
+            : new VerticalStackLayout
+            {
+                Children =
+                {
+                    stack,
+                    new BoxView { HeightRequest = DesignTokens.Shape.HairlineDp, Color = PaperResources.Colour("Hairline") },
+                },
+            };
     }
 
     private static View SectionLabel(string text) => new Label

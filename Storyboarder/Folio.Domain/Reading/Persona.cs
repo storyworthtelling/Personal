@@ -58,6 +58,19 @@ public sealed record Persona(string Id, string Name, string Question, PersonaKin
     /// </summary>
     public bool FanOfTheGenre { get; init; }
 
+    /// <summary>
+    /// What a 2, 4, 6, 8 and 10 mean on this reader's question, in this reader's own terms — so a six
+    /// means the same from one read to the next. Empty for a section, which does not score.
+    /// </summary>
+    public IReadOnlyList<string> ScoreAnchors { get; init; } = [];
+
+    /// <summary>The anchors for a short story, where this persona's question is different; null where it is not.</summary>
+    public IReadOnlyList<string>? ShortStoryScoreAnchors { get; init; }
+
+    /// <summary>The anchors this persona scores a manuscript of this length against.</summary>
+    public IReadOnlyList<string> AnchorsFor(StoryLength length) =>
+        length == StoryLength.ShortStory && ShortStoryScoreAnchors is { } anchors ? anchors : ScoreAnchors;
+
     /// <summary>The question this persona is asked of a manuscript of this length.</summary>
     public string QuestionFor(StoryLength length) =>
         length == StoryLength.ShortStory && ShortStoryQuestion is { } question ? question : Question;
