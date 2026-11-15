@@ -16,7 +16,10 @@ namespace Plate;
 internal static class FaceNameChooser
 {
     private const string HostTag = "face-name-chooser";
-    private const int HazeAlpha = 0xB3;
+    // A byte, as ActionCard's is: R, G and B are bytes, so an int alpha leaves new Color(…) between its
+    // (byte×4) and (int×4) overloads, which is CS0121 and stopped every Plate build since W7.1.
+    // The same haze as every other card (ActionCard.HazeAlpha).
+    private const byte HazeAlpha = 219;
 
     public static void Show(
         Context context, FrameLayout host, IReadOnlyList<PickablePerson> people, string? wronglySuggested,

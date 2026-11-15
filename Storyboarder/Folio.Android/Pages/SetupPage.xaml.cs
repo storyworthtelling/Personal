@@ -344,15 +344,17 @@ public partial class SetupPage : FolioBinderPage
 
     // The installed build, readable on the locked-down phone (no access to system app info). The build
     // string is the versionCode the GitHub update channel compares, so this is what confirms an update landed.
+    // The suite's one build line (BuildLine.Format): name, version, package.
     private static string BuildInfoText()
     {
         try
         {
-            return $"{FolioIdentity.DisplayName} {AppInfo.Current.VersionString} ({AppInfo.Current.BuildString}) · {AppInfo.Current.PackageName}";
+            return Storyworthtelling.Updates.BuildLine.Format(
+                FolioIdentity.DisplayName, AppInfo.Current.VersionString, AppInfo.Current.PackageName);
         }
-        catch
+        catch (Exception)
         {
-            return $"{FolioIdentity.DisplayName} · {AppSigningInfo.PackageName}";
+            return Storyworthtelling.Updates.BuildLine.Format(FolioIdentity.DisplayName, null, AppSigningInfo.PackageName);
         }
     }
 
@@ -395,29 +397,56 @@ public partial class SetupPage : FolioBinderPage
         CopyStatusLabel.Text = "Copied.";
     }
 
-    private async void OnSaveClicked(object sender, EventArgs e)
+    // There is no Save (DESIGN.md §5, audit W8.4): each field is stored as it is typed, and the vault
+    // publish runs when a field loses focus or the page goes away (leaving by a tab never blurs a field).
+    private readonly HashSet<string> unpublished = [];
+
+    private void OnFieldChanged(object? sender, TextChangedEventArgs e)
     {
-        var claude = ClaudeKeyEntry.Text?.Trim() ?? string.Empty;
-        var gemini = GeminiKeyEntry.Text?.Trim() ?? string.Empty;
+        var text = e.NewTextValue?.Trim() ?? string.Empty;
+        if (sender == VaultPassphraseEntry)
+        {
+            SettingsStore.VaultPassphrase = e.NewTextValue ?? string.Empty;
+            return;
+        }
+
+        // Replace empties a key's field for a paste; a blank never overwrites the working key.
+        if (text.Length == 0)
+            return;
 
         // Only what the owner changed here may replace the vault's copy (VaultMerge.Pick).
-        var changed = new List<string>();
-        if (claude != SettingsStore.ClaudeApiKey)
-            changed.Add(FolioVaultSection.Claude);
-        if (gemini != SettingsStore.GeminiApiKey)
-            changed.Add(FolioVaultSection.Gemini);
+        if (sender == ClaudeKeyEntry && text != SettingsStore.ClaudeApiKey)
+        {
+            SettingsStore.ClaudeApiKey = text;
+            unpublished.Add(FolioVaultSection.Claude);
+        }
+        else if (sender == GeminiKeyEntry && text != SettingsStore.GeminiApiKey)
+        {
+            SettingsStore.GeminiApiKey = text;
+            unpublished.Add(FolioVaultSection.Gemini);
+        }
+    }
 
-        SettingsStore.ClaudeApiKey = claude;
-        SettingsStore.GeminiApiKey = gemini;
-        SettingsStore.VaultPassphrase = VaultPassphraseEntry.Text ?? string.Empty;
-        // Publish this app's keys (and, since the shared Claude key is entered here, the voice key) to the
-        // encrypted Drive vault so every com.storyworthtelling app can back up and restore from one place.
-        // The keys already work locally; a failed publish now surfaces (a silently-skipped backup is what
-        // left the vault empty after the cutover) instead of vanishing.
+    private void OnFieldSettled(object? sender, FocusEventArgs e) =>
+        _ = PublishChangedAsync();
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _ = PublishChangedAsync();
+    }
+
+    // Publishes this app's keys (and, since the shared Claude key is entered here, the voice key) to the
+    // encrypted Drive vault so every com.storyworthtelling app can back up and restore from one place.
+    // The keys already work locally; a failed publish surfaces instead of vanishing.
+    private async Task PublishChangedAsync()
+    {
+        if (unpublished.Count == 0)
+            return;
+
+        var changed = unpublished.ToList();
+        unpublished.Clear();
         await PublishToVaultAsync(changed);
-        // Success is the state change: saving returns to the library.
-        await Navigation.PopAsync();
-        await Navigation.PopAsync();
     }
 
     // Publishes and, only when a passphrase was set but the backup didn't land, tells the owner. A

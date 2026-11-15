@@ -83,7 +83,7 @@ public sealed class SettingsModel
             .Select(id => RowFor(id, stated.TryGetValue(id, out var input) ? input : new ConnectionInput(id, false, ConnectionHealth.Unknown)))
             .ToList();
         // Counted by what the owner can act on: a row with a button.
-        var needing = rows.Count(row => row.ButtonLabel is not null);
+        var needing = rows.Count(row => row.EntryWanted);
 
         return new SettingsModel
         {
@@ -122,6 +122,9 @@ public sealed class SettingsModel
     private static string Header(string title, string summary) =>
         summary.Length == 0 ? title : $"{title} {summary}";
 
+    /// <summary>The quiet button beside a settled key.</summary>
+    public const string ReplaceLabel = "Replace";
+
     private static readonly string[] ConnectionOrder =
         [HealthConnectId, CredentialIds.SleepNumber, CredentialIds.Remarkable];
 
@@ -150,8 +153,11 @@ public sealed class SettingsModel
                 button, null);
         }
 
+        // A settled key keeps a quiet Replace, the suite's one rule (audit W8.4, report 02 §7); a connection
+        // with nothing to enter (Health Connect) keeps no button.
+        var replace = button is null ? null : ReplaceLabel;
         return input.Health == ConnectionHealth.Working
-            ? new ConnectionRow(id, name, detail, ConnectionStatus.Working, "Working ✓", EntryWanted: false, null, null)
-            : new ConnectionRow(id, name, detail, ConnectionStatus.Saved, "Saved.", EntryWanted: false, null, null);
+            ? new ConnectionRow(id, name, detail, ConnectionStatus.Working, "Working ✓", EntryWanted: false, replace, null)
+            : new ConnectionRow(id, name, detail, ConnectionStatus.Saved, "Saved.", EntryWanted: false, replace, null);
     }
 }

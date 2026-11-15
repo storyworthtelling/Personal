@@ -115,6 +115,6 @@ public static class LedgerAreas
         new("Snowball", SnowballGlyph, Color.FromArgb(SnowballMarkHex), Color.FromArgb(SnowballFillHex)),
         new("Budget", BudgetGlyph, Color.FromArgb(BudgetMarkHex), Color.FromArgb(BudgetFillHex)),
         new("Savings", SavingsGlyph, Color.FromArgb(SavingsMarkHex), Color.FromArgb(SavingsFillHex)),
-        new("Settings", SettingsGlyph, PaperResources.Colour("InkMuted"), PaperResources.Colour("PaperDeep")),
+        new("Settings", SettingsGlyph, PaperResources.Colour("ResolvedMark"), PaperResources.Colour("ResolvedFill")),
     ];
 }

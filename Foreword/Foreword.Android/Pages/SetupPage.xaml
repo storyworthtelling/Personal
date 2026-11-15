@@ -12,10 +12,11 @@
 
         Two rules shape what is here at all:
 
-        A WORKING CREDENTIAL DOES NOT APPEAR. Not collapsed to a "Working" line — absent. The
-        vault backs a key up and restores it, so a healthy one has nothing to ask and nothing to
-        show; the row itself is the clutter. "Needs you" is a whole group that does not exist on
-        a good morning.
+        A WORKING CREDENTIAL IS ONE QUIET LINE. "Working ✓" and a quiet Replace, as in every app
+        of the suite (audit W8.4): the vault backs a key up and restores it, so a healthy one has
+        nothing to ask, and its field is shown again only when it is missing, was just refused,
+        or the owner asks to replace it. "Needs you" is a whole group that does not exist on a
+        good morning.
 
         THERE IS NO SAVE. Every value commits as it changes, which is §5's inline state change
         and the rule Score gives for its own vault field: leaving by a tab never blurs anything,
@@ -53,6 +54,13 @@
                    IsVisible="False" />
             <Border x:Name="NeedsYouCard" Style="{StaticResource GroupCard}" IsVisible="False">
                 <VerticalStackLayout x:Name="NeedsYouRows" />
+            </Border>
+
+            <!-- ==== Connections: the keys that work, one quiet line each =============== -->
+            <Label x:Name="ConnectionsLabel" Text="Connections" Style="{StaticResource GroupLabel}"
+                   IsVisible="False" />
+            <Border x:Name="ConnectionsCard" Style="{StaticResource GroupCard}" IsVisible="False">
+                <VerticalStackLayout x:Name="ConnectionsRows" />
             </Border>
 
             <!-- ==== Calendars ========================================================= -->

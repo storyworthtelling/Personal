@@ -445,7 +445,7 @@ public class UnlockActivity : Activity
         tokenStatusRow.SetGravity(GravityFlags.CenterVertical);
         tokenStatusRow.AddView(PaperUi.Secondary(this, "Update token: " + tokenState.StatusText),
             new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
-        tokenStatusRow.AddView(PaperUi.SecondaryButton(this, "Replace", () =>
+        tokenStatusRow.AddView(PaperUi.QuietButton(this, "Replace", () =>
         {
             input.Text = string.Empty;
             input.Visibility = ViewStates.Visible;

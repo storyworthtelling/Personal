@@ -20,7 +20,7 @@ public class SettingsGroupsTests
     [Fact]
     public void TheVaultIsWorkingOnlyWhenNoKeyWantsEntering()
     {
-        Assert.Equal("Working", SettingsGroups.VaultMeta([false, false, false]));
+        Assert.Equal("Working ✓", SettingsGroups.VaultMeta([false, false, false]));
         Assert.Equal("1 key needed", SettingsGroups.VaultMeta([false, true, false]));
         Assert.Equal("3 keys needed", SettingsGroups.VaultMeta([true, true, true]));
     }
