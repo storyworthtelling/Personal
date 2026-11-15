@@ -101,6 +101,8 @@ public static class MauiProgram
         builder.Services.AddScoped<SnowballService>();
         builder.Services.AddScoped<BudgetService>();
         builder.Services.AddScoped<SavingsService>();
+        // The worksheet's income projection (WorksheetPlanBuilder's own dependency).
+        builder.Services.AddScoped<IIncomeDetectionService, IncomeDetectionService>();
 
         // Owner's voice: read the shared profile + Claude key from Drive (device-account sign-in, read-only)
         // and greet the owner in their voice on the account list, degrading to neutral copy when the profile,
