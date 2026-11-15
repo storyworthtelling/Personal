@@ -152,7 +152,7 @@ public sealed class ReviewProcessor : IPipelineStep
         // to a provider, not just the step that set it, so a book that cannot reach the network is not
         // walked through the same failing request once per unit.
         if (novel.Stage is ProjectStage.BuildingDesignBible or ProjectStage.RenderingSceneImages
-                or ProjectStage.ComposingAnalysis &&
+                or ProjectStage.ComposingAnalysis or ProjectStage.Archiving &&
             novel.RetryNotBeforeUtc is { } notBefore && notBefore > clock.UtcNow)
             return Task.FromResult(ProcessResult.Waiting(notBefore - clock.UtcNow, novel.Id));
 
@@ -1248,8 +1248,11 @@ public sealed class ReviewProcessor : IPipelineStep
             // Reuses the manuscript-level attempt counter, as the report consolidations do, since archiving
             // is also a once-per-manuscript step with no per-unit row to hang a budget off. Past the budget
             // the review finishes anyway with the reason recorded — the report is safe on disk regardless.
-            novel.StageAttempts++;
             novel.LastError = $"Could not archive to Drive: {ex.Message}";
+            if (NetworkFailure.IsOffline(ex))
+                return await WaitForNetwork(db, novel, ex, "Archiving to Drive", cancellationToken);
+
+            novel.StageAttempts++;
             if (novel.StageAttempts >= rateLimits.MaxAttempts)
             {
                 logger.LogWarning(ex,
@@ -1408,6 +1411,22 @@ public sealed class ReviewProcessor : IPipelineStep
     }
 
     // --- helpers ---
+
+    // A delivery step (the Drive archive, the tablet) that could not reach the network. Nothing left the
+    // phone, so it is not a try at the work: no attempt is spent, and the wait is stored on the manuscript
+    // (RetryNotBeforeUtc, honoured by Dispatch) so the next worker cycle does not ask again at once.
+    private async Task<ProcessResult> WaitForNetwork(
+        FolioDbContext db, Novel novel, Exception exception, string step, CancellationToken cancellationToken)
+    {
+        var delay = TimeSpan.FromSeconds(rateLimits.OfflineRetrySeconds);
+        novel.RetryNotBeforeUtc = clock.UtcNow + delay;
+        logger.LogWarning(exception,
+            "{Step} could not reach the network for manuscript {NovelId}: the phone is offline; this does not " +
+            "count as an attempt; next check after {NextAttempt:u}: {Error}",
+            step, novel.Id, novel.RetryNotBeforeUtc, ErrorText.Describe(exception));
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.Waiting(delay, novel.Id);
+    }
 
     // Records a failed once-per-manuscript call (a reduction, one of the sixteen reads, the jacket) and
     // decides what happens next. These calls each send the whole book, so a failure that is simply
