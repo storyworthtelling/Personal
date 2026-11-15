@@ -318,7 +318,9 @@ public class PostActivity : Activity
     private void RenderContent()
     {
         RefreshHeader();
-        TapWatch.Screen(Active.Title);
+        // The tab's label, never the title: an open correspondence titles the page with a person, and the
+        // tap line is uploaded.
+        TapWatch.Screen(Active.Tab.Label);
 
         content.RemoveAllViews();
         content.AddView(Active.BuildView(), new FrameLayout.LayoutParams(
