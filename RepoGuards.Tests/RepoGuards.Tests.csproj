@@ -20,6 +20,8 @@
   <!-- The detectors live in the log-loop reader so CI's leakscan and these guards read one copy. -->
   <ItemGroup>
     <ProjectReference Include="..\Tools\LogLoopReader\LogLoopReader.csproj" />
+    <!-- The suite's Settings order, which SettingsStandardTests reads the MAUI pages against. -->
+    <ProjectReference Include="..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 
 </Project>

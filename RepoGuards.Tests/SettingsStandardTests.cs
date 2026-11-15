@@ -67,6 +67,28 @@ public partial class SettingsStandardTests
         Assert.True(missing.Count == 0, "Draw the groups through Codex.Ui.SettingsAccordion: " + string.Join(", ", missing));
     }
 
+    /// <summary>The MAUI heads draw the same groups through the kit's <c>SettingsGroup</c>, in the same order.</summary>
+    [Fact]
+    public void EveryMauiSettingsScreenFoldsItsGroupsInTheSuitesOrder()
+    {
+        var pages = Screens.Where(screen => screen.EndsWith(".xaml.cs", StringComparison.Ordinal))
+            .Select(screen => screen[..^".cs".Length])
+            .ToList();
+        Assert.Equal(3, pages.Count);
+        foreach (var page in pages)
+        {
+            var xaml = File.ReadAllText(Path.Combine(GuardScan.RepoRoot(), page));
+            var groups = MauiGroup().Matches(xaml).Select(match => match.Groups["title"].Value).ToList();
+            Assert.True(Storyworthtelling.Updates.SettingsAnatomy.IsInOrder(groups),
+                $"{page} runs {string.Join(", ", groups)}; the suite runs Connections, Vault, the app's own, Diagnostics.");
+            Assert.DoesNotContain("StaticResource GroupCard", xaml, StringComparison.Ordinal);
+            Assert.DoesNotContain("StaticResource TitleLabel", xaml, StringComparison.Ordinal);
+        }
+    }
+
+    [GeneratedRegex(@"<kit:SettingsGroup\b[^>]*\bTitle=""(?<title>[^""]+)""")]
+    private static partial Regex MauiGroup();
+
     [Fact]
     public void AWorkingKeyDoesNotAppear()
     {

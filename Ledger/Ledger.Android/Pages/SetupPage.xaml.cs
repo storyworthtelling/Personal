@@ -172,7 +172,7 @@ public partial class SetupPage : LedgerBinderPage
     {
         var isHers = role == InstallRole.Hers;
 
-        VaultHeadingLabel.Text = SettingsCopy.VaultHeading(role);
+        VaultGroup.Title = SettingsCopy.VaultHeading(role);
         var vaultIntro = SettingsCopy.VaultIntro(role);
         VaultIntroLabel.Text = vaultIntro;
         VaultIntroLabel.IsVisible = vaultIntro is not null;
@@ -189,9 +189,7 @@ public partial class SetupPage : LedgerBinderPage
         ApplyPlaidCredentialField();
         ApplySharedKeySection();
         ConnectedAccountsSection.IsVisible = !isHers;
-        ConnectedAccountsDivider.IsVisible = !isHers;
         BudgetSection.IsVisible = !isHers;
-        BudgetDivider.IsVisible = !isHers;
         DiagnosticsSection.IsVisible = !isHers;
     }
 
@@ -257,7 +255,6 @@ public partial class SetupPage : LedgerBinderPage
     {
         var shown = !hersInstall && sharedKeyPresent == false;
         SharedKeysSection.IsVisible = shown;
-        SharedKeysDivider.IsVisible = shown;
     }
 
     // Shows the Plaid client id/secret fields only when there's something to do: no credentials stored yet,
@@ -270,7 +267,6 @@ public partial class SetupPage : LedgerBinderPage
         var state = CredentialFieldState.Decide(isSet, CredentialHealth().Get(CredentialIds.Plaid));
         var shown = !hersInstall && state.Appears;
         PlaidSection.IsVisible = shown;
-        PlaidDivider.IsVisible = shown;
         PlaidCredentialFields.IsVisible = state.ShowEntry;
         PlaidStatusLabel.IsVisible = state.IsWarning;
         PlaidStatusLabel.Text = state.StatusText;

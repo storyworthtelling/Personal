@@ -239,8 +239,8 @@ public class SettingsSelfSaveTests
     [Fact]
     public void TheOwnersVaultCopyIsStillTheCopyItWasBeforeThisTask()
     {
-        // The owner-side drift (mockup 10's "Vault" heading and helper) is Phase 4, not this task.
-        Assert.Equal("Secrets vault", SettingsCopy.VaultHeading(InstallRole.Owner));
+        // The group is "Vault" on both installs: the suite's Settings anatomy names it (audit W8.4b).
+        Assert.Equal("Vault", SettingsCopy.VaultHeading(InstallRole.Owner));
         Assert.Contains("your Plaid credentials", SettingsCopy.VaultIntro(InstallRole.Owner), StringComparison.Ordinal);
         Assert.StartsWith("Shown in the clear", SettingsCopy.PassphraseNote(InstallRole.Owner), StringComparison.Ordinal);
         Assert.StartsWith("Sign in with Google", SettingsCopy.GoogleIntro(InstallRole.Owner), StringComparison.Ordinal);

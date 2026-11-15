@@ -13,8 +13,9 @@ namespace Index.Domain.Household;
 /// </summary>
 public static class SettingsCopy
 {
+    /// <summary>"Vault" on both installs: the suite's Settings anatomy names the group (audit W8.4b).</summary>
     public static string VaultHeading(InstallRole role) =>
-        role == InstallRole.Hers ? "Vault" : "Secrets vault";
+        Enum.IsDefined(role) ? "Vault" : throw new ArgumentOutOfRangeException(nameof(role), role, "Not an install role.");
 
     /// <summary>The paragraph above the passphrase field. Her screen has none: the label and the field
     /// are the whole of it, with the helper underneath.</summary>
