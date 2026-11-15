@@ -155,7 +155,7 @@ public static class TapWatch
             return;
         }
         var control = hit;
-        while (control is not null && !IsControl(control, longPress))
+        while (control is not null && !IsControl(control, longPress, x, y))
         {
             control = control.Parent as View;
         }
@@ -165,8 +165,20 @@ public static class TapWatch
         Schedule();
     }
 
-    private static bool IsControl(View view, bool longPress) =>
-        longPress ? view.LongClickable : view.Clickable || view.HasOnClickListeners;
+    // x and y are in window coordinates; a view that draws its own controls is asked in its own.
+    private static bool IsControl(View view, bool longPress, float x, float y)
+    {
+        if (view is IDrawnControls drawn)
+        {
+            var origin = new int[2];
+            view.GetLocationInWindow(origin);
+            if (drawn.HasControlAt(x - origin[0], y - origin[1]))
+            {
+                return true;
+            }
+        }
+        return longPress ? view.LongClickable : view.Clickable || view.HasOnClickListeners;
+    }
 
     private static string Name(View view, Activity activity)
     {
