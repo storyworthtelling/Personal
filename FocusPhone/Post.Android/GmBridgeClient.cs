@@ -375,22 +375,25 @@ public sealed class GmBridgeClient
         }
     }
 
-    /// <summary>Deletes a message in Google Messages (and so on the phone).</summary>
-    public bool TryDelete(string messageId)
+    /// <summary>
+    /// Deletes a message in Google Messages (and so on the phone). Logs nothing: the caller says it once —
+    /// the filing retry at its own throttle, the Mailbox's delete in its one line — since a line here on
+    /// every failure buried the log under the half-hourly retry.
+    /// </summary>
+    public BridgeDeleteResult TryDelete(string messageId)
     {
         if (!IsConnected)
         {
-            return false;
+            return BridgeDeleteResult.NotConnected;
         }
         try
         {
             bridge!.DeleteMessage(messageId);
-            return true;
+            return BridgeDeleteResult.Deleted;
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            PostDiagnostics.LogWarning(Source, "Bridge delete failed", e);
-            return false;
+            return BridgeDeleteResult.Refused;
         }
     }
 
@@ -477,7 +480,7 @@ public sealed class GmBridgeClient
 
     public bool TrySendMedia(string conversationId, byte[] data, string fileName, string mime) => false;
 
-    public bool TryDelete(string messageId) => false;
+    public BridgeDeleteResult TryDelete(string messageId) => BridgeDeleteResult.NotConnected;
 
     public byte[]? DownloadMedia(string mediaId, string key) => null;
 
