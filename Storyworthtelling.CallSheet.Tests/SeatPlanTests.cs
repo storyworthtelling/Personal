@@ -68,3 +68,18 @@ public class SeatPlanTests
         Assert.Matches("^[0-9a-f]{16}$", one);
     }
 }
+
+/// <summary>Which day a line belongs to: an evening that runs past midnight is the evening of the day it began.</summary>
+public class SeatDayTests
+{
+    [Theory]
+    [InlineData(9, 9, 0, 9)]
+    [InlineData(9, 23, 30, 9)]
+    [InlineData(10, 0, 30, 9)]
+    [InlineData(10, 4, 59, 9)]
+    [InlineData(10, 5, 0, 10)]
+    public void TheDayTurnsAtFive(int day, int hour, int minute, int expectedDay)
+    {
+        Assert.Equal(new DateOnly(2026, 3, expectedDay), SeatPlan.Today(new DateTime(2026, 3, day, hour, minute, 0)));
+    }
+}

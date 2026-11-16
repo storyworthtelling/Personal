@@ -115,14 +115,14 @@ public class HomeActivity : Activity
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
         greeting ??= new Codex.Ui.Voice.VoiceGreeting(
-            voiceAccount.GetAccessToken, "Flyleaf", Path.Combine(FilesDir!.AbsolutePath, "voice-lines.json"));
+            voiceAccount.GetAccessToken, "Flyleaf", Path.Combine(FilesDir!.AbsolutePath, "voice-seats.json"));
         ComposeHelloThenFade(overlay, hello);
     }
 
     private async void ComposeHelloThenFade(FrameLayout overlay, TextView hello)
     {
         // The part of the day rather than the minute, so the line is kept and reused until the next part (efficiency §4).
-        var timeContext = $"the owner just opened Flyleaf; it is {Codex.Domain.Voice.GreetingCache.PartOfDay(DateTime.Now)}";
+        var timeContext = $"the owner just opened Flyleaf; it is {Codex.Domain.Voice.PartOfDay.Of(DateTime.Now)}";
         var compose = greeting!.ComposeAsync(
             Storyworthtelling.CallSheet.CallSheet.For("Flyleaf", "welcome"), timeContext, CancellationToken.None);
         var finished = await Task.WhenAny(compose, Task.Delay(DesignTokens.Motion.CoverHelloWaitMs));

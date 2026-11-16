@@ -14,6 +14,12 @@ public sealed record VoiceFacts(VoiceSeat Seat, IReadOnlyList<string> Lines, Age
 {
     public VoicedOccasion Occasion => VoicedOccasions.For(Seat);
 
+    /// <summary>
+    /// Whom the seat speaks about, when more than one could share it: a child's id on a child's seat, so two
+    /// children on one phone keep their own lines (audit 06). Empty for a seat there is only one of.
+    /// </summary>
+    public string Subject { get; init; } = string.Empty;
+
     public bool HasFacts => Lines.Count > 0;
 
     /// <summary>The context handed to the composer: the facts, then the reading level when a child hears it.</summary>

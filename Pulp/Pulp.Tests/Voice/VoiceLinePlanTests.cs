@@ -1,62 +1,67 @@
+using Pulp.Domain.Children;
+using Pulp.Domain.Core;
 using Pulp.Domain.Voice;
+using SeatMemory = Storyworthtelling.CallSheet.SeatMemory;
+using SeatPlan = Storyworthtelling.CallSheet.SeatPlan;
 
 namespace Pulp.Tests.Voice;
 
 /// <summary>
-/// When a seat's line is composed again: at most once per seat, facts and day (Index's
-/// <c>VoiceSeatComposer</c>, Folio's <c>VoicedLinePlan</c>), and never when there is no profile or key.
+/// When a seat's line is composed again: the suite's one rule (<see cref="SeatPlan"/>, audit W10.3) — at most
+/// once per seat, facts and day; an empty attempt tried again after a short wait; never with no profile or key.
 /// </summary>
 public class VoiceLinePlanTests
 {
     private static readonly DateOnly Today = new(2026, 10, 9);
+    private static readonly DateTimeOffset Now = new(2026, 10, 9, 18, 0, 0, TimeSpan.Zero);
     private static readonly VoiceFacts Playlist = VoiceFactBuilder.Playlist("Rainy Sundays", entries: 6, watched: 2);
 
+    private static SeatMemory Kept(VoiceFacts facts, string? line, DateOnly? day = null, DateTimeOffset? at = null) =>
+        SeatPlan.Remember(facts.Hash, day ?? Today, line, at ?? Now.AddHours(-1));
+
     [Fact]
-    public void NothingRememberedIsComposed() =>
-        Assert.Equal(VoiceLineAction.Compose, VoiceLinePlan.Decide(Playlist, voiceReady: true, remembered: null, Today));
+    public void AFirstLookComposes()
+    {
+        Assert.Equal(VoiceLineAction.Compose, VoiceLinePlan.Decide(Playlist, voiceReady: true, remembered: null, Now, Today));
+    }
 
     [Fact]
     public void TheSameSeatFactsAndDayReuseTheLine()
     {
-        var remembered = new RememberedLine(Playlist.Seat, Playlist.Hash, Today, "A line already written.");
-        Assert.Equal(VoiceLineAction.Reuse, VoiceLinePlan.Decide(Playlist, true, remembered, Today));
+        Assert.Equal(VoiceLineAction.Reuse,
+            VoiceLinePlan.Decide(Playlist, true, Kept(Playlist, "A line already written."), Now, Today));
     }
 
     [Fact]
     public void ANewDayComposesAgain()
     {
-        var remembered = new RememberedLine(Playlist.Seat, Playlist.Hash, Today.AddDays(-1), "Yesterday's line.");
-        Assert.Equal(VoiceLineAction.Compose, VoiceLinePlan.Decide(Playlist, true, remembered, Today));
+        Assert.Equal(VoiceLineAction.Compose,
+            VoiceLinePlan.Decide(Playlist, true, Kept(Playlist, "Yesterday's line.", Today.AddDays(-1)), Now, Today));
     }
 
     [Fact]
     public void ChangedFactsComposeAgain()
     {
-        var remembered = new RememberedLine(Playlist.Seat, "0000000000000000", Today, "About older facts.");
-        Assert.Equal(VoiceLineAction.Compose, VoiceLinePlan.Decide(Playlist, true, remembered, Today));
-    }
-
-    [Fact]
-    public void AnotherSeatsLineIsNeverReused()
-    {
-        var greeting = VoiceFactBuilder.Greeting(new DateTimeOffset(2026, 10, 9, 8, 0, 0, TimeSpan.Zero), true, 1, 0);
-        var remembered = new RememberedLine(greeting.Seat, Playlist.Hash, Today, "The greeting's line.");
-        Assert.Equal(VoiceLineAction.Compose, VoiceLinePlan.Decide(Playlist, true, remembered, Today));
+        var older = SeatPlan.Remember("an-older-hash", Today, "About older facts.", Now.AddHours(-1));
+        Assert.Equal(VoiceLineAction.Compose, VoiceLinePlan.Decide(Playlist, true, older, Now, Today));
     }
 
     /// <summary>
-    /// An attempt that came back with nothing (no profile, a failed call) is not retried the same day for
-    /// the same facts — that is what "at most once" means — so the seat falls back instead.
+    /// An empty attempt is believed only for a short while (audit W10.3): a key restored a minute later used to wait
+    /// until tomorrow. Meanwhile each seat falls back by its own rule.
     /// </summary>
     [Fact]
-    public void AnAttemptThatCameBackEmptyIsNotRetriedTheSameDay()
+    public void AnEmptyAttemptFallsBackThenIsTriedAgain()
     {
-        var remembered = new RememberedLine(Playlist.Seat, Playlist.Hash, Today, Line: null);
-        Assert.Equal(VoiceLineAction.Hide, VoiceLinePlan.Decide(Playlist, true, remembered, Today));
+        var justNow = Kept(Playlist, null, at: Now.AddMinutes(-2));
+        Assert.Equal(VoiceLineAction.Hide, VoiceLinePlan.Decide(Playlist, true, justNow, Now, Today));
 
         var empty = VoiceFactBuilder.EmptyPlaylists();
-        var emptyRemembered = new RememberedLine(empty.Seat, empty.Hash, Today, Line: "  ");
-        Assert.Equal(VoiceLineAction.ShowNeutral, VoiceLinePlan.Decide(empty, true, emptyRemembered, Today));
+        Assert.Equal(VoiceLineAction.ShowNeutral,
+            VoiceLinePlan.Decide(empty, true, Kept(empty, "  ", at: Now.AddMinutes(-2)), Now, Today));
+
+        var aWhileAgo = Kept(Playlist, null, at: Now - SeatPlan.RetryAfter);
+        Assert.Equal(VoiceLineAction.Compose, VoiceLinePlan.Decide(Playlist, true, aWhileAgo, Now, Today));
     }
 
     [Fact]
@@ -67,7 +72,7 @@ public class VoiceLinePlanTests
         {
             var facts = new VoiceFacts(occasion.Seat, ["Something true."], null);
             var expected = occasion.Fallback == VoiceFallback.Hide ? VoiceLineAction.Hide : VoiceLineAction.ShowNeutral;
-            Assert.Equal(expected, VoiceLinePlan.Decide(facts, voiceReady: false, remembered: null, Today));
+            Assert.Equal(expected, VoiceLinePlan.Decide(facts, voiceReady: false, remembered: null, Now, Today));
             count++;
         }
 
@@ -78,8 +83,20 @@ public class VoiceLinePlanTests
     public void AHiddenSeatWithNoFactsIsHiddenButAnEmptyPageStillSpeaks()
     {
         Assert.Equal(VoiceLineAction.Hide,
-            VoiceLinePlan.Decide(new VoiceFacts(VoiceSeat.PlaylistLine, [], null), true, null, Today));
+            VoiceLinePlan.Decide(new VoiceFacts(VoiceSeat.PlaylistLine, [], null), true, null, Now, Today));
         Assert.Equal(VoiceLineAction.Compose,
-            VoiceLinePlan.Decide(VoiceFactBuilder.EmptyRecentlyWatched(), true, null, Today));
+            VoiceLinePlan.Decide(VoiceFactBuilder.EmptyRecentlyWatched(), true, null, Now, Today));
+    }
+
+    /// <summary>Two children on one phone keep their own lines (audit 06: one child's line overwrote another's).</summary>
+    [Fact]
+    public void EachChildsSeatIsItsOwn()
+    {
+        var robin = new ChildRules(new ViewerId("robin"), AgeBand.UnderSeven);
+        var juniper = new ChildRules(new ViewerId("juniper"), AgeBand.UnderSeven);
+
+        Assert.Equal("robin", ChildVoiceFacts.EmptyFavorites(robin).Subject);
+        Assert.Equal("juniper", ChildVoiceFacts.Greeting(juniper, Now, firstOpenOfDay: false).Subject);
+        Assert.Equal(string.Empty, Playlist.Subject);
     }
 }

@@ -2,6 +2,9 @@ using System.Globalization;
 using Android.Content;
 using Codex.Ui.Voice;
 using Pulp.Domain.Voice;
+using SeatMemory = Storyworthtelling.CallSheet.SeatMemory;
+using SeatMemoryFile = Storyworthtelling.CallSheet.SeatMemoryFile;
+using SeatPlan = Storyworthtelling.CallSheet.SeatPlan;
 
 namespace Pulp.Watching;
 
@@ -9,8 +12,8 @@ namespace Pulp.Watching;
 /// The home's two voiced seats — the greeting under the header (D118) and the empty page's invitation
 /// (D264) — composed in the owner's voice through the shared <see cref="VoiceGreeting"/> (Score's
 /// path: the shared profile and the vault's key, read with this phone's Google account). What a seat
-/// was last given is remembered per seat, facts and day, so <see cref="VoiceLinePlan"/> can say
-/// "reuse" instead of billing a model call per look at the home.
+/// was last given is kept in the suite's one memory file (audit W10.3), so <see cref="VoiceLinePlan"/>
+/// can say "reuse" instead of billing a model call per look at the home.
 ///
 /// <para>Score's first-open-of-day context is kept the same way Score keeps it: the day is remembered
 /// when the home first loads, and the flag holds for the rest of that process's day so the greeting's
@@ -26,12 +29,15 @@ public sealed class WatchingVoice
 
     private readonly ISharedPreferences prefs;
     private readonly Lazy<VoiceGreeting> composer;
+    private readonly SeatMemoryFile memory;
 
     public WatchingVoice(Context context)
     {
         ArgumentNullException.ThrowIfNull(context);
         prefs = context.GetSharedPreferences(PrefsName, FileCreationMode.Private)
             ?? throw new InvalidOperationException($"The {PrefsName} preferences could not be opened.");
+        // What each seat was last given, in the suite's one memory file (audit W10.3).
+        memory = new SeatMemoryFile(Path.Combine(context.FilesDir!.AbsolutePath, "voice-seats.json"));
         composer = new Lazy<VoiceGreeting>(() => new VoiceGreeting(new VoiceGoogleAccount().GetAccessToken, "Pulp"));
     }
 
@@ -57,37 +63,26 @@ public sealed class WatchingVoice
         return first;
     }
 
-    public RememberedLine? Remembered(VoiceSeat seat)
+    /// <summary>What the seat was last given, for this subject (a child's own line is their own).</summary>
+    public SeatMemory? Remembered(VoiceFacts facts)
     {
-        var hash = prefs.GetString(Key(seat, "hash"), null);
-        var day = prefs.GetString(Key(seat, "day"), null);
-        if (hash is null || day is null
-            || !DateOnly.TryParseExact(day, DayFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-        {
-            return null;
-        }
-
-        return new RememberedLine(seat, hash, parsed, prefs.GetString(Key(seat, "line"), null));
+        ArgumentNullException.ThrowIfNull(facts);
+        return memory.Get(facts.Occasion.Line, facts.Subject);
     }
 
     /// <summary>
     /// Composes the seat's line, or the empty string when there is no profile, key or answer — never
-    /// throws, as <see cref="VoiceGreeting"/> never does — and remembers the attempt either way, since
-    /// an empty answer is still the day's attempt for these facts.
+    /// throws, as <see cref="VoiceGreeting"/> never does — and remembers the attempt either way, so an empty
+    /// answer is believed for <see cref="SeatPlan.RetryAfter"/> and then asked again.
     /// </summary>
     public async Task<string> ComposeAsync(VoiceFacts facts, DateOnly today, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(facts);
         var line = await composer.Value.ComposeAsync(facts.Occasion.Line, facts.Context, cancellationToken);
-        prefs.Edit()!
-            .PutString(Key(facts.Seat, "hash"), facts.Hash)!
-            .PutString(Key(facts.Seat, "day"), Format(today))!
-            .PutString(Key(facts.Seat, "line"), line)!
-            .Apply();
+        memory.Put(facts.Occasion.Line, facts.Subject, SeatPlan.Remember(facts.Hash, today, line, DateTimeOffset.Now));
         return line;
     }
 
-    private static string Key(VoiceSeat seat, string part) => $"{seat}.{part}";
 
     private static string Format(DateOnly day) => day.ToString(DayFormat, CultureInfo.InvariantCulture);
 }
