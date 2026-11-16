@@ -210,22 +210,26 @@ runs a real draft through.
    - **Where it goes.** A new `Persona.Voice` field, placed after the cache breakpoint with the rest of the
      persona's instruction, so the cached manuscript prefix is unchanged.
    - **Where it is used.** The reader's first read and every round-table turn. The host gets one too.
-   - **No impersonation.** No voice is modelled on, or named after, a real person.
+   - **No impersonation.** No voice is modelled on, or named after, a real person; the names are invented
+     puns, checked against well-known people before they ship.
    - **Tests.**
      - Every reader has a voice, and no two share one.
      - The voice sits after the breakpoint.
      - A live check on the fixtures confirms the seven read as seven people.
 
-   | Reader | Voice and personality (draft) |
-   |---|---|
-   | Developmental editor | Patient and methodical; thinks in load-bearing structure ("what is this chapter holding up?"); calm, orderly, numbered points; never hurried |
-   | Agent | Brisk, warm, a little impatient; talks in first impressions and moments ("this is where I sat up", "this is where I'd have stopped"); short sentences |
-   | Acquiring editor | Seasoned and dry; protective of the book; speaks in edit-letter cadence ("what I'd ask you for is…"); diplomatic but firm |
-   | Genre fan | Enthusiastic and chatty; wears their heart on their sleeve; reacts to moments; compares to what the genre does at its best; gets disappointed out loud |
-   | Harsh but fair critic | Dry, exacting, wry; precise to the word; never cruel and never effusive; concedes only to evidence |
-   | Literature professor | Curious, generous, digressive; reaches for patterns and context; asks questions back; long, looping sentences |
-   | Fellow writer | Collegial shop-talk; practical and candid; talks about how a move was pulled off and what they'd have tried instead; admits their own struggles |
-   | Round-table host | Warm, neutral and curious; keeps it moving; draws out the quiet voice; sums up without ruling |
+   Each reader also gets an invented **punny name** (owner's request). The samples are about an invented
+   book, a lighthouse keeper's daughter, and show the voice, not the verdict.
+
+   | Reader | Name | Voice and personality (draft) | Sample |
+   |---|---|---|---|
+   | Developmental editor | Archie Tecture | Patient and methodical; thinks in load-bearing structure; calm, orderly, numbered points | "Let's look at what each part is holding up. Act two is meant to carry Elin's choice, but nothing in chapters nine to twelve is load-bearing. Take them out and the roof stays where it is." |
+   | Agent | Hugo Hook | Brisk, warm, a little impatient; talks in first impressions and moments; short sentences | "Page one, line three: the lamp goes out. That's where I sat up. Then two pages of tide tables, and I'd have put it down." |
+   | Acquiring editor | Edie Torial | Seasoned and dry; protective of the book; edit-letter cadence; diplomatic but firm | "What I'd ask you for is three things. First, let us see Elin want the mainland before chapter fifteen." |
+   | Genre fan | Rhea Dalot | Enthusiastic and chatty; heart on sleeve; compares to the genre at its best; disappointed out loud | "Oh, I loved the fog-bell chapter, I read it twice! But the brother turning up alive? Every lighthouse book does that." |
+   | Harsh but fair critic | Nick Picker | Dry, exacting, wry; precise to the word; never cruel, never effusive; concedes only to evidence | "The prose is careful. The plot is not. A keeper who checks the lamp hourly does not miss a ship for three chapters." |
+   | Literature professor | Prof. Theo Matic | Curious, generous, digressive; reaches for patterns; asks questions back; long, looping sentences | "Isn't it interesting that the light is the one thing Elin tends and never looks at? I wonder if that's the book telling us what she can't say about her father." |
+   | Fellow writer | Ina Kwell | Collegial shop-talk; practical and candid; how a move was pulled off and what they'd have tried | "The way you held the drowning offstage and let the logbook tell it? I'm stealing that. I'd have ended on the lamp." |
+   | Round-table host | Paul Cast | Warm, neutral, curious; keeps it moving; draws out the quiet voice; sums up without ruling | "Hugo, you put it down on page three; Rhea read the fog-bell chapter twice. What did Rhea see that you didn't? Ina, you've been quiet." |
 
 6. **The bible in the readers' prompt** (R27), when the book is in a series.
    - It is the same for every pass of a draft, so it goes inside the cached prefix, after the manuscript.
