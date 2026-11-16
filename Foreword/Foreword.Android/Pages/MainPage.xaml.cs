@@ -12,6 +12,10 @@ namespace Foreword.Android.Pages;
 
 public partial class MainPage : BinderPage
 {
+    // The welcome line, from the suite's voice-line Call Sheet (audit W10.3).
+    private static readonly Storyworthtelling.CallSheet.VoiceLine Welcome =
+        Storyworthtelling.CallSheet.CallSheet.For("Foreword", "welcome");
+
     private static string CrashLogPath =>
         System.IO.Path.Combine(FileSystem.AppDataDirectory, "crash.log");
 
@@ -95,7 +99,7 @@ public partial class MainPage : BinderPage
         {
             await voiceOptions.RefreshAsync(CancellationToken.None);
             message = await voice.ComposeAsync(
-                new MessageRequest("welcome", "the owner is checking their morning brief", HighVisibility: true),
+                new MessageRequest(Welcome.Purpose, "the owner is checking their morning brief", Welcome.MaxWords, Welcome.HighVisibility),
                 fallback: string.Empty, CancellationToken.None);
         }
         catch

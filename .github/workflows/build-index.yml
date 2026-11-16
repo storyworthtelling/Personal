@@ -14,6 +14,7 @@ on:
       - 'Storyworthtelling.Maui/**'
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.CallSheet/**'
       - 'Storyworthtelling.Materials/**'
       - 'Storyworthtelling.Materials.Android/**'
       - 'Storyworthtelling.Folds/**'

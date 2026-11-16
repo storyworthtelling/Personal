@@ -10,26 +10,29 @@ namespace Index.Domain.Voice;
 /// </summary>
 public static class VoicedOccasions
 {
-    public const string Accounts = "a line above the accounts about how the household's debt has been moving";
+    public static string Accounts => Line(VoiceSeat.Accounts).Purpose;
 
-    public const string Snowball = "a line above the debt-free date about how far the debt has come down";
+    public static string Snowball => Line(VoiceSeat.Snowball).Purpose;
 
-    public const string Savings = "a line under the switch on the savings page about the pace the savings are growing at";
+    public static string Savings => Line(VoiceSeat.Savings).Purpose;
 
     public static IReadOnlyList<string> All { get; } = [Accounts, Snowball, Savings];
 
-    public static string For(VoiceSeat seat) => seat switch
+    public static string For(VoiceSeat seat) => Line(seat).Purpose;
+
+    /// <summary>The seat's entry on the suite's voice-line Call Sheet (audit W10.3): purpose, instruction, words.</summary>
+    public static Storyworthtelling.CallSheet.VoiceLine Line(VoiceSeat seat) => seat switch
     {
-        VoiceSeat.Accounts => Accounts,
-        VoiceSeat.Snowball => Snowball,
-        VoiceSeat.Savings => Savings,
+        VoiceSeat.Accounts => Storyworthtelling.CallSheet.CallSheet.For("Index", "accounts"),
+        VoiceSeat.Snowball => Storyworthtelling.CallSheet.CallSheet.For("Index", "snowball"),
+        VoiceSeat.Savings => Storyworthtelling.CallSheet.CallSheet.For("Index", "savings"),
         _ => throw new ArgumentOutOfRangeException(nameof(seat), seat, "That seat has no occasion."),
     };
 }
 
 /// <summary>
-/// The only free text a seat's model call is given besides the facts, pinned in one place the way Foreword's
-/// <c>HandwritingInstruction</c> is so that a change to it is a decision and not a drift. Words, never
+/// The only free text a seat's model call is given besides the facts, written on the suite's voice-line Call
+/// Sheet (audit W10.3) so that a change to it is a decision and not a drift. Words, never
 /// digits: a number in an instruction is a number the model was handed without a fact to stand on, and
 /// <c>VoiceSeatPromptTests</c> fails on one.
 ///
@@ -39,32 +42,15 @@ public static class VoicedOccasions
 /// </summary>
 public static class VoiceSeatInstructions
 {
-    private const string Common =
-        "Write one short sentence in the owner's voice, as a line of copy at the top of a screen in a " +
-        "personal finance notebook. Build it ONLY from the FACTS below: use no number the FACTS do not " +
-        "give, and do not invent one. Say numbers in words, and percentages in words as in \"about one " +
-        "percent\". No advice, no instruction, no judgement, no exclamation marks, no emoji, no quotation " +
-        "marks. At most eighteen words. If the FACTS are not enough for a sentence, reply with nothing at all.";
+    public static string Accounts => For(VoiceSeat.Accounts);
 
-    public const string Accounts =
-        Common + " Speak only in percentages and counts. Never state a dollar amount, an account number, " +
-        "a bank name or an account name.";
+    public static string Snowball => For(VoiceSeat.Snowball);
 
-    public const string Snowball =
-        Common + " Speak only in percentages and counts. Never state a dollar amount, an account number, " +
-        "a bank name or an account name.";
+    public static string Savings => For(VoiceSeat.Savings);
 
-    public const string Savings =
-        Common + " Mention only the monthly rate the FACTS give, as an amount per month. Never state a " +
-        "balance, a total saved, a goal or target, a date, an account name or a bank name.";
-
-    public static string For(VoiceSeat seat) => seat switch
-    {
-        VoiceSeat.Accounts => Accounts,
-        VoiceSeat.Snowball => Snowball,
-        VoiceSeat.Savings => Savings,
-        _ => throw new ArgumentOutOfRangeException(nameof(seat), seat, "That seat has no instruction."),
-    };
+    /// <summary>The seat's standing instruction, written on the suite's voice-line Call Sheet.</summary>
+    public static string For(VoiceSeat seat) => VoicedOccasions.Line(seat).Guidance
+        ?? throw new InvalidOperationException($"The Call Sheet gives Index's {seat} seat no instruction.");
 }
 
 /// <summary>What the composer sends: the occasion (<c>Purpose</c>), the pinned instruction followed by the
@@ -87,7 +73,7 @@ public static class VoiceSeatPrompts
             VoiceSeatInstructions.For(facts.Seat)
             + "\n\nFACTS (the only things you may draw on):\n"
             + string.Join('\n', facts.Lines.Select(line => $"- {line}"));
-        return new VoiceSeatPrompt(VoicedOccasions.For(facts.Seat), context, MaxWords: 24);
+        return new VoiceSeatPrompt(VoicedOccasions.For(facts.Seat), context, VoicedOccasions.Line(facts.Seat).MaxWords);
     }
 }
 

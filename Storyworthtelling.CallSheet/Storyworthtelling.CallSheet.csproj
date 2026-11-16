@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The voice-line Call Sheet (audit W10.3, owner's ruling): every place in the suite that speaks in the
+    owner's voice, in one list, with the instruction Claude gets, the model tier, the word limit and what
+    shows without a voice; and the one rule for when a line is composed again. BCL only, so every app's
+    Domain can reference it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.CallSheet</RootNamespace>
+  </PropertyGroup>
+
+</Project>

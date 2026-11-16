@@ -78,7 +78,7 @@ public sealed class WatchingVoice
     public async Task<string> ComposeAsync(VoiceFacts facts, DateOnly today, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(facts);
-        var line = await composer.Value.ComposeAsync(facts.Occasion.Purpose, facts.Context, cancellationToken);
+        var line = await composer.Value.ComposeAsync(facts.Occasion.Line, facts.Context, cancellationToken);
         prefs.Edit()!
             .PutString(Key(facts.Seat, "hash"), facts.Hash)!
             .PutString(Key(facts.Seat, "day"), Format(today))!

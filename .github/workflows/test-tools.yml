@@ -22,6 +22,7 @@ on:
       - 'Storyworthtelling.Pipeline/**'
       - 'Storyworthtelling.Paper/**'
       - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.CallSheet/**'
       - 'Storyworthtelling.Materials/**'
       - 'Storyworthtelling.Folds/**'
       - 'Branding/**'

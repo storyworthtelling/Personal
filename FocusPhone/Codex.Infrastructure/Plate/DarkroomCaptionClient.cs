@@ -37,11 +37,11 @@ public sealed class DarkroomCaptionClient
     /// </summary>
     public const int MostPictures = 4;
 
-    private const string Instruction =
-        "You write one short line for a photographer looking at their own unsorted pictures, "
-        + "in their voice, described by the PROFILE that follows; never instructional. Say something true about what is in "
-        + "front of them. Do not name or identify any person. Do not tell them what to do with "
-        + "the pictures. Reply with the line only — no quotes, no preamble, at most fifteen words.";
+    // The instruction and word limit are written on the suite's voice-line Call Sheet (audit W10.3).
+    private static readonly Storyworthtelling.CallSheet.VoiceLine Line =
+        Storyworthtelling.CallSheet.CallSheet.For("Plate", "caption");
+
+    private static readonly string Instruction = Line.Guidance!;
 
     private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
@@ -87,7 +87,7 @@ public sealed class DarkroomCaptionClient
 
             var system = new[] { ClaudeBlock.Text(Instruction), ClaudeBlock.Text(VoiceProfilePrompt.Block(profile), cache: true) };
             var reply = await claude.SendAsync(
-                new ClaudeRequest(options.FastModel, options.ComposeMaxTokens, system, user),
+                new ClaudeRequest(Line.HighVisibility ? options.Model : options.FastModel, options.ComposeMaxTokens, system, user),
                 cancellationToken);
             var line = reply.Text.Trim().Trim('"');
             return line.Length > 0 ? line : null;

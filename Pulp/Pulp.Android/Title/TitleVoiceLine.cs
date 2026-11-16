@@ -51,7 +51,7 @@ internal sealed class TitleVoiceLine
             case VoiceLineAction.ShowNeutral:
                 return null;
             case VoiceLineAction.Compose:
-                var line = await Composer.Value.ComposeAsync(facts.Occasion.Purpose, facts.Context, cancellationToken);
+                var line = await Composer.Value.ComposeAsync(facts.Occasion.Line, facts.Context, cancellationToken);
                 var kept = string.IsNullOrWhiteSpace(line) ? null : line.Trim();
                 Write(key, new RememberedLine(facts.Seat, facts.Hash, today, kept));
                 return kept;
