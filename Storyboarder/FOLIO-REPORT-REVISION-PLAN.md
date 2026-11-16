@@ -284,7 +284,15 @@ Each linked item also prints the page it leads to, because a pen on paper cannot
    - Links: test that the destination page carries the mark.
    - Checkboxes: drawn so the tablet's pen can tick them; nothing reads them back.
 
-### Release E — Leaner notes and a labelled pacing chart (R16–R17)
+### Release E — Leaner notes and a labelled pacing chart (R16–R17) — **built**
+
+How it was built: every section read's findings are now written on the manuscript (they were bullets
+under the section), so a section's whole-book note is its paragraph alone, asked for at four sentences (two
+for a short story) and cut at a sentence's end if it runs over (`WholeBookNotes.Summary`). A short story's
+notes with no line of their own go to one list at the story's start, "Notes on the story", rather than a
+list in the notes, and its whole-book notes start on a sheet of their own. The chart's labels sit in lanes
+above it (`ChartLabels`), so a crowded chart takes another lane rather than overprinting.
+
 1. Whole-book notes: one short paragraph per section at novel length. A short story gets one page, with
    only what is true of the whole piece.
    - Enforced by a page-count test on a short-story fixture.

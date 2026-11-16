@@ -35,6 +35,7 @@ public class FoldedSectionsTests
     private static BookAnalysisResult Everything() => SampleAnalysis.Of(plotHoles:
         [new ReportFinding("Chapter 2", "Nobody reacts to her return.") { Excerpt = "nobody spoke to her" }]) with
     {
+        WordCount = 90_000,
         Inconsistencies = [new ReportFinding("Chapter 1", "Her brother is two ages at once.")],
         LineEdits = [new LineEdit("Chapter 1", "Ruth came back to Saltings", "x", "A flat opening.")],
         Expansion = new ExpansionReport(

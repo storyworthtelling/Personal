@@ -1,5 +1,6 @@
 using Folio.Domain.Analysis;
 using Folio.Domain.Readiness;
+using Folio.Domain.Text;
 
 namespace Folio.Domain.Report;
 
@@ -56,6 +57,31 @@ public static class PacingChart
 
     /// <summary>One slack chapter is a breath; this many in a row is a sag.</summary>
     public const int SagRun = 2;
+
+    /// <summary>
+    /// Whether a book gets the chart at all (R17, R38): a novel with two chapters to trend between, a
+    /// novella with three or more, and never a short story, whose "tension across the chapters" is one
+    /// or two points dressed as a curve.
+    /// </summary>
+    public static bool Shows(StoryLength length, int chapters) => length switch
+    {
+        StoryLength.Novel => chapters >= 2,
+        StoryLength.Novella => chapters >= 3,
+        _ => false,
+    };
+
+    /// <summary>
+    /// The number printed under a point: the chapter's own number from its label ("Chapter 7" → 7, the
+    /// first of a range), else its place in reading order — a chapter titled rather than numbered is
+    /// still the fifth one.
+    /// </summary>
+    public static string AxisLabel(ChapterTension point, int index)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        return ChapterCitation.Span(point.Chapter) is { } span
+            ? span.From.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : (index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     public static PacingOverlay Overlay(
         IReadOnlyList<ChapterTension> curve, IReadOnlyList<PacingFinding> findings)

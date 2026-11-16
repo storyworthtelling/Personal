@@ -32,7 +32,14 @@ public sealed record ChapterNote(ReadinessTier Severity, string Label, string Te
 /// one (<see cref="FollowsTitle"/>), else at its first character, so the list is never printed after
 /// the first line of a paragraph. Notes run most severe first, then in the order they were found.</para>
 /// </summary>
-public sealed record ChapterNoteList(int Chapter, int Offset, bool FollowsTitle, IReadOnlyList<ChapterNote> Notes);
+public sealed record ChapterNoteList(int Chapter, int Offset, bool FollowsTitle, IReadOnlyList<ChapterNote> Notes)
+{
+    /// <summary>
+    /// What the list is headed: "Notes on this chapter", or for a short story — whose list gathers every
+    /// note with no line of its own, since each is about the whole piece (R16) — "Notes on the story".
+    /// </summary>
+    public string Heading { get; init; } = "Notes on this chapter";
+}
 
 /// <summary>What the report's findings come to once they are written on the manuscript.</summary>
 public sealed record MarkedReport(IReadOnlyList<Mark> Marks, IReadOnlyList<UnplacedNote> Unplaced)

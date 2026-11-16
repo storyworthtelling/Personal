@@ -186,7 +186,10 @@ public sealed class AnalysisDocumentRenderer
             text, analysis, chapters,
             (category, detail) => Tag(category, detail, statusByFinding));
 
-        RenderWholeBookNotes(writer, analysis, marked.Unplaced, body, bodyBold, bodyItalic, h2, h3);
+        // How long the book is decides what the notes hold: a short story never gets the pacing chart.
+        var words = analysis.WordCount > 0 ? analysis.WordCount : cover.WordCount;
+        var storyLength = words > 0 ? ManuscriptLength.Classify(words) : StoryLength.Novel;
+        RenderWholeBookNotes(writer, analysis, marked.Unplaced, storyLength, body, bodyBold, bodyItalic, h2, h3);
 
         RenderMarkedManuscript(writer, text, marked, scenes, bodyItalic, h2);
 
@@ -270,20 +273,22 @@ public sealed class AnalysisDocumentRenderer
     /// a finding disappear.</para>
     /// </summary>
     private static void RenderWholeBookNotes(
-        PageWriter writer, BookAnalysisResult analysis, IReadOnlyList<UnplacedNote> unplaced,
+        PageWriter writer, BookAnalysisResult analysis, IReadOnlyList<UnplacedNote> unplaced, StoryLength length,
         SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2, SKFont h3)
     {
         var blocks = new List<Action>();
 
         void Persona(SectionRead section)
         {
+            if (string.IsNullOrWhiteSpace(section.Summary))
+                return;
+
             blocks.Add(() =>
             {
+                // One short paragraph (R16). The section's findings are written on the manuscript, or, with
+                // no place to go, listed under "Not tied to a place in the text" below.
                 writer.Heading(PersonaName(section.PersonaId), h3, Ink);
-                if (!string.IsNullOrWhiteSpace(section.Summary))
-                    writer.Paragraph(section.Summary, body, Ink);
-                foreach (var finding in section.Findings ?? [])
-                    writer.Bullet(Join(finding.Chapter, finding.Detail), body, Ink);
+                writer.Paragraph(WholeBookNotes.Summary(section.Summary, length), body, Ink);
                 writer.Gap(PageGeometry.BlockGap);
             });
         }
@@ -294,13 +299,13 @@ public sealed class AnalysisDocumentRenderer
             switch (persona.Id)
             {
                 case "pacing":
-                    AddPacing(blocks, writer, analysis, section, body, bodyItalic, h3);
+                    AddPacing(blocks, writer, analysis, section, length, body, bodyItalic, h3);
                     break;
                 case "voice-consistency":
-                    AddVoice(blocks, writer, analysis, section, body, bodyBold, h3);
+                    AddVoice(blocks, writer, analysis, section, length, body, bodyBold, h3);
                     break;
                 case "series-continuity":
-                    AddSeries(blocks, writer, analysis, section, body, bodyBold, h3);
+                    AddSeries(blocks, writer, analysis, section, length, body, bodyBold, h3);
                     break;
                 default:
                     if (section is { HasContent: true })
@@ -337,6 +342,11 @@ public sealed class AnalysisDocumentRenderer
         if (blocks.Count == 0)
             return;
 
+        // A short story's notes are one page (R16), so they start on a sheet of their own rather than
+        // under the frame, where they would break across two.
+        if (length == StoryLength.ShortStory && !writer.OnFreshPage)
+            writer.NewPage();
+
         writer.BeginSection(FolioSheet.Notes);
         writer.Heading("Whole-book notes", h2, Ink, ruled: true);
         writer.Paragraph(
@@ -356,11 +366,13 @@ public sealed class AnalysisDocumentRenderer
     /// what either mark was. The chapter-cited pacing notes are marks on the manuscript.
     /// </summary>
     private static void AddPacing(
-        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section,
+        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section, StoryLength length,
         SKFont body, SKFont bodyItalic, SKFont h3)
     {
         var hasSummary = section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary);
-        var hasChart = analysis.PacingCurve is { Count: >= 2 };
+        // A novel, or a novella of three chapters or more (R17, R38); never a short story.
+        var hasChart = analysis.PacingCurve is { Count: >= 2 }
+            && Folio.Domain.Report.PacingChart.Shows(length, analysis.PacingCurve.Count);
         if (!hasSummary && !hasChart)
             return;
 
@@ -368,10 +380,12 @@ public sealed class AnalysisDocumentRenderer
         {
             writer.Heading("Pacing", h3, Ink);
             if (hasSummary)
-                writer.Paragraph(section!.Summary, body, Ink);
+                writer.Paragraph(WholeBookNotes.Summary(section!.Summary, length), body, Ink);
             if (hasChart)
             {
-                writer.Paragraph("Tension across the chapters — a dip is a place to check the story is still pulling.", bodyItalic, Muted);
+                writer.Paragraph(
+                    "Tension across the chapters, numbered along the foot, each point labelled with what drives "
+                    + "it — a dip is a place to check the story is still pulling.", bodyItalic, Muted);
                 writer.PacingChart(analysis.PacingCurve, PlacedFindings(analysis));
             }
             writer.Gap(PageGeometry.BlockGap);
@@ -379,7 +393,7 @@ public sealed class AnalysisDocumentRenderer
     }
 
     private static void AddVoice(
-        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section,
+        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section, StoryLength length,
         SKFont body, SKFont bodyBold, SKFont h3)
     {
         var hasSummary = section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary);
@@ -391,7 +405,7 @@ public sealed class AnalysisDocumentRenderer
         {
             writer.Heading("Voice consistency", h3, Ink);
             if (hasSummary)
-                writer.Paragraph(section!.Summary, body, Ink);
+                writer.Paragraph(WholeBookNotes.Summary(section!.Summary, length), body, Ink);
             if (!string.IsNullOrWhiteSpace(voice))
             {
                 writer.Paragraph("The book's voice:", bodyBold, Ink);
@@ -406,7 +420,7 @@ public sealed class AnalysisDocumentRenderer
     // says it. Only a book with real continuity content earns it. The breaks are on the manuscript;
     // what is left here is the status of the prior book's open threads, which is about the whole book.
     private static void AddSeries(
-        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section,
+        List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section, StoryLength length,
         SKFont body, SKFont bodyBold, SKFont h3)
     {
         var series = analysis.SeriesContinuity;
@@ -420,7 +434,7 @@ public sealed class AnalysisDocumentRenderer
                 : $"“{series.PriorBookTitle}”";
             writer.Heading("Series continuity", h3, Ink);
             if (section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary))
-                writer.Paragraph(section.Summary, body, Ink);
+                writer.Paragraph(WholeBookNotes.Summary(section.Summary, length), body, Ink);
             if (series.CarriedThreads is { Count: > 0 })
             {
                 writer.Paragraph($"Threads carried from {against}:", bodyBold, Ink);

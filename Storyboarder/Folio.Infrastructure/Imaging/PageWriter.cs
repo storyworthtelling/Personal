@@ -360,11 +360,26 @@ internal sealed class PageWriter : IDisposable
 
         var height = PageGeometry.PacingChartHeight;
         var width = ContentWidth;
-        if (y + height > ContentBottom && y > ContentTop)
+        var left = ContentLeft;
+        var step = width / (curve.Count - 1);
+        var xs = Enumerable.Range(0, curve.Count).Select(i => left + (i * step)).ToArray();
+
+        // Each point's few words on what drives it (R17), in lanes above the chart so none prints over
+        // another; a crowded chart takes more lanes rather than losing a label.
+        using var labelFont = ReportType.Small();
+        var words = curve.Select(point => Fit(point.Driver, labelFont, MaxLabelWidth)).ToArray();
+        var labels = ChartLabels.Place(
+            [.. xs.Select((x, i) => new LabelRequest(x, words[i].Length == 0 ? 0 : labelFont.MeasureText(words[i])))],
+            labelFont.Spacing, left, left + width);
+        var lanes = words.Any(word => word.Length > 0) ? ChartLabels.Lanes(labels) : 0;
+        var labelBand = lanes * labelFont.Spacing + (lanes > 0 ? 6f : 0f);
+        var axisBand = SagBandDepth + labelFont.Spacing + 2f;
+
+        if (y + labelBand + height + axisBand > ContentBottom && y > ContentTop)
             NewPage();
 
-        var left = ContentLeft;
-        var bottom = y + height;
+        var bandTop = y;
+        var bottom = y + labelBand + height;
         var overlay = Domain.Report.PacingChart.Overlay(curve, findings ?? []);
 
         using (var frame = new SKPaint
@@ -374,14 +389,34 @@ internal sealed class PageWriter : IDisposable
             canvas.DrawLine(left, bottom, left + width, bottom, frame);
 
         var points = new SKPoint[curve.Count];
-        var step = curve.Count == 1 ? 0 : width / (curve.Count - 1);
         for (var i = 0; i < curve.Count; i++)
         {
-            var px = curve.Count == 1 ? left + width / 2 : left + i * step;
             var t = (float)Math.Clamp(curve[i].Tension, 0, 1);
-            var py = bottom - t * (height - 3f);
-            points[i] = new SKPoint(px, py);
+            points[i] = new SKPoint(xs[i], bottom - t * (height - 3f));
         }
+
+        // The labels, lane 0 nearest the chart, each with a hairline down to its point.
+        using (var labelInk = new SKPaint { Color = ReportPalette.InkSoft, IsAntialias = true })
+        using (var leader = new SKPaint
+        {
+            Color = ReportPalette.Hairline, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 0.6f,
+        })
+            for (var i = 0; i < curve.Count; i++)
+            {
+                if (words[i].Length == 0)
+                    continue;
+                var label = labels[i];
+                var baseline = bandTop + ((lanes - 1 - label.Lane) * labelFont.Spacing) + labelFont.Size;
+                canvas.DrawText(words[i], (float)label.Left, baseline, labelFont, labelInk);
+                canvas.DrawLine(xs[i], baseline + 2f, xs[i], points[i].Y - 4f, leader);
+            }
+
+        // The chapter numbers under the rule, below the sag brackets.
+        using (var axisInk = new SKPaint { Color = ReportPalette.InkSoft, IsAntialias = true })
+            for (var i = 0; i < curve.Count; i++)
+                canvas.DrawText(
+                    Domain.Report.PacingChart.AxisLabel(curve[i], i), xs[i], bottom + SagBandDepth + labelFont.Size + 2f,
+                    SKTextAlign.Center, labelFont, axisInk);
 
         // A sag is a bracket *under* the rule, not a wash behind the line. Rendered as a pale fill it
         // came out as a smear sitting on the baseline and read as a printing fault; a bracket is a
@@ -432,7 +467,7 @@ internal sealed class PageWriter : IDisposable
             canvas.DrawCircle(point.X, point.Y, 4f, ring);
         }
 
-        y = bottom + SagBandDepth;
+        y = bottom + axisBand;
         Key(overlay);
     }
 
@@ -484,6 +519,22 @@ internal sealed class PageWriter : IDisposable
         }
 
         y += PageGeometry.BlockGap;
+    }
+
+    /// <summary>The widest a pacing label prints; longer words are cut at a word with an ellipsis.</summary>
+    private const float MaxLabelWidth = 96f;
+
+    /// <summary>A label cut to the width it may take, at a word, with an ellipsis when cut.</summary>
+    private static string Fit(string? words, SKFont font, float width)
+    {
+        var text = (words ?? string.Empty).Trim();
+        if (text.Length == 0 || font.MeasureText(text) <= width)
+            return text;
+
+        var cut = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+        while (cut.Count > 1 && font.MeasureText(string.Join(' ', cut) + "…") > width)
+            cut.RemoveAt(cut.Count - 1);
+        return string.Join(' ', cut) + "…";
     }
 
     /// <summary>How far below the chart's rule a sag bracket hangs.</summary>

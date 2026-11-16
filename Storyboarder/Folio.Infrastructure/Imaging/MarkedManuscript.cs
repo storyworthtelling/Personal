@@ -124,7 +124,7 @@ internal static class MarkedManuscript
         writer.KeepTogether(italic.Spacing + (small.Spacing * 3));
         foreach (var item in chapter.Notes)
             writer.MarkPlace(item.FindingKey, PageGeometry.ContentLeft, writer.Y);
-        writer.Paragraph("Notes on this chapter", italic, ReportPalette.InkMuted);
+        writer.Paragraph(chapter.Heading, italic, ReportPalette.InkMuted);
         foreach (var item in chapter.Notes)
         {
             var text = string.IsNullOrWhiteSpace(item.Text) ? item.Label : $"{item.Label} — {item.Text}";

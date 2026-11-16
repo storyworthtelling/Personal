@@ -61,7 +61,7 @@ public class PacingChartPlacementTests
 
     private static byte[] Render(IReadOnlyList<ChapterTension> curve) =>
         new AnalysisDocumentRenderer().Render(
-            SampleAnalysis.Of() with { PacingCurve = curve }, Cover, Array.Empty<SceneEvidence>());
+            SampleAnalysis.Of() with { PacingCurve = curve, WordCount = 90_000 }, Cover, Array.Empty<SceneEvidence>());
 
     private static string TextOf(byte[] pdf)
     {
