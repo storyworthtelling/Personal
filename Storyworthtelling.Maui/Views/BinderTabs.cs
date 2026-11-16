@@ -209,6 +209,20 @@ public class BinderTabs : ContentView
             Margin = new Thickness(0, DesignTokens.Space.X1, 0, 0),
         };
 
+        // §2 Marker: the active tab's label is written in marker, as the native strip's is; an inactive one is
+        // plain ink on its cloth. The streaks go on the platform text's paint once it exists.
+        if (active)
+        {
+            label.HandlerChanged += (_, _) =>
+            {
+                if (label.Handler?.PlatformView is global::Android.Widget.TextView text)
+                {
+                    MaterialPainters.Marker(text.Paint!, tint.AsColor(), text.Resources!.DisplayMetrics!.Density);
+                    text.Invalidate();
+                }
+            };
+        }
+
         var column = new VerticalStackLayout
         {
             HorizontalOptions = LayoutOptions.Center,

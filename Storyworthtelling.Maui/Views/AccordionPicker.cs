@@ -146,12 +146,12 @@ public class AccordionPicker : VerticalStackLayout
         {
             Padding = new Thickness(DesignTokens.Space.X3, DesignTokens.Space.X2),
             MinimumHeightRequest = DesignTokens.Shape.TouchTargetDp,
-
-            // §8 Selected: the highlighter wash of the functional hue, behind full-strength ink —
-            // never a dimmed row, which would mean disabled.
-            BackgroundColor = chosen ? PaperResources.Colour("ActionWash") : Colors.Transparent,
             Children = { label },
         };
+
+        // §8 Selected: the highlighter band of the functional hue, behind full-strength ink — never a dimmed
+        // row, which would mean disabled.
+        PaperMaterials.Highlight(row, PaperResources.Colour("ActionMark"), chosen);
 
         if (!string.IsNullOrWhiteSpace(choice.Detail))
         {

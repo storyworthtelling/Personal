@@ -84,6 +84,55 @@ public partial class MaterialsAreOneEngineTests
         Assert.Contains(call, Read(file), StringComparison.Ordinal);
 
     /// <summary>
+    /// Watercolor is for covers only (owner's ruling, W8.8): no in-app screen is washed. A radial wash is drawn only
+    /// by Flyleaf's painted cover and bookcase, the scoped departure DESIGN.md §1/§5 records.
+    /// </summary>
+    [Fact]
+    public void NoScreenIsWashedInWatercolor()
+    {
+        string[] painted = ["FocusPhone/Flyleaf.Android/CoverView.cs", "FocusPhone/Flyleaf.Android/BookshelfView.cs"];
+        var found = Files(Heads.Append("Storyworthtelling.Materials.Android"), "*.cs")
+            .Concat(Files(Heads, "*.xaml"))
+            .Where(file => !painted.Contains(Relative(file), StringComparer.Ordinal))
+            .Where(file => File.ReadAllText(file).Contains("RadialGradient", StringComparison.Ordinal))
+            .Select(Relative)
+            .ToList();
+        Assert.True(found.Count == 0, "Watercolor stays on the covers:\n" + string.Join("\n", found));
+    }
+
+    /// <summary>The MAUI kit's components draw in the same media, through the same drawables (W8.8 PR 2b).</summary>
+    [Theory]
+    [InlineData("Storyworthtelling.Maui/Materials/PaperMaterials.cs", "new MarkerFillDrawable(")]
+    [InlineData("Storyworthtelling.Maui/Materials/PaperMaterials.cs", "new PencilOutlineDrawable(")]
+    [InlineData("Storyworthtelling.Maui/Materials/PaperMaterials.cs", "new HighlighterDrawable(")]
+    [InlineData("Storyworthtelling.Maui/Materials/PaperMaterials.cs", "new PaperCardDrawable(")]
+    [InlineData("Storyworthtelling.Maui/Resources/Styles/Paper.xaml.cs", "PaperMaterials.Install()")]
+    [InlineData("Storyworthtelling.Maui/Views/PaperSegmented.cs", "PaperMaterials.Highlight(")]
+    [InlineData("Storyworthtelling.Maui/Views/PaperList.cs", "PaperMaterials.Highlight(")]
+    [InlineData("Storyworthtelling.Maui/Views/AccordionPicker.cs", "PaperMaterials.Highlight(")]
+    [InlineData("Storyworthtelling.Maui/Views/PaperCheckbox.cs", "MaterialPainters.Pencil(")]
+    [InlineData("Storyworthtelling.Maui/Views/PaperPageHeader.cs", "MaterialPainters.Marker(")]
+    [InlineData("Storyworthtelling.Maui/Views/BinderTabs.cs", "MaterialPainters.Marker(")]
+    public void TheMauiKitDrawsInTheMedia(string file, string call) =>
+        Assert.Contains(call, Read(file), StringComparison.Ordinal);
+
+    /// <summary>A MAUI selection is the kit's highlighter, never a flat wash colour set on a view.</summary>
+    [Fact]
+    public void NoMauiViewIsAFlatWash()
+    {
+        var found = Files(["Ledger/Ledger.Android", "Storyboarder/Folio.Android", "Foreword/Foreword.Android", "Storyworthtelling.Maui/Views"], "*.cs")
+            .Concat(Files(["Ledger/Ledger.Android", "Storyboarder/Folio.Android", "Foreword/Foreword.Android"], "*.xaml"))
+            .SelectMany(file => File.ReadLines(file).Select((line, i) => (file, line, i)))
+            .Where(hit => !hit.line.TrimStart().StartsWith("//", StringComparison.Ordinal) && FlatWash().IsMatch(hit.line))
+            .Select(hit => $"{Relative(hit.file)}:{hit.i + 1}")
+            .ToList();
+        Assert.True(found.Count == 0, "Use PaperMaterials.Highlight:\n" + string.Join("\n", found));
+    }
+
+    [GeneratedRegex(@"(Colour|Color|StaticResource)\W+\w+Wash\b")]
+    private static partial Regex FlatWash();
+
+    /// <summary>
     /// A selection is a highlighter band and a chip is a pencil one, from the kit, never a flat wash of the hue a head
     /// mixes for itself; and the old one-texture-for-everything overlay is gone.
     /// </summary>

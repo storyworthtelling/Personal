@@ -87,10 +87,10 @@ public partial class CalendarColumnPage : BinderPage
         {
             Padding = new Thickness(16, 12),
             MinimumHeightRequest = DesignTokens.Shape.TouchTargetDp,
-
-            // §8 Selected: the highlighter wash behind full-strength ink, never a dimmed row.
-            BackgroundColor = chosen ? PaperResources.Colour("ActionWash") : Colors.Transparent,
         };
+
+        // §8 Selected: the highlighter band behind full-strength ink, never a dimmed row.
+        PaperMaterials.Highlight(row, PaperResources.Colour("ActionMark"), chosen);
         row.Children.Add(lines);
 
         var tap = new TapGestureRecognizer();

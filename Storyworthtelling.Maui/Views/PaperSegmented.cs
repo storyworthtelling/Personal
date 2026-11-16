@@ -96,10 +96,9 @@ public sealed class PaperSegmented : Border
         {
             var isPicked = choice.IsPicked(choice.Options[i]);
 
-            // The picked segment carries the wash and the full ink; the rest stay quiet. Not dimmed:
+            // The picked segment carries the highlighter band and the full ink; the rest stay quiet. Not dimmed:
             // a dimmed segment means DISABLED, and every one of these is available.
-            ((Grid)row.Children[i]).BackgroundColor =
-                isPicked ? PaperResources.Colour("ActionWash") : Colors.Transparent;
+            PaperMaterials.Highlight((Grid)row.Children[i], PaperResources.Colour("ActionMark"), isPicked);
             labels[i].TextColor = PaperResources.Colour(isPicked ? "Ink" : "InkMuted");
 
             // The FAMILY changes, not FontAttributes. Source Sans 3 ships Regular and SemiBold as
