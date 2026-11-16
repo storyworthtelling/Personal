@@ -138,6 +138,11 @@ public class SeriesBiblePage : FolioBinderPage
             return entry;
         }
 
+        // The Drive doc follows the correction (owner's request), so its history keeps it. Best-effort and
+        // quiet: a write that fails is made at the bible's next change.
+        _ = IPlatformApplication.Current!.Services.GetRequiredService<SeriesBibleBackup>()
+            .WriteAsync(seriesId, $"your correction to {entry.Name}", null, CancellationToken.None);
+
         var corrected = entry with { Correction = correction.Trim() };
         current.Text = corrected.Current;
         whose.Text = Whose(corrected);

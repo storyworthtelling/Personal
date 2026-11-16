@@ -60,7 +60,5 @@ public class DeliveredDocumentTests
     {
         Assert.Equal("The Tides — Series bible — after The Tide Ledger draft 2",
             DeliveredDocument.BibleName("The Tides", "The Tide Ledger", 2));
-        Assert.Equal("The Tides — Series bible — after The Tide Ledger draft 2.pdf",
-            DeliveredDocument.BibleFileName("The Tides", "The Tide Ledger", 2));
     }
 }

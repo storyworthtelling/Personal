@@ -257,3 +257,68 @@ public static class SeriesBibleCodec
         }
     }
 }
+
+/// <summary>
+/// The series bible as the plain-text Google Doc kept in Drive (owner's request): one document per
+/// series, rewritten in place each time the bible changes, so the doc's own version history shows what
+/// each book and each correction changed. Everything is written in a stable order, kinds first, then
+/// entries as the bible holds them, so a version differs from the last only where the bible did. The
+/// second line says what prompted the version.
+/// </summary>
+public static class BibleDocumentText
+{
+    private static readonly (BibleKind Kind, string Heading)[] Order =
+    [
+        (BibleKind.Character, "CHARACTERS"),
+        (BibleKind.Setting, "SETTINGS"),
+        (BibleKind.Rule, "WORLD RULES"),
+        (BibleKind.Event, "TIMELINE EVENTS"),
+        (BibleKind.Thread, "OPEN THREADS"),
+    ];
+
+    public static string For(
+        string series, SeriesBible bible, IReadOnlyDictionary<Guid, StoryPlacement> placements, string occasion)
+    {
+        ArgumentNullException.ThrowIfNull(bible);
+        var lines = new List<string>
+        {
+            $"{series} — Series bible",
+            $"This version: {occasion}",
+            string.Empty,
+            "The earliest-written book is canon; your corrections win over every book.",
+            string.Empty,
+            "BOOKS",
+        };
+        for (var i = 0; i < bible.Books.Count; i++)
+        {
+            var book = bible.Books[i];
+            var where = placements.TryGetValue(book.BookId, out var placement) ? $" — {placement.Line}" : string.Empty;
+            lines.Add($"{i + 1}. {book.Title}{where}");
+        }
+
+        foreach (var (kind, heading) in Order)
+        {
+            var entries = bible.Entries.Where(entry => entry.Kind == kind).ToList();
+            if (entries.Count == 0)
+                continue;
+
+            lines.Add(string.Empty);
+            lines.Add(heading);
+            foreach (var entry in entries)
+            {
+                lines.Add(string.Empty);
+                lines.Add(entry.Aliases.Count == 0 ? entry.Name : $"{entry.Name} (also {string.Join(", ", entry.Aliases)})");
+                foreach (var state in entry.States)
+                {
+                    lines.Add($"  {state.Book}{(state.Era.Length > 0 ? $" ({state.Era})" : string.Empty)}: {state.Text}");
+                    if (state.Quote.Length > 0)
+                        lines.Add($"    “{state.Quote}”");
+                }
+                if (entry.Correction.Length > 0)
+                    lines.Add($"  Your correction: {entry.Correction}");
+            }
+        }
+
+        return string.Join("\n", lines) + "\n";
+    }
+}

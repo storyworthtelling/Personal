@@ -1597,14 +1597,21 @@ public class ReviewProcessorTests : IDisposable
         drive.Setup(d => d.UploadFile(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("file");
+        string? docText = null;
+        drive.Setup(d => d.WriteGoogleDoc(null, "folder-one", "The Gate — Series bible", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string? _, string _, string _, string text, CancellationToken _) => docText = text)
+            .ReturnsAsync("bible-doc");
 
         await DriveToCompletion(NewProcessor(
             new ArchiveOptions { DeliverToRemarkable = true, Enabled = true }, remarkable.Object, drive.Object));
 
         var name = DeliveredDocument.BibleName("The Gate", "Quest", 1);
         remarkable.Verify(r => r.Upload(name, It.IsAny<Stream>(), It.IsAny<long>(), null, It.IsAny<CancellationToken>()), Times.Once);
-        drive.Verify(d => d.UploadFile("folder-one", name + ".pdf", "application/pdf", It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        // Drive keeps one versioned Google Doc for the series rather than a PDF per draft (owner's request).
+        drive.Verify(d => d.UploadFile(It.IsAny<string>(), name + ".pdf", It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("This version: after Quest, draft 1", docText);
         using var check = database.NewContext();
+        Assert.Equal("bible-doc", check.SeriesBibles.Single().DriveDocId);
         Assert.True(check.BookAnalyses.Single(a => a.NovelId == second).SeriesBibleDelivered);
         Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == second).Stage);
     }

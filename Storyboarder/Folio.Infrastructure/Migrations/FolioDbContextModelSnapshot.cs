@@ -552,6 +552,12 @@ namespace Folio.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("BackedUpAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DriveDocId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Json")
                         .IsRequired()
                         .HasColumnType("TEXT");

@@ -344,12 +344,12 @@ How it was built:
   readers get the bible in place of the bare canon.
 - **Printing and correcting.** The bible prints as its own framed document (`SeriesBibleDocument`), with one
   tab per kind.
-  - It goes to the tablet and to the report's Drive folder once per draft, best-effort.
+  - It goes to the tablet once per draft, best-effort.
   - A screen off the book page (`SeriesBiblePage`) corrects an entry.
-- **Not built:**
-  - A sealed copy of the bible's data in Drive: the printed copy is there, but a phone reset loses the
-    corrections.
-  - Removing a deleted book's states from the bible.
+- **Backup (owner's request, after G was built).** The backup is a plain Google Doc per series, rewritten in
+  place after each book and each correction, so its version history shows the changes (`SeriesBibleBackup`).
+  It replaces a bible PDF per draft in Drive. Nothing restores from it yet.
+- **Deleted books stay in the bible** (owner's ruling): their world-building still stands.
 1. **Model.**
    - A `SeriesBible` per series, holding characters, settings, world rules, timeline events and open
      threads.

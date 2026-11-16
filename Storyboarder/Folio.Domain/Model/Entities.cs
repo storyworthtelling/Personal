@@ -474,6 +474,11 @@ public class SeriesBibleRecord
     public Guid SeriesId { get; set; }
     public string Json { get; set; } = string.Empty;
     public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    // The Google Doc in Drive this bible is backed up to (owner's request), rewritten in place so its version
+    // history shows each change; null until the first backup. When it was last written, or null.
+    public string? DriveDocId { get; set; }
+    public DateTimeOffset? BackedUpAtUtc { get; set; }
 }
 
 public class ModelBatch

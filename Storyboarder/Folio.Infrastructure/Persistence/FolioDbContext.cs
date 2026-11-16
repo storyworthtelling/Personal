@@ -156,6 +156,7 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
         {
             entity.HasKey(bible => bible.SeriesId);
             entity.Property(bible => bible.UpdatedAtUtc).HasConversion(TicksConverter);
+            entity.Property(bible => bible.BackedUpAtUtc).HasConversion(NullableTicksConverter);
         });
 
         model.Entity<ModelBatch>(entity =>

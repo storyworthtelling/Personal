@@ -84,4 +84,15 @@ public class PaperDeliveryTests
         var noDrive = new PaperDelivery(Mock.Of<IRemarkableClient>());
         await Assert.ThrowsAsync<InvalidOperationException>(() => noDrive.UploadDriveFile("f", "n", "m", [1]));
     }
+
+    [Fact]
+    public async Task AGoogleDocIsWrittenThroughTheDriveArchive()
+    {
+        var drive = new Mock<IPaperDriveArchive>();
+        drive.Setup(d => d.WriteGoogleDoc("doc-1", "folder", "Bible", "text", It.IsAny<CancellationToken>())).ReturnsAsync("doc-1");
+
+        var id = await new PaperDelivery(drive: drive.Object).WriteDriveDoc("doc-1", "folder", "Bible", "text");
+
+        Assert.Equal("doc-1", id);
+    }
 }

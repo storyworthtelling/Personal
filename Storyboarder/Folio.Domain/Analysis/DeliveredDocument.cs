@@ -25,14 +25,10 @@ public static class DeliveredDocument
 
     /// <summary>
     /// The series bible's name (release G, R26), dated by the book and draft it was last read from, so
-    /// a newer copy in a folder listing is told from an older one.
+    /// a newer copy on the tablet is told from an older one.
     /// </summary>
     public static string BibleName(string? series, string? title, int draftNumber) =>
         $"{Safe(series)} — Series bible — after {Safe(title)} draft {draftNumber}";
-
-    /// <summary>The bible's name as a file.</summary>
-    public static string BibleFileName(string? series, string? title, int draftNumber) =>
-        $"{BibleName(series, title, draftNumber)}.pdf";
 
     /// <summary>
     /// A title that can be a file name. A slash in a book's title is not exotic — "Book One / Book

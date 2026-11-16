@@ -9,6 +9,7 @@ using Folio.Domain.Series;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Infrastructure.Imaging;
+using Folio.Infrastructure.Services;
 using Folio.Domain.Model;
 using Folio.Domain.Pipeline;
 using Storyworthtelling.Voice.Health;
@@ -87,6 +88,8 @@ public sealed class ReviewProcessor : IPipelineStep
     private const int VoiceConsistencySampleChars = 800;
     private readonly DesignBibleMerger merger = new();
 
+    private readonly IOptions<ArchiveOptions> archiveOptions;
+
     public ReviewProcessor(
         IDbContextFactory<FolioDbContext> dbContextFactory,
         IClaudeAnalysisClient claude,
@@ -111,6 +114,7 @@ public sealed class ReviewProcessor : IPipelineStep
         this.voiceClient = voiceClient;
         this.voiceStore = voiceStore;
         this.delivery = delivery;
+        this.archiveOptions = archiveOptions;
 
         rateLimits = rateLimitOptions.Value;
         archive = archiveOptions.Value;
@@ -1500,20 +1504,14 @@ public sealed class ReviewProcessor : IPipelineStep
                 }
             }
 
-            if (archive.Enabled && delivery is { CanArchiveToDrive: true } && novel.ArchiveFolderId is not null)
-            {
-                try
-                {
-                    await delivery.UploadDriveFile(
-                        novel.ArchiveFolderId, DeliveredDocument.BibleFileName(series, novel.Title, novel.DraftNumber),
-                        "application/pdf", pdf, cancellationToken);
-                    logger.LogInformation("Archived the series bible of manuscript {NovelId} to Drive", novel.Id);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    logger.LogWarning(ex, "Manuscript {NovelId}: the series bible did not reach Drive; leaving it", novel.Id);
-                }
-            }
+        }
+
+        // Drive keeps the bible as one Google Doc per series, rewritten in place, so its version history
+        // shows what each book changed (owner's request), rather than a PDF per draft.
+        if (readable)
+        {
+            await new SeriesBibleBackup(dbContextFactory, delivery, archiveOptions, clock, logger)
+                .WriteAsync(novel.SeriesId!.Value, $"after {novel.Title}, draft {novel.DraftNumber}", novel.ArchiveFolderId, cancellationToken);
         }
 
         analysis.SeriesBibleDelivered = true;
