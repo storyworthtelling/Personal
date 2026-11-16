@@ -129,8 +129,6 @@ public partial class AccessibilityTests
     /// <summary>Drawn views still to be given a node per item; each goes in its own PR and leaves this list.</summary>
     private static readonly string[] StillToDescribe =
     [
-        "FocusPhone/Codex.Ui.Android/Dial.cs",
-        "FocusPhone/Plate.Android/CropOverlayView.cs",
     ];
 
     [Fact]

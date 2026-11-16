@@ -171,6 +171,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         row.AddView(PaperUi.Secondary(Host, $"scanned {TimeFormats.Clock12(page.ScannedAt)}"));
         row.LongClickable = true;
         row.LongClick += (_, _) => ShowPageActions(index);
+        PaperUi.NameLongPress(row, "Actions for this page");
         return row;
     }
 

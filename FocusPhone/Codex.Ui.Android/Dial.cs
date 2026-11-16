@@ -1,7 +1,10 @@
 using Android.Content;
 using Android.Graphics;
 using Storyworthtelling.Materials.Android;
+using Android.OS;
 using Android.Views;
+using AccessibilityNodeInfo = Android.Views.Accessibility.AccessibilityNodeInfo;
+using EventTypes = Android.Views.Accessibility.EventTypes;
 using Codex.Domain.Design;
 
 namespace Codex.Ui;
@@ -31,10 +34,19 @@ public sealed class Dial : View
 
     private int value;
     private int? turnedFrom;
+    private readonly string unit;
+    private readonly int step;
 
-    public Dial(Context context, DialGeometry geometry, int value, Color hue) : base(context)
+    /// <param name="unit">What the number counts, said after it ("120 beats per minute").</param>
+    /// <param name="step">How far one TalkBack scroll or D-pad press turns it.</param>
+    public Dial(Context context, DialGeometry geometry, int value, Color hue, string unit, int step = 1) : base(context)
     {
         this.geometry = geometry;
+        this.unit = unit;
+        this.step = step;
+
+        // Reachable without a drag (§17, audit W9.3): focusable for a D-pad or switch, read as a slider with its range.
+        Focusable = true;
         this.value = Math.Clamp(value, geometry.Minimum, geometry.Maximum);
 
         track.SetStyle(Paint.Style.Stroke);
@@ -85,6 +97,59 @@ public sealed class Dial : View
             this.value = wanted;
             Invalidate();
         }
+    }
+
+    public override void OnInitializeAccessibilityNodeInfo(AccessibilityNodeInfo? info)
+    {
+        base.OnInitializeAccessibilityNodeInfo(info);
+        if (info is null)
+        {
+            return;
+        }
+
+        info.ClassName = "android.widget.SeekBar";
+        info.SetRangeInfo(new AccessibilityNodeInfo.RangeInfo(
+            (int)Android.Views.Accessibility.RangeType.Int, geometry.Minimum, geometry.Maximum, value));
+        info.StateDescription = $"{value} {unit}";
+        if (value < geometry.Maximum)
+        {
+            info.AddAction(AccessibilityNodeInfo.AccessibilityAction.ActionScrollForward);
+        }
+        if (value > geometry.Minimum)
+        {
+            info.AddAction(AccessibilityNodeInfo.AccessibilityAction.ActionScrollBackward);
+        }
+    }
+
+    public override bool PerformAccessibilityAction(global::Android.Views.Accessibility.Action action, Bundle? arguments) => action switch
+    {
+        global::Android.Views.Accessibility.Action.ScrollForward => Nudge(1),
+        global::Android.Views.Accessibility.Action.ScrollBackward => Nudge(-1),
+        _ => base.PerformAccessibilityAction(action, arguments),
+    };
+
+    public override bool OnKeyDown(Keycode keyCode, KeyEvent? e) => keyCode switch
+    {
+        Keycode.DpadRight or Keycode.DpadUp => Nudge(1),
+        Keycode.DpadLeft or Keycode.DpadDown => Nudge(-1),
+        _ => base.OnKeyDown(keyCode, e),
+    };
+
+    // One step, as a turn and a settle together: the same two events a finger's drag ends with.
+    private bool Nudge(int direction)
+    {
+        var turned = geometry.Nudge(value, direction, step);
+        if (turned == value)
+        {
+            return false;
+        }
+
+        value = turned;
+        Invalidate();
+        Turned?.Invoke(value);
+        Settled?.Invoke(value);
+        SendAccessibilityEvent(EventTypes.ViewSelected);
+        return true;
     }
 
     public override bool OnTouchEvent(MotionEvent? e)

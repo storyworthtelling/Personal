@@ -42,20 +42,32 @@ public sealed record ShelfRow(string? SeriesName, IReadOnlyList<ShelfBook> Books
     /// painter's own walk read backwards, and it is here rather than in the view because a painter
     /// and a hit test that drift apart open the wrong book while both look correct.</para>
     /// </summary>
-    public ShelfBook? At(double x)
+    public ShelfBook? At(double x) =>
+        Spans.FirstOrDefault(span => x >= span.LeftDp && x < span.LeftDp + span.WidthDp)?.Book;
+
+    /// <summary>
+    /// Where each spine stands, from the row's left edge: the painter's walk (bookend, spine, gap, spine), shared by
+    /// the tap test above and the screen reader's buttons laid over the painting (audit W9.3).
+    /// </summary>
+    public IReadOnlyList<SpineSpan> Spans
     {
-        var cursor = HasBookends ? (double)ShelfComposer.BookendWidthDp : 0;
-
-        foreach (var book in Books)
+        get
         {
-            if (x >= cursor && x < cursor + book.WidthDp)
-                return book;
-            cursor += book.WidthDp + GapDp;
-        }
+            var spans = new List<SpineSpan>(Books.Count);
+            var cursor = HasBookends ? ShelfComposer.BookendWidthDp : 0;
+            foreach (var book in Books)
+            {
+                spans.Add(new SpineSpan(book, cursor, book.WidthDp));
+                cursor += book.WidthDp + GapDp;
+            }
 
-        return null;
+            return spans;
+        }
     }
 }
+
+/// <summary>One spine's place on its shelf, in points from the row's left edge.</summary>
+public sealed record SpineSpan(ShelfBook Book, int LeftDp, int WidthDp);
 
 /// <summary>
 /// Deals the library onto shelves.

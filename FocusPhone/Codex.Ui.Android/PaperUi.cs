@@ -144,6 +144,39 @@ public static class PaperUi
         return button;
     }
 
+    /// <summary>
+    /// A glyph button (an arrow, a ×) with the words it stands for (§17, audit W9.3, report 10 §18): at least 48dp
+    /// square whatever its glyph's width, and read by TalkBack as <paramref name="label"/> ("Move Lectures up",
+    /// "Clear search") rather than as the glyph's name ("up arrow", "multiplication sign").
+    /// </summary>
+    public static Button IconButton(Context context, string glyph, string label, Action onClick)
+    {
+        var button = QuietButton(context, glyph, onClick);
+        var target = PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp);
+        button.SetMinimumWidth(target);
+        button.SetMinWidth(target);
+        button.SetMinimumHeight(target);
+        button.ContentDescription = label;
+        return button;
+    }
+
+    /// <summary>
+    /// Gives a view's long press a name TalkBack offers as an action ("Actions for Lectures") instead of an unnamed
+    /// "double-tap and hold" (§9 has no kebab, so a long press is the only way to an item's actions; audit W9.3, §20).
+    /// For a view that owns its own long press — a ListView's rows are named by the list itself.
+    /// </summary>
+    public static void NameLongPress(View view, string label) => view.SetAccessibilityDelegate(new LongPressName(label));
+
+    private sealed class LongPressName(string label) : View.AccessibilityDelegate
+    {
+        public override void OnInitializeAccessibilityNodeInfo(View host, Android.Views.Accessibility.AccessibilityNodeInfo info)
+        {
+            base.OnInitializeAccessibilityNodeInfo(host, info);
+            info.AddAction(new Android.Views.Accessibility.AccessibilityNodeInfo.AccessibilityAction(
+                (int)Android.Views.Accessibility.Action.LongClick, label));
+        }
+    }
+
     // Every PaperUi button's click runs through the tap watch (LOG-LOOP-PLAN.md §4.1): a handler that
     // throws is logged with the taps before it, and the dead window starts when a slow handler returns.
     private static Button ButtonBase(Context context, string label, Action onClick, Color textColor, Typeface typeface)

@@ -126,6 +126,10 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
                 ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
         }
 
+        // Heard as well as seen (§17, audit W9.3): what it is, when, and whether it is chosen.
+        image.ImportantForAccessibility = ImportantForAccessibility.No;
+        frame.ContentDescription = DarkroomWords.Cell(item, shell.Room.IsChosen(item.Id), DateTime.Now);
+
         frame.Clickable = true;
         frame.Click += (_, _) =>
         {
@@ -142,6 +146,7 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
         // A long-press starts the cull with that picture already picked, which is how it
         // actually begins: you see the bad one first.
         frame.LongClickable = true;
+        PaperUi.NameLongPress(frame, "Actions for this picture");
         frame.LongClick += (_, _) =>
         {
             if (choosing)

@@ -213,6 +213,10 @@ public static class ActionCard
         scrim.SetBackgroundColor(new Color(
             PaperTheme.PaperDeep.R, PaperTheme.PaperDeep.G, PaperTheme.PaperDeep.B, HazeAlpha));
         scrim.Click += (_, _) => Dismiss(host);
+        // Modal for a screen reader too (§17, audit W9.3): the haze is named for what a tap on it does, the card
+        // announces itself as a pane, and the page behind it is hidden from TalkBack until the card goes.
+        scrim.ContentDescription = "Dismiss";
+        scrim.AccessibilityPaneTitle = title;
 
         // A touch sink: taps on the card are swallowed so they do not fall through and dismiss it, without
         // a click handler that would make the tap watch take the whole card for a control.
@@ -238,10 +242,28 @@ public static class ActionCard
         layout.SetMargins(edge, 0, edge, 0);
         scrim.AddView(card, layout);
 
+        var hidden = new List<(View View, ImportantForAccessibility Was)>();
+        for (var i = 0; i < host.ChildCount; i++)
+        {
+            if (host.GetChildAt(i) is { } behind)
+            {
+                hidden.Add((behind, behind.ImportantForAccessibility));
+                behind.ImportantForAccessibility = ImportantForAccessibility.NoHideDescendants;
+            }
+        }
+        Hidden.AddOrUpdate(host, hidden);
+
         scrim.Alpha = 0f;
         host.AddView(scrim, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
         scrim.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.InkMs).Start();
+
+        // TalkBack starts on the card's heading, not wherever it was on the page behind.
+        if (card.GetChildAt(0) is ViewGroup header && header.GetChildAt(0) is { } heading)
+        {
+            heading.Post(() => heading.PerformAccessibilityAction(Android.Views.Accessibility.Action.AccessibilityFocus, null));
+        }
+
         return scrim;
     }
 
@@ -321,15 +343,16 @@ public static class ActionCard
         var header = new LinearLayout(context) { Orientation = Orientation.Vertical };
         header.SetPadding(pad, 0, pad, PaperTheme.Dp(context, DesignTokens.Space.X3));
 
+        // Two lines before it is cut, so a long subject or title is read whole far more often (audit W9.3).
         var heading = PaperUi.Heading(context, title);
-        heading.SetSingleLine(true);
+        heading.SetMaxLines(2);
         heading.Ellipsize = Android.Text.TextUtils.TruncateAt.End;
         header.AddView(heading);
 
         if (!string.IsNullOrWhiteSpace(subtitle))
         {
             var secondary = PaperUi.Secondary(context, subtitle);
-            secondary.SetSingleLine(true);
+            secondary.SetMaxLines(2);
             secondary.Ellipsize = Android.Text.TextUtils.TruncateAt.End;
             header.AddView(secondary);
         }
@@ -387,6 +410,16 @@ public static class ActionCard
         {
             host.RemoveView(existing);
         }
+
+        // The page behind comes back to TalkBack as it was.
+        if (Hidden.TryGetValue(host, out var hidden))
+        {
+            foreach (var (view, was) in hidden)
+            {
+                view.ImportantForAccessibility = was;
+            }
+            Hidden.Remove(host);
+        }
     }
 
     // Enough to settle the page back without hiding it — you are still looking at
@@ -399,4 +432,7 @@ public static class ActionCard
     private static readonly Color Problem = Color.ParseColor(DesignTokens.ProblemText);
 
     private static readonly Java.Lang.String HostTag = new("paper-action-card");
+
+    // What a card hid from TalkBack on each host, so dismissing it puts the page back exactly.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<FrameLayout, List<(View View, ImportantForAccessibility Was)>> Hidden = new();
 }
