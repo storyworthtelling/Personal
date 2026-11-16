@@ -338,6 +338,35 @@ public class ClaudeAnalysisClientTests
         Assert.Equal(["f0000beef"], Assert.Single(read.RevisionPlan).Draws);
     }
 
+    /// <summary>Each chapter on the pacing curve says in a few words what drives or drains it (R17).</summary>
+    [Fact]
+    public async Task ThePacingCurveCarriesWhatDrivesEachChapter()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"pacingCurve\":[{\"chapter\":\"Chapter 1\",\"tension\":0.4,\"driver\":\"The storm builds\"}]}"));
+
+        var analysis = await client.ConsolidateAnalysis("Title", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+
+        var body = Assert.Single(handler.RequestBodies);
+        Assert.Contains("driver", body, StringComparison.Ordinal);
+        Assert.Equal("The storm builds", Assert.Single(analysis.PacingCurve).Driver);
+    }
+
+    /// <summary>A section is asked for one short paragraph: four sentences for a book, two for a short story (R16).</summary>
+    [Theory]
+    [InlineData(500, "at most two sentences")]
+    [InlineData(90_000, "at most four sentences")]
+    public async Task ASectionIsAskedForAParagraphItsLengthAllows(int words, string asked)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"summary\":\"s\",\"findings\":[]}"));
+        var manuscript = string.Join(' ', Enumerable.Repeat("word", words));
+
+        await client.ReadSection(PersonaCatalogue.Sections[0], manuscript, GenreFrame.Unknown, CancellationToken.None);
+
+        Assert.Contains(asked, Assert.Single(handler.RequestBodies), StringComparison.Ordinal);
+    }
+
     /// <summary>A judgement with no call or nothing accomplished is a failed pass, retried, never printed half-made.</summary>
     [Theory]
     [InlineData("{\"accomplishes\":\"x\",\"call\":\"Maybe\",\"tension\":0.5,\"verdict\":\"v\"}")]

@@ -140,7 +140,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "\"characters\":[{\"name\":string,\"role\":string," +
         "\"arcSummary\":string,\"relationships\":[string]}],\"themes\":[string],\"plotHoles\":[FINDING]," +
         "\"inconsistencies\":[FINDING],\"inaccuracies\":[FINDING],\"pacingNotes\":[FINDING]," +
-        "\"pacingCurve\":[{\"chapter\":string,\"tension\":number}],\"reviews\":" +
+        "\"pacingCurve\":[{\"chapter\":string,\"tension\":number,\"driver\":string}],\"reviews\":" +
         "[{\"perspective\":string,\"assessment\":string,\"strengths\":[string],\"weaknesses\":[string]," +
         "\"recommendation\":string}],\"revisionPlan\":[{\"priority\":string,\"chapter\":string," +
         "\"issue\":string,\"suggestedFix\":string}]," +
@@ -160,8 +160,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "Set \"chapter\" on each revisionPlan item the same way. " +
         "genre: infer the book's genre. wordCountRange: the word-count range publishers expect for that " +
         "genre (e.g. \"90,000–120,000\"). " +
-        "pacingCurve: one entry PER CHAPTER in reading order with tension from 0.0 (calm) to 1.0 (peak), so " +
-        "a saggy stretch is visible; copy the chapter label from the notes. " +
+        "pacingCurve: one entry PER CHAPTER in reading order with tension from 0.0 (calm) to 1.0 (peak), and " +
+        "\"driver\": three to six words on what drives or drains that chapter's tension (\"the storm breaks\", " +
+        "\"backstory stalls the chase\"), printed over its point on the chart. The curve is what makes " +
+        "a saggy stretch visible; copy the chapter label from the notes. " +
         "Provide AT LEAST FOUR reviews from DISTINCT, fair perspectives — a DEVELOPMENTAL EDITOR (structure, " +
         "arcs, stakes), the TARGET-GENRE READER (where they're gripped, bored, confused, moved), the SKEPTIC " +
         "(the harshest fair read), and an AGENT & ACQUIRING EDITOR (is it sellable, is it ready, where it " +
@@ -360,7 +362,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         SubmitBatch(
             personas.Select(persona =>
             {
-                var pass = PassRequest(persona, manuscript, frame, persona.Kind == PersonaKind.Reader ? ReaderFormat : SectionFormat);
+                var pass = PassRequest(persona, manuscript, frame, persona.Kind == PersonaKind.Reader ? ReaderFormat : SectionFormat(manuscript));
                 return (PassKey(persona.Id), (object)new
                 {
                     model = pass.Model,
@@ -749,7 +751,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             WordCountRange = dto.WordCountRange ?? string.Empty,
             PacingCurve = (dto.PacingCurve ?? [])
                 .Where(t => !string.IsNullOrWhiteSpace(t.Chapter))
-                .Select(t => new ChapterTension(t.Chapter!, Math.Clamp(t.Tension, 0, 1)))
+                .Select(t => new ChapterTension(t.Chapter!, Math.Clamp(t.Tension, 0, 1)) { Driver = t.Driver?.Trim() ?? string.Empty })
                 .ToList(),
             Verdict = dto.Verdict is null
                 ? Verdict.Empty
@@ -987,9 +989,12 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     // fast one — see ClaudeOptions.FastModel for why those two and not the rest.
     // What each pass is asked to hand back. Kept beside the calls that use them so the shape the
     // parser expects and the shape the prompt asks for cannot drift apart.
-    private const string SectionFormat =
-        "Reply with JSON only: {\"summary\": \"one or two sentences on what you found overall, or an "
-        + "empty string if this book gives you nothing to say\", \"findings\": [{\"chapter\": \"Ch. 12-15\", "
+    // The summary is the section's whole entry in the whole-book notes (R16): one short paragraph, two
+    // sentences for a short story so its notes fit one page. The findings go on the manuscript.
+    private static string SectionFormat(string manuscript) =>
+        "Reply with JSON only: {\"summary\": \"one short paragraph on what you found overall, at most "
+        + (ManuscriptLength.Classify(manuscript) == StoryLength.ShortStory ? "two" : "four")
+        + " sentences, or an empty string if this book gives you nothing to say\", \"findings\": [{\"chapter\": \"Ch. 12-15\", "
         + "\"detail\": \"what is wrong and why it matters\", \"excerpt\": \"a short phrase (under fifteen "
         + "words) copied verbatim from the manuscript where it happens, or an empty string when it is about "
         + "the whole book\", \"severity\": \"Must if the book does not work until it is fixed, Should if it "
@@ -1035,7 +1040,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     public async Task<SectionRead> ReadSection(
         Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
     {
-        var reply = await SendPass(persona, manuscript, frame, SectionFormat, cancellationToken);
+        var reply = await SendPass(persona, manuscript, frame, SectionFormat(manuscript), cancellationToken);
         return ReadSectionReply(persona, reply);
     }
 
@@ -1600,6 +1605,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     {
         public string? Chapter { get; set; }
         public double Tension { get; set; }
+        public string? Driver { get; set; }
     }
 
     private sealed class VerdictDto

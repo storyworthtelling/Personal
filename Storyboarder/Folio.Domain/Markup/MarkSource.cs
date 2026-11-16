@@ -2,7 +2,9 @@ using System.Text.RegularExpressions;
 using Folio.Domain.Analysis;
 using Folio.Domain.Model;
 using Folio.Domain.Readiness;
+using Folio.Domain.Reading;
 using Folio.Domain.Report;
+using Folio.Domain.Text;
 
 namespace Folio.Domain.Markup;
 
@@ -121,6 +123,14 @@ public static partial class MarkSource
                     break;
                 case "series-continuity":
                     PlaceFindings(placer, analysis, "Series continuity", "Contradicts the previous book", section.Findings, null, null);
+                    break;
+                default:
+                    // Every other section's findings are written on the text too (R16), so its whole-book
+                    // note is its paragraph and nothing else. A persona the catalogue does not know is named
+                    // by its id, so a wrong citation shows rather than tidying itself away.
+                    var name = PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == section.PersonaId)?.Name
+                               ?? section.PersonaId;
+                    PlaceFindings(placer, analysis, name, name, section.Findings, null, null);
                     break;
             }
         }
@@ -270,7 +280,8 @@ public static partial class MarkSource
         private readonly ExcerptIndex? index;
         private readonly List<Mark> marks = [];
         private readonly List<UnplacedNote> unplaced = [];
-        private readonly List<(int Chapter, int Order, ChapterNote Note)> chapterNotes = [];
+        private readonly List<(ChapterSpan Chapter, int Order, ChapterNote Note)> chapterNotes = [];
+        private readonly bool shortStory;
         private readonly List<FindingEntry> findings = [];
 
         public Placer(string manuscript, BookAnalysisResult analysis, IReadOnlyList<ChapterSpan> chapters)
@@ -279,6 +290,7 @@ public static partial class MarkSource
             this.analysis = analysis;
             this.chapters = chapters;
             index = string.IsNullOrEmpty(manuscript) ? null : ExcerptIndex.Of(manuscript);
+            shortStory = analysis.WordCount > 0 && ManuscriptLength.Classify(analysis.WordCount) == StoryLength.ShortStory;
         }
 
         public void Place(
@@ -304,8 +316,17 @@ public static partial class MarkSource
             if (fallsBackToChapter && ChapterOf(chapter) is { } cited && ChapterHead(cited) is not null)
             {
                 // A list at the chapter's head (R7), keeping the words it tried to quote.
-                chapterNotes.Add((cited.Number, chapterNotes.Count,
+                chapterNotes.Add((cited, chapterNotes.Count,
                     new ChapterNote(severity, label, Join(Quoted(excerpt), reason), source) { FindingKey = key }));
+                return;
+            }
+
+            // A short story's note with no line of its own is about the whole piece (R16): it joins the
+            // list at the story's start rather than a list of its own in the whole-book notes.
+            if (shortStory && !string.IsNullOrWhiteSpace(unplaced) && Piece() is { } piece)
+            {
+                chapterNotes.Add((piece, chapterNotes.Count,
+                    new ChapterNote(severity, label, unplaced, source) { FindingKey = key }));
                 return;
             }
 
@@ -367,16 +388,30 @@ public static partial class MarkSource
         /// Where a chapter's list goes: past its title when the first line is one — short, on a line
         /// of its own, not ending like a sentence — else before its first word.
         /// </summary>
-        private ChapterNoteList Notes(int number, IReadOnlyList<ChapterNote> notes)
+        private ChapterNoteList Notes(ChapterSpan chapter, IReadOnlyList<ChapterNote> notes)
         {
-            var chapter = chapters.First(candidate => candidate.Number == number);
             var head = ChapterHead(chapter)!.Value;
             var line = manuscript[head.Start..head.End].TrimEnd();
             var isTitle = head.End < manuscript.Length
                 && manuscript[head.End] == '\n'
                 && line.Length > 0
                 && !".!?\"”’…:;,".Contains(line[^1]);
-            return new ChapterNoteList(number, isTitle ? head.End : head.Start, isTitle, notes);
+            return new ChapterNoteList(chapter.Number, isTitle ? head.End : head.Start, isTitle, notes)
+            {
+                Heading = shortStory && chapters.Count <= 1 ? "Notes on the story" : "Notes on this chapter",
+            };
+        }
+
+        /// <summary>The whole of a short story, as one span: its first chapter, or the text when it has none.</summary>
+        private ChapterSpan? Piece()
+        {
+            if (index is null)
+            {
+                return null;
+            }
+
+            var span = chapters.Count > 0 ? chapters[0] : new ChapterSpan(1, 0, manuscript.Length);
+            return ChapterHead(span) is null ? null : span;
         }
 
         private ChapterSpan? ChapterOf(string? citation) =>

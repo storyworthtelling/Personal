@@ -495,7 +495,14 @@ public sealed record LengthAssessment(int WordCount, int TargetLow, int TargetHi
 }
 
 // One chapter's dramatic tension, 0 (calm) to 1 (peak), for the pacing chart.
-public sealed record ChapterTension(string Chapter, double Tension);
+public sealed record ChapterTension(string Chapter, double Tension)
+{
+    /// <summary>
+    /// A few words on what drives or drains this chapter's tension, printed over its point on the chart
+    /// (R17). Empty on a report stored before the curve carried it.
+    /// </summary>
+    public string Driver { get; init; } = string.Empty;
+}
 
 // The candid state-of-the-draft that closes the report: what is working best, what is most broken, and
 // the single thing this draft most needs before the next revision.
