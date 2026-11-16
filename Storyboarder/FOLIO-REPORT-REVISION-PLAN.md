@@ -267,6 +267,45 @@ runs a real draft through.
 5. **Status.** `ReadingPlan`, the desk's "read N of M" status and the run estimate are updated for the
    new passes.
 
+### Release R — Regenerate the books already reviewed (owner's request)
+When releases A–H have landed, every book Folio has already reviewed gets a fresh report in the new
+form. This is done once, at the end, so no book is paid for twice.
+
+1. **The latest draft of each project only.**
+   - Earlier drafts keep their old reports.
+   - A series is regenerated **in story order** once release G's placement is confirmed, so each book's
+     bible exists before the next book is read against it.
+2. **The owner's voice profile is not touched.**
+   - Regeneration does not run the voice refinement (`ReviewProcessor`'s `RefineAsync` step, guarded per
+     draft by `Novel.VoiceAnalyzed`).
+   - So nothing is written to the authorial-voice document in Drive (`storyworthtelling-voice-sealed.json`).
+   - The manuscripts already shaped the profile once; re-reading them would count each book twice.
+   - Guard test: a regeneration run calls no voice client and never saves the profile store.
+3. **A deliberate exception to "a finished book never re-renders".**
+   - Regeneration is started by the owner (one action in Settings, listing the books and the estimated
+     cost before it starts), never by the healer.
+   - `CompletedBooksDoNotHealTests` still holds for everything else.
+4. **What is re-run and what is reused.**
+
+   | Step | Regenerated | Why |
+   |---|---|---|
+   | Scene detection | Re-run (release A) | The new rules split scenes differently |
+   | Scene images | Reused where the new scene matches an old one (`SceneMatcher`); otherwise generated | |
+   | The reads | Re-run | |
+   | Conversation, plan and series checks | Re-run | |
+   | Chapter notes and reductions | Re-run only where a release changed their prompt | |
+   | Imported source text | Not re-imported | The draft's stored source text is the manuscript |
+
+5. **It stays the same draft.**
+   - The regenerated report replaces that draft's report in place; no new draft number.
+   - A later draft still compares against it.
+   - Findings keep their thread ids where the new read finds the same issue.
+6. **Batched** (see below). A backfill nobody is waiting on is exactly what the batch tier is for, so the
+   whole regeneration runs at the batch discount.
+7. **Delivery.** The new report goes to Drive (replacing the old file) and to the reMarkable.
+   - The tablet's old copy is left in place unless the owner says otherwise (open question 8).
+   - The diagnostics export lists each regenerated book and where it went.
+
 ### Cross-cutting — batching the AI calls (owner's request)
 Folio's pipeline runs unattended: nobody watches a reduction or a scene prompt finish. The Message
 Batches API takes **50% off every token in a request, including cache reads and writes** (the two
@@ -333,6 +372,8 @@ checked, not assumed.
 7. **Batching trades speed for half the cost.** Should every unattended call be batched? A report may
    then take hours (rarely up to a day) instead of about fifteen minutes for the reads. Or should only the
    scene prompts and verdicts be batched, keeping the reads quick?
+8. When a book is regenerated, should the **old report on the reMarkable** be moved to the trash (Folio can
+   trash a document it delivered), or left beside the new one?
 
 ## 5. Order and size
 - **A, Scenes:** medium. A live bug, so it goes first.
@@ -343,6 +384,9 @@ checked, not assumed.
 - **F, Between drafts:** small. Needs A and D.
 - **G, Series bible:** large. Feeds B5.
 - **H, Conversation:** medium. Best after B, so the Fellow writer takes part.
+- **R, Regenerate reviewed books:** small to build, and the largest single API spend in the plan.
+  - Last, after A–H.
+  - Its cost is shown and approved in the app before it runs.
 - **Batching:** medium, cross-cutting.
   - It needs a batch submit/poll client beside the existing ones, and the pipeline's stage state to hold
     a batch id.
