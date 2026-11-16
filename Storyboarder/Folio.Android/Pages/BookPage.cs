@@ -331,12 +331,12 @@ public class BookPage : FolioBinderPage
             ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto)],
             ColumnSpacing = 10,
         };
-        var who = new Label { Text = row.Name, FontFamily = "SerifSemibold", FontSize = 17 };
+        var who = new Label { Text = row.Name, FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize") };
         var number = new Label
         {
             Text = row.Line,
             Style = PaperResources.Token<Style>("MonoLabel"),
-            FontSize = 13,
+            FontSize = PaperResources.Token<double>("LabelSize"),
             HorizontalOptions = LayoutOptions.End,
             VerticalOptions = LayoutOptions.Center,
         };
@@ -351,11 +351,11 @@ public class BookPage : FolioBinderPage
             Children =
             {
                 line,
-                new Label { Text = row.Question, FontSize = 13, TextColor = PaperResources.Colour("InkMuted") },
+                new Label { Text = row.Question, FontSize = PaperResources.Token<double>("LabelSize"), TextColor = PaperResources.Colour("InkMuted") },
                 new Label
                 {
                     Text = row.Reason,
-                    FontSize = 14,
+                    FontSize = PaperResources.Token<double>("SecondarySize"),
                     TextColor = PaperResources.Colour("InkSoft"),
                     Margin = new Thickness(0, 4, 0, 0),
                 },
