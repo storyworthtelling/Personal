@@ -12,6 +12,7 @@ public enum ContentRating
     Everyone,
     Teen,
     Mature,
+    AdultsOnly,
 }
 
 public enum AppVerdict
