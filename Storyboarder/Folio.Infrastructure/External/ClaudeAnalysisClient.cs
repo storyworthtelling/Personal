@@ -1257,16 +1257,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "\"regressed\" if the last draft had fixed it or made it smaller and it has come back or grown. And add, "
         + "beside revisionPlan, \"fixed\": the numbers of the last plan's items that no read raises any more.";
 
-    private static string VerdictInstruction(StoryLength length) =>
-        $"You are given {Spelled(PersonaCatalogue.All.Count)} independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
-        + "state of this draft. "
-        // "standing" is the line the author repeats to themselves afterwards, so it is asked for as a
-        // sentence rather than as a rating: a page that opens on a number is read as a mark.
-        + "Open with \"standing\": ONE short sentence naming where the draft stands (\"The book is "
-        + "close.\"), and \"reading\": a paragraph that argues it. Then its biggest strengths, its "
-        + "biggest problems, and the one thing it most needs. Reply with JSON only: {\"verdict\": "
-        + "{\"standing\": \"\", \"reading\": \"\", \"strengths\": [], \"problems\": [], \"mostNeeds\": \"\"}}.";
-
     public async Task<SectionRead> ReadSection(
         Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
     {
@@ -1356,7 +1346,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         });
         // On a later draft the plan is also shown the last plan, numbered, to say where each item stands
         // against it and which of its items are now fixed (R19).
-        IReadOnlyList<RevisionItem> previous = passId == "verdict" ? [] : previousPlan ?? [];
+        IReadOnlyList<RevisionItem> previous = previousPlan ?? [];
         var evidence = previous.Count == 0
             ? JsonSerializer.Serialize(new { sections, readers, findings = listed }, JsonResponse.CaseInsensitive)
             : JsonSerializer.Serialize(new
@@ -1366,9 +1356,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             }, JsonResponse.CaseInsensitive);
         var known = (findings ?? []).Select(entry => entry.Key).ToHashSet(StringComparer.Ordinal);
         var length = ManuscriptLength.Classify(wordCount);
-        var instruction = passId == "verdict"
-            ? VerdictInstruction(length)
-            : RevisionPlanInstruction(length) + (previous.Count == 0 ? string.Empty : ComparisonInstruction);
+        var instruction = RevisionPlanInstruction(length) + (previous.Count == 0 ? string.Empty : ComparisonInstruction);
         var reply = await SendMessage(
             instruction, evidence, cancellationToken, options.PassMaxTokens, model: options.StrongModel);
 

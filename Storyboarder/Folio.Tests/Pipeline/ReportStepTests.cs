@@ -19,6 +19,23 @@ public class ReportStepTests
         Assert.Equal("Reading the whole book through — read 3 of 17: Continuity editor", step);
     }
 
+    /// <summary>After the reads, the round table says which turn it is on, out of about how many (release H).</summary>
+    [Fact]
+    public void AfterTheReadsTheRoundTableSaysWhichTurnItIsOn()
+    {
+        var step = ReportStep.Describe(Everything with { RoundTableTurns = 11, RoundTableCap = 30 });
+
+        Assert.Equal("Round table — turn 12 of about 30", step);
+    }
+
+    [Fact]
+    public void AClosedRoundTableHandsOnToTheJacketAndThePages()
+    {
+        var step = ReportStep.Describe(Everything with { RoundTableTurns = 31, RoundTableCap = 30, RoundTableClosed = true });
+
+        Assert.Equal("Composing the report", step);
+    }
+
     [Fact]
     public void TheFirstRead_IsReadOne()
     {

@@ -12,11 +12,12 @@ namespace Folio.Tests.Reading;
 public class ReadingPlanTests
 {
     [Fact]
-    public void SeventeenPassesMakeARead()
+    public void SixteenPassesMakeARead()
     {
-        Assert.Equal(17, ReadingPlan.Passes.Count);
+        // The verdict pass went with release H: the round table replaces it (R32).
+        Assert.Equal(16, ReadingPlan.Passes.Count);
         Assert.Equal(15, ReadingPlan.Passes.Count(pass => !pass.IsSynthesis));
-        Assert.Equal(2, ReadingPlan.Passes.Count(pass => pass.IsSynthesis));
+        Assert.Equal(1, ReadingPlan.Passes.Count(pass => pass.IsSynthesis));
     }
 
     /// <summary>

@@ -172,4 +172,16 @@ public class RoundTablePlanTests
         Assert.Empty(RoundTableCodec.Read("garbage").Turns);
         Assert.Empty(RoundTableCodec.Read(null).Turns);
     }
+
+    /// <summary>
+    /// A host turn always lands in the transcript, even when the host says nothing, so the show cannot
+    /// loop on silent host turns short of its cap.
+    /// </summary>
+    [Fact]
+    public void ASilentHostStillTakesATurn()
+    {
+        var table = RoundTablePlan.Apply(RoundTable.Empty, new HostMove("  ", "agent", "Go on.", "", false), Panel);
+
+        Assert.Equal("Over to you, Hugo Hook.", Assert.Single(table.Turns).Words);
+    }
 }

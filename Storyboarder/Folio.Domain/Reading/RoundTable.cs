@@ -161,11 +161,10 @@ public static class RoundTablePlan
     public static RoundTable Apply(RoundTable table, HostMove move, IReadOnlyList<Review> reviews)
     {
         ArgumentNullException.ThrowIfNull(move);
-        var turns = string.IsNullOrWhiteSpace(move.Says)
-            ? table.Turns
-            : [.. table.Turns, new RoundTableTurn(HostId, move.Says.Trim())];
-        var spoken = table with { Turns = turns };
         var panel = reviews.Select(review => review.PersonaId).ToList();
+        var spoken = string.IsNullOrWhiteSpace(move.Says)
+            ? table
+            : table with { Turns = [.. table.Turns, new RoundTableTurn(HostId, move.Says.Trim())] };
 
         if (move.Close)
         {
@@ -179,6 +178,9 @@ public static class RoundTablePlan
             ? move.Speaker!.Trim()
             : panel.OrderBy(id => spoken.Turns.Count(turn => turn.Speaker == id)).ThenBy(panel.IndexOf).First();
         var answering = move.Answering?.Trim() ?? string.Empty;
+        // A host turn always lands in the transcript, so silent host turns cannot loop short of the cap.
+        if (string.IsNullOrWhiteSpace(move.Says))
+            spoken = spoken with { Turns = [.. spoken.Turns, new RoundTableTurn(HostId, $"Over to you, {Name(speaker)}.")] };
         return spoken with
         {
             Next = new RoundTableCue(speaker, move.Ask?.Trim() ?? string.Empty)
