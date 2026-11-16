@@ -303,19 +303,6 @@ public static class PaperUi
     // ---- Structure ----
 
     /// <summary>
-    /// The in-page chapter-heading screen title (DESIGN.md §7), without its stroke.
-    /// Prefer <see cref="ScreenHeader"/> — §7 says every screen opens with the title
-    /// <i>and</i> a full-width marker underline; this is the bare title for the
-    /// places that compose their own.
-    /// </summary>
-    public static TextView PageHeader(Context context, string title)
-    {
-        var view = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
-        view.SetPadding(0, 0, 0, PaperTheme.Dp(context, DesignTokens.Space.X6));
-        return view;
-    }
-
-    /// <summary>
     /// How every screen opens (DESIGN.md §7): a Display Serif Black title with a
     /// full-width marker underline in the area's hue, and nothing else. There is no
     /// standing top app bar — the header <i>is</i> the chrome.

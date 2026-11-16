@@ -39,15 +39,15 @@ public partial class SetupPage : LedgerBinderPage
     private readonly PassphraseRestoreFlow restoreFlow;
     private readonly ILogger<SetupPage> logger;
 
-    // A removed category's undo is the suite's dog-ear, a fixed corner of the page (task 2.7): the bar
-    // that used to carry it sat in the Connected accounts section near the top, several screens above
-    // the Categories list it answered to, and disappeared with that section.
+    // A removed category's or bank's undo is the suite's dog-ear, a fixed corner of the page (task 2.7,
+    // audit W8.9): the bar that used to carry them sat in the Connected accounts section near the top,
+    // several screens above the Categories list, and was the last hand-built undo bar in the suite.
     private readonly DogEarState dogEarState = new();
     private readonly DogEar dogEar;
 
     private List<InstitutionRow> rows = [];
     private InstitutionRow? pendingInstitutionRemoval;
-    // The bar below serves the institution removal only; it sits in its own section, beside Remove.
+    // The bank goes for good when the dog-ear's window closes; the fold itself only reverses.
     private IDispatcherTimer? undoTimer;
 
     // Set by the page that sends the owner here to type the passphrase (mockup 14, state 2), before the
@@ -468,14 +468,25 @@ public partial class SetupPage : LedgerBinderPage
         NoAccountsLabel.IsVisible = rows.Count == 0;
 
         pendingInstitutionRemoval = row;
-        BeginUndo($"Removed {row.Name}.");
+
+        // Undo-first (DESIGN.md §7, §13): the row goes at once and the dog-ear holds the way back for the
+        // suite's one undo window; the bank is released and deleted only when that window closes.
+        var window = TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs);
+        dogEarState.BeginUndo($"Removed {row.Name}", reverse: UndoBankRemoval, DateTimeOffset.Now, window);
+        dogEar.Refresh();
+
+        undoTimer = Dispatcher.CreateTimer();
+        undoTimer.Interval = window;
+        undoTimer.IsRepeating = false;
+        undoTimer.Tick += (_, _) => CommitPendingUndo();
+        undoTimer.Start();
     }
 
-    private void OnUndoClicked(object? sender, EventArgs e)
+    // Bound to the dog-ear's turn: the bank was never deleted, so it only has to be shown again.
+    private void UndoBankRemoval()
     {
         undoTimer?.Stop();
         undoTimer = null;
-        UndoBar.IsVisible = false;
 
         if (pendingInstitutionRemoval is not null)
         {
@@ -491,23 +502,10 @@ public partial class SetupPage : LedgerBinderPage
         await ReloadCategoriesAsync();
     }
 
-    private void BeginUndo(string message)
-    {
-        UndoLabel.Text = message;
-        UndoBar.IsVisible = true;
-
-        undoTimer = Dispatcher.CreateTimer();
-        undoTimer.Interval = TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs);
-        undoTimer.IsRepeating = false;
-        undoTimer.Tick += (_, _) => CommitPendingUndo();
-        undoTimer.Start();
-    }
-
     private void CommitPendingUndo()
     {
         undoTimer?.Stop();
         undoTimer = null;
-        UndoBar.IsVisible = false;
 
         var row = pendingInstitutionRemoval;
         pendingInstitutionRemoval = null;

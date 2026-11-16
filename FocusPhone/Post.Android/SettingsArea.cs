@@ -256,7 +256,6 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         var labelView = PaperUi.Secondary(Host, label);
         labelView.TextSize = DesignTokens.TypeSp.Label;
         labelView.Typeface = PaperTheme.SansSemibold(Host);
-        labelView.SetTextColor(PaperTheme.Ink);
         layout.AddView(labelView, Spaced(0, DesignTokens.Space.X1));
         layout.AddView(field, Spaced(0, helper is null ? DesignTokens.Space.X4 : DesignTokens.Space.X1));
         if (helper is not null)

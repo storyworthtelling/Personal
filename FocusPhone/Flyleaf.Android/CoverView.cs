@@ -175,16 +175,21 @@ public class CoverView : View
         canvas.DrawText("Storyworthtelling", plate.CenterX(), titleY + 22 * density, sub);
     }
 
+    // The maker's mark is the owner's drawn mark (DESIGN.md §12), the medallion IconStudio cuts from
+    // Branding/owners-mark.png for every consumer; never a letter drawn here, and never a photograph.
+    private Bitmap? makersMark;
+
     private void DrawMakersMark(Canvas canvas, float cx, float cy)
     {
+        makersMark ??= BitmapFactory.DecodeResource(Resources, Resource.Drawable.owner_medallion);
+        if (makersMark is null)
+        {
+            return;
+        }
+
         var radius = 12 * density;
-        using var ring = new Paint { AntiAlias = true, Color = PaperTheme.FlyleafMark, StrokeWidth = 1.4f * density };
-        ring.SetStyle(Paint.Style.Stroke);
-        canvas.DrawCircle(cx, cy, radius, ring);
-        using var m = new Paint(PaintFlags.AntiAlias) { Color = PaperTheme.FlyleafMark, TextAlign = Paint.Align.Center };
-        m.SetTypeface(PaperTheme.SerifSemibold(Context!));
-        m.TextSize = radius * 1.1f;
-        canvas.DrawText("M", cx, cy + m.TextSize / 3f, m);
+        using var paint = new Paint(PaintFlags.AntiAlias | PaintFlags.FilterBitmap);
+        canvas.DrawBitmap(makersMark, null, new RectF(cx - radius, cy - radius, cx + radius, cy + radius), paint);
     }
 
     private static RectF Inset(RectF r, float d) => new(r.Left + d, r.Top + d, r.Right - d, r.Bottom - d);

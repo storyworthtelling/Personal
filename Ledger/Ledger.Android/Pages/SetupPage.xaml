@@ -76,12 +76,8 @@
                          kept here, out of the mockup's section order, until Release C's Accounts/connect
                          screens (mockups 2/4/5) give this its own home. Removing it now would leave no way
                          to connect or remove a bank at all.
-                         D09: hidden entirely on her install (no connect flow, no Plaid-shaped anything). The
-                         UndoBar below lives in this wrapper too — the only two things it ever serves
-                         (an institution removal, a Budget category removal) are both owner-only actions, so
-                         hiding it alongside them is correct, not incidental. (A Budget category's undo is NOT
-                         served by it any more: that one is the dog-ear, which stays in view wherever the
-                         category was removed.) -->
+                         D09: hidden entirely on her install (no connect flow, no Plaid-shaped anything). A
+                         removal here is undone from the page's dog-ear, as a Budget category's is (audit W8.9). -->
                     <VerticalStackLayout x:Name="ConnectedAccountsSection" Spacing="12">
                         <Label Text="Connected accounts" Style="{StaticResource FieldLabel}" />
                         <Label x:Name="NoAccountsLabel" Text="Nothing connected yet."
@@ -101,17 +97,6 @@
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
                         </VerticalStackLayout>
-
-                        <!-- Undo-first removal (DESIGN.md §7): the row goes immediately; this bar self-dismisses.
-                             Serves the institution removal only, which happens in this section, right above it. -->
-                        <Border x:Name="UndoBar" IsVisible="False" Style="{StaticResource HairlineCard}" Padding="16,12">
-                            <Grid ColumnDefinitions="*,Auto">
-                                <Label x:Name="UndoLabel" Grid.Column="0" Style="{StaticResource SecondaryLabel}"
-                                       VerticalOptions="Center" />
-                                <Button Grid.Column="1" Text="Undo" Style="{StaticResource QuietButton}"
-                                        Clicked="OnUndoClicked" />
-                            </Grid>
-                        </Border>
 
                         <Button x:Name="ConnectButton" Text="Connect an account"
                                 Clicked="OnConnectClicked" Style="{StaticResource SecondaryButton}" Margin="0,4,0,0" />
@@ -174,18 +159,16 @@
                     <!-- Long-press-to-manage (D55/D110) is drawn as a tap here instead: .NET MAUI has no
                          stock long-press recognizer, and a hand-timed PointerGestureRecognizer's press/release
                          pair is unverified on Android touch input with no device available to try it on.
-                         Tapping a row opens the same Rename/Move/Remove choices an action sheet, undo-first. -->
+                         Tapping a row opens the Rename/Move/Remove card, undo-first; there is no kebab (§9). -->
                     <VerticalStackLayout x:Name="CategoriesList" Spacing="4"
                                          BindableLayout.ItemsSource="{Binding .}">
                         <BindableLayout.ItemTemplate>
                             <DataTemplate>
-                                <Grid ColumnDefinitions="*,Auto" Padding="0,8">
+                                <Grid Padding="0,8">
                                     <Grid.GestureRecognizers>
                                         <TapGestureRecognizer Tapped="OnCategoryTapped" />
                                     </Grid.GestureRecognizers>
-                                    <Label Grid.Column="0" Text="{Binding .}" Style="{StaticResource SecondaryLabel}"
-                                           VerticalOptions="Center" />
-                                    <Label Grid.Column="1" Text="⋮" Style="{StaticResource SecondaryLabel}"
+                                    <Label Text="{Binding .}" Style="{StaticResource SecondaryLabel}"
                                            VerticalOptions="Center" />
                                 </Grid>
                             </DataTemplate>
