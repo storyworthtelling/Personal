@@ -478,7 +478,7 @@ public partial class MainPage : FolioBinderPage
         {
             Drawable = new DeskFillerDrawable(),
             HeightRequest = 150,
-            Margin = new Thickness(0, 10, 0, 0),
+            Margin = new Thickness(0, 12, 0, 0),
             InputTransparent = true,
         });
     }
@@ -514,7 +514,7 @@ public partial class MainPage : FolioBinderPage
                 Text = row.Problem,
                 FontSize = PaperResources.Token<double>("LabelSize"),
                 TextColor = PaperResources.Colour("ProblemMark"),
-                Margin = new Thickness(0, 6, 0, 0),
+                Margin = new Thickness(0, 8, 0, 0),
             });
         }
 
@@ -524,7 +524,7 @@ public partial class MainPage : FolioBinderPage
             {
                 Text = voiced,
                 Style = PaperResources.Token<Style>("VoiceLabel"),
-                Margin = new Thickness(0, 10, 0, 0),
+                Margin = new Thickness(0, 12, 0, 0),
             });
         }
 
@@ -535,7 +535,7 @@ public partial class MainPage : FolioBinderPage
         var grid = new Grid
         {
             ColumnDefinitions = [new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star)],
-            ColumnSpacing = 14,
+            ColumnSpacing = 16,
             Margin = new Thickness(0, index == 0 ? 4 : 18, 0, 0),
         };
 

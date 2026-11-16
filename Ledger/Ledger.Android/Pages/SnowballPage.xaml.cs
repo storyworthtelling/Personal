@@ -83,7 +83,7 @@ public partial class SnowballPage : LedgerBinderPage
         Text = SnowballHistoryCopy.EmptyHistory,
         Style = PaperResources.Token<Style>("EmptyStateLabel"),
         HorizontalTextAlignment = TextAlignment.Center,
-        Margin = new Thickness(24, 60, 24, 0),
+        Margin = new Thickness(24, 64, 24, 0),
         IsVisible = false,
     };
     // Mockup 6 draws no caption until a bar or a panel is touched, so both start hidden (R-G24).
@@ -539,9 +539,9 @@ public partial class SnowballPage : LedgerBinderPage
     private View BuildLoanPostIt(SnowballLoanView loan)
     {
         var softInk = PaperResources.Colour("InkSoft");
-        var content = new VerticalStackLayout { Spacing = 6 };
+        var content = new VerticalStackLayout { Spacing = 8 };
 
-        var facts = new HorizontalStackLayout { Spacing = 18 };
+        var facts = new HorizontalStackLayout { Spacing = 16 };
         facts.Children.Add(FactColumn("APR", $"{loan.Apr * 100m:0.##}%", softInk));
         facts.Children.Add(FactColumn("As the focus", PlanText.AsFocus(loan.FocusedWeeklyPayment), softInk));
         content.Children.Add(facts);

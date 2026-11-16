@@ -57,7 +57,7 @@ public sealed class DayChooser : ContentView
         var row = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
-            ColumnSpacing = 6,
+            ColumnSpacing = 8,
             Children = { label, chevron },
         };
         Grid.SetColumn(label, 0);

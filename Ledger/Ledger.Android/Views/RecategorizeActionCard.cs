@@ -40,7 +40,7 @@ public static class RecategorizeActionCard
         {
             Text = $"{merchantName} goes to the category you pick from now on. Earlier transactions stay where they are.",
             Style = PaperResources.Token<Style>("SecondaryLabel"),
-            Padding = new Thickness(18, 10, 18, 14),
+            Padding = new Thickness(16, 12, 16, 16),
         });
 
         var card = new Border
@@ -70,7 +70,7 @@ public static class RecategorizeActionCard
 
     private static View BuildHeader(string summary, string subtitle) => new VerticalStackLayout
     {
-        Padding = new Thickness(18, 14, 18, 11),
+        Padding = new Thickness(16, 16, 16, 12),
         Children =
         {
             new Label { Text = summary, Style = PaperResources.Token<Style>("HeadingLabel") },
@@ -83,8 +83,8 @@ public static class RecategorizeActionCard
         var row = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
-            ColumnSpacing = 10,
-            Padding = new Thickness(18, 13),
+            ColumnSpacing = 12,
+            Padding = new Thickness(16, 12),
         };
 
         var check = new Label

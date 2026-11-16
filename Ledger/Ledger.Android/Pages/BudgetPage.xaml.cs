@@ -250,7 +250,7 @@ public partial class BudgetPage : LedgerBinderPage
 
     private static View BuildEmptyState() => new VerticalStackLayout
     {
-        Margin = new Thickness(24, 160, 24, 0),
+        Margin = new Thickness(24, 96, 24, 0),
         Children =
         {
             new Label
@@ -607,7 +607,7 @@ public partial class BudgetPage : LedgerBinderPage
         return new Grid
         {
             ColumnSpacing = 8,
-            Padding = new Thickness(0, 5),
+            Padding = new Thickness(0, 4),
             ColumnDefinitions =
             {
                 new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto),
@@ -631,7 +631,7 @@ public partial class BudgetPage : LedgerBinderPage
             TextColor = PaperResources.Colour("InkSoft"),
             MinimumHeightRequest = 40,
             VerticalTextAlignment = TextAlignment.Center,
-            Margin = new Thickness(0, 6, 0, 0),
+            Margin = new Thickness(0, 8, 0, 0),
         };
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) =>

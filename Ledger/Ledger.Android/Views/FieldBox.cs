@@ -29,7 +29,7 @@ public sealed class FieldBox : VerticalStackLayout
     public FieldBox(Entry entry, bool mono = false, string? prefix = null, string? suffix = null)
     {
         Entry = entry;
-        Spacing = 2;
+        Spacing = 4;
 
         entry.BackgroundColor = Colors.Transparent;
         entry.VerticalOptions = LayoutOptions.Center;
@@ -66,7 +66,7 @@ public sealed class FieldBox : VerticalStackLayout
         {
             var suffixBlock = new HorizontalStackLayout
             {
-                Spacing = 6,
+                Spacing = 8,
                 Margin = new Thickness(FieldBoxLayout.AffixGapDp, 0, 0, 0),
                 VerticalOptions = LayoutOptions.Center,
                 Children =

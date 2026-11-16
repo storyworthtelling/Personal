@@ -4,6 +4,6 @@
              xmlns:local="clr-namespace:Folio.Android.Pages"
              x:Class="Folio.Android.Pages.DraftDiffPage">
     <ScrollView Padding="{StaticResource ScreenPadding}">
-        <VerticalStackLayout x:Name="Content" Spacing="6" />
+        <VerticalStackLayout x:Name="Content" Spacing="8" />
     </ScrollView>
 </local:FolioBinderPage>

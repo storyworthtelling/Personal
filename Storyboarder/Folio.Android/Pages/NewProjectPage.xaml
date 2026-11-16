@@ -4,7 +4,7 @@
              xmlns:kit="clr-namespace:Storyworthtelling.Maui.Views;assembly=Storyworthtelling.Maui"
              xmlns:local="clr-namespace:Folio.Android.Pages"
              x:Class="Folio.Android.Pages.NewProjectPage">
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Padding="{StaticResource ScreenPadding}" RowSpacing="10">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto" Padding="{StaticResource ScreenPadding}" RowSpacing="12">
 
         <Button Grid.Row="1" x:Name="SignInButton"
                 Text="Sign in with Google" Clicked="OnSignInClicked"
@@ -33,11 +33,11 @@
                         SelectionMode="Single" SelectionChanged="OnEntrySelected">
             <CollectionView.EmptyView>
                 <Label Text="Sign in, then browse your Google Drive here."
-                       Style="{StaticResource EmptyStateLabel}" Margin="0,40" />
+                       Style="{StaticResource EmptyStateLabel}" Margin="0,48" />
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <Border Style="{StaticResource HairlineCard}" Padding="12,10" Margin="0,3">
+                    <Border Style="{StaticResource HairlineCard}" Padding="12,12" Margin="0,4">
                         <Label Text="{Binding Display}" />
                     </Border>
                 </DataTemplate>

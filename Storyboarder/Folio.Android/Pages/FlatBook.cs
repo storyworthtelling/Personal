@@ -61,7 +61,7 @@ public sealed class FlatBook : Border
             FontFamily = "SerifSemibold",
             FontSize = titleSize,
             LineHeight = 1.12,
-            Padding = new Thickness(7, 5, 7, 6),
+            Padding = new Thickness(8, 4, 8, 8),
             VerticalOptions = LayoutOptions.End,
             TextColor = painted ? PaperResources.Colour("Ink") : Color.FromArgb(PaperColorTokens.Paper),
         };

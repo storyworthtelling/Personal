@@ -54,7 +54,7 @@ public static class RenameCard
             StrokeShape = new RoundRectangle { CornerRadius = DesignTokens.Shape.RadiusCard },
             Content = new VerticalStackLayout
             {
-                Padding = new Thickness(18, 14, 18, 16),
+                Padding = new Thickness(16, 16, 16, 16),
                 Spacing = DesignTokens.Space.X3,
                 Children =
                 {

@@ -342,7 +342,7 @@ public partial class MainPage : LedgerBinderPage
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
             ColumnSpacing = 8,
-            Padding = new Thickness(0, 0, 0, 6),
+            Padding = new Thickness(0, 0, 0, 8),
         };
         row.Children.Add(nameLabel);
         Grid.SetColumn(nameLabel, 0);
@@ -391,7 +391,7 @@ public partial class MainPage : LedgerBinderPage
         // The well is 24 from the left and 16 from the binder (mockup 2's `.dv-well`); the status line is the
         // kit's quiet one, and the voiced line (when there is one) sits 10 below it.
         statusLabel.Style = PaperResources.Token<Style>("StatusLine");
-        voiceLabel.Margin = new Thickness(2, 10, 0, 0);
+        voiceLabel.Margin = new Thickness(4, 12, 0, 0);
 
         var column = new VerticalStackLayout
         {
@@ -811,7 +811,7 @@ public partial class MainPage : LedgerBinderPage
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
             ColumnSpacing = 8,
-            Padding = new Thickness(0, 0, 0, 6),
+            Padding = new Thickness(0, 0, 0, 8),
         };
         row.Children.Add(nameLabel);
         Grid.SetColumn(nameLabel, 0);
@@ -993,7 +993,7 @@ public partial class MainPage : LedgerBinderPage
 
         return new VerticalStackLayout
         {
-            Margin = new Thickness(0, 6, 0, 0),
+            Margin = new Thickness(0, 8, 0, 0),
             Children =
             {
                 new BoxView { HeightRequest = 1, Color = Color.FromArgb(PostItTint.Edge(PostItTint.From(institution.PrimaryColorHex))) },
@@ -1021,7 +1021,7 @@ public partial class MainPage : LedgerBinderPage
     private View BuildManualPostIt(Institution institution, Account account)
     {
         var softInk = PaperResources.Colour("InkSoft");
-        var column = new VerticalStackLayout { Spacing = 6 };
+        var column = new VerticalStackLayout { Spacing = 8 };
 
         // Kind decides which fields the post-it offers, as it did the Add form (mockup 4): a card also has its
         // limit, a bank account has no payment to keep.
@@ -1231,7 +1231,7 @@ public partial class MainPage : LedgerBinderPage
         {
             column.Children.Add(new HorizontalStackLayout
             {
-                Spacing = 14,
+                Spacing = 16,
                 Children =
                 {
                     new VerticalStackLayout { WidthRequest = 110, Children = { ManualFieldRow("APR", null, apr.Box) } },
@@ -1313,7 +1313,7 @@ public partial class MainPage : LedgerBinderPage
         {
             HeightRequest = 1,
             Color = Color.FromArgb(PostItTint.Edge(PostItTint.From(institution.PrimaryColorHex))),
-            Margin = new Thickness(0, 10, 0, 0),
+            Margin = new Thickness(0, 12, 0, 0),
         };
         var removeLabel = new Label
         {
@@ -1339,7 +1339,7 @@ public partial class MainPage : LedgerBinderPage
         var labelRow = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
-            ColumnSpacing = 6,
+            ColumnSpacing = 8,
         };
         labelRow.Children.Add(new Label
         {
