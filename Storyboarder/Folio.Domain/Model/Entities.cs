@@ -383,6 +383,10 @@ public class BookAnalysis
     // resumable call and column, folded in at render like the craft/voice/expansion halves. Null until it runs;
     // it runs only for a book with a PreviousBookId — a standalone book leaves it null, so no section renders.
     public string? SeriesContinuityJson { get; set; }
+
+    // Set once this draft's read has been merged into its series' bible (release G, R20). A series book only;
+    // billed once per draft, like the other whole-book calls.
+    public bool SeriesBibleUpdated { get; set; }
 }
 
 /// <summary>
@@ -451,6 +455,16 @@ public class Finding
 // One submitted batch of model calls for one draft (owner's ruling, R39): which kind of call, the batch
 // tier's id, and where it stands. One per kind per draft; once completed (or abandoned), whatever it left
 // undone goes one call at a time. Kind is a wire name from BatchKinds; never rename one.
+// One series' bible (release G, R20), stored as a SeriesBible in JSON. One row per series, keyed by the
+// series id. It is derived from the manuscripts, so it stays on the phone (and, sealed, in the owner's Drive),
+// never in the repository. Not cascaded from any draft: deleting a book leaves the series' bible standing.
+public class SeriesBibleRecord
+{
+    public Guid SeriesId { get; set; }
+    public string Json { get; set; } = string.Empty;
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+}
+
 public class ModelBatch
 {
     public Guid Id { get; set; } = Guid.NewGuid();

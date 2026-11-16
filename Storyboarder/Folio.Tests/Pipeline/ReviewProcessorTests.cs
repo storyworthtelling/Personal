@@ -7,6 +7,7 @@ using PdfSharp.Pdf.IO;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
 using Folio.Domain.Scenes;
+using Folio.Domain.Series;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
@@ -38,6 +39,7 @@ public class ReviewProcessorTests : IDisposable
     private readonly Mock<IClaudeAnalysisClient> claude = new();
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int chapterAnalysisCalls;
+    private readonly List<string> biblesSeen = [];
     private readonly List<string> sectionReads = [];
     private readonly List<string> readerReads = [];
     private readonly List<GenreFrame> readerGenres = [];
@@ -188,6 +190,16 @@ public class ReviewProcessorTests : IDisposable
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns((string _, SeriesCanon canon, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
                 Task.FromResult(SeriesContinuity.Empty with { PriorBookTitle = canon.PriorBookTitle }));
+
+        // Default series bible read (release G): the book establishes one character.
+        claude.Setup(c => c.ReadSeriesBible(
+                It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, ReadingFrame _, string _, string soFar, CancellationToken _) =>
+            {
+                biblesSeen.Add(soFar);
+                return Task.FromResult<IReadOnlyList<BibleFact>>(
+                    [new BibleFact(BibleKind.Character, "Hero", [], "", "Now a knight errant.", "The knight's son rode out")]);
+            });
 
         claude.Setup(c => c.DescribeSceneImage(
                 It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
@@ -1451,6 +1463,69 @@ public class ReviewProcessorTests : IDisposable
 
         Assert.Equal(PersonaCatalogue.Readers.Count, readerFrames.Count);
         Assert.All(readerFrames, frame => Assert.Contains("Quest", frame.SeriesCanon, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The series bible (release G): book two's read is merged into its series' bible, which is seeded
+    /// first from book one's stored canon rather than a second read of book one.
+    /// </summary>
+    [Fact]
+    public async Task ASequelIsReadIntoItsSeriesBibleSeededFromTheEarlierBooksCanon()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        Assert.Empty(biblesSeen);
+
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        // Once, shown what book one established.
+        var seen = Assert.Single(biblesSeen);
+        Assert.Contains("\"Quest\"", seen, StringComparison.Ordinal);
+
+        using var context = database.NewContext();
+        Assert.True(context.BookAnalyses.Single(a => a.NovelId == second).SeriesBibleUpdated);
+        var record = Assert.Single(context.SeriesBibles);
+        var bible = SeriesBibleCodec.Read(record.Json);
+        Assert.Equal(2, bible.Books.Count);
+        var hero = Assert.Single(bible.Entries, entry => entry.Kind == BibleKind.Character && entry.Name == "Hero");
+        Assert.Equal(2, hero.States.Count);
+        Assert.Equal("Now a knight errant.", hero.Current);
+        Assert.Equal("The knight's son rode out", hero.States[1].Quote);
+    }
+
+    [Fact]
+    public async Task AStandaloneBookHasNoSeriesBible()
+    {
+        SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Empty(biblesSeen);
+        using var context = database.NewContext();
+        Assert.Empty(context.SeriesBibles);
+    }
+
+    /// <summary>A stored bible that will not read is never written over: the review finishes without it.</summary>
+    [Fact]
+    public async Task AnUnreadableBibleIsLeftAloneAndTheReviewStillFinishes()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        Guid series;
+        using (var context = database.NewContext())
+        {
+            series = context.Novels.Single(n => n.Id == second).SeriesId!.Value;
+            context.SeriesBibles.Add(new SeriesBibleRecord { SeriesId = series, Json = "damaged", UpdatedAtUtc = clock.UtcNow });
+            context.SaveChanges();
+        }
+
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Empty(biblesSeen);
+        using var check = database.NewContext();
+        Assert.Equal("damaged", check.SeriesBibles.Single().Json);
+        Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == second).Stage);
     }
 
     [Fact]

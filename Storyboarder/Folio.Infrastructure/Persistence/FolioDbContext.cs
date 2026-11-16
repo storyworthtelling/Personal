@@ -20,6 +20,7 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
     public DbSet<BookAnalysis> BookAnalyses => Set<BookAnalysis>();
     public DbSet<Finding> Findings => Set<Finding>();
     public DbSet<PassRead> PassReads => Set<PassRead>();
+    public DbSet<SeriesBibleRecord> SeriesBibles => Set<SeriesBibleRecord>();
 
     // Every save moves FolioSaves, so the desk can tell whether anything changed without asking (efficiency §6).
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -149,6 +150,12 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
             entity.Property(scene => scene.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
             entity.HasIndex(scene => new { scene.NovelId, scene.Number });
             entity.HasIndex(scene => new { scene.ImageStatus, scene.NextAttemptAtUtc });
+        });
+
+        model.Entity<SeriesBibleRecord>(entity =>
+        {
+            entity.HasKey(bible => bible.SeriesId);
+            entity.Property(bible => bible.UpdatedAtUtc).HasConversion(TicksConverter);
         });
 
         model.Entity<ModelBatch>(entity =>

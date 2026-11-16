@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Markup;
 using Folio.Domain.Reading;
+using Folio.Domain.Series;
 using Folio.Domain.Scenes;
 using Folio.Domain.External;
 using Folio.Domain.Health;
@@ -911,6 +912,48 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return new ExpansionReport(scenes, showTell, length);
     }
 
+    public async Task<IReadOnlyList<BibleFact>> ReadSeriesBible(
+        string manuscript, ReadingFrame frame, string title, string bibleSoFar, CancellationToken cancellationToken)
+    {
+        var system = ReadingPrompt.System(manuscript, frame, SeriesBibleInstruction(title))
+            .Select(block => block.Cached
+                ? (object)new { type = "text", text = block.Text, cache_control = new { type = "ephemeral" } }
+                : new { type = "text", text = block.Text })
+            .ToArray();
+        var user = string.IsNullOrWhiteSpace(bibleSoFar)
+            ? $"This is the first book of the series read into its bible: \"{title}\"."
+            : $"WHAT THE EARLIER BOOKS ESTABLISHED (use the same names for the same things):\n{bibleSoFar}";
+        var reply = await SendRaw(system, user, options.PassMaxTokens, options.StandardModel,
+            nameof(ReadSeriesBible), options.PassEffort, cancellationToken);
+
+        var json = JsonResponse.ExtractObject(reply)
+                   ?? throw new InvalidOperationException("The series bible read came back with no JSON.");
+        var dto = JsonResponse.Deserialize<BibleDto>(json)
+                  ?? throw new InvalidOperationException("The series bible read came back unreadable.");
+        return [.. (dto.Entries ?? [])
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Name) && !string.IsNullOrWhiteSpace(entry.Text))
+            .Select(entry => new BibleFact(
+                Enum.TryParse<BibleKind>(entry.Kind, ignoreCase: true, out var kind) ? kind : BibleKind.Event,
+                entry.Name!.Trim(),
+                [.. (entry.Aliases ?? []).Where(alias => !string.IsNullOrWhiteSpace(alias)).Select(alias => alias.Trim())],
+                entry.Era?.Trim() ?? string.Empty,
+                entry.Text!.Trim(),
+                entry.Quote?.Trim() ?? string.Empty))];
+    }
+
+    private static string SeriesBibleInstruction(string title) =>
+        $"You keep the series bible for this book, \"{title}\", a book in a series. List what this book establishes "
+        + "that a later or earlier book in the series must stay consistent with: its characters (who they are, how they "
+        + "look, what they can do, who they are to each other), its settings, the rules of its world, the events of its "
+        + "timeline, and the threads it leaves open. Record only what this book says, as of the point in story time it "
+        + "says it; where the book gives a date, an era or a time relative to an earlier book, say so. Do not judge the "
+        + "book, and do not suggest changes.\n\n"
+        + "Reply with JSON only: {\"entries\": [{\"kind\": \"character, setting, rule, event or thread\", \"name\": "
+        + "\"the name the book uses most\", \"aliases\": [\"other names the book uses for it\"], \"era\": \"the story "
+        + "time this holds as of, in the book's own terms, or an empty string\", \"text\": \"what the book establishes, "
+        + "in one or two sentences\", \"quote\": \"a short passage (under twenty words) copied verbatim from the book "
+        + "that establishes it, or an empty string\"}]}";
+
     public async Task<SeriesContinuity> AssessSeriesContinuity(
         string title, SeriesCanon priorCanon, IReadOnlyList<ChapterNotes> notes, string continuitySummary,
         CancellationToken cancellationToken)
@@ -1502,6 +1545,21 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             .Where(e => !string.IsNullOrWhiteSpace(e.Name))
             .Select(e => new EntityMention(e.Name!, e.Description ?? string.Empty, e.Scale ?? string.Empty, e.Aliases ?? []))
             .ToList();
+
+    private sealed class BibleDto
+    {
+        public List<BibleEntryDto>? Entries { get; set; }
+    }
+
+    private sealed class BibleEntryDto
+    {
+        public string? Kind { get; set; }
+        public string? Name { get; set; }
+        public List<string>? Aliases { get; set; }
+        public string? Era { get; set; }
+        public string? Text { get; set; }
+        public string? Quote { get; set; }
+    }
 
     private sealed class FragmentDto
     {

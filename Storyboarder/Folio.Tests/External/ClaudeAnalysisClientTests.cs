@@ -1516,4 +1516,48 @@ public class ClaudeAnalysisClientTests
             HttpRequestMessage request, CancellationToken cancellationToken) =>
             throw new TaskCanceledException("The worker was stopped.");
     }
+    [Fact]
+    public async Task TheBibleReadSharesTheReadsCachedManuscriptAndAsksForTheBooksEntries()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"entries\":[{\"kind\":\"character\",\"name\":\"Wren Abernay\","
+            + "\"aliases\":[\"the pilot\"],\"era\":\"Year of the flood\",\"text\":\"A ferry pilot.\","
+            + "\"quote\":\"Wren held the tiller\"},{\"kind\":\"oddity\",\"name\":\"Gullhaven\",\"text\":\"On stilts.\"},"
+            + "{\"kind\":\"thread\",\"name\":\"\",\"text\":\"Nameless.\"}]}"));
+        const string manuscript = "Wren held the tiller and did not look back.";
+        var frame = new ReadingFrame(GenreFrame.Unknown, "SERIES BIBLE: earlier.");
+
+        var facts = await client.ReadSeriesBible(manuscript, frame, "The Tide Ledger", "earlier entries", CancellationToken.None);
+
+        using var body = JsonDocument.Parse(Assert.Single(handler.RequestBodies));
+        var system = body.RootElement.GetProperty("system").EnumerateArray().ToList();
+        // The same cached blocks the reads send, so the bible read is a cache hit after them.
+        var reads = ReadingPrompt.System(manuscript, PersonaCatalogue.All[0], frame).TakeWhile(block => block.Cached).ToList();
+        for (var i = 0; i < reads.Count; i++)
+        {
+            Assert.Equal(reads[i].Text, system[i].GetProperty("text").GetString());
+            Assert.True(system[i].TryGetProperty("cache_control", out _));
+        }
+        var user = body.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert.Contains("The Tide Ledger", system[^1].GetProperty("text").GetString() + user);
+        Assert.Contains("earlier entries", user);
+
+        Assert.Equal(2, facts.Count);
+        Assert.Equal(Folio.Domain.Series.BibleKind.Character, facts[0].Kind);
+        Assert.Equal(["the pilot"], facts[0].Aliases);
+        Assert.Equal("Year of the flood", facts[0].Era);
+        Assert.Equal("Wren held the tiller", facts[0].Quote);
+        // A kind it does not know is not thrown away: it is kept as an event.
+        Assert.Equal(Folio.Domain.Series.BibleKind.Event, facts[1].Kind);
+    }
+
+    [Fact]
+    public async Task ABibleReadWithAnUnreadableReplyFailsRatherThanEmptyingTheBooksEntries()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("Sorry, no."));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.ReadSeriesBible("text", GenreFrame.Unknown, "Book", string.Empty, CancellationToken.None));
+    }
 }

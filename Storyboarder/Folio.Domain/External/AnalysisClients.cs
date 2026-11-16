@@ -147,6 +147,20 @@ public interface IClaudeAnalysisClient
     // ignored, or contradicted. It NUDGES, never rewrites — pointers only. Best-effort: a blank/partial reply
     // degrades to SeriesContinuity.Empty (keeping the prior book's title) so it never blocks the report. Runs
     // only for a book linked to a prior one; a standalone book never calls it.
+    /// <summary>
+    /// What this book establishes for its series' bible (release G, R20): its characters, settings, world
+    /// rules, timeline events and open threads, each with the story time it holds as of and a short
+    /// passage quoted from the book. Sent with the reads' cached manuscript, so it is a cache hit after
+    /// them. <paramref name="bibleSoFar"/> is what the earlier books established, so names match. Throws
+    /// on an unreadable reply: an empty list would erase the book from the bible.
+    /// </summary>
+    Task<IReadOnlyList<Folio.Domain.Series.BibleFact>> ReadSeriesBible(
+        string manuscript,
+        Folio.Domain.Reading.ReadingFrame frame,
+        string title,
+        string bibleSoFar,
+        CancellationToken cancellationToken);
+
     Task<SeriesContinuity> AssessSeriesContinuity(
         string title,
         SeriesCanon priorCanon,
