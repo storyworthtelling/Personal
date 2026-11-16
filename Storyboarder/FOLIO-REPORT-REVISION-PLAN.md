@@ -158,7 +158,7 @@ because it carries a live bug. Every release is test-first, keeps the existing g
 compiles the Android head before it is called done. None of it is verified on a device until the owner
 runs a real draft through.
 
-### Release A — Scenes from the text (R1–R5)
+### Release A — Scenes from the text (R1–R5) — **built**
 1. **`SceneDetector`**:
    - Breaks on chapter starts, divider lines, two or more blank lines, and horizontal rules.
    - Remove the length split (`TargetSceneChars`/`MaxSceneChars`), so a chapter with no breaks is one scene.
@@ -183,7 +183,12 @@ runs a real draft through.
    - Fewer, longer scenes means fewer images and longer image prompts.
    - Log the first real run's scene count and image cost against the last.
 
-### Release B — Readers (R10–R14, R27)
+### Release B — Readers (R10–R14, R27) — **built**
+
+Rulings taken when B began: Hugo Hook keeps "Could I sell it" and its selling anchors but writes about what
+gets the manuscript to a sellable state, never where to pitch it; Edie Torial's edit-letter anchors are
+approved; each reader page leads with the name, then the role.
+
 1. **Fellow writer.**
    - A seventh persona on the strong model: "What would I steal, and what would I do differently".
    - Anchors as approved in R34.
