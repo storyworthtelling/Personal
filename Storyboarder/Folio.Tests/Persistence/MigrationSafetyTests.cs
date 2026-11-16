@@ -81,18 +81,18 @@ public class MigrationSafetyTests : IDisposable
         {
             db.GetService<IMigrator>().Migrate("20261022192414_RetryNotBefore");
 
-            var now = DateTimeOffset.UtcNow;
+            // Rows written in the schema of that day, not through today's model, which has columns that
+            // table does not have yet.
             foreach (var stage in new[] { ProjectStage.ComposingAnalysis, ProjectStage.Completed, ProjectStage.Failed })
             {
                 var id = Guid.NewGuid();
-                db.Novels.Add(new Novel
+                InsertOldRow(db, "Novels", new Dictionary<string, object?>
                 {
-                    Id = id, ProjectId = id, Title = stage.ToString(), GoogleDocId = "doc", Stage = stage,
-                    VoicedLine = "Draft 1 is complete.", VoicedLineStage = stage,
-                    CreatedAtUtc = now, UpdatedAtUtc = now
+                    ["Id"] = id.ToString().ToUpperInvariant(), ["ProjectId"] = id.ToString().ToUpperInvariant(),
+                    ["Title"] = stage.ToString(), ["GoogleDocId"] = "doc", ["Stage"] = (int)stage,
+                    ["VoicedLine"] = "Draft 1 is complete.", ["VoicedLineStage"] = (int)stage,
                 });
             }
-            db.SaveChanges();
         }
         SqliteConnection.ClearAllPools();
 
@@ -109,5 +109,41 @@ public class MigrationSafetyTests : IDisposable
             Assert.Equal("Draft 1 is complete.", novels["Completed"].VoicedLine);
             Assert.Equal(ProjectStage.Completed, novels["Completed"].VoicedLineStage);
         }
+    }
+
+    // Inserts one row into a table as an older migration left it: the values given, and for every other
+    // column that may not be null and has no default, a zero or an empty string.
+    private static void InsertOldRow(FolioDbContext db, string table, IReadOnlyDictionary<string, object?> values)
+    {
+        var connection = db.Database.GetDbConnection();
+        connection.Open();
+        var columns = new Dictionary<string, object?>(values);
+        using (var info = connection.CreateCommand())
+        {
+            info.CommandText = $"PRAGMA table_info(\"{table}\")";
+            using var reader = info.ExecuteReader();
+            while (reader.Read())
+            {
+                var name = reader.GetString(1);
+                var type = reader.GetString(2);
+                var notNull = reader.GetInt32(3) == 1;
+                var hasDefault = !reader.IsDBNull(4);
+                if (notNull && !hasDefault && !columns.ContainsKey(name))
+                    columns[name] = type.Equals("TEXT", StringComparison.OrdinalIgnoreCase) ? string.Empty : 0;
+            }
+        }
+
+        using var insert = connection.CreateCommand();
+        var names = columns.Keys.ToList();
+        insert.CommandText = $"INSERT INTO \"{table}\" ({string.Join(", ", names.Select(n => $"\"{n}\""))}) "
+            + $"VALUES ({string.Join(", ", names.Select((_, i) => $"$p{i}"))})";
+        for (var i = 0; i < names.Count; i++)
+        {
+            var parameter = insert.CreateParameter();
+            parameter.ParameterName = $"$p{i}";
+            parameter.Value = columns[names[i]] ?? DBNull.Value;
+            insert.Parameters.Add(parameter);
+        }
+        insert.ExecuteNonQuery();
     }
 }

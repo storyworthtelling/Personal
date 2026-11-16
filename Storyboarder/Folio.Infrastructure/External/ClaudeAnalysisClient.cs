@@ -954,6 +954,41 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "in one or two sentences\", \"quote\": \"a short passage (under twenty words) copied verbatim from the book "
         + "that establishes it, or an empty string\"}]}";
 
+    public async Task<StoryPlacement> PlaceInSeries(
+        string title, IReadOnlyList<string> otherBooks, string bibleText, string continuitySummary,
+        CancellationToken cancellationToken)
+    {
+        var books = (otherBooks ?? []).Where(book => !string.IsNullOrWhiteSpace(book)).ToList();
+        var plainest = StoryPlacement.After(books.Count == 0 ? string.Empty : books[^1]);
+        var user =
+            $"THIS BOOK: \"{title}\"\n\n"
+            + $"THE OTHER BOOKS, in the order they were written: {string.Join(", ", books.Select(book => $"\"{book}\""))}\n\n"
+            + $"WHERE THIS BOOK'S STORY STANDS:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(not known)" : continuitySummary)}\n\n"
+            + bibleText;
+        var reply = await SendMessage(PlacementInstruction, user, cancellationToken, options.MaxTokens, model: options.StandardModel);
+
+        var json = JsonResponse.ExtractObject(reply);
+        var dto = json is null ? null : JsonResponse.Deserialize<PlacementDto>(json);
+        string? Known(string? name) => books.FirstOrDefault(book => string.Equals(book, name?.Trim(), StringComparison.OrdinalIgnoreCase));
+        return dto?.Kind?.Trim().ToLowerInvariant() switch
+        {
+            "after" when Known(dto.Book) is { } book => StoryPlacement.After(book),
+            "before" when Known(dto.Book) is { } book => StoryPlacement.Before(book),
+            "between" when Known(dto.Book) is { } earlier && Known(dto.OtherBook) is { } later => StoryPlacement.Between(earlier, later),
+            "era" when !string.IsNullOrWhiteSpace(dto.Era) => StoryPlacement.InEra(dto.Era),
+            _ => plainest,
+        };
+    }
+
+    private const string PlacementInstruction =
+        "You place a book in its series' story time. Given the series bible of the books written before it and where "
+        + "this book's story stands, say where it takes place against them: after one book, before one book, between "
+        + "two books, or, when it is set far from all of them, in an era of its own, named in the series' own terms. "
+        + "Use only the book titles given.\n\n"
+        + "Reply with JSON only: {\"kind\": \"after, before, between or era\", \"book\": \"a title (the earlier one, "
+        + "for between)\", \"otherBook\": \"the later title, for between, else an empty string\", \"era\": \"the era, "
+        + "for era, else an empty string\"}";
+
     public async Task<SeriesContinuity> AssessSeriesContinuity(
         string title, SeriesCanon priorCanon, IReadOnlyList<ChapterNotes> notes, string continuitySummary,
         CancellationToken cancellationToken)
@@ -1545,6 +1580,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             .Where(e => !string.IsNullOrWhiteSpace(e.Name))
             .Select(e => new EntityMention(e.Name!, e.Description ?? string.Empty, e.Scale ?? string.Empty, e.Aliases ?? []))
             .ToList();
+
+    private sealed class PlacementDto
+    {
+        public string? Kind { get; set; }
+        public string? Book { get; set; }
+        public string? OtherBook { get; set; }
+        public string? Era { get; set; }
+    }
 
     private sealed class BibleDto
     {

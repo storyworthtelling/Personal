@@ -1560,4 +1560,28 @@ public class ClaudeAnalysisClientTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             client.ReadSeriesBible("text", GenreFrame.Unknown, "Book", string.Empty, CancellationToken.None));
     }
+
+    [Theory]
+    [InlineData("{\"kind\":\"between\",\"book\":\"the salt road\",\"otherBook\":\"The Tide Ledger\"}", "between \u201CThe Salt Road\u201D and \u201CThe Tide Ledger\u201D")]
+    [InlineData("{\"kind\":\"before\",\"book\":\"The Salt Road\"}", "before \u201CThe Salt Road\u201D")]
+    [InlineData("{\"kind\":\"era\",\"era\":\"the age before the flood\"}", "in the age before the flood")]
+    // A book it was not shown, or nothing readable, is the plainest guess: after the latest-written book.
+    [InlineData("{\"kind\":\"after\",\"book\":\"A Book Nobody Wrote\"}", "after \u201CThe Tide Ledger\u201D")]
+    [InlineData("No idea.", "after \u201CThe Tide Ledger\u201D")]
+    public async Task APlacementIsReadAgainstTheBooksItWasShown(string reply, string where)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(reply));
+
+        var placement = await client.PlaceInSeries(
+            "The Third Tide", ["The Salt Road", "The Tide Ledger"], "SERIES BIBLE ...", "The flood has not come yet.",
+            CancellationToken.None);
+
+        Assert.Equal(where, placement.Where);
+        Assert.False(placement.Confirmed);
+        var user = JsonDocument.Parse(Assert.Single(handler.RequestBodies)).RootElement
+            .GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert.Contains("The flood has not come yet.", user);
+        Assert.Contains("SERIES BIBLE", user);
+    }
 }

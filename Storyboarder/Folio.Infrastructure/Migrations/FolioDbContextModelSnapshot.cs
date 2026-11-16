@@ -379,6 +379,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<string>("LastError")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PlacementJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("PreviousBookId")
                         .HasColumnType("TEXT");
 

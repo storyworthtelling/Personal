@@ -58,4 +58,10 @@ public sealed record BookRecord(
 
     /// <summary>Which draft <see cref="ReaderScores"/> are from; null when there are none.</summary>
     public int? ScoredDraftNumber { get; init; }
+
+    /// <summary>Where the book sits in its series' story time (R21); null for a standalone book or one not yet placed.</summary>
+    public Folio.Domain.Series.StoryPlacement? Placement { get; init; }
+
+    /// <summary>The series' other books, in the order they were written: what the book can be placed against.</summary>
+    public IReadOnlyList<string> OtherBooks { get; init; } = [];
 }

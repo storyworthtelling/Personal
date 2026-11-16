@@ -40,6 +40,7 @@ public class ReviewProcessorTests : IDisposable
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int chapterAnalysisCalls;
     private readonly List<string> biblesSeen = [];
+    private readonly List<IReadOnlyList<string>> placementBooks = [];
     private readonly List<string> sectionReads = [];
     private readonly List<string> readerReads = [];
     private readonly List<GenreFrame> readerGenres = [];
@@ -199,6 +200,15 @@ public class ReviewProcessorTests : IDisposable
                 biblesSeen.Add(soFar);
                 return Task.FromResult<IReadOnlyList<BibleFact>>(
                     [new BibleFact(BibleKind.Character, "Hero", [], "", "Now a knight errant.", "The knight's son rode out")]);
+            });
+
+        // Default placement guess (release G, R21): after the latest-written other book.
+        claude.Setup(c => c.PlaceInSeries(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, IReadOnlyList<string> books, string _, string _, CancellationToken _) =>
+            {
+                placementBooks.Add(books);
+                return Task.FromResult(StoryPlacement.After(books[^1]));
             });
 
         claude.Setup(c => c.DescribeSceneImage(
@@ -1492,6 +1502,46 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(2, hero.States.Count);
         Assert.Equal("Now a knight errant.", hero.Current);
         Assert.Equal("The knight's son rode out", hero.States[1].Quote);
+    }
+
+    /// <summary>A sequel's place in the series is guessed once, from the other books, and kept as a guess (R21).</summary>
+    [Fact]
+    public async Task ASequelsPlaceInTheSeriesIsGuessedAndKeptUnconfirmed()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        Assert.Empty(placementBooks);
+
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(["Quest"], Assert.Single(placementBooks));
+        using var context = database.NewContext();
+        var placement = StoryPlacementCodec.Read(context.Novels.Single(n => n.Id == second).PlacementJson);
+        Assert.NotNull(placement);
+        Assert.Equal("after \u201CQuest\u201D", placement!.Where);
+        Assert.False(placement.Confirmed);
+    }
+
+    /// <summary>A placement the owner confirmed, carried onto a later draft, is not guessed again.</summary>
+    [Fact]
+    public async Task AConfirmedPlacementIsNotGuessedAgain()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        using (var context = database.NewContext())
+        {
+            context.Novels.Single(n => n.Id == second).PlacementJson =
+                StoryPlacementCodec.Write(StoryPlacement.Before("Quest").Confirm());
+            context.SaveChanges();
+        }
+
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Empty(placementBooks);
+        using var check = database.NewContext();
+        Assert.True(StoryPlacementCodec.Read(check.Novels.Single(n => n.Id == second).PlacementJson)!.Confirmed);
     }
 
     [Fact]

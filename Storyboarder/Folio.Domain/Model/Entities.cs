@@ -120,6 +120,13 @@ public class Novel
     public Guid? PreviousBookId { get; set; }
     public int SeriesSequence { get; set; } = 1;
 
+    /// <summary>
+    /// Where this book sits in its series' story time (R21), as a <c>StoryPlacement</c> in JSON: Folio's
+    /// guess until the owner confirms it. Null for a standalone book or a series' first. Carried onto a
+    /// book's later drafts like the series fields above, so a confirmed placement is never guessed again.
+    /// </summary>
+    public string? PlacementJson { get; set; }
+
     // Set once the per-chunk extractions have been merged into canonical DesignRefs, so the merge
     // (which would otherwise reset reference-sheet state) runs exactly once.
     public bool DesignBibleConsolidated { get; set; }

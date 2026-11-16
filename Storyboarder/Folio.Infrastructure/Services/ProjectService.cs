@@ -6,6 +6,7 @@ using Folio.Domain.Analysis;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
+using Folio.Domain.Series;
 using Folio.Domain.Pipeline;
 using Folio.Domain.Readiness;
 using Folio.Domain.Reading;
@@ -119,6 +120,7 @@ public sealed class ProjectService
         draft.SeriesId = previous.SeriesId;
         draft.PreviousBookId = previous.PreviousBookId;
         draft.SeriesSequence = previous.SeriesSequence;
+        draft.PlacementJson = previous.PlacementJson;
         draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
         draft.WordCount = Words(text);
 
@@ -592,6 +594,27 @@ public sealed class ProjectService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// The owner's word on where a book sits in its series (R21), written onto every draft of the book so
+    /// it is never guessed again. Any draft of the book names it.
+    /// </summary>
+    public async Task ConfirmPlacementAsync(Guid draftId, StoryPlacement placement, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(placement);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var projectId = await db.Novels.Where(n => n.Id == draftId).Select(n => (Guid?)n.ProjectId).FirstOrDefaultAsync(cancellationToken);
+        if (projectId is null)
+            return;
+
+        var json = StoryPlacementCodec.Write(placement.Confirm());
+        foreach (var draft in await db.Novels.Where(n => n.ProjectId == projectId).ToListAsync(cancellationToken))
+        {
+            draft.PlacementJson = json;
+            draft.UpdatedAtUtc = clock.UtcNow;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     private sealed record DraftStub(Guid Id, Guid ProjectId, int DraftNumber, DateTimeOffset CreatedAtUtc, DateTimeOffset? ShelvedAtUtc);
 
     /// <summary>
@@ -835,6 +858,19 @@ public sealed class ProjectService
                 .Distinct()
                 .CountAsync(cancellationToken);
 
+        var latestPlacement = await db.Novels.Where(n => n.Id == latest.Id).Select(n => n.PlacementJson).FirstAsync(cancellationToken);
+        var otherBooks = latest.SeriesId is null
+            ? []
+            : (await db.Novels
+                .Where(n => n.SeriesId == latest.SeriesId && n.ProjectId != projectId && n.DeletedAtUtc == null)
+                .Select(n => new { n.ProjectId, n.DraftNumber, n.SeriesSequence, n.Title })
+                .ToListAsync(cancellationToken))
+              .GroupBy(n => n.ProjectId)
+              .Select(other => other.OrderByDescending(n => n.DraftNumber).First())
+              .OrderBy(other => other.SeriesSequence)
+              .Select(other => other.Title)
+              .ToList();
+
         return new BookRecord(
             projectId.Value,
             latest.Id,
@@ -857,6 +893,8 @@ public sealed class ProjectService
         {
             ReaderScores = scores,
             ScoredDraftNumber = scoredDraft,
+            Placement = latest.SeriesId is null ? null : StoryPlacementCodec.Read(latestPlacement),
+            OtherBooks = otherBooks,
         };
     }
 

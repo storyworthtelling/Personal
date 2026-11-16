@@ -1056,6 +1056,37 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2e2) Guess where a series book sits in its series' story time (R21), once, when there are other
+        // books to place it against. The owner confirms or changes it on the book's page; a confirmed
+        // placement is carried onto later drafts and never guessed again.
+        if (novel.SeriesId is not null && novel.PlacementJson is null
+            && await EarlierBooks(db, novel, cancellationToken) is { Count: > 0 } others)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var bible = SeriesBibleCodec.Read(await db.SeriesBibles
+                .Where(record => record.SeriesId == novel.SeriesId)
+                .Select(record => record.Json)
+                .FirstOrDefaultAsync(cancellationToken));
+            try
+            {
+                var placement = await claude.PlaceInSeries(
+                    novel.Title, [.. others.Select(book => book.Title)],
+                    BibleText.For(bible.Without(novel.ProjectId)), novel.ContinuitySummary, cancellationToken);
+                novel.PlacementJson = StoryPlacementCodec.Write(placement with { Confirmed = false });
+                ClearCallFailures(novel);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, "PlaceInSeries", cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 2f) Cross-book continuity read (Phase 5): only for a book linked to a prior one. Checks this book
         // against the prior book's established canon and tracks its carried-over open threads. Its own resumable
         // step + column, billed once — like the other reduce halves. A standalone book has no PreviousBookId, so
@@ -1898,19 +1929,10 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        var earlier = await db.Novels
-            .Where(other => (other.SeriesId == seriesId || other.ProjectId == seriesId || other.Id == novel.PreviousBookId)
-                            && other.ProjectId != novel.ProjectId
-                            && other.Stage == ProjectStage.Completed
-                            && other.DeletedAtUtc == null)
-            .Select(other => new { other.Id, other.ProjectId, other.Title, other.SeriesSequence, other.DraftNumber })
-            .ToListAsync(cancellationToken);
-        foreach (var book in earlier.GroupBy(other => other.ProjectId)
-                     .Select(drafts => drafts.OrderByDescending(draft => draft.DraftNumber).First())
-                     .Where(book => !bible.Has(book.ProjectId)))
+        foreach (var book in (await EarlierBooks(db, novel, cancellationToken)).Where(book => !bible.Has(book.ProjectId)))
         {
-            var canon = await LoadSeriesCanon(db, book.Id, cancellationToken);
-            bible = bible.WithBook(new SeriesBook(book.ProjectId, book.Title, book.SeriesSequence), BibleSeed.From(canon));
+            var canon = await LoadSeriesCanon(db, book.DraftId, cancellationToken);
+            bible = bible.WithBook(new SeriesBook(book.ProjectId, book.Title, book.Written), BibleSeed.From(canon));
         }
 
         if (!claudeLimiter.TryAcquire())
@@ -1945,6 +1967,27 @@ public sealed class ReviewProcessor : IPipelineStep
         Touch(novel);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
+    }
+
+    private sealed record OtherBook(Guid DraftId, Guid ProjectId, string Title, int Written);
+
+    // The series' other finished books, each as its newest finished draft, in the order they were written.
+    // A series' id is its first book's project id, which is how a first book read before it was linked is found.
+    private static async Task<IReadOnlyList<OtherBook>> EarlierBooks(
+        FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var seriesId = novel.SeriesId;
+        var drafts = await db.Novels
+            .Where(other => (other.SeriesId == seriesId || other.ProjectId == seriesId || other.Id == novel.PreviousBookId)
+                            && other.ProjectId != novel.ProjectId
+                            && other.Stage == ProjectStage.Completed
+                            && other.DeletedAtUtc == null)
+            .Select(other => new { other.Id, other.ProjectId, other.Title, other.SeriesSequence, other.DraftNumber })
+            .ToListAsync(cancellationToken);
+        return [.. drafts.GroupBy(other => other.ProjectId)
+            .Select(book => book.OrderByDescending(draft => draft.DraftNumber).First())
+            .OrderBy(book => book.SeriesSequence)
+            .Select(book => new OtherBook(book.Id, book.ProjectId, book.Title, book.SeriesSequence))];
     }
 
     // Assembles the prior book's canon for the cross-book continuity read (Phase 5): its title, its design-bible

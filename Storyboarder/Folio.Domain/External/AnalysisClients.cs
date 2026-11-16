@@ -161,6 +161,18 @@ public interface IClaudeAnalysisClient
         string bibleSoFar,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Where this book sits in its series' story time (R21), guessed from what the earlier books
+    /// established and where this book's story stands. Answers only books it was shown; a reply it cannot
+    /// read is the plainest guess, after the latest-written book. Never confirmed: the owner confirms.
+    /// </summary>
+    Task<Folio.Domain.Series.StoryPlacement> PlaceInSeries(
+        string title,
+        IReadOnlyList<string> otherBooks,
+        string bibleText,
+        string continuitySummary,
+        CancellationToken cancellationToken);
+
     Task<SeriesContinuity> AssessSeriesContinuity(
         string title,
         SeriesCanon priorCanon,
