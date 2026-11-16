@@ -11,27 +11,27 @@ public sealed record SceneSpan(int Number, int ChapterNumber, string ChapterLabe
 // image. Pure and deterministic: the same text + chapters always yield the same scenes, so detection runs
 // once at ingestion and is trusted thereafter.
 //
-// Detection is HYBRID:
-//   1. Honor AUTHORIAL scene breaks within each chapter — a divider line ("* * *", "---", "#") or a gap
-//      of two or more blank lines.
-//   2. For a long chapter with no authorial breaks (or a scene that still runs very long), fall back to
-//      splitting at paragraph boundaries near a target length, so a wall-of-text chapter still yields
-//      several scenes instead of one enormous one. (A Claude-assisted refinement of these boundaries is
-//      deferred; the deterministic split keeps the count sensible without a model call.)
+// Scene breaks come from the author's text and nothing else (owner's ruling, R1–R2):
+//   - a chapter start;
+//   - a divider line ("* * *", "#", "⁂", "~ ~ ~", "---", a horizontal rule the extractors write as one);
+//   - a gap of two or more blank lines (a single blank line is paragraph spacing).
+// A chapter with no breaks is ONE scene, however long. There used to be a length cap that cut an unbroken
+// chapter at paragraph boundaries every ~5,000 characters; it invented scenes the author never wrote, and
+// the scene verdicts paired against those invented scenes were the "muddled separation" the owner saw.
 //
 // The spans tile each chapter contiguously and gaplessly, and there is never an empty result, so every
 // scene can be attributed to a chapter.
 public sealed class SceneDetector
 {
-    // Split a scene once it grows past this, and aim each split piece near TargetSceneChars.
-    public const int TargetSceneChars = 5_000;
-    public const int MaxSceneChars = 9_000;
+    // Rule-like marks: a run of these is a divider only when there are at least three (a dash or two in a
+    // line of its own is punctuation, not a rule).
+    private const string RuleMarks = "-–—_=";
+    private const int MinRuleMarks = 3;
 
-    private const int MinSeparatorMarks = 3;
-
-    // A scene/section divider line: a run of ornament characters, optionally spaced ("* * *", "---", "###").
-    private static readonly Regex SeparatorRule = new(
-        @"^[*#~\-–—•·§_=+]+(?:[ \t]+[*#~\-–—•·§_=+]+)*$", RegexOptions.CultureInvariant);
+    // A divider line: ornament glyphs, optionally spaced ("* * *", "⁂", "#", "~ ~ ~"), or spaced o's.
+    private static readonly Regex DividerLine = new(
+        @"^(?:[*#~\-–—•·§_=+⁂❦❧☙✻✱✳✦◆◇○●]+(?:[ \t]+[*#~\-–—•·§_=+⁂❦❧☙✻✱✳✦◆◇○●]+)*|o(?:[ \t]+o){2,})$",
+        RegexOptions.CultureInvariant);
 
     /// <summary>
     /// Splits the manuscript into ordered scenes. When no chapters are supplied the whole text is treated
@@ -63,8 +63,7 @@ public sealed class SceneDetector
         return scenes;
     }
 
-    // Yields contiguous, gapless [start, end) scene spans for one chapter: authorial breaks first, then a
-    // length cap so an unbroken run doesn't become one giant scene.
+    // Yields contiguous, gapless [start, end) scene spans for one chapter, one per authorial break.
     private static IEnumerable<(int Start, int End)> SplitChapter(string text, int start, int end)
     {
         var starts = SceneStartOffsets(text, start, end);
@@ -81,8 +80,7 @@ public sealed class SceneDetector
             // heading line rides with the first scene).
             var spanStart = i == 0 ? start : starts[i];
             var spanEnd = i + 1 < starts.Count ? starts[i + 1] : end;
-            foreach (var piece in CapLength(text, spanStart, spanEnd))
-                yield return piece;
+            yield return (spanStart, spanEnd);
         }
     }
 
@@ -127,48 +125,11 @@ public sealed class SceneDetector
         return starts;
     }
 
-    // Splits an over-long span at paragraph boundaries (blank lines) so each piece sits near
-    // TargetSceneChars, hard-cutting only when a single paragraph exceeds MaxSceneChars.
-    private static IEnumerable<(int Start, int End)> CapLength(string text, int start, int end)
+    private static bool IsDivider(string trimmedLine)
     {
-        if (end - start <= MaxSceneChars)
-        {
-            yield return (start, end);
-            yield break;
-        }
-
-        var cursor = start;
-        while (end - cursor > MaxSceneChars)
-        {
-            var target = cursor + TargetSceneChars;
-            var boundary = ParagraphBoundaryAtOrAfter(text, target, cursor + MaxSceneChars);
-            yield return (cursor, boundary);
-            cursor = boundary;
-        }
-        yield return (cursor, end);
+        if (!DividerLine.IsMatch(trimmedLine))
+            return false;
+        var marks = trimmedLine.Where(c => !char.IsWhiteSpace(c)).ToList();
+        return marks.All(c => RuleMarks.Contains(c)) ? marks.Count >= MinRuleMarks : marks.Count >= 1;
     }
-
-    // The start of the paragraph at or after `from` (a blank-line boundary), bounded by `hardLimit`.
-    private static int ParagraphBoundaryAtOrAfter(string text, int from, int hardLimit)
-    {
-        var i = from;
-        while (i < hardLimit)
-        {
-            var newline = text.IndexOf('\n', i);
-            if (newline < 0 || newline >= hardLimit)
-                break;
-            // A blank line (two consecutive newlines, allowing whitespace between) is a paragraph break.
-            var j = newline + 1;
-            while (j < text.Length && (text[j] == ' ' || text[j] == '\t' || text[j] == '\r'))
-                j++;
-            if (j < text.Length && text[j] == '\n')
-                return j + 1;
-            i = newline + 1;
-        }
-        return hardLimit;
-    }
-
-    private static bool IsDivider(string trimmedLine) =>
-        SeparatorRule.IsMatch(trimmedLine) &&
-        trimmedLine.Count(c => !char.IsWhiteSpace(c)) >= MinSeparatorMarks;
 }
