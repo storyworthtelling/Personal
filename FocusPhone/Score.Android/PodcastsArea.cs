@@ -547,12 +547,12 @@ public sealed class PodcastsArea : ScoreArea
 
         if (index > 0)
         {
-            row.AddView(PaperUi.QuietButton(Host, "↑", () => { queue.Move(index, index - 1); SaveQueue(); Invalidate(); }));
+            row.AddView(PaperUi.IconButton(Host, "↑", $"Move {episode.Title} up", () => { queue.Move(index, index - 1); SaveQueue(); Invalidate(); }));
         }
 
         if (index < total - 1)
         {
-            row.AddView(PaperUi.QuietButton(Host, "↓", () => { queue.Move(index, index + 1); SaveQueue(); Invalidate(); }));
+            row.AddView(PaperUi.IconButton(Host, "↓", $"Move {episode.Title} down", () => { queue.Move(index, index + 1); SaveQueue(); Invalidate(); }));
         }
 
         return row;

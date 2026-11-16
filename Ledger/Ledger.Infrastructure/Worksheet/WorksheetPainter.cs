@@ -25,7 +25,7 @@ public static class WorksheetPainter
 
     public static byte[] Paint(Domain.Worksheet.WorksheetPlan plan)
     {
-        using var sink = new VectorPdfSink();
+        using var sink = new VectorPdfSink(title: "Index budget worksheet");
         using var ink = new PageInk();
 
         // One layout answers where every box is on every sheet, and this method draws exactly that —

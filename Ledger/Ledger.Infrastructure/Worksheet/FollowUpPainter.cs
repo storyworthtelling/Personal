@@ -18,7 +18,7 @@ public static class FollowUpPainter
 
     public static byte[] Paint(FollowUpPlan plan)
     {
-        using var sink = new VectorPdfSink();
+        using var sink = new VectorPdfSink(title: "Index follow-up");
         var canvas = sink.BeginPage(IndexSheet.Page);
         SheetFrame.Clear(canvas);
         Draw(canvas, plan);

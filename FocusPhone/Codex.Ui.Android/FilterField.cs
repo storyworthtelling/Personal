@@ -53,12 +53,9 @@ public class FilterField : LinearLayout
         input.SetPadding(0, 0, 0, 0);
         AddView(input, new LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
-        clear = PaperUi.Body(context, "×");
-        clear.SetTextColor(PaperTheme.InkSoft);
+        // A 48dp target read as "Clear search", not a small "multiplication sign" (§17, audit W9.3).
+        clear = PaperUi.IconButton(context, "×", "Clear search", Clear);
         clear.Visibility = ViewStates.Gone;
-        var hit = PaperTheme.Dp(context, DesignTokens.Space.X2);
-        clear.SetPadding(hit, hit, 0, hit);
-        clear.Click += (_, _) => Clear();
         AddView(clear);
 
         input.TextChanged += (_, _) =>

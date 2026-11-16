@@ -40,6 +40,22 @@ public class VectorPdfSinkTests
         Assert.Contains("Tuesday", document.GetPage(1).Text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A document says what it is when it leaves the tablet for Drive or a desktop reader (audit W9.3, report 10 §22):
+    /// its title is in the metadata, so a screen reader and a file list name it.
+    /// </summary>
+    [Fact]
+    public void ADocumentCarriesItsTitle()
+    {
+        var sink = new VectorPdfSink(title: "The Day, Tuesday");
+        Draw(sink.BeginPage(LetterWidth, LetterHeight), "Tuesday");
+        sink.EndPage();
+
+        using var document = PdfDocument.Open(new MemoryStream(sink.Close()));
+        Assert.Equal("The Day, Tuesday", document.Information.Title);
+        Assert.Equal("Storyworthtelling", document.Information.Creator);
+    }
+
     [Fact]
     public void EveryPageBegunIsAPageInTheDocument()
     {

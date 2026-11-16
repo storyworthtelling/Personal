@@ -47,6 +47,10 @@ public sealed class CropOverlayView : View
         this.imageHeight = imageHeight;
         this.onReleased = onReleased;
 
+        // The frame is a drag, which TalkBack cannot do; it is named so the screen is not silent, and the editor's
+        // own buttons remain the way through for someone who cannot drag (audit W9.3).
+        ContentDescription = "Crop frame. Drag a corner or an edge to crop the picture.";
+
         scrim.Color = new Color(PaperTheme.Ink.R, PaperTheme.Ink.G, PaperTheme.Ink.B, (byte)140);
 
         frame.SetStyle(Paint.Style.Stroke);

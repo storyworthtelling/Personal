@@ -38,9 +38,20 @@ public sealed class VectorPdfSink : IDisposable
     /// of them came out at 173 MB, over the reMarkable's documented 100 MB, and large enough to run a
     /// phone out of memory just holding the bytes. Text and vector drawing are unaffected either way.
     /// </param>
-    public VectorPdfSink(int imageQuality = Lossless)
+    /// <param name="title">
+    /// What the document is, written into its metadata so a desktop reader, a screen reader or a Drive listing names
+    /// it once it leaves the tablet (audit W9.3, report 10 §22). Skia writes no tag structure, so the vector text
+    /// layer stays the document's reading order.
+    /// </param>
+    public VectorPdfSink(int imageQuality = Lossless, string? title = null)
     {
-        document = SKDocument.CreatePdf(stream, new SKDocumentPdfMetadata { EncodingQuality = imageQuality })
+        var metadata = new SKDocumentPdfMetadata { EncodingQuality = imageQuality, Creator = "Storyworthtelling" };
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            metadata.Title = title;
+        }
+
+        document = SKDocument.CreatePdf(stream, metadata)
             ?? throw new InvalidOperationException(
                 "Skia would not create a PDF document. The native library is probably missing — a "
                 + "head needs SkiaSharp.NativeAssets for its platform.");

@@ -50,6 +50,14 @@ public sealed class SavingsGrowthChart : GraphicsView
     {
         painter.Series = series;
         HeightRequest = series.GoalTargetAmount is null ? NoGoalChartHeight : ChartHeight;
+
+        // The line in one sentence for a screen reader (§17, audit W9.3, report 10 §8): what the screen already shows.
+        var points = series.Points;
+        SemanticProperties.SetDescription(this, points.Count == 0
+            ? $"{series.AccountName}: no months recorded yet."
+            : $"{series.AccountName}, {points[0].MonthOf:MMMM yyyy} to {points[^1].MonthOf:MMMM yyyy}: "
+              + $"{PlanMoney.Balance(points[0].Balance)} then, {PlanMoney.Balance(points[^1].Balance)} now"
+              + (series.GoalTargetAmount is { } goal ? $"; goal {PlanMoney.Balance(goal)}." : "."));
         Invalidate();
     }
 

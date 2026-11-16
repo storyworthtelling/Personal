@@ -124,7 +124,23 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
             wash.Background = PaperUi.Highlight(Host, PaperTheme.ProgressMark);
             frame.AddView(wash, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
+            // Chosen is a ticked box as well as a wash (owner's approval, W9 mock-up item 5; report 10 §7): a cull ends
+            // in a send or a delete of the only copy, and a wash alone is colour alone. The cell reads it aloud already.
+            var tick = new Checkbox(Host) { ImportantForAccessibility = ImportantForAccessibility.No };
+            tick.SetPicked(true);
+            var box = PaperTheme.Dp(Host, DesignTokens.Shape.CheckboxDp);
+            var inset = PaperTheme.Dp(Host, DesignTokens.Space.X2);
+            frame.AddView(tick, new FrameLayout.LayoutParams(box, box, GravityFlags.Top | GravityFlags.End)
+            {
+                TopMargin = inset,
+                RightMargin = inset,
+            });
         }
+
+        // Heard as well as seen (§17, audit W9.3): what it is, when, and whether it is chosen.
+        image.ImportantForAccessibility = ImportantForAccessibility.No;
+        frame.ContentDescription = DarkroomWords.Cell(item, shell.Room.IsChosen(item.Id), DateTime.Now);
 
         frame.Clickable = true;
         frame.Click += (_, _) =>
@@ -142,6 +158,7 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
         // A long-press starts the cull with that picture already picked, which is how it
         // actually begins: you see the bad one first.
         frame.LongClickable = true;
+        PaperUi.NameLongPress(frame, "Actions for this picture");
         frame.LongClick += (_, _) =>
         {
             if (choosing)

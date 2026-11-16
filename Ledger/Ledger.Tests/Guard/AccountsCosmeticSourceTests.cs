@@ -332,7 +332,7 @@ public class AccountsCosmeticSourceTests
         foreach (var name in new[] { "ClientIdEntry", "SecretEntry", "VaultPassphraseEntry" })
         {
             Assert.Matches(
-                new Regex(@"<Border Style=""\{StaticResource HairlineCard\}"" BackgroundColor=""\{StaticResource PaperDeep\}"" Padding=""12,0"" HeightRequest=""44"">\s*<Entry x:Name=""" + name),
+                new Regex(@"<Border Style=""\{StaticResource HairlineCard\}"" BackgroundColor=""\{StaticResource PaperDeep\}"" Padding=""12,0"" MinimumHeightRequest=""48"">\s*<Entry x:Name=""" + name),
                 setup);
         }
     }

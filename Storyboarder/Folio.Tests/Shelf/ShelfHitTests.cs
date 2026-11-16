@@ -66,4 +66,21 @@ public class ShelfHitTests
     [Fact]
     public void AnEmptyShelfHoldsNothing() =>
         Assert.Null(new ShelfRow(null, []).At(10));
+
+    /// <summary>
+    /// Where each spine stands, for the screen reader's buttons laid over the painting (audit W9.3, report 10 §8):
+    /// the same walk as <see cref="ShelfRow.At"/>, so a button and a tap open the same book.
+    /// </summary>
+    [Fact]
+    public void EachSpinesSpanIsWhereATapFindsIt()
+    {
+        var row = new ShelfRow("A series", [First, Second]);
+
+        var spans = row.Spans;
+
+        Assert.Equal([First, Second], spans.Select(span => span.Book).ToArray());
+        Assert.All(spans, span => Assert.Equal(span.Book, row.At(span.LeftDp + 1)));
+        Assert.Equal(ShelfComposer.BookendWidthDp, spans[0].LeftDp);
+        Assert.Equal(First.WidthDp, spans[0].WidthDp);
+    }
 }

@@ -36,6 +36,13 @@ public sealed record DialGeometry
 
     /// <summary>How far along the track a value sits, 0–1. Clamped: a dial cannot be
     /// dragged past its own ends without painting the knob off the arc.</summary>
+    /// <summary>
+    /// The value one step along in <paramref name="direction"/> (+1 or -1), held to the range: how TalkBack's scroll
+    /// actions and a D-pad turn the dial for someone who cannot drag it round (DESIGN.md §17, audit W9.3).
+    /// </summary>
+    public int Nudge(int value, int direction, int step) =>
+        Math.Clamp(value + (Math.Sign(direction) * step), Minimum, Maximum);
+
     public double FractionOf(int value) =>
         Math.Clamp((double)(value - Minimum) / (Maximum - Minimum), 0d, 1d);
 

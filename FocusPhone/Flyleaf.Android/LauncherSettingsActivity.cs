@@ -632,11 +632,11 @@ public class LauncherSettingsActivity : Activity
         var index = orderedIds.IndexOf(category.Id);
         if (index > 0)
         {
-            row.AddView(PaperUi.QuietButton(this, "↑", () => MoveShelf(category.Id, -1)));
+            row.AddView(PaperUi.IconButton(this, "↑", $"Move {category.Name} up", () => MoveShelf(category.Id, -1)));
         }
         if (index < orderedIds.Count - 1)
         {
-            row.AddView(PaperUi.QuietButton(this, "↓", () => MoveShelf(category.Id, +1)));
+            row.AddView(PaperUi.IconButton(this, "↓", $"Move {category.Name} down", () => MoveShelf(category.Id, +1)));
         }
         row.AddView(PaperUi.QuietButton(this, "Redraw", () => RegenerateShelfGlyph(category.Id, category.Name)));
         row.AddView(PaperUi.QuietButton(this, "Remove", () => RemoveShelf(category.Id)));

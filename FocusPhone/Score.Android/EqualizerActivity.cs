@@ -222,6 +222,7 @@ public class EqualizerActivity : Activity
             var name = preset.Name;
             var row = PaperUi.SecondaryButton(this, name, () => ApplyPreset(name));
             row.LongClick += (_, _) => OfferDelete(name);
+            PaperUi.NameLongPress(row, $"Delete {name}");
             content.AddView(row);
         }
 

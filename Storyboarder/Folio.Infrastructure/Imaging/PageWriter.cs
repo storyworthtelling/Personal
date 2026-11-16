@@ -38,7 +38,7 @@ internal sealed class PageWriter : IDisposable
     // 67 scene illustrations made a 173 MB file; as JPEG at this quality the whole report is a few tens.
     private const int PictureQuality = 80;
 
-    private readonly VectorPdfSink sink = new(PictureQuality);
+    private readonly VectorPdfSink sink;
     private readonly List<(string Title, int Page)> tocEntries = [];
 
     private readonly string header;
@@ -58,6 +58,8 @@ internal sealed class PageWriter : IDisposable
     /// <param name="sections">The report's parts that have a tab, in order (a measuring pass passes none).</param>
     public PageWriter(string runningFoot, IReadOnlyList<ReportSection>? sections = null)
     {
+        // The document names itself to a desktop or screen reader once it leaves the tablet (audit W9.3).
+        sink = new VectorPdfSink(PictureQuality, $"{runningFoot}: revision report");
         header = runningFoot;
         tabSections = sections ?? [];
         tabs = FolioSheet.Tabs(tabSections);

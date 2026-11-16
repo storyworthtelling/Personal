@@ -129,8 +129,6 @@ public partial class AccessibilityTests
     /// <summary>Drawn views still to be given a node per item; each goes in its own PR and leaves this list.</summary>
     private static readonly string[] StillToDescribe =
     [
-        "FocusPhone/Codex.Ui.Android/Dial.cs",
-        "FocusPhone/Plate.Android/CropOverlayView.cs",
     ];
 
     [Fact]
@@ -160,6 +158,52 @@ public partial class AccessibilityTests
         Assert.Contains("ShelfAccess.Nodes(layout, DesignTokens.Shape.TouchTargetDp * density", shelf, StringComparison.Ordinal);
         Assert.Contains("ShelfAccess.At(nodes, x, y)", shelf, StringComparison.Ordinal);
         Assert.Contains("DispatchHoverEvent", shelf, StringComparison.Ordinal);
+    }
+
+    /// <summary>The app and control fixes of W9.3 (report 10 §7–§9, §17–§20, §22–§23), each held where it was made.</summary>
+    [Fact]
+    public void TheControlsReachAScreenReader()
+    {
+        var dial = Read(NativeKit, "Dial.cs");
+        Assert.Contains("SetRangeInfo", dial, StringComparison.Ordinal);
+        Assert.Contains("ScrollForward", dial, StringComparison.Ordinal);
+
+        var card = Read(NativeKit, "ActionCard.cs");
+        Assert.Contains("AccessibilityPaneTitle", card, StringComparison.Ordinal);
+        Assert.Contains("NoHideDescendants", card, StringComparison.Ordinal);
+
+        Assert.Contains("public static Button IconButton(", Read(NativeKit, "PaperUi.cs"), StringComparison.Ordinal);
+        Assert.Contains("PaperUi.IconButton(context, \"×\", \"Clear search\"", Read(NativeKit, "FilterField.cs"), StringComparison.Ordinal);
+        Assert.Contains("DarkroomWords.Cell(", Read("FocusPhone/Plate.Android", "DarkroomArea.cs"), StringComparison.Ordinal);
+        Assert.Contains("row.Spans", Read("Storyboarder/Folio.Android", "Pages/ShelfPage.cs"), StringComparison.Ordinal);
+        Assert.Contains("PaperMotion.ReadingTime(", Read("FocusPhone/Flyleaf.Android", "HomeActivity.cs"), StringComparison.Ordinal);
+
+        // The two drawn changes the owner approved from the W9 mock-up (items 5 and 6).
+        Assert.Contains("tick.SetPicked(true)", Read("FocusPhone/Plate.Android", "DarkroomArea.cs"), StringComparison.Ordinal);
+        Assert.Contains("art.SpineTakesInk(item.Key)", Read("FocusPhone/Flyleaf.Android", "BookshelfView.cs"), StringComparison.Ordinal);
+    }
+
+    /// <summary>A glyph standing in for words is a glyph button with those words (report 10 §18).</summary>
+    [Fact]
+    public void NoArrowIsAQuietButton()
+    {
+        var found = Lines(Screens, ".cs")
+            .Where(hit => Regex.IsMatch(hit.line, @"QuietButton\([^,]+,\s*""[↑↓×]""")) 
+            .Select(hit => hit.at)
+            .ToList();
+        Assert.True(found.Count == 0, "Use PaperUi.IconButton(glyph, words, …):\n" + string.Join("\n", found));
+    }
+
+    /// <summary>A field's box is never shorter than a touch (report 10 §19).</summary>
+    [Fact]
+    public void NoFieldBoxIsShorterThanATouch()
+    {
+        var found = Lines(Screens, ".xaml")
+            .Where(hit => Regex.Match(hit.line, @"<Border[^>]*\bHeightRequest=""(?<h>\d+)""") is { Success: true } m
+                && int.Parse(m.Groups["h"].Value) < 48)
+            .Select(hit => hit.at)
+            .ToList();
+        Assert.True(found.Count == 0, "Use MinimumHeightRequest=\"48\" so a field grows with the type:\n" + string.Join("\n", found));
     }
 
     [Theory]

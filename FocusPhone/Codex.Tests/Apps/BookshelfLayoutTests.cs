@@ -193,4 +193,19 @@ public class BookshelfLayoutTests
             Assert.All(shelf.Items, it => Assert.Equal(shelf.Ledge.Top, it.Rect.Bottom, precision: 1));
         });
     }
+
+    /// <summary>
+    /// No spine is narrower than 30dp (owner's approval, W9 mock-up item 6; report 10 §14): the least-used apps had
+    /// the smallest targets. The four sizes stay distinct, so usage still reads as width.
+    /// </summary>
+    [Fact]
+    public void NoSpineIsNarrowerThanThirty()
+    {
+        var widths = new[] { SpineSizing.Size.Slim, SpineSizing.Size.Regular, SpineSizing.Size.Wide, SpineSizing.Size.Broad }
+            .Select(size => M.SpineWidths[size])
+            .ToArray();
+
+        Assert.True(widths[0] >= 30f, $"Slim is {widths[0]}dp");
+        Assert.True(widths.Zip(widths.Skip(1)).All(pair => pair.First < pair.Second), "the sizes must stay distinct");
+    }
 }
