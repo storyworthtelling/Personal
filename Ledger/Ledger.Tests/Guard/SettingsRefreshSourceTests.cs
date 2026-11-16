@@ -136,19 +136,15 @@ public class SettingsRefreshSourceTests
     [Fact]
     public void AnUndoThatIsUnreachableOrUnreadableLeavesNoBespokeBarBehind()
     {
-        // The institution removal still has a bar, in its own section next to the Remove button, where the
-        // owner is looking. A category's undo may not borrow it.
+        // Both removals on this page, a category's and a bank's, are undone from the dog-ear (audit W8.9); the
+        // hand-built bar the bank removal kept in its own section is gone, and nothing borrows a private bar.
         var setup = Source(SetupCode);
         var xaml = Source(SetupXaml);
 
         Assert.DoesNotContain("pendingCategoryRemoval", setup, StringComparison.Ordinal);
-        var uses = Regex.Matches(setup, @"BeginUndo\(\$""Removed \{categoryName\}");
-        Assert.Empty(uses);
-        // And the bar stays inside the Connected accounts section, not at page level.
-        var bar = xaml.IndexOf("x:Name=\"UndoBar\"", StringComparison.Ordinal);
-        var sectionStart = xaml.IndexOf("x:Name=\"ConnectedAccountsSection\"", StringComparison.Ordinal);
-        var sectionEnd = xaml.IndexOf("Google account ====", StringComparison.Ordinal);
-        Assert.True(bar > sectionStart && bar < sectionEnd);
+        Assert.DoesNotContain("UndoBar", xaml + setup, StringComparison.Ordinal);
+        Assert.Matches(@"dogEarState\.BeginUndo\(\s*\$""Removed \{categoryName\}""", setup);
+        Assert.Matches(@"dogEarState\.BeginUndo\(\s*\$""Removed \{row\.Name\}""", setup);
     }
 
     // ---- finding 5: the design annotation that leaked into the Shared keys row ----

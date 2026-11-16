@@ -517,7 +517,7 @@ public class UnlockActivity : Activity
         PolicyManager.ApplyCurrentPolicy(this);
     }
 
-    private void AddHeader(string text) => content!.AddView(PaperUi.PageHeader(this, text));
+    private void AddHeader(string text) => content!.AddView(PaperUi.ScreenHeader(this, text, PaperTheme.FlyleafMark));
 
     private void AddBody(string text)
     {

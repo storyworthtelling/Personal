@@ -41,7 +41,7 @@ public class CrashViewerActivity : Activity
             PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X12),
             PaperTheme.Dp(this, DesignTokens.Shape.ScreenEdgeDp), PaperTheme.Dp(this, DesignTokens.Space.X6));
 
-        layout.AddView(PaperUi.PageHeader(this, "Something went wrong"));
+        layout.AddView(PaperUi.ScreenHeader(this, "Something went wrong", PaperTheme.ProblemMark));
 
         layout.AddView(PaperUi.Body(this,
             "This app closed unexpectedly the last time it ran. The details below "

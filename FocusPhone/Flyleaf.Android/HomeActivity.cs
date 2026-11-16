@@ -92,17 +92,23 @@ public class HomeActivity : Activity
         overlay.AddView(new CoverView(this), new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        var hello = PaperUi.Secondary(this, string.Empty);
+        // §4, §14: a voiced line is the owner's hand, Pinyon Script in ink-blue, and it sits on a slip of
+        // paper laid on the cover, since ink-blue on the warm identity ground would not read.
+        var hello = PaperUi.Voice(this, string.Empty);
         hello.Gravity = GravityFlags.Center;
-        hello.SetTextColor(PaperTheme.Paper);
         hello.Visibility = ViewStates.Invisible;
-        var pad = PaperTheme.Dp(this, DesignTokens.Space.X8);
-        hello.SetPadding(pad, 0, pad, 0);
+        hello.Background = PaperUi.Fill(this, PaperTheme.Paper, DesignTokens.Shape.RadiusCard);
+        var padX = PaperTheme.Dp(this, DesignTokens.Space.X6);
+        var padY = PaperTheme.Dp(this, DesignTokens.Space.X3);
+        hello.SetPadding(padX, padY, padX, padY);
+        var margin = PaperTheme.Dp(this, DesignTokens.Space.X8);
         overlay.AddView(hello, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+            ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
         {
             Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal,
-            BottomMargin = PaperTheme.Dp(this, DesignTokens.Space.X8),
+            BottomMargin = margin,
+            LeftMargin = margin,
+            RightMargin = margin,
         });
 
         root!.AddView(overlay, new FrameLayout.LayoutParams(
