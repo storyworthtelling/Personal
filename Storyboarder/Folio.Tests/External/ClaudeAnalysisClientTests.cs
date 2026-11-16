@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Model;
 using Folio.Domain.Reading;
+using Folio.Domain.Text;
 using Folio.Domain.Pipeline;
 using Folio.Infrastructure.Configuration;
 using Folio.Infrastructure.External;
@@ -163,11 +164,74 @@ public class ClaudeAnalysisClientTests
         await client.ExtractEntities("excerpt", CancellationToken.None);
         await client.AnalyzeChapter("excerpt", "Chapter 1", [], string.Empty, CancellationToken.None);
         await client.ConsolidateAnalysis("Title", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
-        await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", CancellationToken.None);
+        await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", GenreFrame.Unknown, CancellationToken.None);
 
         Assert.Equal(4, handler.RequestBodies.Count);
         foreach (var body in handler.RequestBodies)
             Assert.Contains("\"output_config\":{\"effort\":\"medium\"}", body);
+    }
+
+    /// <summary>
+    /// A reader's request carries the manuscript, its own instruction (word count and genre among it)
+    /// and its own question — and nothing else: one user message, no history, no other pass's notes.
+    /// "None of them saw the others' notes" is printed on the report, so it is held here against the
+    /// request actually sent rather than against the wording of a prompt.
+    /// </summary>
+    [Fact]
+    public async Task AReadersRequestCarriesNothingButTheManuscriptAndItsOwnBrief()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"verdict\":\"v\",\"assessment\":\"a\",\"strengths\":[\"s\"],"
+            + "\"weaknesses\":[\"w\"],\"condition\":\"c\",\"score\":7,\"scoreReason\":\"r\"}"));
+        var persona = PersonaCatalogue.ById("genre-fan");
+        const string manuscript = "The tide was out and the wall was down.";
+        var genre = new GenreFrame("Cozy mystery", "70,000-90,000");
+
+        await client.ReadAsReader(persona, manuscript, genre, CancellationToken.None);
+
+        using var body = JsonDocument.Parse(Assert.Single(handler.RequestBodies));
+        var system = body.RootElement.GetProperty("system").EnumerateArray()
+            .Select(block => block.GetProperty("text").GetString()).ToList();
+        var messages = body.RootElement.GetProperty("messages").EnumerateArray().ToList();
+
+        Assert.Equal(ReadingPrompt.System(manuscript, persona, genre).Select(block => block.Text), system);
+        var message = Assert.Single(messages);
+        Assert.Equal("user", message.GetProperty("role").GetString());
+        Assert.StartsWith(ReadingPrompt.Question(persona, StoryLength.ShortStory),
+            message.GetProperty("content").GetString(), StringComparison.Ordinal);
+        Assert.Contains("Cozy mystery", system[^1], StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("7", 7)]
+    [InlineData("\"8\"", 8)]
+    [InlineData("6.6", 7)]
+    public async Task AReadersScoreIsReadAsAWholeNumber(string score, int expected)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"verdict\":\"v\",\"assessment\":\"a\",\"strengths\":[\"s\"],"
+            + "\"weaknesses\":[\"w\"],\"condition\":\"c\",\"score\":" + score + ",\"scoreReason\":\"Because.\"}"));
+
+        var review = await client.ReadAsReader(PersonaCatalogue.ById("agent"), "the manuscript", GenreFrame.Unknown, CancellationToken.None);
+
+        Assert.Equal(expected, review.Score);
+        Assert.Equal("Because.", review.ScoreReason);
+    }
+
+    /// <summary>A read with no score is a short read, retried like any other.</summary>
+    [Theory]
+    [InlineData(",\"scoreReason\":\"r\"")]
+    [InlineData(",\"score\":0,\"scoreReason\":\"r\"")]
+    [InlineData(",\"score\":12,\"scoreReason\":\"r\"")]
+    [InlineData(",\"score\":7")]
+    public async Task AReadWithoutAUsableScoreIsAFailedPass(string tail)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"verdict\":\"v\",\"assessment\":\"a\",\"strengths\":[\"s\"],"
+            + "\"weaknesses\":[\"w\"],\"condition\":\"c\"" + tail + "}"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.ReadAsReader(PersonaCatalogue.ById("agent"), "the manuscript", GenreFrame.Unknown, CancellationToken.None));
     }
 
     [Fact]
@@ -180,7 +244,7 @@ public class ClaudeAnalysisClientTests
         }));
         handler.EnqueueOk(Reply("{\"summary\":\"\",\"findings\":[]}"));
 
-        await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", CancellationToken.None);
+        await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", GenreFrame.Unknown, CancellationToken.None);
 
         Assert.Contains("\"output_config\":{\"effort\":\"low\"}", Assert.Single(handler.RequestBodies));
     }
@@ -1065,7 +1129,7 @@ public class ClaudeAnalysisClientTests
         var persona = PersonaCatalogue.Readers[0];
 
         await Assert.ThrowsAsync<HttpRequestException>(
-            () => client.ReadAsReader(persona, "the manuscript", CancellationToken.None));
+            () => client.ReadAsReader(persona, "the manuscript", GenreFrame.Unknown, CancellationToken.None));
 
         var entry = Assert.Single(log.Entries, e => e.Level == LogLevel.Warning);
         Assert.Contains(nameof(client.ReadAsReader), entry.Message);

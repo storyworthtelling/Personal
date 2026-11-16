@@ -159,7 +159,18 @@ public sealed record Review(
     string Assessment,
     IReadOnlyList<string> Strengths,
     IReadOnlyList<string> Weaknesses,
-    string Condition);
+    string Condition)
+{
+    /// <summary>
+    /// The reader's score from 1 to 10 on its own question, against its own written anchors
+    /// (<c>Persona.AnchorsFor</c>) — the owner's ruling. Zero means not scored: a read stored before
+    /// scores existed, or one of the omnibus reduce's reviews, which the readers replace.
+    /// </summary>
+    public int Score { get; init; }
+
+    /// <summary>The one sentence that says why the score is that number.</summary>
+    public string ScoreReason { get; init; } = string.Empty;
+}
 
 // One actionable revision suggestion. The report lists these highest-impact-first.
 public sealed record RevisionItem(
@@ -340,7 +351,7 @@ public sealed record BookAnalysisResult(
         this with { SeriesContinuity = seriesContinuity };
 
     /// <summary>
-    /// Folds the sixteen reads over the consolidated report.
+    /// Folds the fourteen reads and the two synthesis passes over the consolidated report.
     ///
     /// <para>The readers <b>replace</b> whatever the omnibus reduce produced rather than joining it:
     /// the whole point of a persona pass is that one voice read the whole book, and a page carrying

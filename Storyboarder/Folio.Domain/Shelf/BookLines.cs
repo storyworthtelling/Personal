@@ -44,8 +44,8 @@ public static class BookLines
     /// The frame's own way with small numbers: words to ten, figures after.
     ///
     /// <para>Ten rather than a rounder-sounding six because the drawings settle it: the report's own
-    /// pages say "Seven readers" and "Reader 3 of seven", and a document that spells three and
-    /// prints 7 in the same sentence reads as two documents. Past ten the word is longer than the
+    /// pages say "Six readers" and "Reader 3 of six", and a document that spells three and
+    /// prints 6 in the same sentence reads as two documents. Past ten the word is longer than the
     /// thing it counts and stops helping.</para>
     /// </summary>
     public static string Spell(int count) => count switch

@@ -1,3 +1,5 @@
+using Folio.Domain.Text;
+
 namespace Folio.Domain.Reading;
 
 /// <summary>What a persona is for. The two kinds are read and printed differently.</summary>
@@ -35,4 +37,41 @@ public enum ModelTier
 /// (finding §7), which is why every persona's question is written down here where it can be changed
 /// on what a real run shows.</para>
 /// </summary>
-public sealed record Persona(string Id, string Name, string Question, PersonaKind Kind, ModelTier Tier);
+public sealed record Persona(string Id, string Name, string Question, PersonaKind Kind, ModelTier Tier)
+{
+    /// <summary>
+    /// The question this persona asks of a short story instead, where its own question does not fit
+    /// one; null where it does. Printed on the reader's page, so it is the question actually asked.
+    /// </summary>
+    public string? ShortStoryQuestion { get; init; }
+
+    /// <summary>
+    /// What this persona is told to read a short story for, in place of its usual brief; null for a
+    /// persona that reads a short story the way it reads anything else.
+    /// </summary>
+    public string? ShortStoryBrief { get; init; }
+
+    /// <summary>
+    /// True for the reader who is a fan of this book's own genre: predisposed to like it, particular
+    /// about how it is done. Told the genre by name, because "genre fan" alone reads as a fan of
+    /// science fiction, fantasy and horror whatever the book is.
+    /// </summary>
+    public bool FanOfTheGenre { get; init; }
+
+    /// <summary>
+    /// What a 2, 4, 6, 8 and 10 mean on this reader's question, in this reader's own terms — so a six
+    /// means the same from one read to the next. Empty for a section, which does not score.
+    /// </summary>
+    public IReadOnlyList<string> ScoreAnchors { get; init; } = [];
+
+    /// <summary>The anchors for a short story, where this persona's question is different; null where it is not.</summary>
+    public IReadOnlyList<string>? ShortStoryScoreAnchors { get; init; }
+
+    /// <summary>The anchors this persona scores a manuscript of this length against.</summary>
+    public IReadOnlyList<string> AnchorsFor(StoryLength length) =>
+        length == StoryLength.ShortStory && ShortStoryScoreAnchors is { } anchors ? anchors : ScoreAnchors;
+
+    /// <summary>The question this persona is asked of a manuscript of this length.</summary>
+    public string QuestionFor(StoryLength length) =>
+        length == StoryLength.ShortStory && ShortStoryQuestion is { } question ? question : Question;
+}

@@ -38,6 +38,7 @@ public class ReviewProcessorTests : IDisposable
     private int chapterAnalysisCalls;
     private readonly List<string> sectionReads = [];
     private readonly List<string> readerReads = [];
+    private readonly List<GenreFrame> readerGenres = [];
     private readonly List<string> synthesisReads = [];
     private int sectionsSeenBySynthesis;
     private int readersSeenBySynthesis;
@@ -52,11 +53,11 @@ public class ReviewProcessorTests : IDisposable
         claude.Setup(c => c.DeriveArtStyle(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("ink-wash watercolor, muted palette");
 
-        // The sixteen reads. Stubbed for real rather than left to Moq's defaults: a default-valued
+        // The sixteen passes. Stubbed for real rather than left to Moq's defaults: a default-valued
         // Task<T> completes with null, which the pipeline records as a finished pass — so the step
         // would appear to work while reading nothing, which is the failure PassPipelineTests names.
-        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, CancellationToken _) =>
+        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) =>
             {
                 sectionReads.Add(persona.Id);
                 return Task.FromResult(new SectionRead(
@@ -64,13 +65,15 @@ public class ReviewProcessorTests : IDisposable
                     [new ReportFinding("Chapter 1", $"{persona.Name} found something.")]));
             });
 
-        claude.Setup(c => c.ReadAsReader(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, CancellationToken _) =>
+        claude.Setup(c => c.ReadAsReader(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, GenreFrame genre, CancellationToken _) =>
             {
                 readerReads.Add(persona.Id);
+                readerGenres.Add(genre);
                 return Task.FromResult(new Review(
                     persona.Id, "A verdict in one clause.", "A sustained read in character.",
-                    ["what works"], ["what does not"], "what it would need"));
+                    ["what works"], ["what does not"], "what it would need")
+                { Score = 7, ScoreReason = "One clause on why." });
             });
 
         claude.Setup(c => c.Synthesise(
@@ -119,7 +122,8 @@ public class ReviewProcessorTests : IDisposable
                 [new RevisionItem("High", "Chapter 1", "Sagging middle", "Cut a subplot.")],
                 ["Comparable Title"], "Upmarket fantasy for adult readers.",
                 // The craft sections arrive from ConsolidateCraft and are folded in by the processor.
-                [], [], [], []));
+                [], [], [], [])
+            { Genre = "Upmarket fantasy", WordCountRange = "90,000-120,000" });
 
         claude.Setup(c => c.ConsolidateCraft(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<CancellationToken>()))
@@ -225,10 +229,25 @@ public class ReviewProcessorTests : IDisposable
     // Drains the pipeline the way the worker does, advancing the clock past any backoff wait so a
     // rescheduled unit becomes due. Bails out after a generous cycle cap so a stuck test fails fast.
     /// <summary>
-    /// End to end: all sixteen reads run, each once, in plan order — and the synthesis passes see
+    /// End to end: all sixteen passes run, each once, in plan order — and the synthesis passes see
     /// the other fourteen, which is the only thing that makes them synthesis rather than a
     /// fifteenth opinion.
     /// </summary>
+    /// <summary>
+    /// Every reader is told the genre the consolidation read out of the text, and the length its
+    /// market expects — the frame a length judgement, and the genre fan, both need.
+    /// </summary>
+    [Fact]
+    public async Task EveryReaderIsToldTheGenreReadFromTheText()
+    {
+        SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(PersonaCatalogue.Readers.Count, readerGenres.Count);
+        Assert.All(readerGenres, genre =>
+            Assert.Equal(new GenreFrame("Upmarket fantasy", "90,000-120,000"), genre));
+    }
+
     [Fact]
     public async Task EverySixteenReadsRunOnceAndTheSynthesisSeesThemAll()
     {
@@ -272,7 +291,7 @@ public class ReviewProcessorTests : IDisposable
 
     // ---- A failing whole-manuscript call must be visible, paced, and capped --------------------------
     //
-    // The sixteen reads and the reduce calls each send the whole book to Claude. A failure used to be
+    // The fourteen whole-book passes and the reduce calls each send the whole book to Claude. A failure used to be
     // recorded nowhere but the manuscript's one-line error, was retried four seconds later with no limit
     // (StageAttempts documented a cap that nothing applied), and the next worker cycle started again
     // immediately — so a call that kept dying mid-stream was re-billed all day with nothing in the log.
@@ -283,8 +302,8 @@ public class ReviewProcessorTests : IDisposable
     {
         var count = 0;
         claude.Setup(c => c.ReadSection(
-                It.Is<Persona>(persona => persona.Id == pass.Id), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, CancellationToken _) =>
+                It.Is<Persona>(persona => persona.Id == pass.Id), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) =>
             {
                 count++;
                 calls?.Add(count);
@@ -800,6 +819,33 @@ public class ReviewProcessorTests : IDisposable
         return draft.Id;
     }
 
+    /// <summary>
+    /// A second draft's report says how each reader's score moved, against that reader's score on the
+    /// draft it was made from — read back from the first draft's own stored reads.
+    /// </summary>
+    [Fact]
+    public async Task SecondDraft_ReportSaysHowEachReadersScoreMoved()
+    {
+        const string text = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        var firstId = SeedManuscript(text);
+        await DriveToCompletion(NewProcessor());
+        Assert.DoesNotContain("last draft", ReportText(firstId), StringComparison.Ordinal);
+
+        var secondId = SeedNextDraft(firstId, text);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Contains("unchanged from last draft", ReportText(secondId), StringComparison.Ordinal);
+    }
+
+    private string ReportText(Guid draftId)
+    {
+        using var context = database.NewContext();
+        var path = context.BookAnalyses.Single(a => a.NovelId == draftId).PdfPath;
+        Assert.NotNull(path);
+        using var pdf = UglyToad.PdfPig.PdfDocument.Open(path);
+        return string.Join("\n", pdf.GetPages().Select(page => page.Text));
+    }
+
     [Fact]
     public async Task SecondDraft_UnchangedText_ReusesEverySceneImage()
     {
@@ -894,8 +940,8 @@ public class ReviewProcessorTests : IDisposable
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(),
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExpansionReport.Empty);
-        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, CancellationToken _) => Task.FromResult(SectionRead.Silent(persona.Id)));
+        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) => Task.FromResult(SectionRead.Silent(persona.Id)));
 
         var id = SeedManuscript("The knight rode to the castle and knocked on the gate.");
         await DriveToCompletion(NewProcessor());

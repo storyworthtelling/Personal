@@ -157,6 +157,59 @@ public class BookReadTests : IDisposable
         Assert.Equal(0, book.SeriesLength);
     }
 
+    /// <summary>
+    /// The book page shows the newest scored draft's six scores, each against the same reader's
+    /// score on the draft before it.
+    /// </summary>
+    [Fact]
+    public async Task TheBookCarriesTheNewestScoresAndHowTheyMoved()
+    {
+        var first = Seed(draftNumber: 1, words: 71_000);
+        var second = Seed(draftNumber: 2, words: 88_400, projectId: first);
+        Seed(draftNumber: 3, words: 94_200, projectId: first);
+        Score(first, "agent", 5);
+        Score(first, "genre-fan", 8);
+        Score(second, "agent", 7);
+        Score(second, "genre-fan", 6);
+        Score(second, "harsh-critic", 4);
+
+        var book = await Read(first);
+
+        Assert.Equal(["agent", "genre-fan", "harsh-critic"], book!.ReaderScores.Select(score => score.PersonaId));
+        Assert.Equal((7, (int?)5), (book.ReaderScores[0].Score, book.ReaderScores[0].Previous));
+        Assert.Equal((6, (int?)8), (book.ReaderScores[1].Score, book.ReaderScores[1].Previous));
+        Assert.Null(book.ReaderScores[2].Previous);
+        Assert.Equal(2, book.ScoredDraftNumber);
+    }
+
+    [Fact]
+    public async Task ABookWithNoScoresYetCarriesNone()
+    {
+        var first = Seed(draftNumber: 1, words: 71_000);
+
+        var book = await Read(first);
+
+        Assert.Empty(book!.ReaderScores);
+        Assert.Null(book.ScoredDraftNumber);
+    }
+
+    private void Score(Guid draftId, string personaId, int score)
+    {
+        using var context = database.NewContext();
+        context.PassReads.Add(new PassRead
+        {
+            NovelId = draftId,
+            PassId = personaId,
+            Json = JsonSerializer.Serialize(new Review(personaId, "v", "a", ["s"], ["w"], "c")
+            {
+                Score = score,
+                ScoreReason = "Because.",
+            }),
+            CompletedAtUtc = Start,
+        });
+        context.SaveChanges();
+    }
+
     [Fact]
     public async Task AnUnknownBookReadsAsNothing() =>
         Assert.Null(await Read(Guid.NewGuid()));

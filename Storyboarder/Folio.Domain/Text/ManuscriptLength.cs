@@ -29,10 +29,13 @@ public static class ManuscriptLength
         : StoryLength.ShortStory;
 
     /// <summary>Counts the manuscript's own words rather than trusting a caller's count.</summary>
-    public static StoryLength Classify(string manuscript) =>
-        Classify(string.IsNullOrWhiteSpace(manuscript)
+    public static StoryLength Classify(string manuscript) => Classify(CountWords(manuscript));
+
+    /// <summary>The manuscript's own word count: runs of non-whitespace.</summary>
+    public static int CountWords(string? manuscript) =>
+        string.IsNullOrWhiteSpace(manuscript)
             ? 0
-            : manuscript.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length);
+            : manuscript.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
 
     /// <summary>The noun a prompt should call this manuscript by.</summary>
     public static string Noun(StoryLength length) => length switch

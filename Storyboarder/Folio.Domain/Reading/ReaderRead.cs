@@ -17,8 +17,12 @@ namespace Folio.Domain.Reading;
 /// </summary>
 public static class ReaderRead
 {
-    /// <summary>The reason this read is incomplete, or null when it is whole.</summary>
-    public static string? Incomplete(Review review)
+    /// <summary>
+    /// The reason this read is incomplete, or null when it is whole. A reader's own pass must carry
+    /// its score; <paramref name="scored"/> is false only for the omnibus reduce's reviews, which are
+    /// never scored and which the six readers replace.
+    /// </summary>
+    public static string? Incomplete(Review review, bool scored = true)
     {
         if (review is null)
         {
@@ -50,8 +54,20 @@ public static class ReaderRead
         {
             return $"{who} attached no condition, so the verdict is an opinion the author cannot act on";
         }
+        if (!scored)
+        {
+            return null;
+        }
+        if (review.Score is < 1 or > 10)
+        {
+            return $"{who} gave no score from 1 to 10";
+        }
+        if (string.IsNullOrWhiteSpace(review.ScoreReason))
+        {
+            return $"{who} gave a score with no reason, so the number cannot be argued with";
+        }
         return null;
     }
 
-    public static bool IsWhole(Review review) => Incomplete(review) is null;
+    public static bool IsWhole(Review review, bool scored = true) => Incomplete(review, scored) is null;
 }

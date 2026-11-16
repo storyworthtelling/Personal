@@ -1017,7 +1017,7 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 2g) The sixteen reads. Eight whole-book sections on the standard model, then six readers
+        // 2g) The sixteen passes. Eight whole-book sections on the standard model, then six readers
         // on the strong one, then the two synthesis passes that read the other fourteen.
         //
         // One pass per turn, each persisted the moment it succeeds, because each is a separate model
@@ -1051,10 +1051,12 @@ public sealed class ReviewProcessor : IPipelineStep
                         JsonResponse.CaseInsensitive)
                     : due.Persona!.Kind == PersonaKind.Reader
                         ? JsonSerializer.Serialize(
-                            await claude.ReadAsReader(due.Persona, await Manuscript(db, novel.Id, cancellationToken), cancellationToken),
+                            await claude.ReadAsReader(due.Persona, await Manuscript(db, novel.Id, cancellationToken),
+                                Genre(analysis), cancellationToken),
                             JsonResponse.CaseInsensitive)
                         : JsonSerializer.Serialize(
-                            await claude.ReadSection(due.Persona, await Manuscript(db, novel.Id, cancellationToken), cancellationToken),
+                            await claude.ReadSection(due.Persona, await Manuscript(db, novel.Id, cancellationToken),
+                                Genre(analysis), cancellationToken),
                             JsonResponse.CaseInsensitive);
 
                 row.CompletedAtUtc = clock.UtcNow;
@@ -1135,7 +1137,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
-                // The sixteen reads, folded last so the readers replace the omnibus reduce's reviews
+                // The sixteen passes, folded last so the readers replace the omnibus reduce's reviews
                 // rather than sitting beside them.
                 var sections = await ReadSections(db, novel.Id, cancellationToken);
                 var readers = await ReadReaders(db, novel.Id, cancellationToken);
@@ -1431,7 +1433,7 @@ public sealed class ReviewProcessor : IPipelineStep
         return ProcessResult.Waiting(delay, novel.Id);
     }
 
-    // Records a failed once-per-manuscript call (a reduction, one of the sixteen reads, the jacket) and
+    // Records a failed once-per-manuscript call (a reduction, one of the sixteen passes, the jacket) and
     // decides what happens next. These calls each send the whole book, so a failure that is simply
     // retried is a failure that is simply re-billed:
     //  - it is LOGGED, by name, with the attempt it was and the cause all the way down the inner chain;
@@ -1803,7 +1805,13 @@ public sealed class ReviewProcessor : IPipelineStep
             .Select(f => new ReportFindingView(f.Category, f.Chapter, f.Detail, FindingStatus.Carried))
             .ToList();
 
-        return new DraftReview(novel.DraftNumber, findings, resolved);
+        // Each reader's score on the draft this was made from, so its page can say how it moved.
+        var previousScores = (await ReadReaders(db, previousId, cancellationToken))
+            .Where(read => read.Score is >= 1 and <= 10)
+            .GroupBy(read => read.PersonaId)
+            .ToDictionary(group => group.Key, group => group.Last().Score);
+
+        return new DraftReview(novel.DraftNumber, findings, resolved) { PreviousReaderScores = previousScores };
     }
 
     // Builds each scene's evidence for the report: the rendered image (if any), cited "Ch. N · Scene M",
@@ -2008,6 +2016,19 @@ public sealed class ReviewProcessor : IPipelineStep
             .ToListAsync(cancellationToken);
 
         return ReadingPlan.Passes.FirstOrDefault(pass => !done.Contains(pass.Id));
+    }
+
+    /// <summary>
+    /// The genre the consolidation read from the text, and its market's usual length, for the
+    /// whole-book passes. A label and a range, not anyone's notes, so the readers stay independent.
+    /// </summary>
+    private static GenreFrame Genre(BookAnalysis analysis)
+    {
+        if (analysis.ConsolidatedJson is null)
+            return GenreFrame.Unknown;
+
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive);
+        return report is null ? GenreFrame.Unknown : new GenreFrame(report.Genre ?? string.Empty, report.WordCountRange ?? string.Empty);
     }
 
     private async Task<string> Manuscript(FolioDbContext db, Guid novelId, CancellationToken cancellationToken) =>

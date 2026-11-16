@@ -57,6 +57,12 @@ public sealed record DraftReview(
     IReadOnlyList<ReportFindingView> Resolved)
 {
     public static DraftReview FirstDraft { get; } = new(1, Array.Empty<ReportFindingView>(), Array.Empty<ReportFindingView>());
+
+    /// <summary>
+    /// Each reader's score on the draft this one was made from, by persona id, so the reader's page
+    /// can say how it moved. Empty on a first draft, or when the last draft was read before scores.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> PreviousReaderScores { get; init; } = new Dictionary<string, int>();
 }
 
 /// <summary>

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
@@ -426,7 +427,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                     r.Strengths ?? [],
                     r.Weaknesses ?? [],
                     r.Condition ?? r.Recommendation ?? string.Empty))
-                .Where(ReaderRead.IsWhole).ToList(),
+                // The omnibus reduce's reviews are never scored; the six readers replace them.
+                .Where(review => ReaderRead.IsWhole(review, scored: false)).ToList(),
             (dto.RevisionPlan ?? []).Select(r =>
                 new RevisionItem(r.Priority ?? string.Empty, r.Chapter ?? string.Empty,
                     r.Issue ?? string.Empty, r.SuggestedFix ?? string.Empty)).ToList(),
@@ -688,7 +690,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "Reply with JSON only: {\"verdict\": \"your answer in one clause\", \"assessment\": \"your full "
         + "review in character, several hundred words\", \"strengths\": [\"what works, in your terms\"], "
         + "\"weaknesses\": [\"what does not, in your terms\"], \"condition\": \"what would have to change "
-        + "before your verdict changed\"}. Every field is required. If you cannot fill one of them you "
+        + "before your verdict changed\", \"score\": a whole number from 1 to 10 against your anchors, "
+        + "\"scoreReason\": \"one sentence on why the score is that number\"}. Every field is required. If you cannot fill one of them you "
         + "have not finished reading: a short answer is worse than none, because the page prints it.";
 
     // Built rather than a const: the noun has to name what this manuscript actually is (a 1,200-word
@@ -713,9 +716,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "{\"standing\": \"\", \"reading\": \"\", \"strengths\": [], \"problems\": [], \"mostNeeds\": \"\"}}.";
 
     public async Task<SectionRead> ReadSection(
-        Persona persona, string manuscript, CancellationToken cancellationToken)
+        Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken)
     {
-        var reply = await SendPass(persona, manuscript, SectionFormat, cancellationToken);
+        var reply = await SendPass(persona, manuscript, genre, SectionFormat, cancellationToken);
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
         {
@@ -740,9 +743,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     }
 
     public async Task<Review> ReadAsReader(
-        Persona persona, string manuscript, CancellationToken cancellationToken)
+        Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken)
     {
-        var reply = await SendPass(persona, manuscript, ReaderFormat, cancellationToken);
+        var reply = await SendPass(persona, manuscript, genre, ReaderFormat, cancellationToken);
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException(
                 $"{persona.Name} replied with nothing this could read as a review. A reader's pass is "
@@ -756,7 +759,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             dto?.Assessment ?? string.Empty,
             dto?.Strengths ?? [],
             dto?.Weaknesses ?? [],
-            dto?.Condition ?? dto?.Recommendation ?? string.Empty);
+            dto?.Condition ?? dto?.Recommendation ?? string.Empty)
+        {
+            Score = ScoreOf(dto?.Score),
+            ScoreReason = dto?.ScoreReason ?? string.Empty,
+        };
 
         // A short read is a failed pass, not a shorter one (F44, F46). Throwing here is what makes
         // that true: the pipeline retries the pass, where swallowing it would print the gap.
@@ -807,23 +814,23 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     ///
     /// <para>It does not go through <see cref="SendMessage"/>, and that is the point. SendMessage puts
     /// its instruction in the first cached block, which is right when the instruction is constant for
-    /// a call type and catastrophic here: the instruction names the persona, so seventeen passes would
-    /// be seventeen different cache prefixes and the manuscript would be written seventeen times
-    /// instead of read fifteen — measured at roughly $17 a draft against $2 (F50), with nothing
+    /// a call type and catastrophic here: the instruction names the persona, so fourteen passes would
+    /// be fourteen different cache prefixes and the manuscript would be written fourteen times
+    /// instead of twice (once per model) — measured at roughly $17 a draft against $2 (F50), with nothing
     /// visible wrong. <c>ReadingPrompt</c> decides the order and a guard holds it.</para>
     /// </summary>
     private Task<string> SendPass(
-        Persona persona, string manuscript, string format, CancellationToken cancellationToken,
+        Persona persona, string manuscript, GenreFrame genre, string format, CancellationToken cancellationToken,
         [CallerMemberName] string call = "")
     {
-        var system = ReadingPrompt.System(manuscript, persona)
+        var system = ReadingPrompt.System(manuscript, persona, genre)
             .Select(block => block.Cached
                 ? (object)new { type = "text", text = block.Text, cache_control = new { type = "ephemeral" } }
                 : new { type = "text", text = block.Text })
             .ToArray();
 
         var model = persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel;
-        return SendRaw(system, ReadingPrompt.Question(persona) + "\n\n" + format,
+        return SendRaw(system, ReadingPrompt.Question(persona, ManuscriptLength.Classify(manuscript)) + "\n\n" + format,
             options.PassMaxTokens, model, $"{call}[{persona.Id}]", options.PassEffort, cancellationToken);
     }
 
@@ -1334,6 +1341,25 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public List<string>? Weaknesses { get; set; }
         public string? Condition { get; set; }
         public string? Recommendation { get; set; }
+        public JsonElement? Score { get; set; }
+        public string? ScoreReason { get; set; }
+    }
+
+    // A score as the model wrote it: a number, a number in quotes, or a half point, rounded to the
+    // whole number the page prints. Anything else is zero, which ReaderRead calls a short read.
+    private static int ScoreOf(JsonElement? score)
+    {
+        if (score is not { } element)
+            return 0;
+
+        double value;
+        if (element.ValueKind == JsonValueKind.Number)
+            value = element.GetDouble();
+        else if (element.ValueKind != JsonValueKind.String
+                 || !double.TryParse(element.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+            return 0;
+
+        return (int)Math.Round(value, MidpointRounding.AwayFromZero);
     }
 
     private sealed class RevisionItemDto
