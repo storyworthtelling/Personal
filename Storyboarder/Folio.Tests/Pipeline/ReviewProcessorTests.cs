@@ -5,6 +5,7 @@ using Moq;
 using PdfSharp.Pdf.IO;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
+using Folio.Domain.Scenes;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
@@ -39,6 +40,7 @@ public class ReviewProcessorTests : IDisposable
     private readonly List<string> sectionReads = [];
     private readonly List<string> readerReads = [];
     private readonly List<GenreFrame> readerGenres = [];
+    private readonly List<SceneToJudge> judgedScenes = [];
     private readonly List<string> synthesisReads = [];
     private int sectionsSeenBySynthesis;
     private int readersSeenBySynthesis;
@@ -132,6 +134,17 @@ public class ReviewProcessorTests : IDisposable
                 [new ProseNote("Chapter 1", "Filter words", "\"he felt\"", "Cut the filter.")],
                 [new DialogueNote("Chapter 1", "Hero", "On the nose.", "Trust the subtext.")],
                 [new SceneBeat("Chapter 1", "The hero knocks.", "Opens the confrontation.", "Earns its place.")]));
+
+        // Each detected scene is judged on its own; the judgement names the scene it was asked about, so a
+        // verdict printed under the wrong scene shows up in the report text.
+        claude.Setup(c => c.JudgeScene(It.IsAny<SceneToJudge>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .Returns((SceneToJudge scene, DesignBible _, CancellationToken _) =>
+            {
+                judgedScenes.Add(scene);
+                return Task.FromResult(new SceneJudgement(
+                    scene.Number, scene.Chapter, $"Scene {scene.Number} does its own job.", SceneCall.Keep, 0.5,
+                    $"Verdict for scene {scene.Number}.", []));
+            });
 
         claude.Setup(c => c.AssessVoiceConsistency(
                 It.IsAny<IReadOnlyList<ChapterSample>>(), It.IsAny<CancellationToken>()))
@@ -246,6 +259,31 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(PersonaCatalogue.Readers.Count, readerGenres.Count);
         Assert.All(readerGenres, genre =>
             Assert.Equal(new GenreFrame("Upmarket fantasy", "90,000-120,000"), genre));
+    }
+
+    /// <summary>
+    /// The pairing bug (release A3). Claude's own scene list (one beat here) was zipped against the
+    /// detected scenes (two here) by position, so the second scene printed nothing and any mismatch
+    /// shifted every later verdict. Now every detected scene is judged on its own, and each block prints
+    /// its own scene's verdict.
+    /// </summary>
+    [Fact]
+    public async Task EachSceneIsJudgedOnItsOwnAndItsBlockCarriesItsOwnVerdict()
+    {
+        const string text = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        var id = SeedManuscript(text);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal([1, 2], judgedScenes.Select(scene => scene.Number).Order());
+        Assert.Contains(judgedScenes, scene => scene.Text.Contains("At the gate", StringComparison.Ordinal));
+
+        var report = ReportText(id);
+        Assert.Contains("Scene 1 does its own job.", report, StringComparison.Ordinal);
+        Assert.Contains("Scene 2 does its own job.", report, StringComparison.Ordinal);
+        Assert.True(
+            report.IndexOf("At the gate", StringComparison.Ordinal) < report.IndexOf("Scene 2 does its own job.", StringComparison.Ordinal),
+            "Scene two's verdict should follow scene two's prose.");
+        Assert.DoesNotContain("Opens the confrontation.", report, StringComparison.Ordinal);
     }
 
     [Fact]

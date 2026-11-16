@@ -6,7 +6,12 @@ namespace Folio.Domain.Pipeline;
 /// </summary>
 public sealed record ReportProgress(
     bool StoryReport, bool Craft, bool Voice, bool Findings, bool Expansion, bool SeriesPending,
-    int ReadsDone, int ReadsTotal, string? NextRead, bool JacketPending, bool Rendered);
+    int ReadsDone, int ReadsTotal, string? NextRead, bool JacketPending, bool Rendered)
+{
+    /// <summary>How many detected scenes have their own judgement, and how many there are (release A3).</summary>
+    public int ScenesJudged { get; init; }
+    public int ScenesTotal { get; init; }
+}
 
 /// <summary>
 /// "Writing the revision report" was one sentence for everything from the first reduction to the last
@@ -24,6 +29,8 @@ public static class ReportStep
         if (!progress.Findings) return "Matching findings against the last draft";
         if (!progress.Expansion) return "Looking for scenes to add";
         if (progress.SeriesPending) return "Checking continuity against the previous book";
+        if (progress.ScenesJudged < progress.ScenesTotal)
+            return $"Judging the scenes — scene {progress.ScenesJudged + 1} of {progress.ScenesTotal}";
 
         if (progress.ReadsDone < progress.ReadsTotal)
         {

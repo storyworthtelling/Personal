@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
+using Folio.Domain.Scenes;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
@@ -1017,6 +1018,40 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2f2) Judge each detected scene on its own (release A3–A4): what it accomplishes, keep / tighten /
+        // rewrite / cut, its tension and its inconsistencies. One scene per turn, stored on the scene the
+        // moment it succeeds. The verdicts used to come from the craft reduce's own list of scenes, zipped
+        // against the detected scenes by position, so any difference in count printed every later verdict
+        // under the wrong scene.
+        var unjudged = await db.Scenes
+            .Where(s => s.NovelId == novel.Id && s.JudgementJson == null)
+            .OrderBy(s => s.Number)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (unjudged is not null)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            try
+            {
+                var toJudge = await SceneToJudge(db, novel.Id, analysis, unjudged, cancellationToken);
+                var bible = await LoadBible(db, novel.Id, cancellationToken);
+                var judgement = await claude.JudgeScene(toJudge, bible, cancellationToken);
+                unjudged.JudgementJson = JsonSerializer.Serialize(judgement, JsonResponse.CaseInsensitive);
+                ClearCallFailures(novel);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                unjudged.JudgementAttempts++;
+                await db.SaveChangesAsync(cancellationToken);
+                return await DeferAfterFailedCall(db, novel, ex, $"Judging scene {unjudged.Number}", cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 2g) The sixteen passes. Eight whole-book sections on the standard model, then six readers
         // on the strong one, then the two synthesis passes that read the other fourteen.
         //
@@ -1135,7 +1170,7 @@ public sealed class ReviewProcessor : IPipelineStep
                     : JsonSerializer.Deserialize<SeriesContinuity>(analysis.SeriesContinuityJson, JsonResponse.CaseInsensitive) ?? SeriesContinuity.Empty;
 
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
-                var scenes = await GatherSceneEvidence(db, novel.Id, craft.SceneBreakdown, cancellationToken);
+                var scenes = await GatherSceneEvidence(db, novel.Id, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
                 // The sixteen passes, folded last so the readers replace the omnibus reduce's reviews
                 // rather than sitting beside them.
@@ -1143,7 +1178,15 @@ public sealed class ReviewProcessor : IPipelineStep
                 var readers = await ReadReaders(db, novel.Id, cancellationToken);
                 var synthesis = await ReadSynthesis(db, novel.Id, cancellationToken);
 
+                // Each scene's own judgement (release A3). When the scenes have been judged one by one,
+                // the craft reduce's separate scene list is not printed at all: it is the list that used
+                // to be zipped against the real scenes by position.
+                var judgements = scenes.Select(scene => scene.Judgement).OfType<SceneJudgement>().ToList();
+                if (judgements.Count > 0)
+                    craft = craft with { SceneBreakdown = [] };
+
                 var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount)
+                    .WithSceneJudgements(judgements)
                     .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity)
                     .WithReads(
                         readers,
@@ -1817,12 +1860,12 @@ public sealed class ReviewProcessor : IPipelineStep
     // Builds each scene's evidence for the report: the rendered image (if any), cited "Ch. N · Scene M",
     // paired by reading order with the craft read's scene-by-scene note for its purpose and verdict.
     private async Task<IReadOnlyList<SceneEvidence>> GatherSceneEvidence(
-        FolioDbContext db, Guid novelId, IReadOnlyList<SceneBeat> sceneBreakdown, CancellationToken cancellationToken)
+        FolioDbContext db, Guid novelId, CancellationToken cancellationToken)
     {
         var scenes = await db.Scenes
             .Where(s => s.NovelId == novelId)
             .OrderBy(s => s.Number)
-            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath, s.Changed, s.PreviousSceneId, s.EndOffset })
+            .Select(s => new { s.Number, s.ChapterNumber, s.ChapterLabel, s.ImagePath, s.Changed, s.PreviousSceneId, s.EndOffset, s.JudgementJson })
             .ToListAsync(cancellationToken);
 
         // The before half of a changed scene's pair (F41). Only for changed scenes: an unchanged one
@@ -1846,7 +1889,10 @@ public sealed class ReviewProcessor : IPipelineStep
             var citation = string.IsNullOrWhiteSpace(scene.ChapterLabel)
                 ? $"Scene {scene.Number}"
                 : $"{scene.ChapterLabel} · Scene {scene.Number}";
-            var beat = i < sceneBreakdown.Count ? sceneBreakdown[i] : null;
+            // The scene's OWN judgement, read off its own row (release A3). Never a list zipped by position.
+            var judgement = scene.JudgementJson is null
+                ? null
+                : JsonSerializer.Deserialize<SceneJudgement>(scene.JudgementJson, JsonResponse.CaseInsensitive);
             byte[]? Read(string? path) =>
                 path is not null && imageStore.Exists(path) ? imageStore.Read(path) : null;
 
@@ -1858,14 +1904,43 @@ public sealed class ReviewProcessor : IPipelineStep
             }
 
             evidence.Add(new SceneEvidence(
-                citation, beat?.Purpose ?? string.Empty, beat?.Verdict ?? string.Empty,
+                citation, judgement?.Accomplishes ?? string.Empty, judgement?.Verdict ?? string.Empty,
                 Read(scene.ImagePath), previous)
             {
                 // Where the scene ends, so its block is inserted under its own last line.
                 EndOffset = scene.EndOffset,
+                Judgement = judgement,
             });
         }
         return evidence;
+    }
+
+    /// <summary>
+    /// What one scene is judged from: its own text, the story so far when it begins (the running state of
+    /// the last notes block that ended before it) and the book's dominant voice, if the voice read has run.
+    /// </summary>
+    private static async Task<SceneToJudge> SceneToJudge(
+        FolioDbContext db, Guid novelId, BookAnalysis analysis, Scene scene, CancellationToken cancellationToken)
+    {
+        var source = await db.SourceTexts.Where(s => s.NovelId == novelId)
+            .Select(s => s.FullText).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+        var start = Math.Clamp(scene.StartOffset, 0, source.Length);
+        var end = Math.Clamp(scene.EndOffset, start, source.Length);
+
+        var chunks = await db.Chunks.Where(c => c.NovelId == novelId)
+            .Select(c => new { c.Ordinal, c.StartOffset, c.EndOffset }).ToListAsync(cancellationToken);
+        var notes = await db.ChunkAnalyses.Where(a => a.NovelId == novelId && a.NotesJson != null)
+            .Select(a => new { a.Ordinal, a.NotesJson }).ToListAsync(cancellationToken);
+        var blocks = chunks.Join(notes, c => c.Ordinal, n => n.Ordinal, (c, n) => new TextBlockState(
+            c.StartOffset, c.EndOffset,
+            JsonSerializer.Deserialize<ChapterNotes>(n.NotesJson!, JsonResponse.CaseInsensitive)?.RunningState ?? string.Empty));
+
+        var voice = analysis.VoiceJson is null
+            ? string.Empty
+            : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive)?.DominantVoice ?? string.Empty;
+
+        return new SceneToJudge(scene.Number, scene.ChapterLabel, source[start..end],
+            SceneContext.StorySoFar(blocks, scene.StartOffset), voice);
     }
 
     private async Task<DesignBible> LoadBible(FolioDbContext db, Guid novelId, CancellationToken cancellationToken)

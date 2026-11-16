@@ -321,6 +321,12 @@ public class Scene : IRetryable
     public DateTimeOffset? NextAttemptAtUtc { get; set; }
     public string? LastError { get; set; }
 
+    // This scene's own judgement (release A3–A4): a serialized SceneJudgement, null until judged. Stored on
+    // the scene so the report reads each scene's verdict from the scene itself, never by position in a
+    // separate list. Its attempts are counted apart from the image's.
+    public string? JudgementJson { get; set; }
+    public int JudgementAttempts { get; set; }
+
     [NotMapped]
     public WorkStatus WorkState { get => ImageStatus; set => ImageStatus = value; }
 }

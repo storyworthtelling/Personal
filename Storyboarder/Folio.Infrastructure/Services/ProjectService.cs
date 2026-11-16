@@ -1138,7 +1138,11 @@ public sealed class ProjectService
             SeriesPending: novel.PreviousBookId is not null && book?.SeriesContinuityJson is null,
             reads.Done, reads.Total, next?.Name,
             JacketPending: novel.CoverPath is null && !novel.CoverAttempted,
-            Rendered: rendered));
+            Rendered: rendered)
+        {
+            ScenesJudged = await db.Scenes.CountAsync(s => s.NovelId == novel.Id && s.JudgementJson != null, cancellationToken),
+            ScenesTotal = await db.Scenes.CountAsync(s => s.NovelId == novel.Id, cancellationToken),
+        });
         return (reads, step);
     }
 

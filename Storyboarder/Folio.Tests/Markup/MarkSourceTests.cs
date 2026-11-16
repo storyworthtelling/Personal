@@ -1,6 +1,7 @@
 using Folio.Domain.Analysis;
 using Folio.Domain.Markup;
 using Folio.Domain.Readiness;
+using Folio.Domain.Scenes;
 
 namespace Folio.Tests.Markup;
 
@@ -287,6 +288,30 @@ public class MarkSourceTests
             showTell: [new ShowTellNote("Ch. 1", "nobody spoke to her", ShowTellDirection.Dramatize, "z")]);
 
         Assert.DoesNotContain(MarkSource.From(Manuscript, analysis), mark => mark.Kind == MarkKind.Check);
+    }
+
+    /// <summary>
+    /// A scene's inconsistency (voice, tense, characterisation, setting) is written at the line it
+    /// quotes as well as in the scene's block (owner's ruling, R5).
+    /// </summary>
+    [Fact]
+    public void ASceneInconsistencyBecomesAQueryAtTheLineItQuoted()
+    {
+        var analysis = BookAnalysisResult.Empty with
+        {
+            SceneJudgements =
+            [
+                new SceneJudgement(1, "Chapter 1", "Sets the grief.", SceneCall.Keep, 0.4, "It holds.",
+                    [new SceneInconsistency(SceneInconsistencyKind.Tense,
+                        "Slips into the present here.", "nobody spoke to her")]),
+            ],
+        };
+
+        var mark = Assert.Single(MarkSource.From(Manuscript, analysis));
+        Assert.Equal(MarkKind.Query, mark.Kind);
+        Assert.Equal("Tense", mark.Label);
+        Assert.Equal("nobody spoke to her", Manuscript[mark.StartOffset..mark.EndOffset]);
+        Assert.Equal("Slips into the present here.", mark.Reason);
     }
 
     private static BookAnalysisResult With(

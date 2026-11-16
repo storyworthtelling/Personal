@@ -160,6 +160,19 @@ public static partial class MarkSource
                 fallsBackToChapter: false, unplaced: null);
         }
 
+        // Each scene's inconsistencies are written at the line they quote, as well as in the scene's
+        // block (owner's ruling, R5). The label is the kind (Voice, Tense, Characterisation, Setting).
+        foreach (var judgement in analysis.SceneJudgements ?? [])
+        {
+            foreach (var inconsistency in judgement.Inconsistencies ?? [])
+            {
+                placer.Place(
+                    "Scene by scene", MarkKind.Query, Scenes.SceneWords.Kind(inconsistency.Kind),
+                    inconsistency.Excerpt, inconsistency.Detail, judgement.Chapter,
+                    Severity(judgement.Chapter, analysis), fallsBackToChapter: true, unplaced: inconsistency.Detail);
+            }
+        }
+
         return placer.Finish();
     }
 

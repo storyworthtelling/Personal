@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Model;
 using Folio.Domain.Reading;
+using Folio.Domain.Scenes;
 using Folio.Domain.Text;
 using Folio.Domain.Pipeline;
 using Folio.Infrastructure.Configuration;
@@ -232,6 +233,61 @@ public class ClaudeAnalysisClientTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             client.ReadAsReader(PersonaCatalogue.ById("agent"), "the manuscript", GenreFrame.Unknown, CancellationToken.None));
+    }
+
+    /// <summary>
+    /// A scene is judged from its own text, the story so far and the book's voice, and the reply comes
+    /// back as one scene's judgement (release A3–A4).
+    /// </summary>
+    [Fact]
+    public async Task JudgeScene_SendsTheSceneAndItsContext_AndReadsTheJudgement()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"accomplishes\":\"Sets the grief.\",\"call\":\"Tighten\",\"tension\":0.7,"
+            + "\"verdict\":\"Repeats itself.\",\"inconsistencies\":[{\"kind\":\"Tense\",\"detail\":\"Slips.\","
+            + "\"excerpt\":\"nobody spoke\"}]}"));
+
+        var judgement = await client.JudgeScene(
+            new SceneToJudge(4, "Chapter 2", "She walked the sea wall.", "Her brother drowned.", "Measured, past tense."),
+            new DesignBible([], []), CancellationToken.None);
+
+        var body = Assert.Single(handler.RequestBodies);
+        Assert.Contains("She walked the sea wall.", body, StringComparison.Ordinal);
+        Assert.Contains("Her brother drowned.", body, StringComparison.Ordinal);
+        Assert.Contains("Measured, past tense.", body, StringComparison.Ordinal);
+        Assert.Equal(4, judgement.SceneNumber);
+        Assert.Equal("Chapter 2", judgement.Chapter);
+        Assert.Equal(SceneCall.Tighten, judgement.Call);
+        Assert.Equal(0.7, judgement.Tension, 3);
+        var inconsistency = Assert.Single(judgement.Inconsistencies);
+        Assert.Equal(SceneInconsistencyKind.Tense, inconsistency.Kind);
+        Assert.Equal("nobody spoke", inconsistency.Excerpt);
+    }
+
+    /// <summary>A judgement with no call or nothing accomplished is a failed pass, retried, never printed half-made.</summary>
+    [Theory]
+    [InlineData("{\"accomplishes\":\"x\",\"call\":\"Maybe\",\"tension\":0.5,\"verdict\":\"v\"}")]
+    [InlineData("{\"accomplishes\":\"\",\"call\":\"Keep\",\"tension\":0.5,\"verdict\":\"v\"}")]
+    [InlineData("not json")]
+    public async Task JudgeScene_RefusesAnIncompleteJudgement(string reply)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(reply));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.JudgeScene(
+            new SceneToJudge(1, "Chapter 1", "Text.", "", ""), new DesignBible([], []), CancellationToken.None));
+    }
+
+    /// <summary>Nudge never write: the instruction forbids replacement prose in the verdict and the notes.</summary>
+    [Fact]
+    public async Task JudgeScene_IsToldNeverToWriteTheAuthorsSentences()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"accomplishes\":\"a\",\"call\":\"Keep\",\"tension\":0.2,\"verdict\":\"v\",\"inconsistencies\":[]}"));
+
+        await client.JudgeScene(new SceneToJudge(1, "Chapter 1", "Text.", "", ""), new DesignBible([], []), CancellationToken.None);
+
+        Assert.Contains("never write replacement prose", Assert.Single(handler.RequestBodies), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -41,6 +41,13 @@ public sealed record SceneEvidence(
     /// block follows the end of the text rather than being lost.
     /// </summary>
     public int EndOffset { get; init; } = -1;
+
+    /// <summary>
+    /// The scene's own judgement (release A3–A4): what it accomplishes, the keep/tighten/rewrite/cut call,
+    /// its tension and its inconsistencies. Null for a report made before scenes were judged one by one,
+    /// which prints <see cref="Purpose"/> and <see cref="Verdict"/> as before.
+    /// </summary>
+    public Scenes.SceneJudgement? Judgement { get; init; }
 }
 
 // One finding as it appears in the report, tagged with the cross-draft status the reconciliation gave it, so

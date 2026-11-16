@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
+using Folio.Domain.Scenes;
 using Folio.Domain.External;
 using Folio.Domain.Health;
 using Folio.Domain.Model;
@@ -53,6 +54,23 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "setting, then describe ONE cohesive illustration style for the WHOLE book — medium, rendering, " +
         "linework, colour palette, lighting and mood — in a single vivid sentence an illustrator could " +
         "follow consistently. Respond with ONLY a JSON object: {\"artStyle\":string}. No prose outside the JSON.";
+
+    // One detected scene, judged on its own (release A3–A4). Nudge never write: the verdict and the notes
+    // point at problems and never supply the author's sentences.
+    private const string SceneJudgementInstruction =
+        "You are judging ONE scene of a manuscript as a developmental editor. You are given the scene's own " +
+        "text, the story so far when it begins, the book's dominant voice, and the cast and settings it names. " +
+        "Respond with ONLY a JSON object: {\"accomplishes\":string,\"call\":\"Keep|Tighten|Rewrite|Cut\"," +
+        "\"tension\":number,\"verdict\":string,\"inconsistencies\":[{\"kind\":\"Voice|Tense|Characterisation|Setting\"," +
+        "\"detail\":string,\"excerpt\":string}]}. accomplishes = what this scene does for the plot and for the " +
+        "characters, in one or two sentences. call = Keep (it works), Tighten (it works but runs long or repeats), " +
+        "Rewrite (it does not yet do its job), or Cut (the book loses nothing without it). tension = how much " +
+        "pressure the scene carries, from 0 (calm) to 1 (peak). verdict = one or two sentences on why the call. " +
+        "inconsistencies = places where the scene's voice drifts from the book's, its tense slips, a character " +
+        "acts or sounds unlike the story so far without cause, or a setting contradicts what was established; " +
+        "an empty list when there are none. excerpt = a short verbatim quote (under fifteen words) from THIS " +
+        "scene where the inconsistency is, so the note can be written on that line. You diagnose and point: " +
+        "never write replacement prose, never rewrite a sentence, never supply the author's words.";
 
     private const string SceneImageInstruction =
         "You are a visual-development artist illustrating ONE scene of a novel for a fidelity check: the " +
@@ -151,18 +169,19 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "verdict: the candid state of the draft — biggest strengths, biggest problems, and the single thing " +
         "this draft most needs before the next revision. Use [] when none. No prose outside the JSON.";
 
+    // The scene-by-scene map is no longer asked for here: each detected scene is judged on its own
+    // (JudgeScene, release A3). A reply that still carries a sceneBreakdown is parsed, for stored reports.
     private const string CraftConsolidationInstruction =
         "You are a line editor and craft critic producing the CRAFT half of a REVISION REPORT for an " +
         "author preparing a novel for publication. You are given per-chunk notes gathered across the " +
         "whole manuscript in reading order; each carries the chapter it was taken from, and " +
-        "lineEditCandidates/proseObservations/dialogueObservations/sceneBeats are the raw material for " +
-        "your four sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
+        "lineEditCandidates/proseObservations/dialogueObservations are the raw material for " +
+        "your three sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
         "book — merge duplicates, drop the trivial, keep the author's own words when quoting. Respond " +
         "with ONLY a JSON object: " +
         "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string,\"kind\":string}]," +
         "\"proseNotes\":[{\"chapter\":string,\"pattern\":string,\"evidence\":string,\"fix\":string}]," +
-        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string,\"excerpt\":string}]," +
-        "\"sceneBreakdown\":[{\"chapter\":string,\"scene\":string,\"purpose\":string,\"verdict\":string,\"excerpt\":string,\"outcome\":string}]}. " +
+        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string,\"excerpt\":string}]}. " +
         "lineEdits: specific sentences to cut, tighten, or rewrite — \"excerpt\" quoted verbatim from " +
         "the notes so the author can find it, \"suggestion\" the actual replacement or cut, \"reason\" " +
         "one short clause, \"kind\" the ONE word that names what is actually wrong with the sentence: " +
@@ -178,12 +197,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "and exposition dumped into speech. \"excerpt\": when the note is about a SPECIFIC exchange, " +
         "quote it verbatim from the notes; leave \"\" for an aggregate observation with no single " +
         "exchange to point at (e.g. \"all three sound identical\"). AT MOST 20. " +
-        "sceneBreakdown: the scene-by-scene map in reading order — \"scene\" what happens, \"purpose\" " +
-        "what it accomplishes for the book (plot, character, theme, information), \"verdict\" whether it " +
-        "earns its place and what is missing if not. Say plainly when a scene does no work. \"excerpt\": " +
-        "quote, verbatim, a short line from near the END of the scene, so the note can sit at the " +
-        "scene's own close — leave \"\" only when the notes give nothing quotable for this scene. " +
-        "\"outcome\": \"EarnsItsPlace\" or \"DoesNoWork\", matching \"verdict\". AT MOST 100. " +
         "Every \"chapter\" is copied from the note the item came from; \"\" only when the notes carry " +
         "none. Use [] when none. No prose outside the JSON.";
 
@@ -304,6 +317,55 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             return string.Empty;
         var dto = JsonResponse.Deserialize<ArtStyleDto>(json);
         return dto?.ArtStyle?.Trim() ?? string.Empty;
+    }
+
+    public async Task<SceneJudgement> JudgeScene(
+        SceneToJudge scene, DesignBible bible, CancellationToken cancellationToken)
+    {
+        var cast = JsonSerializer.Serialize(bible.ForScene(scene.Text), JsonResponse.CaseInsensitive);
+        var userContent =
+            $"BOOK'S DOMINANT VOICE:\n{(string.IsNullOrWhiteSpace(scene.DominantVoice) ? "(not yet described)" : scene.DominantVoice)}\n\n" +
+            $"STORY SO FAR:\n{(string.IsNullOrWhiteSpace(scene.StorySoFar) ? "(this is the opening)" : scene.StorySoFar)}\n\n" +
+            $"CAST & SETTINGS THIS SCENE NAMES (JSON):\n{cast}\n\n" +
+            $"SCENE {scene.Number} ({scene.Chapter}):\n{scene.Text}";
+
+        var reply = await SendMessage(SceneJudgementInstruction, userContent, cancellationToken);
+        var json = JsonResponse.ExtractObject(reply)
+            ?? throw new InvalidOperationException(
+                $"Scene {scene.Number}'s judgement came back with nothing readable as JSON; the pass is retried.");
+
+        var dto = JsonResponse.Deserialize<SceneJudgementDto>(json);
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Accomplishes))
+            throw new InvalidOperationException($"Scene {scene.Number}'s judgement did not say what the scene accomplishes.");
+        if (!Enum.TryParse<SceneCall>(dto.Call?.Trim(), ignoreCase: true, out var call) || !Enum.IsDefined(call))
+            throw new InvalidOperationException($"Scene {scene.Number}'s judgement gave no keep/tighten/rewrite/cut call (got '{dto.Call}').");
+
+        var inconsistencies = (dto.Inconsistencies ?? [])
+            .Where(item => !string.IsNullOrWhiteSpace(item.Detail))
+            .Select(item => (Ok: Enum.TryParse<SceneInconsistencyKind>(item.Kind?.Trim(), ignoreCase: true, out var kind) && Enum.IsDefined(kind), Kind: kind, Item: item))
+            .Where(entry => entry.Ok)
+            .Select(entry => new SceneInconsistency(entry.Kind, entry.Item.Detail!, entry.Item.Excerpt ?? string.Empty))
+            .ToList();
+
+        return new SceneJudgement(
+            scene.Number, scene.Chapter, dto.Accomplishes!, call, Math.Clamp(dto.Tension ?? 0.5, 0, 1),
+            dto.Verdict ?? string.Empty, inconsistencies);
+    }
+
+    private sealed class SceneJudgementDto
+    {
+        public string? Accomplishes { get; set; }
+        public string? Call { get; set; }
+        public double? Tension { get; set; }
+        public string? Verdict { get; set; }
+        public List<SceneInconsistencyDto>? Inconsistencies { get; set; }
+    }
+
+    private sealed class SceneInconsistencyDto
+    {
+        public string? Kind { get; set; }
+        public string? Detail { get; set; }
+        public string? Excerpt { get; set; }
     }
 
     public async Task<string> DescribeSceneImage(

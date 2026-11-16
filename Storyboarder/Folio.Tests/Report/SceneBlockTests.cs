@@ -1,6 +1,7 @@
 using Folio.Domain.Analysis;
 using Folio.Domain.Imaging;
 using Folio.Domain.Markup;
+using Folio.Domain.Scenes;
 using Folio.Infrastructure.Imaging;
 using Folio.Tests.Support;
 using UglyToad.PdfPig;
@@ -32,6 +33,29 @@ public class SceneBlockTests
     private static SceneEvidence Two(byte[]? image = null) =>
         new("Chapter 1 · Scene 2", "Shows the village closing ranks.", "Does no work.", image)
         { EndOffset = Manuscript.Length };
+
+    /// <summary>
+    /// The richer verdict (owner's ruling, R4): what the scene accomplishes, the keep/tighten/rewrite/cut
+    /// call, its tension, and any inconsistencies, all in the block under the scene.
+    /// </summary>
+    [Fact]
+    public void ABlockCarriesTheCallTheTensionAndTheInconsistencies()
+    {
+        var judged = One() with
+        {
+            Judgement = new SceneJudgement(1, "Chapter 1", "Sets up the grief that drives the book.",
+                SceneCall.Tighten, 0.8, "Strong, but the second paragraph repeats the first.",
+                [new SceneInconsistency(SceneInconsistencyKind.Setting, "The spring here is autumn in chapter three.", "")]),
+        };
+
+        var text = TextOf(Render([judged]));
+
+        Assert.Contains("Tighten", text, StringComparison.Ordinal);
+        Assert.Contains("Tension: high", text, StringComparison.Ordinal);
+        Assert.Contains("Sets up the grief that drives the book.", text, StringComparison.Ordinal);
+        Assert.Contains("Strong, but the second paragraph repeats the first.", text, StringComparison.Ordinal);
+        Assert.Contains("The spring here is autumn in chapter three.", text, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void EachScenesBlockSitsUnderThatScenesLastLine()

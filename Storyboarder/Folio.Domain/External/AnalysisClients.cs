@@ -25,6 +25,14 @@ public interface IClaudeAnalysisClient
     // visual prompt for the image model (no lettering). Best-effort: empty when it can't be derived, so a
     // scene image is never blocked on art direction. `avoidMoments` names beats already tried and refused,
     // so a retry can target a different moment of the same scene.
+    /// <summary>
+    /// Judges one detected scene on its own (release A3–A4): what it accomplishes, a keep / tighten /
+    /// rewrite / cut call, its tension, and any inconsistencies in voice, tense, characterisation or
+    /// setting. Throws when the judgement comes back without a call or without what the scene
+    /// accomplishes, so the pass is retried rather than printed half-made.
+    /// </summary>
+    Task<Scenes.SceneJudgement> JudgeScene(Scenes.SceneToJudge scene, DesignBible bible, CancellationToken cancellationToken);
+
     Task<string> DescribeSceneImage(
         string sceneText,
         DesignBible bible,

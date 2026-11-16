@@ -470,6 +470,12 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<int>("ImageStatus")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("JudgementAttempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("JudgementJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("LastError")
                         .HasColumnType("TEXT");
 
