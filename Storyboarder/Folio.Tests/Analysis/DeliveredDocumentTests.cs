@@ -54,4 +54,13 @@ public class DeliveredDocumentTests
         Assert.Equal(
             "Book One - Book Two — Draft 2 — Revision report.pdf",
             DeliveredDocument.FileName("Book One / Book Two", 2));
+
+    [Fact]
+    public void TheSeriesBibleIsNamedForItsSeriesAndTheDraftItWasLastReadFrom()
+    {
+        Assert.Equal("The Tides — Series bible — after The Tide Ledger draft 2",
+            DeliveredDocument.BibleName("The Tides", "The Tide Ledger", 2));
+        Assert.Equal("The Tides — Series bible — after The Tide Ledger draft 2.pdf",
+            DeliveredDocument.BibleFileName("The Tides", "The Tide Ledger", 2));
+    }
 }

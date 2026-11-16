@@ -8,6 +8,7 @@ using Folio.Domain.Scenes;
 using Folio.Domain.Series;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
+using Folio.Infrastructure.Imaging;
 using Folio.Domain.Model;
 using Folio.Domain.Pipeline;
 using Storyworthtelling.Voice.Health;
@@ -1394,7 +1395,12 @@ public sealed class ReviewProcessor : IPipelineStep
         var reportPending = reportReady && archive.Enabled && delivery is { CanArchiveToDrive: true } && analysis!.ArchivedDriveFileId is null;
 
         if (!reportPending)
+        {
+            // The series bible goes beside the report (R26), once the report has gone wherever it was going.
+            if (reportReady && novel.SeriesId is not null && analysis!.SeriesBibleUpdated && !analysis.SeriesBibleDelivered)
+                return await DeliverSeriesBible(db, novel, analysis, cancellationToken);
             return await FinishArchiving(db, novel, cancellationToken);
+        }
 
         try
         {
@@ -1453,6 +1459,67 @@ public sealed class ReviewProcessor : IPipelineStep
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.Waiting(delay, novel.Id);
         }
+    }
+
+    // Prints the series bible as this draft left it and sends it to the tablet's root and to the Drive folder
+    // the report went to (R26). Best-effort, one try at each target: the bible is a convenience beside the
+    // report, so a target that fails (offline included) is logged and left, never retried into duplicates,
+    // and never holds the review.
+    private async Task<ProcessResult> DeliverSeriesBible(
+        FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
+    {
+        var (readable, bible) = await LoadSeriesBible(db, novel, cancellationToken);
+        var placements = (await db.Novels
+                .Where(other => other.SeriesId == novel.SeriesId && other.PlacementJson != null && other.DeletedAtUtc == null)
+                .Select(other => new { other.ProjectId, other.DraftNumber, other.PlacementJson })
+                .ToListAsync(cancellationToken))
+            .GroupBy(other => other.ProjectId)
+            .Select(book => book.OrderByDescending(draft => draft.DraftNumber).First())
+            .Select(book => (book.ProjectId, Placement: StoryPlacementCodec.Read(book.PlacementJson)))
+            .Where(book => book.Placement is not null)
+            .ToDictionary(book => book.ProjectId, book => book.Placement!);
+        var series = string.IsNullOrWhiteSpace(novel.SeriesName)
+            ? bible.Books.FirstOrDefault()?.Title ?? novel.Title
+            : novel.SeriesName;
+        var pdf = readable ? SeriesBibleDocument.RenderOrNull(series, bible, placements) : null;
+
+        if (pdf is not null)
+        {
+            var name = DeliveredDocument.BibleName(series, novel.Title, novel.DraftNumber);
+            if (archive.DeliverToRemarkable && delivery is { CanDeliverToRemarkable: true } && RemarkableLimits.TooLarge(pdf.Length) is null)
+            {
+                try
+                {
+                    await using var stream = new MemoryStream(pdf, writable: false);
+                    await delivery.DeliverToRemarkableRoot(name, stream, pdf.Length, cancellationToken);
+                    logger.LogInformation("Delivered the series bible of manuscript {NovelId} to the reMarkable root", novel.Id);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Manuscript {NovelId}: the series bible did not reach the reMarkable; leaving it", novel.Id);
+                }
+            }
+
+            if (archive.Enabled && delivery is { CanArchiveToDrive: true } && novel.ArchiveFolderId is not null)
+            {
+                try
+                {
+                    await delivery.UploadDriveFile(
+                        novel.ArchiveFolderId, DeliveredDocument.BibleFileName(series, novel.Title, novel.DraftNumber),
+                        "application/pdf", pdf, cancellationToken);
+                    logger.LogInformation("Archived the series bible of manuscript {NovelId} to Drive", novel.Id);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Manuscript {NovelId}: the series bible did not reach Drive; leaving it", novel.Id);
+                }
+            }
+        }
+
+        analysis.SeriesBibleDelivered = true;
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
     }
 
     // Delivers the finished report to the ROOT of the owner's reMarkable tablet — the same proven path
@@ -1936,19 +2003,30 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
 
         var manuscript = await Manuscript(db, novel.Id, cancellationToken);
+        IReadOnlyList<BibleFact> facts;
         try
         {
-            var facts = await claude.ReadSeriesBible(
+            facts = await claude.ReadSeriesBible(
                 manuscript, await Frame(db, novel, analysis, cancellationToken), novel.Title,
                 BibleText.For(bible.Without(novel.ProjectId)), cancellationToken);
-            bible = bible.WithBook(
-                new SeriesBook(novel.ProjectId, novel.Title, novel.SeriesSequence), BibleQuotes.Keep(manuscript, facts));
             ClearCallFailures(novel);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return await DeferAfterFailedCall(db, novel, ex, "ReadSeriesBible", cancellationToken);
         }
+
+        // Read again after the call, which can take a minute: a correction the owner made meanwhile is kept.
+        record ??= await db.SeriesBibles.FirstOrDefaultAsync(stored => stored.SeriesId == seriesId, cancellationToken);
+        (readable, bible) = await LoadSeriesBible(db, novel, cancellationToken);
+        if (!readable)
+        {
+            analysis.SeriesBibleUpdated = true;
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+        bible = bible.WithBook(
+            new SeriesBook(novel.ProjectId, novel.Title, novel.SeriesSequence), BibleQuotes.Keep(manuscript, facts));
 
         if (record is null)
         {

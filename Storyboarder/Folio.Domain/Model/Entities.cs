@@ -394,6 +394,10 @@ public class BookAnalysis
     // Set once this draft's read has been merged into its series' bible (release G, R20). A series book only;
     // billed once per draft, like the other whole-book calls.
     public bool SeriesBibleUpdated { get; set; }
+
+    // Set once the series bible, as this draft left it, has been sent to the tablet and Drive (R26), or
+    // given up on. Best-effort: the bible is a convenience beside the report, never a reason to hold it.
+    public bool SeriesBibleDelivered { get; set; }
 }
 
 /// <summary>

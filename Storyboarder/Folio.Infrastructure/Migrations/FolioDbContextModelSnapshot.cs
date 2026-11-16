@@ -53,6 +53,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<string>("RemarkableNote")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("SeriesBibleDelivered")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("SeriesBibleUpdated")
                         .HasColumnType("INTEGER");
 

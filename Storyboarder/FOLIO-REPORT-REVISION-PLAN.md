@@ -318,7 +318,38 @@ chart were already shipped.
    before/after images already there.
 3. **Readers:** the score movement already shipped, plus B4's history chart.
 
-### Release G — The series bible (R20–R26)
+### Release G — The series bible (R20–R26) — **built**
+
+How it was built:
+- **The bible** (`SeriesBible`) is one row per series in the phone's database (`SeriesBibles`).
+  - Each entry keeps one state per book, in the order the books were written, so the first state is canon. A
+    state holds the era, the book's words and a quoted passage.
+  - A correction from the owner wins over the books and survives every later read.
+  - A stored bible that will not read is never written over.
+- **Building it.** After a series book's reads, one call (`ReadSeriesBible`) reads the book into the bible.
+  - It sends the reads' cached blocks, so it is a cache hit after them.
+  - Earlier books are seeded from their stored canon, so nothing is read twice.
+  - A quotation the book does not contain is dropped.
+  - The bible is read again after the call, so a correction made while it ran is kept.
+- **Placement** (`StoryPlacement`) is guessed once the story is consolidated and stored on the book.
+  - The book page shows it under Series, and a paper card confirms or changes it.
+  - A confirmed placement is carried onto later drafts and never guessed again.
+- **The continuity read** checks the book against the other books' bible and the placement. Each finding
+  carries:
+  - one of the four kinds (`ContinuityKinds`);
+  - the earlier book and its quote;
+  - while the placement is unconfirmed, what the read assumed.
+
+  The findings are marks labelled by kind and are also listed in the Series continuity section. The
+  readers get the bible in place of the bare canon.
+- **Printing and correcting.** The bible prints as its own framed document (`SeriesBibleDocument`), with one
+  tab per kind.
+  - It goes to the tablet and to the report's Drive folder once per draft, best-effort.
+  - A screen off the book page (`SeriesBiblePage`) corrects an entry.
+- **Not built:**
+  - A sealed copy of the bible's data in Drive: the printed copy is there, but a phone reset loses the
+    corrections.
+  - Removing a deleted book's states from the bible.
 1. **Model.**
    - A `SeriesBible` per series, holding characters, settings, world rules, timeline events and open
      threads.

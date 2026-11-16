@@ -1575,6 +1575,94 @@ public class ReviewProcessorTests : IDisposable
         Assert.All(readerFrames, frame => Assert.StartsWith("SERIES BIBLE", frame.SeriesCanon, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The series bible is printed and sent beside the report (R26): to the tablet's root and to the
+    /// Drive folder the report went to, once per draft.
+    /// </summary>
+    [Fact]
+    public async Task ASequelsSeriesBibleIsDeliveredToTheTabletAndDrive()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        using (var context = database.NewContext())
+        {
+            foreach (var novel in context.Novels)
+                novel.SeriesName = "The Gate";
+            context.SaveChanges();
+        }
+        var remarkable = new Mock<IRemarkableClient>();
+        var drive = new Mock<IPaperDriveArchive>();
+        drive.Setup(d => d.FindParentFolder(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("folder-one");
+        drive.Setup(d => d.UploadFile(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("file");
+
+        await DriveToCompletion(NewProcessor(
+            new ArchiveOptions { DeliverToRemarkable = true, Enabled = true }, remarkable.Object, drive.Object));
+
+        var name = DeliveredDocument.BibleName("The Gate", "Quest", 1);
+        remarkable.Verify(r => r.Upload(name, It.IsAny<Stream>(), It.IsAny<long>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        drive.Verify(d => d.UploadFile("folder-one", name + ".pdf", "application/pdf", It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        using var check = database.NewContext();
+        Assert.True(check.BookAnalyses.Single(a => a.NovelId == second).SeriesBibleDelivered);
+        Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == second).Stage);
+    }
+
+    /// <summary>A bible that fails to send is given up on, and the review still finishes.</summary>
+    [Fact]
+    public async Task ABibleThatWillNotSendIsGivenUpOnAndTheReviewFinishes()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.Is<string>(title => title.Contains("Series bible")), It.IsAny<Stream>(),
+                It.IsAny<long>(), null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("refused"));
+
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        using var check = database.NewContext();
+        Assert.True(check.BookAnalyses.Single(a => a.NovelId == second).SeriesBibleDelivered);
+        Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == second).Stage);
+    }
+
+    /// <summary>A correction the owner makes while the bible read is out is kept, not written over (R26).</summary>
+    [Fact]
+    public async Task ACorrectionMadeDuringTheBibleReadIsKept()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        Guid series;
+        using (var context = database.NewContext())
+            series = context.Novels.Single(n => n.Id == second).SeriesId!.Value;
+
+        claude.Setup(c => c.ReadSeriesBible(
+                It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                // The owner corrects the castle while the read is out.
+                using var context = database.NewContext();
+                var bible = SeriesBible.Empty
+                    .WithBook(new SeriesBook(first, "Quest", 1), [new BibleFact(BibleKind.Setting, "Castle", [], "", "Grey stone.", "")])
+                    .Correct(BibleKind.Setting, "Castle", "Black basalt.");
+                context.SeriesBibles.Add(new SeriesBibleRecord { SeriesId = series, Json = SeriesBibleCodec.Write(bible), UpdatedAtUtc = clock.UtcNow });
+                context.SaveChanges();
+                return Task.FromResult<IReadOnlyList<BibleFact>>(
+                    [new BibleFact(BibleKind.Setting, "Castle", [], "", "Ruined.", "")]);
+            });
+
+        await DriveToCompletion(NewProcessor());
+
+        using var check = database.NewContext();
+        var castle = Assert.Single(SeriesBibleCodec.Read(check.SeriesBibles.Single().Json).Entries,
+            entry => entry.Kind == BibleKind.Setting && entry.Name == "Castle");
+        Assert.Equal("Black basalt.", castle.Correction);
+        Assert.Contains(castle.States, state => state.Text == "Ruined.");
+    }
+
     [Fact]
     public async Task AStandaloneBookHasNoSeriesBible()
     {

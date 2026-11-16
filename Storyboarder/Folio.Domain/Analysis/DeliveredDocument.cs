@@ -24,6 +24,17 @@ public static class DeliveredDocument
     public static string FileName(string? title, int draftNumber) => $"{Name(title, draftNumber)}.pdf";
 
     /// <summary>
+    /// The series bible's name (release G, R26), dated by the book and draft it was last read from, so
+    /// a newer copy in a folder listing is told from an older one.
+    /// </summary>
+    public static string BibleName(string? series, string? title, int draftNumber) =>
+        $"{Safe(series)} — Series bible — after {Safe(title)} draft {draftNumber}";
+
+    /// <summary>The bible's name as a file.</summary>
+    public static string BibleFileName(string? series, string? title, int draftNumber) =>
+        $"{BibleName(series, title, draftNumber)}.pdf";
+
+    /// <summary>
     /// A title that can be a file name. A slash in a book's title is not exotic — "Book One / Book
     /// Two" is a real way to title a volume — and on most filesystems it quietly becomes a folder;
     /// an empty one is not a file at all, and failing on it would fail after the whole review has

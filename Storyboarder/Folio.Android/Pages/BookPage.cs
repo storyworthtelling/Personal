@@ -246,14 +246,30 @@ public class BookPage : FolioBinderPage
         body.Add(Hero(book));
 
         // Where the book sits in its series (R21): Folio's guess until the owner says. A tap opens the card.
-        if (record.Placement is not null)
+        // The series bible (R26) opens from here too, to be read and corrected.
+        if (record.InSeries)
         {
             body.Add(SectionLabel("Series"));
-            placementLine.Text = this.placement!.Line;
-            var change = new TapGestureRecognizer();
-            change.Tapped += (_, _) => _ = ChoosePlacement();
-            placementLine.GestureRecognizers.Add(change);
-            body.Add(placementLine);
+            if (record.Placement is not null)
+            {
+                placementLine.Text = this.placement!.Line;
+                var change = new TapGestureRecognizer();
+                change.Tapped += (_, _) => _ = ChoosePlacement();
+                placementLine.GestureRecognizers.Add(change);
+                body.Add(placementLine);
+            }
+
+            var bible = new Label
+            {
+                Text = "The series bible",
+                FontSize = PaperResources.Token<double>("SecondarySize"),
+                TextColor = PaperResources.Colour("ActionText"),
+                Padding = new Thickness(0, DesignTokens.Space.X3),
+            };
+            var open = new TapGestureRecognizer();
+            open.Tapped += (_, _) => _ = Navigation.PushAsync(new SeriesBiblePage(record.LatestDraftId));
+            bible.GestureRecognizers.Add(open);
+            body.Add(bible);
         }
 
         body.Add(SectionLabel("Readiness"));

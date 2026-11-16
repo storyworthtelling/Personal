@@ -65,3 +65,6 @@ public sealed record BookRecord(
     /// <summary>The series' other books, in the order they were written: what the book can be placed against.</summary>
     public IReadOnlyList<string> OtherBooks { get; init; } = [];
 }
+
+/// <summary>A series' bible as the correction screen shows it: which series, what it is called, and the bible.</summary>
+public sealed record SeriesBibleView(Guid SeriesId, string Name, Folio.Domain.Series.SeriesBible Bible);

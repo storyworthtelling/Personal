@@ -264,6 +264,49 @@ public class BookReadTests : IDisposable
         Assert.Null(check.Novels.Single(n => n.Id == first).PlacementJson);
     }
 
+    /// <summary>The series bible is read for the correction screen, and a correction is kept (R26).</summary>
+    [Fact]
+    public async Task TheSeriesBibleIsReadAndCorrectedFromAnyDraftOfTheSeries()
+    {
+        var series = Guid.NewGuid();
+        var book = Seed(draftNumber: 1, words: 80_000, seriesId: series, sequence: 1);
+        var bible = SeriesBible.Empty.WithBook(new SeriesBook(book, "The Salt Line", 1),
+            [new BibleFact(BibleKind.Setting, "Gullhaven", [], "", "On stilts.", "")]);
+        using (var context = database.NewContext())
+        {
+            context.Novels.Single(n => n.Id == book).SeriesName = "The Tides";
+            context.SeriesBibles.Add(new SeriesBibleRecord { SeriesId = series, Json = SeriesBibleCodec.Write(bible), UpdatedAtUtc = Start });
+            context.SaveChanges();
+        }
+
+        var read = await Service().GetSeriesBibleAsync(book, CancellationToken.None);
+        Assert.Equal("The Tides", read!.Name);
+        Assert.Single(read.Bible.Entries);
+
+        Assert.True(await Service().CorrectSeriesBibleAsync(series, BibleKind.Setting, "Gullhaven", "On piles.", CancellationToken.None));
+
+        using var check = database.NewContext();
+        Assert.Equal("On piles.", SeriesBibleCodec.Read(check.SeriesBibles.Single().Json).Entries[0].Current);
+    }
+
+    /// <summary>A stored bible that will not read is refused rather than written over with a correction.</summary>
+    [Fact]
+    public async Task ACorrectionIsNotWrittenOverABibleThatWillNotRead()
+    {
+        var series = Guid.NewGuid();
+        Seed(draftNumber: 1, words: 80_000, seriesId: series);
+        using (var context = database.NewContext())
+        {
+            context.SeriesBibles.Add(new SeriesBibleRecord { SeriesId = series, Json = "damaged", UpdatedAtUtc = Start });
+            context.SaveChanges();
+        }
+
+        Assert.False(await Service().CorrectSeriesBibleAsync(series, BibleKind.Setting, "Gullhaven", "On piles.", CancellationToken.None));
+
+        using var check = database.NewContext();
+        Assert.Equal("damaged", check.SeriesBibles.Single().Json);
+    }
+
     [Fact]
     public async Task AStandaloneBookHasNoPlacement()
     {

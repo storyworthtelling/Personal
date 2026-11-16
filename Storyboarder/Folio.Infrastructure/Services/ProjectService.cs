@@ -615,6 +615,47 @@ public sealed class ProjectService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// The series bible of the series a draft belongs to, for the correction screen (R26), or null when
+    /// the draft is in no series or its series has no bible yet. A stored bible that will not read is
+    /// shown as empty, and is not corrected over.
+    /// </summary>
+    public async Task<SeriesBibleView?> GetSeriesBibleAsync(Guid draftId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var draft = await db.Novels.Where(n => n.Id == draftId)
+            .Select(n => new { n.SeriesId, n.SeriesName }).FirstOrDefaultAsync(cancellationToken);
+        if (draft?.SeriesId is not { } seriesId)
+            return null;
+
+        var json = await db.SeriesBibles.Where(record => record.SeriesId == seriesId)
+            .Select(record => record.Json).FirstOrDefaultAsync(cancellationToken);
+        if (json is null)
+            return null;
+
+        var bible = SeriesBibleCodec.Read(json);
+        var name = string.IsNullOrWhiteSpace(draft.SeriesName) ? bible.Books.FirstOrDefault()?.Title ?? "The series" : draft.SeriesName;
+        return new SeriesBibleView(seriesId, name, bible);
+    }
+
+    /// <summary>
+    /// The owner's correction to one entry of a series bible (R26), which wins over every book; a blank
+    /// one clears it. False when the stored bible will not read: nothing is written over it.
+    /// </summary>
+    public async Task<bool> CorrectSeriesBibleAsync(
+        Guid seriesId, BibleKind kind, string name, string correction, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var record = await db.SeriesBibles.FirstOrDefaultAsync(bible => bible.SeriesId == seriesId, cancellationToken);
+        if (record is null || !SeriesBibleCodec.TryRead(record.Json, out var bible))
+            return false;
+
+        record.Json = SeriesBibleCodec.Write(bible.Correct(kind, name, correction));
+        record.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private sealed record DraftStub(Guid Id, Guid ProjectId, int DraftNumber, DateTimeOffset CreatedAtUtc, DateTimeOffset? ShelvedAtUtc);
 
     /// <summary>
