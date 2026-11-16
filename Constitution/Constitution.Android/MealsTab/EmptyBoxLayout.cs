@@ -49,11 +49,12 @@ internal static class EmptyBoxLayout
     private static View Place(Context context, string? title, PlaceState state)
     {
         var cell = new LinearLayout(context) { Orientation = Orientation.Vertical };
-        var outline = PaperUi.Outline(context, state == PlaceState.Filled ? PaperTheme.PaperBright : PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusCard);
-        if (state == PlaceState.Dashed)
-        {
-            outline.SetStroke(PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp), PaperTheme.Hairline, PaperTheme.Dp(context, DesignTokens.Space.X1), PaperTheme.Dp(context, DesignTokens.Space.X1));
-        }
+        var outline = PaperUi.Outline(
+            context,
+            state == PlaceState.Filled ? PaperTheme.PaperBright : PaperTheme.Paper,
+            PaperTheme.Hairline,
+            DesignTokens.Shape.RadiusCard,
+            dashed: state == PlaceState.Dashed);
 
         cell.Background = outline;
         var pad = PaperTheme.Dp(context, DesignTokens.Space.X2);

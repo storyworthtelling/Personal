@@ -54,7 +54,7 @@ internal static class SportsRows
         var chip = PaperUi.Label(host, text);
         var strong = text is "Playoffs" or "Final";
         chip.SetTextColor(strong ? PaperTheme.Ink : PaperTheme.InkMuted);
-        chip.Background = PaperUi.Outline(host, PaperTheme.Paper, strong ? PaperTheme.Ink : PaperTheme.Hairline, DesignTokens.Shape.RadiusInput);
+        chip.Background = PaperUi.Chip(host, strong ? PaperTheme.Ink : PaperTheme.InkMuted, null, DesignTokens.Shape.RadiusInput);
         var padX = Dp(host, DesignTokens.Space.X2);
         chip.SetPadding(padX, 0, padX, 0);
         return chip;

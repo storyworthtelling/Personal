@@ -392,10 +392,11 @@ internal sealed class PlaylistsScreen
     {
         var chip = PaperUi.Label(host, "Hide watched");
         chip.SetTextColor(hideWatched ? PaperTheme.Ink : PaperTheme.InkSoft);
-        chip.Background = PaperUi.Outline(
+        chip.Background = PaperUi.FilterChip(
             host,
-            hideWatched ? PaperTheme.Wash(Android.Graphics.Color.ParseColor(DesignTokens.Identity.Pulp.Mark)) : PaperTheme.PaperBright,
-            PaperTheme.Hairline,
+            PaperTheme.InkMuted,
+            Android.Graphics.Color.ParseColor(DesignTokens.Identity.Pulp.Mark),
+            hideWatched,
             DesignTokens.Shape.RadiusInput);
         var padX = PaperTheme.Dp(host, DesignTokens.Space.X3);
         var padY = PaperTheme.Dp(host, DesignTokens.Space.X1);

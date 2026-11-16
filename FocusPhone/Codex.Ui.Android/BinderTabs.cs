@@ -4,6 +4,7 @@ using Android.Graphics.Drawables;
 using Android.Views;
 using Android.Widget;
 using Codex.Domain.Design;
+using Storyworthtelling.Materials.Android;
 
 namespace Codex.Ui;
 
@@ -41,7 +42,6 @@ public class BinderTabs : ViewGroup
     private readonly List<BinderArea> areas = [];
     private readonly Paint pageEdge;
     private readonly Paint gutter;
-    private readonly Paint gutterGrain;
     private readonly int radius;
     private int activeIndex;
 
@@ -62,9 +62,6 @@ public class BinderTabs : ViewGroup
         gutter = new Paint { AntiAlias = true, Color = PaperTheme.Paper };
         gutter.SetStyle(Paint.Style.Fill);
 
-        // The gaps read as flat vector color without this — the same grain the tabs'
-        // own cloth carries (DESIGN.md §2), drawn as a second pass over the same rect.
-        gutterGrain = PaperTheme.GrainOverlay(context, gutter);
     }
 
     /// <summary>Fires with the tapped index — including the active one.</summary>
@@ -160,6 +157,15 @@ public class BinderTabs : ViewGroup
             var tint = active ? area.Hue : PaperTheme.Ink;
             pencil.Ink = tint;
             label.SetTextColor(tint);
+            // §2 Marker: the active tab's label is written in marker; an inactive one is plain ink on its cloth.
+            if (active)
+            {
+                MaterialPainters.Marker(label.Paint!, tint, Context!.Resources!.DisplayMetrics!.Density);
+            }
+            else
+            {
+                label.Paint!.SetShader(null);
+            }
         }
     }
 
@@ -211,8 +217,7 @@ public class BinderTabs : ViewGroup
         // makes that cloth read as cloth rather than flat vector color — filling solved
         // the hole-back-to-the-page problem but left the fix itself looking synthetic
         // next to the textured paper it now sits beside (G3-04).
-        canvas.DrawRect(0, 0, Width, Height, gutter);
-        canvas.DrawRect(0, 0, Width, Height, gutterGrain);
+        MaterialPainters.PaperGround(canvas, new RectF(0, 0, Width, Height), gutter.Color, 1f);
 
         // The page edge: the line the tabs are clipped at, running the full height.
         var x = pageEdge.StrokeWidth / 2f;

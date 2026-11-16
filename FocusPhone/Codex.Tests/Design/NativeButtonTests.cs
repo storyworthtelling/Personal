@@ -34,7 +34,9 @@ public class NativeButtonTests
         var primary = source[source.IndexOf("public static Button PrimaryButton", StringComparison.Ordinal)..];
         primary = primary[..primary.IndexOf("return button;", StringComparison.Ordinal)];
 
-        Assert.Contains("PressedHairline(context, PaperTheme.ActionDeep)", primary);
+        // A marker fill of the deep tier (§2, W8.8); the drawable shows the press as an inset Hairline (§8).
+        Assert.Contains("new MarkerFillDrawable(", primary);
+        Assert.Contains("PaperTheme.ActionDeep, PaperTheme.Ink, PaperTheme.Hairline", primary);
         Assert.DoesNotContain("PressableFill", source);
     }
 

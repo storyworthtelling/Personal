@@ -89,11 +89,17 @@ public static class Streaks
     private const uint MarkerSeed = 11;
     private const uint HighlighterSeed = 5;
 
-    /// <summary>The marker's streaks: each row keeps between four fifths and all of the colour.</summary>
-    public static byte[] Marker()
+    /// <summary>
+    /// The marker's streaks: each row keeps between four fifths and all of the colour. Pressed (<paramref name="lift"/>
+    /// of <see cref="MaterialStrength.PressLift"/>), each streak takes that much more again.
+    /// </summary>
+    public static byte[] Marker(double lift = 0)
     {
         var walk = Walk(MarkerSeed);
-        return walk.Select(value => (byte)Math.Round((1 - (MaterialStrength.MarkerStreak * value)) * 255)).ToArray();
+        return walk
+            .Select(value => (int)Math.Round((1 - (MaterialStrength.MarkerStreak * value)) * 255))
+            .Select(rest => (byte)Math.Max(0, 255 - (int)Math.Round((255 - rest) * (1 + lift))))
+            .ToArray();
     }
 
     /// <summary>How much of the marker's colour is left at a point along the stroke (0 its start, 1 its end): it thins in the last tenth.</summary>

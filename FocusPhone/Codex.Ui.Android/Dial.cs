@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Graphics;
+using Storyworthtelling.Materials.Android;
 using Android.Views;
 using Codex.Domain.Design;
 
@@ -25,7 +26,6 @@ public sealed class Dial : View
     private readonly DialGeometry geometry;
     private readonly Paint track = new() { AntiAlias = true };
     private readonly Paint filled = new() { AntiAlias = true };
-    private readonly Paint filledGrain;
     private readonly Paint knob = new() { AntiAlias = true };
     private readonly Paint reading = new() { AntiAlias = true };
 
@@ -42,15 +42,11 @@ public sealed class Dial : View
         track.StrokeCap = Paint.Cap.Round;
         track.Color = PaperTheme.PaperShade;
 
+        // DESIGN.md §7 calls this a colored-pencil filled arc: the hue with the pencil's tooth (§2).
+        MaterialPainters.Pencil(filled, hue, context.Resources!.DisplayMetrics!.Density);
         filled.SetStyle(Paint.Style.Stroke);
         filled.StrokeWidth = PaperTheme.Dp(context, TrackDp);
         filled.StrokeCap = Paint.Cap.Round;
-        filled.Color = hue;
-
-        // DESIGN.md §7 calls this a colored-pencil filled arc — a second, translucent
-        // ink-speckle pass over the same arc is what makes it read as pencil rather
-        // than a flat vector stroke (G3-02).
-        filledGrain = PaperTheme.GrainOverlay(context, filled);
 
         knob.SetStyle(Paint.Style.Fill);
         knob.Color = hue;
@@ -143,7 +139,6 @@ public sealed class Dial : View
         canvas.DrawArc(box, (float)DialGeometry.StartDegrees, (float)DialGeometry.SweepDegrees, false, track);
         var sweep = (float)(DialGeometry.SweepDegrees * geometry.FractionOf(value));
         canvas.DrawArc(box, (float)DialGeometry.StartDegrees, sweep, false, filled);
-        canvas.DrawArc(box, (float)DialGeometry.StartDegrees, sweep, false, filledGrain);
 
         var radius = (box.Width() / 2f);
         var (x, y) = geometry.KnobAt(value, box.CenterX(), box.CenterY(), radius);

@@ -58,4 +58,7 @@ public static class MaterialStrength
 
     /// <summary>Pressed: the surface's grain or tooth rises by this much while held.</summary>
     public const double PressLift = 0.5;
+
+    /// <summary>Marker and highlighter: one streak row, in dp, so a button's fibres are the same size on every screen.</summary>
+    public const float StreakRowDp = 0.75f;
 }

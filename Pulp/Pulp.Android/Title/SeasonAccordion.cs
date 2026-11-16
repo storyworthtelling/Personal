@@ -110,7 +110,7 @@ internal sealed class SeasonAccordion : LinearLayout
         column.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
         if (isNext)
         {
-            column.Background = PaperUi.Fill(context, PaperTheme.Wash(Identity), DesignTokens.Shape.RadiusButton / 2);
+            column.Background = PaperUi.Highlight(context, Identity);
         }
 
         var line = new LinearLayout(context) { Orientation = Orientation.Horizontal };

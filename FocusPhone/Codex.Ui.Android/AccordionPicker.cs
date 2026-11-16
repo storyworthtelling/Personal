@@ -124,7 +124,7 @@ public class AccordionPicker : LinearLayout
         {
             // §8 Selected: the highlighter wash of the functional hue, behind
             // full-strength ink — never a dimmed row, which would mean disabled.
-            row.SetBackgroundColor(PaperTheme.Wash(PaperTheme.Accent));
+            row.Background = PaperUi.Highlight(Context!, PaperTheme.Accent);
         }
 
         var label = PaperUi.Body(Context!, choice.Label);

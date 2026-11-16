@@ -96,12 +96,11 @@ public static class ContinueRowView
 
         if (row.Row.NewEpisode)
         {
-            // The chip sits in the identity's wash with its deepest ink, as drawn — the identity's,
+            // The chip is a marker tag in the identity's fill with its deepest ink (§2) — the identity's,
             // never a role's, so it reads as Pulp's own news rather than a state (D21, §9).
-            var mark = Color.ParseColor(DesignTokens.Identity.Pulp.Mark);
             var chip = PaperUi.Label(context, NewEpisodeChip);
             chip.SetTextColor(Color.ParseColor(DesignTokens.Identity.Pulp.Deep));
-            chip.Background = PaperUi.Fill(context, PaperTheme.Wash(mark), DesignTokens.Shape.RadiusCard);
+            chip.Background = PaperUi.Tag(context, Color.ParseColor(DesignTokens.Identity.Pulp.Fill));
             var padH = PaperTheme.Dp(context, DesignTokens.Space.X2);
             chip.SetPadding(padH, 0, padH, 0);
             titleLine.AddView(chip, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)
