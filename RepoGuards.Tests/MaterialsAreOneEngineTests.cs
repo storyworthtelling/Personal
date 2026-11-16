@@ -62,6 +62,44 @@ public partial class MaterialsAreOneEngineTests
         Assert.DoesNotContain("XorShift", text, StringComparison.Ordinal);
     }
 
+    private static readonly string[] NativeHeads =
+    [
+        "FocusPhone/Flyleaf.Android", "FocusPhone/Score.Android", "FocusPhone/Post.Android", "FocusPhone/Plate.Android",
+        "Pulp/Pulp.Android", "Constitution/Constitution.Android",
+    ];
+
+    /// <summary>The native kit's components draw in the approved media (W8.8 PR 2a).</summary>
+    [Theory]
+    [InlineData("FocusPhone/Codex.Ui.Android/PaperUi.cs", "new MarkerFillDrawable(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/PaperUi.cs", "new PencilOutlineDrawable(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/PaperUi.cs", "new HighlighterDrawable(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/PaperUi.cs", "new PaperCardDrawable(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/Checkbox.cs", "MaterialPainters.Pencil(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/Dial.cs", "MaterialPainters.Pencil(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/MarkerUnderline.cs", "MaterialPainters.Marker(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/BinderTabs.cs", "MaterialPainters.Marker(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/PaperListAdapter.cs", "PaperUi.Highlight(")]
+    [InlineData("FocusPhone/Codex.Ui.Android/AccordionPicker.cs", "PaperUi.Highlight(")]
+    public void TheNativeKitDrawsInTheMedia(string file, string call) =>
+        Assert.Contains(call, Read(file), StringComparison.Ordinal);
+
+    /// <summary>
+    /// A selection is a highlighter band and a chip is a pencil one, from the kit, never a flat wash of the hue a head
+    /// mixes for itself; and the old one-texture-for-everything overlay is gone.
+    /// </summary>
+    [Fact]
+    public void NoNativeHeadMixesItsOwnWashOrGrain()
+    {
+        var found = Files(NativeHeads.Append("FocusPhone/Codex.Ui.Android"), "*.cs")
+            .Where(file => !file.Replace('\\', '/').EndsWith("Codex.Ui.Android/PaperTheme.cs", StringComparison.Ordinal))
+            .SelectMany(file => File.ReadLines(file).Select((line, i) => (file, line, i)))
+            .Where(hit => !hit.line.TrimStart().StartsWith("//", StringComparison.Ordinal)
+                && (hit.line.Contains("PaperTheme.Wash(", StringComparison.Ordinal) || hit.line.Contains("GrainOverlay(", StringComparison.Ordinal)))
+            .Select(hit => $"{Relative(hit.file)}:{hit.i + 1}")
+            .ToList();
+        Assert.True(found.Count == 0, "Use PaperUi.Highlight or PaperUi.Chip:\n" + string.Join("\n", found));
+    }
+
     [Theory]
     [InlineData("    new(\"Music\", Resource.Drawable.area_music, PaperTheme.ScoreMark, PaperTheme.ScoreFill),", true)]
     [InlineData("        PulpArea.Watching => Resource.Drawable.tabwatching,", true)]

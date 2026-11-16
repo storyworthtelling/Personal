@@ -121,7 +121,7 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
         if (shell.Room.IsChosen(item.Id))
         {
             var wash = new View(Host);
-            wash.SetBackgroundColor(PaperTheme.Wash(PaperTheme.ProgressMark));
+            wash.Background = PaperUi.Highlight(Host, PaperTheme.ProgressMark);
             frame.AddView(wash, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
         }

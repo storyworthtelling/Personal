@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Graphics;
+using Storyworthtelling.Materials.Android;
 using Android.Views;
 using Codex.Domain.Design;
 
@@ -29,17 +30,19 @@ public sealed class Checkbox : View
 
     public Checkbox(Context context) : base(context)
     {
+        // §2 Colored pencil: the box, its fill and the tick are all drawn with the pencil's tooth.
+        var density = context.Resources!.DisplayMetrics!.Density;
+        MaterialPainters.Pencil(stroke, PaperTheme.InkMuted, density);
         stroke.SetStyle(Paint.Style.Stroke);
-        stroke.StrokeWidth = PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp);
-        stroke.Color = PaperTheme.Hairline;
+        stroke.StrokeWidth = PaperUi.PencilLineDp * density;
 
+        MaterialPainters.Pencil(fill, PaperTheme.Accent, density);
         fill.SetStyle(Paint.Style.Fill);
-        fill.Color = PaperTheme.Accent;
 
+        MaterialPainters.Pencil(tick, PaperTheme.Paper, density);
         tick.SetStyle(Paint.Style.Stroke);
         tick.StrokeWidth = PaperTheme.Dp(context, 2);
         tick.StrokeCap = Paint.Cap.Round;
-        tick.Color = PaperTheme.Paper;
     }
 
     public void SetPicked(bool value)

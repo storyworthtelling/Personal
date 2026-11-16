@@ -3,6 +3,7 @@ using Android.Content;
 using Android.Content.PM;
 using Android.Graphics;
 using Android.Graphics.Drawables;
+using Storyworthtelling.Materials.Android;
 using Android.Text;
 using Android.Views;
 using Android.Widget;
@@ -103,7 +104,10 @@ public static class PaperUi
     public static Button PrimaryButton(Context context, string label, Action onClick)
     {
         var button = ButtonBase(context, label, onClick, PaperTheme.PaperBright, PaperTheme.SansSemibold(context));
-        button.Background = PressedHairline(context, PaperTheme.ActionDeep);
+        // §2 Marker: the Action deep tier, streaked, heavier at the rim, thinning where the stroke lifted; held, the
+        // streaks deepen and an inset hairline shows the press (§8).
+        button.Background = new MarkerFillDrawable(
+            PaperTheme.ActionDeep, PaperTheme.Ink, PaperTheme.Hairline, DesignTokens.Shape.RadiusButton, Density(context));
         // The bar puts a primary last and widest, whatever order it was handed in (BarOrder).
         Primaries.AddOrUpdate(button, PrimaryMark);
         return button;
@@ -112,7 +116,9 @@ public static class PaperUi
     public static Button SecondaryButton(Context context, string label, Action onClick)
     {
         var button = ButtonBase(context, label, onClick, PaperTheme.Ink, PaperTheme.SansSemibold(context));
-        button.Background = PressableOutline(context, PaperTheme.Hairline);
+        // §2 Colored pencil: the outline is drawn, with the pencil's tooth; held, the tooth rises (§8).
+        button.Background = new PencilOutlineDrawable(
+            PaperTheme.InkMuted, null, DesignTokens.Shape.RadiusButton, PencilLineDp, Density(context));
         return button;
     }
 
@@ -348,9 +354,9 @@ public static class PaperUi
         var tint = hue ?? PaperTheme.Accent;
         var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
         row.Background = Outline(context, PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusInput);
-        // Each cell paints its selection wash as a flat rectangle (SetBackgroundColor below); without
-        // clipping, the first/last cell's fill squares off past the row's own rounded corners. The
-        // GradientDrawable background above provides a rounded-rect outline for free.
+        // Each cell carries its selection as a highlighter band (Highlight below); clipping keeps the first and
+        // last cell's band inside the row's own rounded corners. The GradientDrawable background above provides a
+        // rounded-rect outline for free.
         row.ClipToOutline = true;
 
         var cells = new TextView[labels.Count];
@@ -362,9 +368,7 @@ public static class PaperUi
             {
                 var live = enabled is null || i >= enabled.Count || enabled[i];
                 var active = i == selected && live;
-                cells[i].SetBackgroundColor(active
-                    ? PaperTheme.Wash(tint)
-                    : Color.Transparent);
+                cells[i].Background = active ? Highlight(context, tint) : null;
                 cells[i].SetTextColor(active ? PaperTheme.Ink : PaperTheme.InkMuted);
                 cells[i].SetTypeface(
                     active ? PaperTheme.SansSemibold(context) : PaperTheme.SansRegular(context),
@@ -634,38 +638,63 @@ public static class PaperUi
 
     // ---- Drawables ----
 
-    public static GradientDrawable Fill(Context context, Color color, int radiusDp)
+    /// <summary>
+    /// A filled shape: a card, a field, a pill. On a paper tone it is paper, so it carries the grain (§2) and the grain
+    /// deepens while it is held (§8); any other colour is drawn flat.
+    /// </summary>
+    public static Drawable Fill(Context context, Color color, int radiusDp) =>
+        new PaperCardDrawable(color, IsPaper(color), null, radiusDp, 0, 0, Density(context));
+
+    /// <summary>A filled shape with a hairline round it, as <see cref="Fill"/>; <paramref name="dashed"/> for a place still empty.</summary>
+    public static Drawable Outline(Context context, Color fill, Color stroke, int radiusDp, bool dashed = false) =>
+        new PaperCardDrawable(
+            fill, IsPaper(fill), stroke, radiusDp, DesignTokens.Shape.HairlineDp, dashed ? DesignTokens.Space.X1 : 0, Density(context));
+
+    private static bool IsPaper(Color color) =>
+        color == PaperTheme.Paper || color == PaperTheme.PaperBright || color == PaperTheme.PaperDeep || color == PaperTheme.PaperShade;
+
+    /// <summary>The width of a pencil line on a button or chip, in dp: heavier than a hairline so the tooth shows.</summary>
+    public const float PencilLineDp = 1.5f;
+
+    /// <summary>
+    /// §2 Highlighter: the band behind a selection (a picked row, the segmented control's choice, a chosen option), in
+    /// the wash of <paramref name="hue"/>, streaked, wandering and pooled at its ends. Behind full-strength ink.
+    /// </summary>
+    public static Drawable Highlight(Context context, Color hue) => new HighlighterDrawable(hue, Density(context));
+
+    /// <summary>
+    /// §2 Colored pencil: a chip's ground, outlined in <paramref name="ink"/> and, when it is on or carries a role,
+    /// filled in <paramref name="fill"/>, both with the pencil's tooth; held, the tooth rises (§8).
+    /// </summary>
+    public static Drawable Chip(Context context, Color ink, Color? fill = null, int radiusDp = DesignTokens.Shape.RadiusButton) =>
+        new PencilOutlineDrawable(ink, fill, radiusDp, PencilLineDp, Density(context));
+
+    /// <summary>
+    /// A filter or choice chip (§7): a pencil outline in <paramref name="ink"/> and, when <paramref name="on"/>, the
+    /// highlighter band of <paramref name="hue"/> inside it (§2), behind the chip's full-strength ink.
+    /// </summary>
+    public static Drawable FilterChip(Context context, Color ink, Color hue, bool on, int radiusDp = DesignTokens.Shape.RadiusButton)
     {
-        var drawable = new GradientDrawable();
-        drawable.SetColor(color);
-        drawable.SetCornerRadius(PaperTheme.Dp(context, radiusDp));
-        return drawable;
+        var outline = Chip(context, ink, null, radiusDp);
+        if (!on)
+        {
+            return outline;
+        }
+
+        // The band sits inside the outline's rounded ends rather than under them, so its chisel cut never
+        // shows past the pencil line.
+        var layers = new LayerDrawable([Highlight(context, hue), outline]);
+        var inset = PaperTheme.Dp(context, radiusDp / 2);
+        layers.SetLayerInset(0, inset, 0, inset, 0);
+        return layers;
     }
 
-    public static GradientDrawable Outline(Context context, Color fill, Color stroke, int radiusDp)
-    {
-        var drawable = Fill(context, fill, radiusDp);
-        drawable.SetStroke(PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp), stroke);
-        return drawable;
-    }
+    /// <summary>
+    /// A tag (§2 Marker: "New", "Carried", "Regressed"): a small marker fill in <paramref name="fill"/>, streaked and
+    /// thinning where the stroke lifted, under ink dark enough to read on it.
+    /// </summary>
+    public static Drawable Tag(Context context, Color fill, int radiusDp = DesignTokens.Shape.RadiusInput) =>
+        new MarkerFillDrawable(fill, PaperTheme.Ink, PaperTheme.Hairline, radiusDp, Density(context));
 
-    // §3: a filled button is the deep tier. §8: pressing changes no colour — the fill stays and an
-    // inset hairline shows the press (audit W8.1; it used to darken from the mark tier to the deep).
-    private static StateListDrawable PressedHairline(Context context, Color fill)
-    {
-        var states = new StateListDrawable();
-        states.AddState([Android.Resource.Attribute.StatePressed],
-            Outline(context, fill, PaperTheme.Hairline, DesignTokens.Shape.RadiusButton));
-        states.AddState([], Fill(context, fill, DesignTokens.Shape.RadiusButton));
-        return states;
-    }
-
-    private static StateListDrawable PressableOutline(Context context, Color stroke)
-    {
-        var states = new StateListDrawable();
-        states.AddState([Android.Resource.Attribute.StatePressed],
-            Outline(context, PaperTheme.PaperShade, stroke, DesignTokens.Shape.RadiusButton));
-        states.AddState([], Outline(context, PaperTheme.Paper, stroke, DesignTokens.Shape.RadiusButton));
-        return states;
-    }
+    private static float Density(Context context) => context.Resources!.DisplayMetrics!.Density;
 }

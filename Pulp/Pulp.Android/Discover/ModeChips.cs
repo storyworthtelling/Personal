@@ -51,9 +51,7 @@ internal sealed class ModeChips : LinearLayout
         foreach (var (each, chip) in chips)
         {
             var on = each == mode;
-            chip.Background = on
-                ? PaperUi.Fill(Context!, PaperTheme.Wash(hue), DesignTokens.Shape.RadiusButton)
-                : PaperUi.Outline(Context!, PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusButton);
+            chip.Background = PaperUi.FilterChip(Context!, PaperTheme.InkMuted, hue, on);
             chip.SetTextColor(on ? PaperTheme.Ink : PaperTheme.InkSoft);
         }
     }

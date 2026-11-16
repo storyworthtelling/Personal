@@ -11,7 +11,7 @@ namespace Storyworthtelling.Materials.Android;
 public static class MaterialPainters
 {
     private static readonly Dictionary<string, Path> Paths = [];
-    private static readonly Paint Pencil = new(PaintFlags.AntiAlias)
+    private static readonly Paint GlyphStroke = new(PaintFlags.AntiAlias)
     {
         StrokeCap = Paint.Cap.Round,
         StrokeJoin = Paint.Join.Round,
@@ -40,15 +40,15 @@ public static class MaterialPainters
         matrix.SetScale(texel, texel);
         toothShader.SetLocalMatrix(matrix);
 
-        Pencil.SetStyle(Paint.Style.Stroke);
-        Pencil.StrokeWidth = TabGlyphs.StrokeWidth;
-        Pencil.Color = ink;
-        Pencil.SetShader(toothShader);
+        GlyphStroke.SetStyle(Paint.Style.Stroke);
+        GlyphStroke.StrokeWidth = TabGlyphs.StrokeWidth;
+        GlyphStroke.Color = ink;
+        GlyphStroke.SetShader(toothShader);
 
         var save = canvas.Save();
         canvas.Translate(box.Left, box.Top);
         canvas.Scale(scale, scale);
-        canvas.DrawPath(PathFor(glyph), Pencil);
+        canvas.DrawPath(PathFor(glyph), GlyphStroke);
         canvas.RestoreToCount(save);
     }
 
@@ -67,6 +67,35 @@ public static class MaterialPainters
         grainShader.SetLocalMatrix(matrix);
         Flecks.SetShader(grainShader);
         canvas.DrawRect(box, Flecks);
+    }
+
+    /// <summary>
+    /// Readies <paramref name="paint"/> to draw in colored pencil (§2): <paramref name="ink"/> with the tooth, one tooth
+    /// texel <see cref="MaterialStrength.PencilTexelDp"/> on screen. For a custom view's own strokes and fills (a
+    /// checkbox, the Dial's arc); the caller sets the style and width.
+    /// </summary>
+    public static Paint Pencil(Paint paint, Color ink, float canvasUnitsPerDp, bool pressed = false)
+    {
+        paint.AntiAlias = true;
+        paint.Color = ink;
+        paint.SetShader(MaterialShaders.Tiled(
+            pressed ? MaterialShaders.PencilToothPressed : MaterialShaders.PencilTooth,
+            MaterialStrength.PencilTexelDp * canvasUnitsPerDp));
+        return paint;
+    }
+
+    /// <summary>
+    /// Readies <paramref name="paint"/> to draw in marker (§2): <paramref name="ink"/> with fibre streaks running along
+    /// the x axis, one row <see cref="MaterialStrength.StreakRowDp"/> deep. A heading underline, a tab's label.
+    /// </summary>
+    public static Paint Marker(Paint paint, Color ink, float canvasUnitsPerDp, bool pressed = false)
+    {
+        paint.AntiAlias = true;
+        paint.Color = ink;
+        paint.SetShader(MaterialShaders.Tiled(
+            pressed ? MaterialShaders.MarkerStreaksPressed : MaterialShaders.MarkerStreaks,
+            MaterialStrength.StreakRowDp * canvasUnitsPerDp));
+        return paint;
     }
 
     /// <summary>The Android path for a glyph's data, built once.</summary>

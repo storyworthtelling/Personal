@@ -134,9 +134,9 @@ public class PaperListAdapter : BaseAdapter
             // picked has to actively say so or it inherits the last one's wash.
             checkbox.Visibility = picking ? ViewStates.Visible : ViewStates.Gone;
             checkbox.SetPicked(row.Picked);
-            SetBackgroundColor(picking && row.Picked
-                ? PaperTheme.Wash(PaperTheme.Accent)   // §8 Selected: the highlighter wash
-                : Color.Transparent);
+            Background = picking && row.Picked
+                ? PaperUi.Highlight(Context!, PaperTheme.Accent)   // §8 Selected: the highlighter band
+                : null;
 
             if (picking || row.ArtworkPath is null)
             {

@@ -63,8 +63,7 @@ internal sealed class PileStack : ViewGroup
     private static View GapView(Context context)
     {
         var view = new View(context);
-        var outline = PaperUi.Outline(context, PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusCard);
-        outline.SetStroke(PaperTheme.Dp(context, DesignTokens.Shape.HairlineDp), PaperTheme.Hairline, PaperTheme.Dp(context, DesignTokens.Space.X1), PaperTheme.Dp(context, DesignTokens.Space.X1));
+        var outline = PaperUi.Outline(context, PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusCard, dashed: true);
         view.Background = outline;
         return view;
     }

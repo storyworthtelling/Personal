@@ -31,13 +31,13 @@ public sealed class RatingChipView : TextView
         if (chip.Outlined || chip.Role is null)
         {
             SetTextColor(PaperTheme.InkMuted);
-            Background = PaperUi.Outline(context, PaperTheme.Paper, PaperTheme.Hairline, DesignTokens.Shape.RadiusButton);
+            Background = PaperUi.Chip(context, PaperTheme.InkMuted);
             return;
         }
 
         var (fill, ink) = ColoursOf(chip.Role.Value);
         SetTextColor(ink);
-        Background = PaperUi.Fill(context, fill, DesignTokens.Shape.RadiusButton);
+        Background = PaperUi.Chip(context, fill, fill);
     }
 
     /// <summary>A role's chip colours: its Fill tier behind its Text tier. No arm for Caution exists to reach.</summary>
