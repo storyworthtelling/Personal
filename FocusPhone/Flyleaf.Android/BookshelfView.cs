@@ -1,6 +1,7 @@
 using Android.Content;
 using Android.Graphics;
 using Android.Views;
+using Android.Views.Accessibility;
 using Android.Widget;
 using Codex.Domain.Apps;
 using Codex.Domain.Home;
@@ -42,6 +43,13 @@ public class BookshelfView : View, IDrawnControls
 
     private readonly GestureDetector gesture;
 
+    // A node per book, the clock and each named bookend, decided from the layout the painter draws (ShelfAccess), so
+    // TalkBack, Switch Access and a finger all reach the same things (audit W9.2).
+    private IReadOnlyList<ShelfNode> nodes = [];
+    private readonly ShelfNodes provider;
+    private int focusedNode = AccessibilityNodeProvider.HostViewId;
+    private int hoveredNode = AccessibilityNodeProvider.HostViewId;
+
     public Action<PlacedItem>? ItemTapped;
     public Action<PlacedItem>? ItemLongPressed;
 
@@ -51,6 +59,9 @@ public class BookshelfView : View, IDrawnControls
         density = context.Resources!.DisplayMetrics!.Density;
         metrics = PxMetrics(density);
         gesture = new GestureDetector(context, new TapListener(this));
+        provider = new ShelfNodes(this);
+        ImportantForAccessibility = ImportantForAccessibility.Yes;
+        ContentDescription = "Bookshelf";
     }
 
     /// <summary>Sets the shelves to render; re-lays out and re-bakes on the next measure/draw.</summary>
@@ -83,6 +94,7 @@ public class BookshelfView : View, IDrawnControls
         {
             viewportHeight = vh;
             layout = BookshelfLayout.Build(width, metrics, shelves, viewportHeight);
+            nodes = ShelfAccess.Nodes(layout, DesignTokens.Shape.TouchTargetDp * density, density);
             DropBaked();
         }
         var height = Math.Max((int)layout.TotalHeight, MeasureSpec.GetSize(heightMeasureSpec));
@@ -725,15 +737,17 @@ public class BookshelfView : View, IDrawnControls
     /// <summary>A book is a control the tap watch cannot see by its flags (it is painted, not a view).</summary>
     public bool HasControlAt(float x, float y) => HitTest(x, y) is not null;
 
-    private PlacedItem? HitTest(float x, float y)
+    // A touch goes to the book whose widened box it lands in; between two slim spines, the nearer (ShelfAccess).
+    private PlacedItem? HitTest(float x, float y) =>
+        ShelfAccess.At(nodes, x, y) is { } node ? ItemFor(node) : null;
+
+    private PlacedItem? ItemFor(ShelfNode node)
     {
         foreach (var shelf in layout.Shelves)
         {
             foreach (var item in shelf.Items)
             {
-                var r = item.Rect;
-                // Generous vertical padding so the thin spines/covers are easy to tap.
-                if (x >= r.Left - 4 && x <= r.Right + 4 && y >= r.Top - 12 && y <= r.Bottom + 8)
+                if (item.Key == node.Key && item.Rect == node.Drawn)
                 {
                     return item;
                 }
@@ -777,6 +791,199 @@ public class BookshelfView : View, IDrawnControls
 
     private static RadialGradient Radial(float cx, float cy, float radius, Color c0, Color c1) =>
         new(cx, cy, radius, c0, c1, Shader.TileMode.Clamp!);
+
+    // ---- Accessibility (audit W9.2) ----
+
+    /// <summary>The words TalkBack reads for a node: a book's title and its bookmark, the time, a shelf's name.</summary>
+    private string Words(ShelfNode node) => node.Kind switch
+    {
+        ShelfNodeKind.Clock => ShelfAccess.ClockText(time),
+        ShelfNodeKind.Heading => $"{node.Key} shelf",
+        _ => ShelfAccess.BookText(art.Label(node.Key), art.HasNotification(node.Key) ? art.NotificationRole(node.Key) : null),
+    };
+
+    public override AccessibilityNodeProvider? AccessibilityNodeProvider => provider;
+
+    // Touch exploration sends hover events: the node under the finger is the one read.
+    protected override bool DispatchHoverEvent(MotionEvent? e)
+    {
+        if (e is null || Context!.GetSystemService(Context.AccessibilityService) is not AccessibilityManager { IsTouchExplorationEnabled: true })
+        {
+            return base.DispatchHoverEvent(e);
+        }
+
+        switch (e.Action)
+        {
+            case MotionEventActions.HoverEnter:
+            case MotionEventActions.HoverMove:
+                var node = nodes.FirstOrDefault(candidate => Contains(candidate.Touch, e.GetX(), e.GetY()));
+                HoverOver(node?.Id ?? AccessibilityNodeProvider.HostViewId);
+                return node is not null;
+            case MotionEventActions.HoverExit:
+                HoverOver(AccessibilityNodeProvider.HostViewId);
+                return true;
+            default:
+                return base.DispatchHoverEvent(e);
+        }
+    }
+
+    private void HoverOver(int id)
+    {
+        if (id == hoveredNode)
+        {
+            return;
+        }
+
+        var previous = hoveredNode;
+        hoveredNode = id;
+        Send(id, EventTypes.ViewHoverEnter);
+        Send(previous, EventTypes.ViewHoverExit);
+    }
+
+    private void Send(int id, EventTypes type)
+    {
+        if (id < 0 || id >= nodes.Count || Parent is null)
+        {
+            return;
+        }
+
+        var report = new AccessibilityEvent { EventType = type };
+        report.PackageName = Context!.PackageName;
+        report.ClassName = ClassFor(nodes[id]);
+        report.SetSource(this, id);
+        report.Text!.Add(new Java.Lang.String(Words(nodes[id])));
+        Parent.RequestSendAccessibilityEvent(this, report);
+    }
+
+    private static string ClassFor(ShelfNode node) =>
+        node.Kind == ShelfNodeKind.Heading ? "android.widget.TextView" : "android.widget.Button";
+
+    private static bool Contains(LayoutRect rect, float x, float y) =>
+        x >= rect.Left && x < rect.Right && y >= rect.Top && y <= rect.Bottom;
+
+    private bool Act(int id, global::Android.Views.Accessibility.Action action)
+    {
+        if (id < 0 || id >= nodes.Count)
+        {
+            return false;
+        }
+
+        var node = nodes[id];
+        switch (action)
+        {
+            case global::Android.Views.Accessibility.Action.AccessibilityFocus:
+                if (focusedNode == id)
+                {
+                    return false;
+                }
+                Send(focusedNode, EventTypes.ViewAccessibilityFocusCleared);
+                focusedNode = id;
+                // Moving through the shelf scrolls the book into view.
+                RequestRectangleOnScreen(new Rect((int)node.Touch.Left, (int)node.Touch.Top, (int)node.Touch.Right, (int)node.Touch.Bottom));
+                Send(id, EventTypes.ViewAccessibilityFocused);
+                return true;
+            case global::Android.Views.Accessibility.Action.ClearAccessibilityFocus:
+                if (focusedNode != id)
+                {
+                    return false;
+                }
+                focusedNode = AccessibilityNodeProvider.HostViewId;
+                Send(id, EventTypes.ViewAccessibilityFocusCleared);
+                return true;
+            case global::Android.Views.Accessibility.Action.Click when node.Kind == ShelfNodeKind.Book:
+                if (ItemFor(node) is { } opened)
+                {
+                    ItemTapped?.Invoke(opened);
+                }
+                Send(id, EventTypes.ViewClicked);
+                return true;
+            case global::Android.Views.Accessibility.Action.LongClick when node.Kind != ShelfNodeKind.Heading:
+                if (ItemFor(node) is { } held)
+                {
+                    ItemLongPressed?.Invoke(held);
+                }
+                Send(id, EventTypes.ViewLongClicked);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// The shelf's virtual children for TalkBack and Switch Access: a node per book (open; a named long-press for its
+    /// actions), the clock (its time; a long press opens Settings), and each named bookend as a heading. Written
+    /// against the platform's provider rather than AndroidX's ExploreByTouchHelper, which would add a package.
+    /// </summary>
+    private sealed class ShelfNodes(BookshelfView view) : AccessibilityNodeProvider
+    {
+        public override AccessibilityNodeInfo? CreateAccessibilityNodeInfo(int virtualViewId)
+        {
+            if (virtualViewId == HostViewId)
+            {
+                var host = new AccessibilityNodeInfo(view);
+                view.OnInitializeAccessibilityNodeInfo(host);
+                foreach (var child in view.nodes)
+                {
+                    host.AddChild(view, child.Id);
+                }
+                return host;
+            }
+
+            if (virtualViewId < 0 || virtualViewId >= view.nodes.Count)
+            {
+                return null;
+            }
+
+            var node = view.nodes[virtualViewId];
+            var info = new AccessibilityNodeInfo(view, node.Id);
+            info.SetParent(view);
+            info.PackageName = view.Context!.PackageName;
+            info.ClassName = ClassFor(node);
+            info.ContentDescription = view.Words(node);
+            info.Enabled = true;
+            info.Focusable = true;
+
+            var local = new Rect((int)node.Touch.Left, (int)node.Touch.Top, (int)node.Touch.Right, (int)node.Touch.Bottom);
+            var visible = new Rect();
+            view.GetLocalVisibleRect(visible);
+            info.VisibleToUser = Rect.Intersects(local, visible);
+#pragma warning disable CA1422 // the parent bounds are still read by older services
+            info.SetBoundsInParent(local);
+#pragma warning restore CA1422
+            var origin = new int[2];
+            view.GetLocationOnScreen(origin);
+            info.SetBoundsInScreen(new Rect(local.Left + origin[0], local.Top + origin[1], local.Right + origin[0], local.Bottom + origin[1]));
+
+            if (node.Kind == ShelfNodeKind.Heading)
+            {
+                info.Heading = true;
+            }
+            else
+            {
+                info.LongClickable = true;
+                var held = node.Kind == ShelfNodeKind.Clock ? "Open settings" : $"Actions for {view.art.Label(node.Key)}";
+                info.AddAction(new AccessibilityNodeInfo.AccessibilityAction((int)global::Android.Views.Accessibility.Action.LongClick, held));
+            }
+
+            if (node.Kind == ShelfNodeKind.Book)
+            {
+                info.Clickable = true;
+                info.AddAction(new AccessibilityNodeInfo.AccessibilityAction((int)global::Android.Views.Accessibility.Action.Click, "Open"));
+            }
+
+            var focused = view.focusedNode == node.Id;
+            info.AccessibilityFocused = focused;
+            info.AddAction(focused
+                ? AccessibilityNodeInfo.AccessibilityAction.ActionClearAccessibilityFocus
+                : AccessibilityNodeInfo.AccessibilityAction.ActionAccessibilityFocus);
+            return info;
+        }
+
+        public override bool PerformAction(int virtualViewId, global::Android.Views.Accessibility.Action action, global::Android.OS.Bundle? arguments) =>
+            virtualViewId == HostViewId
+                ? view.PerformAccessibilityAction(action, arguments)
+                : view.Act(virtualViewId, action);
+    }
 
     private sealed class TapListener(BookshelfView view) : GestureDetector.SimpleOnGestureListener
     {
