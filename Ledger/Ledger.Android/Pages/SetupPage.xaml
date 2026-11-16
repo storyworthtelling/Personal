@@ -39,14 +39,14 @@
 
                         <VerticalStackLayout x:Name="PlaidCredentialFields" Spacing="16" IsVisible="False">
                             <Label Text="Client ID" Style="{StaticResource FieldLabel}" />
-                            <Border Style="{StaticResource HairlineCard}" BackgroundColor="{StaticResource PaperDeep}" Padding="12,0" HeightRequest="44">
-                                <Entry x:Name="ClientIdEntry" Placeholder="6f1a…" Style="{StaticResource MonoEntry}"
+                            <Border Style="{StaticResource HairlineCard}" BackgroundColor="{StaticResource PaperDeep}" Padding="12,0" MinimumHeightRequest="48">
+                                <Entry x:Name="ClientIdEntry" SemanticProperties.Description="Client ID" Placeholder="6f1a…" Style="{StaticResource MonoEntry}"
                                        BackgroundColor="Transparent" VerticalOptions="Center" />
                             </Border>
 
                             <Label Text="Secret" Style="{StaticResource FieldLabel}" />
-                            <Border Style="{StaticResource HairlineCard}" BackgroundColor="{StaticResource PaperDeep}" Padding="12,0" HeightRequest="44">
-                                <Entry x:Name="SecretEntry" Placeholder="••••••••" IsPassword="True" Style="{StaticResource MonoEntry}"
+                            <Border Style="{StaticResource HairlineCard}" BackgroundColor="{StaticResource PaperDeep}" Padding="12,0" MinimumHeightRequest="48">
+                                <Entry x:Name="SecretEntry" SemanticProperties.Description="Secret" Placeholder="••••••••" IsPassword="True" Style="{StaticResource MonoEntry}"
                                        BackgroundColor="Transparent" VerticalOptions="Center" />
                             </Border>
                             <ContentView x:Name="PlaidConsoleLink" />
@@ -132,8 +132,8 @@
                     <!-- ==================== Vault ==================== -->
                     <Label x:Name="VaultIntroLabel" Style="{StaticResource SecondaryLabel}" />
                     <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" Margin="0,8,0,0" />
-                    <Border Style="{StaticResource HairlineCard}" BackgroundColor="{StaticResource PaperDeep}" Padding="12,0" HeightRequest="44">
-                        <Entry x:Name="VaultPassphraseEntry" Placeholder="Choose a passphrase"
+                    <Border Style="{StaticResource HairlineCard}" BackgroundColor="{StaticResource PaperDeep}" Padding="12,0" MinimumHeightRequest="48">
+                        <Entry x:Name="VaultPassphraseEntry" SemanticProperties.Description="Vault passphrase" Placeholder="Choose a passphrase"
                                Style="{StaticResource MonoEntry}" BackgroundColor="Transparent" VerticalOptions="Center" />
                     </Border>
                     <Label x:Name="PassphraseNoteLabel" Style="{StaticResource SecondaryLabel}" />

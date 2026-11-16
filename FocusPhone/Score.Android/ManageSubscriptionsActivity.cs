@@ -128,12 +128,12 @@ public class ManageSubscriptionsActivity : Activity
 
         if (index > 0)
         {
-            row.AddView(PaperUi.QuietButton(this, "↑", () => Move(index, index - 1)));
+            row.AddView(PaperUi.IconButton(this, "↑", $"Move {subscription.Title} up", () => Move(index, index - 1)));
         }
 
         if (index < total - 1)
         {
-            row.AddView(PaperUi.QuietButton(this, "↓", () => Move(index, index + 1)));
+            row.AddView(PaperUi.IconButton(this, "↓", $"Move {subscription.Title} down", () => Move(index, index + 1)));
         }
 
         row.AddView(PaperUi.SecondaryButton(this, "Remove", () => RemoveWithUndo(subscription)));

@@ -160,4 +160,13 @@ public class DialGeometryTests
         // No direction to read; the value cannot be changed by a tap on the pivot.
         Assert.Equal(90, Tempo.ValueAtPoint(0, 0));
     }
+
+    /// <summary>TalkBack's scroll actions and a D-pad turn the dial by a step, never past its ends (audit W9.3).</summary>
+    [Theory]
+    [InlineData(120, 1, 125)]
+    [InlineData(120, -1, 115)]
+    [InlineData(178, 1, 180)]
+    [InlineData(92, -1, 90)]
+    public void ANudgeTurnsByAStepAndStopsAtTheEnds(int from, int direction, int expected) =>
+        Assert.Equal(expected, Tempo.Nudge(from, direction, step: 5));
 }

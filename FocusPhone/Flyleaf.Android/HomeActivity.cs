@@ -130,7 +130,8 @@ public class HomeActivity : Activity
         {
             hello.Text = message;
             hello.Visibility = ViewStates.Visible;
-            await Task.Delay(DesignTokens.Motion.CoverReadBeatMs); // a beat to read it
+            // A beat to read it, or the longer one the person asked Android for (audit W9.3).
+            await Task.Delay(PaperMotion.ReadingTime(this, DesignTokens.Motion.CoverReadBeatMs));
         }
         else
         {
@@ -140,7 +141,7 @@ public class HomeActivity : Activity
         {
             return;
         }
-        overlay.Animate()!.Alpha(0f)!.SetDuration(DesignTokens.Motion.InkMs)!
+        overlay.Animate()!.Alpha(0f)!.SetDuration(PaperMotion.Reduced ? 0 : DesignTokens.Motion.InkMs)!
             .WithEndAction(new Java.Lang.Runnable(() => (overlay.Parent as ViewGroup)?.RemoveView(overlay)))!.Start();
     }
 

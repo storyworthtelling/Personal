@@ -268,19 +268,28 @@ public class BookPage : FolioBinderPage
         return row;
     }
 
-    private static View Chart(IReadOnlyList<DraftFindings> readiness) => new GraphicsView
+    private static View Chart(IReadOnlyList<DraftFindings> readiness)
     {
-        Drawable = new ReadinessChartDrawable
+        var chart = new GraphicsView
         {
-            Plot = ReadinessChart.Plot(readiness),
-            Labels = TierNames.ToDictionary(
-                entry => entry.Key,
-                entry => $"{entry.Value} {Latest(readiness, entry.Key)}"),
-        },
-        HeightRequest = ReadinessChartDrawable.FrameHeight,
-        Margin = new Thickness(0, 12, 0, 0),
-        InputTransparent = true,
-    };
+            Drawable = new ReadinessChartDrawable
+            {
+                Plot = ReadinessChart.Plot(readiness),
+                Labels = TierNames.ToDictionary(
+                    entry => entry.Key,
+                    entry => $"{entry.Value} {Latest(readiness, entry.Key)}"),
+            },
+            HeightRequest = ReadinessChartDrawable.FrameHeight,
+            Margin = new Thickness(0, 12, 0, 0),
+            InputTransparent = true,
+        };
+
+        // The chart in one sentence for a screen reader (§17, audit W9.3): how many drafts, and the latest counts.
+        SemanticProperties.SetDescription(chart,
+            $"Findings across {readiness.Count} {(readiness.Count == 1 ? "draft" : "drafts")}; latest: "
+            + string.Join(", ", TierNames.Select(entry => $"{entry.Value} {Latest(readiness, entry.Key)}")) + ".");
+        return chart;
+    }
 
     // The name at a line's end carries its latest count, as the frame prints it: "Must 5".
     private static int Latest(IReadOnlyList<DraftFindings> readiness, ReadinessTier tier) =>
