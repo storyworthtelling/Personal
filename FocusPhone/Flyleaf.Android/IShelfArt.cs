@@ -1,3 +1,4 @@
+using Codex.Domain.Apps;
 using Android.Graphics;
 using Android.Graphics.Drawables;
 
@@ -38,4 +39,7 @@ public interface IShelfArt
     /// priority-coded one reads at a glance regardless of which book it is on.
     /// </summary>
     int NotificationHue(string packageKey);
+
+    /// <summary>What the bookmark means, or null when the book has none: the ribbon's colour said aloud (§15).</summary>
+    BookmarkRole? NotificationRole(string packageKey);
 }

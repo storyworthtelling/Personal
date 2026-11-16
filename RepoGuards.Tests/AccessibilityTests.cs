@@ -129,7 +129,6 @@ public partial class AccessibilityTests
     /// <summary>Drawn views still to be given a node per item; each goes in its own PR and leaves this list.</summary>
     private static readonly string[] StillToDescribe =
     [
-        "FocusPhone/Flyleaf.Android/BookshelfView.cs",
         "FocusPhone/Codex.Ui.Android/Dial.cs",
         "FocusPhone/Plate.Android/CropOverlayView.cs",
     ];
@@ -147,6 +146,20 @@ public partial class AccessibilityTests
             .Where(path => !StillToDescribe.Contains(path))
             .ToList();
         Assert.True(found.Count == 0, "A drawn view a person can tap needs a description or a node per item:\n" + string.Join("\n", found));
+    }
+
+    /// <summary>
+    /// Flyleaf's shelf is the only home on the locked phone (audit W9.2): its books, clock and bookends are nodes, and a
+    /// finger hits the same widened boxes TalkBack reads.
+    /// </summary>
+    [Fact]
+    public void TheShelfIsReadableAndTappableThroughOneSetOfNodes()
+    {
+        var shelf = Read("FocusPhone/Flyleaf.Android", "BookshelfView.cs");
+        Assert.Contains("AccessibilityNodeProvider? AccessibilityNodeProvider => provider", shelf, StringComparison.Ordinal);
+        Assert.Contains("ShelfAccess.Nodes(layout, DesignTokens.Shape.TouchTargetDp * density", shelf, StringComparison.Ordinal);
+        Assert.Contains("ShelfAccess.At(nodes, x, y)", shelf, StringComparison.Ordinal);
+        Assert.Contains("DispatchHoverEvent", shelf, StringComparison.Ordinal);
     }
 
     [Theory]
