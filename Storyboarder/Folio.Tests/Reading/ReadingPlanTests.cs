@@ -12,10 +12,10 @@ namespace Folio.Tests.Reading;
 public class ReadingPlanTests
 {
     [Fact]
-    public void SixteenPassesMakeARead()
+    public void SeventeenPassesMakeARead()
     {
-        Assert.Equal(16, ReadingPlan.Passes.Count);
-        Assert.Equal(14, ReadingPlan.Passes.Count(pass => !pass.IsSynthesis));
+        Assert.Equal(17, ReadingPlan.Passes.Count);
+        Assert.Equal(15, ReadingPlan.Passes.Count(pass => !pass.IsSynthesis));
         Assert.Equal(2, ReadingPlan.Passes.Count(pass => pass.IsSynthesis));
     }
 
@@ -37,8 +37,8 @@ public class ReadingPlanTests
     [Fact]
     public void TheSynthesisPassesComeLastBecauseTheyReadTheOthers()
     {
-        Assert.All(ReadingPlan.Passes.Take(14), pass => Assert.False(pass.IsSynthesis));
-        Assert.All(ReadingPlan.Passes.Skip(14), pass => Assert.True(pass.IsSynthesis));
+        Assert.All(ReadingPlan.Passes.Take(15), pass => Assert.False(pass.IsSynthesis));
+        Assert.All(ReadingPlan.Passes.Skip(15), pass => Assert.True(pass.IsSynthesis));
     }
 
     /// <summary>

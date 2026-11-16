@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
+using Folio.Domain.Scenes;
 using Folio.Domain.External;
 using Folio.Domain.Health;
 using Folio.Domain.Model;
@@ -53,6 +54,23 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "setting, then describe ONE cohesive illustration style for the WHOLE book — medium, rendering, " +
         "linework, colour palette, lighting and mood — in a single vivid sentence an illustrator could " +
         "follow consistently. Respond with ONLY a JSON object: {\"artStyle\":string}. No prose outside the JSON.";
+
+    // One detected scene, judged on its own (release A3–A4). Nudge never write: the verdict and the notes
+    // point at problems and never supply the author's sentences.
+    private const string SceneJudgementInstruction =
+        "You are judging ONE scene of a manuscript as a developmental editor. You are given the scene's own " +
+        "text, the story so far when it begins, the book's dominant voice, and the cast and settings it names. " +
+        "Respond with ONLY a JSON object: {\"accomplishes\":string,\"call\":\"Keep|Tighten|Rewrite|Cut\"," +
+        "\"tension\":number,\"verdict\":string,\"inconsistencies\":[{\"kind\":\"Voice|Tense|Characterisation|Setting\"," +
+        "\"detail\":string,\"excerpt\":string}]}. accomplishes = what this scene does for the plot and for the " +
+        "characters, in one or two sentences. call = Keep (it works), Tighten (it works but runs long or repeats), " +
+        "Rewrite (it does not yet do its job), or Cut (the book loses nothing without it). tension = how much " +
+        "pressure the scene carries, from 0 (calm) to 1 (peak). verdict = one or two sentences on why the call. " +
+        "inconsistencies = places where the scene's voice drifts from the book's, its tense slips, a character " +
+        "acts or sounds unlike the story so far without cause, or a setting contradicts what was established; " +
+        "an empty list when there are none. excerpt = a short verbatim quote (under fifteen words) from THIS " +
+        "scene where the inconsistency is, so the note can be written on that line. You diagnose and point: " +
+        "never write replacement prose, never rewrite a sentence, never supply the author's words.";
 
     private const string SceneImageInstruction =
         "You are a visual-development artist illustrating ONE scene of a novel for a fidelity check: the " +
@@ -151,18 +169,19 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "verdict: the candid state of the draft — biggest strengths, biggest problems, and the single thing " +
         "this draft most needs before the next revision. Use [] when none. No prose outside the JSON.";
 
+    // The scene-by-scene map is no longer asked for here: each detected scene is judged on its own
+    // (JudgeScene, release A3). A reply that still carries a sceneBreakdown is parsed, for stored reports.
     private const string CraftConsolidationInstruction =
         "You are a line editor and craft critic producing the CRAFT half of a REVISION REPORT for an " +
         "author preparing a novel for publication. You are given per-chunk notes gathered across the " +
         "whole manuscript in reading order; each carries the chapter it was taken from, and " +
-        "lineEditCandidates/proseObservations/dialogueObservations/sceneBeats are the raw material for " +
-        "your four sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
+        "lineEditCandidates/proseObservations/dialogueObservations are the raw material for " +
+        "your three sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
         "book — merge duplicates, drop the trivial, keep the author's own words when quoting. Respond " +
         "with ONLY a JSON object: " +
         "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string,\"kind\":string}]," +
         "\"proseNotes\":[{\"chapter\":string,\"pattern\":string,\"evidence\":string,\"fix\":string}]," +
-        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string,\"excerpt\":string}]," +
-        "\"sceneBreakdown\":[{\"chapter\":string,\"scene\":string,\"purpose\":string,\"verdict\":string,\"excerpt\":string,\"outcome\":string}]}. " +
+        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string,\"excerpt\":string}]}. " +
         "lineEdits: specific sentences to cut, tighten, or rewrite — \"excerpt\" quoted verbatim from " +
         "the notes so the author can find it, \"suggestion\" the actual replacement or cut, \"reason\" " +
         "one short clause, \"kind\" the ONE word that names what is actually wrong with the sentence: " +
@@ -178,12 +197,6 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "and exposition dumped into speech. \"excerpt\": when the note is about a SPECIFIC exchange, " +
         "quote it verbatim from the notes; leave \"\" for an aggregate observation with no single " +
         "exchange to point at (e.g. \"all three sound identical\"). AT MOST 20. " +
-        "sceneBreakdown: the scene-by-scene map in reading order — \"scene\" what happens, \"purpose\" " +
-        "what it accomplishes for the book (plot, character, theme, information), \"verdict\" whether it " +
-        "earns its place and what is missing if not. Say plainly when a scene does no work. \"excerpt\": " +
-        "quote, verbatim, a short line from near the END of the scene, so the note can sit at the " +
-        "scene's own close — leave \"\" only when the notes give nothing quotable for this scene. " +
-        "\"outcome\": \"EarnsItsPlace\" or \"DoesNoWork\", matching \"verdict\". AT MOST 100. " +
         "Every \"chapter\" is copied from the note the item came from; \"\" only when the notes carry " +
         "none. Use [] when none. No prose outside the JSON.";
 
@@ -306,20 +319,309 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return dto?.ArtStyle?.Trim() ?? string.Empty;
     }
 
-    public async Task<string> DescribeSceneImage(
-        string sceneText, DesignBible bible, string artStyle, IReadOnlyList<string> avoidMoments,
-        CancellationToken cancellationToken)
+    // The image-prompt request's content: the one place it is built, for the direct call and the batch.
+    private static string SceneImageContent(
+        string sceneText, DesignBible bible, string artStyle, IReadOnlyList<string> avoidMoments)
     {
         // Only the cast and settings this scene names: see DesignBible.ForScene.
         var bibleJson = JsonSerializer.Serialize(bible.ForScene(sceneText), JsonResponse.CaseInsensitive);
         var avoid = avoidMoments.Count == 0
             ? "(none)"
             : string.Join("\n", avoidMoments.Select(m => $"- {m}"));
-        var userContent =
+        return
             $"ART STYLE: {artStyle}\n\n" +
             $"CAST & SETTINGS (JSON):\n{bibleJson}\n\n" +
             $"MOMENTS TO AVOID:\n{avoid}\n\n" +
             $"SCENE:\n{sceneText}";
+    }
+
+    // ---- The batch tier (owner's ruling, R39) ----------------------------------------------------------
+    // The same requests as the direct calls (same instruction, same content, same model and effort), sent
+    // together at half the cost of every token and read back by custom id, never by position.
+
+    private const string BatchesUrl = "https://api.anthropic.com/v1/messages/batches";
+
+    public Task<string?> SubmitSceneJudgements(
+        IReadOnlyList<SceneToJudge> scenes, DesignBible bible, CancellationToken cancellationToken) =>
+        SubmitBatch(
+            scenes.Select(scene => (SceneKey(scene.Number), MessageParams(SceneJudgementInstruction, SceneJudgementContent(scene, bible)))).ToList(),
+            nameof(JudgeScene), cancellationToken);
+
+    public Task<string?> SubmitSceneImagePrompts(
+        IReadOnlyList<SceneImageRequest> scenes, DesignBible bible, string artStyle, CancellationToken cancellationToken) =>
+        SubmitBatch(
+            scenes.Select(scene => (SceneKey(scene.Number), MessageParams(SceneImageInstruction, SceneImageContent(scene.Text, bible, artStyle, [])))).ToList(),
+            nameof(DescribeSceneImage), cancellationToken);
+
+    public Task<string?> SubmitReads(
+        IReadOnlyList<Persona> personas, string manuscript, ReadingFrame frame, CancellationToken cancellationToken) =>
+        SubmitBatch(
+            personas.Select(persona =>
+            {
+                var pass = PassRequest(persona, manuscript, frame, persona.Kind == PersonaKind.Reader ? ReaderFormat : SectionFormat);
+                return (PassKey(persona.Id), (object)new
+                {
+                    model = pass.Model,
+                    max_tokens = pass.MaxTokens,
+                    output_config = new { effort = options.PassEffort },
+                    system = pass.System,
+                    messages = new[] { new { role = "user", content = pass.User } },
+                });
+            }).ToList(),
+            "ReadPass", cancellationToken);
+
+    public async Task<IReadOnlyList<PassBatchItem>> ReadResults(
+        string batchId, IReadOnlyList<Persona> personas, CancellationToken cancellationToken)
+    {
+        var byKey = personas.ToDictionary(persona => PassKey(persona.Id));
+        var items = new List<PassBatchItem>();
+        foreach (var (key, text, failure) in await BatchTexts(batchId, "ReadPass", cancellationToken))
+        {
+            if (!byKey.TryGetValue(key, out var persona))
+                continue;
+            if (text is null)
+            {
+                items.Add(new PassBatchItem(persona.Id, null, failure));
+                continue;
+            }
+            try
+            {
+                var json = persona.Kind == PersonaKind.Reader
+                    ? JsonSerializer.Serialize(ReadReaderReply(persona, text), JsonResponse.CaseInsensitive)
+                    : JsonSerializer.Serialize(ReadSectionReply(persona, text), JsonResponse.CaseInsensitive);
+                items.Add(new PassBatchItem(persona.Id, json, null));
+            }
+            catch (InvalidOperationException incomplete)
+            {
+                items.Add(new PassBatchItem(persona.Id, null, incomplete.Message));
+            }
+        }
+        return items;
+    }
+
+    private static string PassKey(string personaId) => $"pass-{personaId}";
+
+    // An ordinary request's params: its constant instruction, cached, then the content.
+    private object MessageParams(string instruction, string content) => new
+    {
+        model = options.Model,
+        max_tokens = options.MaxTokens,
+        output_config = new { effort = options.Effort },
+        system = new object[] { new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } } },
+        messages = new[] { new { role = "user", content } },
+    };
+
+    public async Task<bool> BatchEnded(string batchId, CancellationToken cancellationToken)
+    {
+        using var batch = await GetBatch(batchId, cancellationToken);
+        return batch.RootElement.TryGetProperty("processing_status", out var status) && status.GetString() == "ended";
+    }
+
+    public async Task<IReadOnlyList<BatchItem<SceneJudgement>>> SceneJudgementResults(
+        string batchId, IReadOnlyDictionary<int, string> chapters, CancellationToken cancellationToken)
+    {
+        var items = new List<BatchItem<SceneJudgement>>();
+        foreach (var (key, text, failure) in await BatchTexts(batchId, nameof(JudgeScene), cancellationToken))
+        {
+            if (SceneNumber(key) is not { } number)
+                continue;
+            if (text is null)
+            {
+                items.Add(new BatchItem<SceneJudgement>(number, null, failure));
+                continue;
+            }
+            try
+            {
+                items.Add(new BatchItem<SceneJudgement>(
+                    number, ReadSceneJudgement(number, chapters.TryGetValue(number, out var chapter) ? chapter : string.Empty, text), null));
+            }
+            catch (InvalidOperationException unreadable)
+            {
+                items.Add(new BatchItem<SceneJudgement>(number, null, unreadable.Message));
+            }
+        }
+        return items;
+    }
+
+    public async Task<IReadOnlyList<BatchItem<string>>> SceneImagePromptResults(string batchId, CancellationToken cancellationToken) =>
+        (await BatchTexts(batchId, nameof(DescribeSceneImage), cancellationToken))
+            .Where(item => SceneNumber(item.Key) is not null)
+            .Select(item => new BatchItem<string>(SceneNumber(item.Key)!.Value, item.Text?.Trim(), item.Failure))
+            .ToList();
+
+    private static int? SceneNumber(string key) =>
+        key.StartsWith("scene-", StringComparison.Ordinal) && int.TryParse(key["scene-".Length..], out var number) ? number : null;
+
+    private static string SceneKey(int number) => $"scene-{number}";
+
+    private async Task<string?> SubmitBatch(
+        IReadOnlyList<(string CustomId, object Params)> items, string call,
+        CancellationToken cancellationToken)
+    {
+        if (items.Count == 0)
+            return null;
+
+        var payload = new
+        {
+            requests = items.Select(item => new { custom_id = item.CustomId, @params = item.Params }).ToList(),
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, BatchesUrl);
+        request.Headers.Add("x-api-key", options.ApiKey);
+        request.Headers.Add("anthropic-version", AnthropicVersion);
+        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, body))
+                healthSink?.MarkFailing(CredentialIds.Claude, $"{(int)response.StatusCode} {response.StatusCode}");
+            logger?.LogWarning("Claude batch for {Call} ({Count} requests) was refused: {Status}", call, items.Count, (int)response.StatusCode);
+            throw ToException(response, body);
+        }
+
+        healthSink?.MarkOk(CredentialIds.Claude);
+        using var created = JsonDocument.Parse(body);
+        var id = created.RootElement.GetProperty("id").GetString();
+        logger?.LogInformation("Claude batch {BatchId} submitted for {Call}: {Count} requests at the batch rate", id, call, items.Count);
+        return id;
+    }
+
+    private async Task<JsonDocument> GetBatch(string batchId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{BatchesUrl}/{Uri.EscapeDataString(batchId)}");
+        request.Headers.Add("x-api-key", options.ApiKey);
+        request.Headers.Add("anthropic-version", AnthropicVersion);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw ToException(response, body);
+        return JsonDocument.Parse(body);
+    }
+
+    // Each result line of a finished batch: the scene it belongs to (by custom id), the reply's text when
+    // it succeeded, or why there is none. Every item is logged with its tokens, as a direct call is.
+    private async Task<IReadOnlyList<(string Key, string? Text, string? Failure)>> BatchTexts(
+        string batchId, string call, CancellationToken cancellationToken)
+    {
+        string resultsUrl;
+        using (var batch = await GetBatch(batchId, cancellationToken))
+        {
+            resultsUrl = batch.RootElement.TryGetProperty("results_url", out var url) && url.GetString() is { Length: > 0 } found
+                ? found
+                : throw new InvalidOperationException($"Batch {batchId} has no results yet.");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, resultsUrl);
+        request.Headers.Add("x-api-key", options.ApiKey);
+        request.Headers.Add("anthropic-version", AnthropicVersion);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw ToException(response, body);
+
+        var items = new List<(string, string?, string?)>();
+        foreach (var line in body.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            using var item = JsonDocument.Parse(line);
+            var customId = item.RootElement.GetProperty("custom_id").GetString() ?? string.Empty;
+
+            var result = item.RootElement.GetProperty("result");
+            var type = result.GetProperty("type").GetString();
+            if (type == "succeeded")
+            {
+                var message = result.GetProperty("message");
+                var text = string.Concat(message.GetProperty("content").EnumerateArray()
+                    .Where(block => block.TryGetProperty("type", out var kind) && kind.GetString() == "text")
+                    .Select(block => block.GetProperty("text").GetString()));
+                var usage = message.TryGetProperty("usage", out var u) ? u : default;
+                logger?.LogInformation(
+                    "Claude batch {BatchId} item {CustomId} ({Call}) succeeded: input={Input} cacheWrite={CacheWrite} cacheRead={CacheRead} output={Output}",
+                    batchId, customId, call, Tokens(usage, "input_tokens"), Tokens(usage, "cache_creation_input_tokens"),
+                    Tokens(usage, "cache_read_input_tokens"), Tokens(usage, "output_tokens"));
+                items.Add((customId, text, null));
+            }
+            else
+            {
+                var why = type == "errored" && result.TryGetProperty("error", out var error)
+                    ? $"errored: {(error.TryGetProperty("message", out var m) ? m.GetString() : error.ToString())}"
+                    : type ?? "unknown";
+                logger?.LogWarning("Claude batch {BatchId} item {CustomId} ({Call}) did not succeed: {Why}", batchId, customId, call, why);
+                items.Add((customId, null, why));
+            }
+        }
+        return items;
+    }
+
+    private static int Tokens(JsonElement usage, string name) =>
+        usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty(name, out var value) && value.TryGetInt32(out var tokens) ? tokens : 0;
+
+    public async Task<SceneJudgement> JudgeScene(
+        SceneToJudge scene, DesignBible bible, CancellationToken cancellationToken)
+    {
+        var reply = await SendMessage(SceneJudgementInstruction, SceneJudgementContent(scene, bible), cancellationToken);
+        return ReadSceneJudgement(scene.Number, scene.Chapter, reply);
+    }
+
+    // The scene-judgement request's content: the one place it is built, for the direct call and the batch.
+    private static string SceneJudgementContent(SceneToJudge scene, DesignBible bible)
+    {
+        var cast = JsonSerializer.Serialize(bible.ForScene(scene.Text), JsonResponse.CaseInsensitive);
+        return
+            $"BOOK'S DOMINANT VOICE:\n{(string.IsNullOrWhiteSpace(scene.DominantVoice) ? "(not yet described)" : scene.DominantVoice)}\n\n" +
+            $"STORY SO FAR:\n{(string.IsNullOrWhiteSpace(scene.StorySoFar) ? "(this is the opening)" : scene.StorySoFar)}\n\n" +
+            $"CAST & SETTINGS THIS SCENE NAMES (JSON):\n{cast}\n\n" +
+            $"SCENE {scene.Number} ({scene.Chapter}):\n{scene.Text}";
+    }
+
+    // A scene judgement read from the model's reply; the one place it is parsed, for both paths.
+    private static SceneJudgement ReadSceneJudgement(int number, string chapter, string reply)
+    {
+        var scene = new { Number = number, Chapter = chapter };
+        var json = JsonResponse.ExtractObject(reply)
+            ?? throw new InvalidOperationException(
+                $"Scene {scene.Number}'s judgement came back with nothing readable as JSON; the pass is retried.");
+
+        var dto = JsonResponse.Deserialize<SceneJudgementDto>(json);
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Accomplishes))
+            throw new InvalidOperationException($"Scene {scene.Number}'s judgement did not say what the scene accomplishes.");
+        if (!Enum.TryParse<SceneCall>(dto.Call?.Trim(), ignoreCase: true, out var call) || !Enum.IsDefined(call))
+            throw new InvalidOperationException($"Scene {scene.Number}'s judgement gave no keep/tighten/rewrite/cut call (got '{dto.Call}').");
+
+        var inconsistencies = (dto.Inconsistencies ?? [])
+            .Where(item => !string.IsNullOrWhiteSpace(item.Detail))
+            .Select(item => (Ok: Enum.TryParse<SceneInconsistencyKind>(item.Kind?.Trim(), ignoreCase: true, out var kind) && Enum.IsDefined(kind), Kind: kind, Item: item))
+            .Where(entry => entry.Ok)
+            .Select(entry => new SceneInconsistency(entry.Kind, entry.Item.Detail!, entry.Item.Excerpt ?? string.Empty))
+            .ToList();
+
+        return new SceneJudgement(
+            scene.Number, scene.Chapter, dto.Accomplishes!, call, Math.Clamp(dto.Tension ?? 0.5, 0, 1),
+            dto.Verdict ?? string.Empty, inconsistencies);
+    }
+
+    private sealed class SceneJudgementDto
+    {
+        public string? Accomplishes { get; set; }
+        public string? Call { get; set; }
+        public double? Tension { get; set; }
+        public string? Verdict { get; set; }
+        public List<SceneInconsistencyDto>? Inconsistencies { get; set; }
+    }
+
+    private sealed class SceneInconsistencyDto
+    {
+        public string? Kind { get; set; }
+        public string? Detail { get; set; }
+        public string? Excerpt { get; set; }
+    }
+
+    public async Task<string> DescribeSceneImage(
+        string sceneText, DesignBible bible, string artStyle, IReadOnlyList<string> avoidMoments,
+        CancellationToken cancellationToken)
+    {
+        var userContent = SceneImageContent(sceneText, bible, artStyle, avoidMoments);
 
         // Best-effort: a wordless prompt is nice to have, so any empty/failed reply yields an empty prompt
         // and the caller leaves the scene without an image rather than blocking the report.
@@ -427,7 +729,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                     r.Strengths ?? [],
                     r.Weaknesses ?? [],
                     r.Condition ?? r.Recommendation ?? string.Empty))
-                // The omnibus reduce's reviews are never scored; the six readers replace them.
+                // The omnibus reduce's reviews are never scored; the seven readers replace them.
                 .Where(review => ReaderRead.IsWhole(review, scored: false)).ToList(),
             (dto.RevisionPlan ?? []).Select(r =>
                 new RevisionItem(r.Priority ?? string.Empty, r.Chapter ?? string.Empty,
@@ -697,16 +999,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     // Built rather than a const: the noun has to name what this manuscript actually is (a 1,200-word
     // short story is not "one novel"), and that depends on the measured word count these passes never
     // see the manuscript to derive for themselves.
+    // The counts in the synthesis instructions come from the catalogue, so a reader added or dropped
+    // cannot leave the prompt describing a panel that no longer exists.
+    private static string Spelled(int count) => Folio.Domain.Shelf.BookLines.Spell(count);
+
     private static string RevisionPlanInstruction(StoryLength length) =>
-        $"You are given fourteen independent reads of one {ManuscriptLength.Noun(length)}: eight structural "
-        + "sections and six readers, none of whom saw the others' notes. Produce the author's revision plan. "
+        $"You are given {Spelled(PersonaCatalogue.All.Count)} independent reads of one {ManuscriptLength.Noun(length)}: "
+        + $"{Spelled(PersonaCatalogue.Sections.Count)} structural sections and {Spelled(PersonaCatalogue.Readers.Count)} readers, none of whom saw the others' notes. Produce the author's revision plan. "
         + "Where several reads name the same thing, that is one item and it ranks higher for it. Reply with "
         + "JSON only: {\"revisionPlan\": [{\"priority\": \"Must|Should|Consider\", \"chapter\": \"Ch. 12-15\", "
         + "\"issue\": \"what is wrong\", \"suggestedFix\": \"what to do about it — a direction, never "
         + "replacement prose\"}]}. You diagnose and point; you never write the author's sentences for them.";
 
     private static string VerdictInstruction(StoryLength length) =>
-        $"You are given fourteen independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
+        $"You are given {Spelled(PersonaCatalogue.All.Count)} independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
         + "state of this draft. "
         // "standing" is the line the author repeats to themselves afterwards, so it is asked for as a
         // sentence rather than as a rating: a page that opens on a number is read as a mark.
@@ -716,9 +1022,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "{\"standing\": \"\", \"reading\": \"\", \"strengths\": [], \"problems\": [], \"mostNeeds\": \"\"}}.";
 
     public async Task<SectionRead> ReadSection(
-        Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken)
+        Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
     {
-        var reply = await SendPass(persona, manuscript, genre, SectionFormat, cancellationToken);
+        var reply = await SendPass(persona, manuscript, frame, SectionFormat, cancellationToken);
+        return ReadSectionReply(persona, reply);
+    }
+
+    // A section's reply, parsed; the one place it is, for the direct pass and the batch.
+    private SectionRead ReadSectionReply(Persona persona, string reply)
+    {
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
         {
@@ -743,9 +1055,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     }
 
     public async Task<Review> ReadAsReader(
-        Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken)
+        Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
     {
-        var reply = await SendPass(persona, manuscript, genre, ReaderFormat, cancellationToken);
+        var reply = await SendPass(persona, manuscript, frame, ReaderFormat, cancellationToken);
+        return ReadReaderReply(persona, reply);
+    }
+
+    // A reader's reply, parsed and held to the whole-read rule; the one place it is, for both paths.
+    private static Review ReadReaderReply(Persona persona, string reply)
+    {
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException(
                 $"{persona.Name} replied with nothing this could read as a review. A reader's pass is "
@@ -820,18 +1138,29 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     /// visible wrong. <c>ReadingPrompt</c> decides the order and a guard holds it.</para>
     /// </summary>
     private Task<string> SendPass(
-        Persona persona, string manuscript, GenreFrame genre, string format, CancellationToken cancellationToken,
+        Persona persona, string manuscript, ReadingFrame frame, string format, CancellationToken cancellationToken,
         [CallerMemberName] string call = "")
     {
-        var system = ReadingPrompt.System(manuscript, persona, genre)
+        var pass = PassRequest(persona, manuscript, frame, format);
+        return SendRaw(pass.System, pass.User, pass.MaxTokens, pass.Model, $"{call}[{persona.Id}]", options.PassEffort, cancellationToken);
+    }
+
+    // One whole-book pass's request: the one place it is built, for the direct pass and the batch, so a
+    // batched pass is the same request (same prefix, same cache) as the direct one.
+    private (object[] System, string User, int MaxTokens, string Model) PassRequest(
+        Persona persona, string manuscript, ReadingFrame frame, string format)
+    {
+        var system = ReadingPrompt.System(manuscript, persona, frame)
             .Select(block => block.Cached
                 ? (object)new { type = "text", text = block.Text, cache_control = new { type = "ephemeral" } }
                 : new { type = "text", text = block.Text })
             .ToArray();
-
-        var model = persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel;
-        return SendRaw(system, ReadingPrompt.Question(persona, ManuscriptLength.Classify(manuscript)) + "\n\n" + format,
-            options.PassMaxTokens, model, $"{call}[{persona.Id}]", options.PassEffort, cancellationToken);
+        var length = ManuscriptLength.Classify(manuscript);
+        return (
+            system,
+            ReadingPrompt.Question(persona, length) + "\n\n" + format,
+            persona.Kind == PersonaKind.Reader && length == StoryLength.Novel ? options.NovelReaderMaxTokens : options.PassMaxTokens,
+            persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel);
     }
 
     private Task<string> SendMessage(

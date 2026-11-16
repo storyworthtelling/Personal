@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -5,6 +6,7 @@ using Moq;
 using PdfSharp.Pdf.IO;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
+using Folio.Domain.Scenes;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
@@ -39,6 +41,8 @@ public class ReviewProcessorTests : IDisposable
     private readonly List<string> sectionReads = [];
     private readonly List<string> readerReads = [];
     private readonly List<GenreFrame> readerGenres = [];
+    private readonly List<ReadingFrame> readerFrames = [];
+    private readonly List<SceneToJudge> judgedScenes = [];
     private readonly List<string> synthesisReads = [];
     private int sectionsSeenBySynthesis;
     private int readersSeenBySynthesis;
@@ -56,8 +60,8 @@ public class ReviewProcessorTests : IDisposable
         // The sixteen passes. Stubbed for real rather than left to Moq's defaults: a default-valued
         // Task<T> completes with null, which the pipeline records as a finished pass — so the step
         // would appear to work while reading nothing, which is the failure PassPipelineTests names.
-        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) =>
+        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, ReadingFrame _, CancellationToken _) =>
             {
                 sectionReads.Add(persona.Id);
                 return Task.FromResult(new SectionRead(
@@ -65,11 +69,12 @@ public class ReviewProcessorTests : IDisposable
                     [new ReportFinding("Chapter 1", $"{persona.Name} found something.")]));
             });
 
-        claude.Setup(c => c.ReadAsReader(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, GenreFrame genre, CancellationToken _) =>
+        claude.Setup(c => c.ReadAsReader(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, ReadingFrame frame, CancellationToken _) =>
             {
                 readerReads.Add(persona.Id);
-                readerGenres.Add(genre);
+                readerGenres.Add(frame.Genre);
+                readerFrames.Add(frame);
                 return Task.FromResult(new Review(
                     persona.Id, "A verdict in one clause.", "A sustained read in character.",
                     ["what works"], ["what does not"], "what it would need")
@@ -132,6 +137,17 @@ public class ReviewProcessorTests : IDisposable
                 [new ProseNote("Chapter 1", "Filter words", "\"he felt\"", "Cut the filter.")],
                 [new DialogueNote("Chapter 1", "Hero", "On the nose.", "Trust the subtext.")],
                 [new SceneBeat("Chapter 1", "The hero knocks.", "Opens the confrontation.", "Earns its place.")]));
+
+        // Each detected scene is judged on its own; the judgement names the scene it was asked about, so a
+        // verdict printed under the wrong scene shows up in the report text.
+        claude.Setup(c => c.JudgeScene(It.IsAny<SceneToJudge>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .Returns((SceneToJudge scene, DesignBible _, CancellationToken _) =>
+            {
+                judgedScenes.Add(scene);
+                return Task.FromResult(new SceneJudgement(
+                    scene.Number, scene.Chapter, $"Scene {scene.Number} does its own job.", SceneCall.Keep, 0.5,
+                    $"Verdict for scene {scene.Number}.", []));
+            });
 
         claude.Setup(c => c.AssessVoiceConsistency(
                 It.IsAny<IReadOnlyList<ChapterSample>>(), It.IsAny<CancellationToken>()))
@@ -248,8 +264,141 @@ public class ReviewProcessorTests : IDisposable
             Assert.Equal(new GenreFrame("Upmarket fantasy", "90,000-120,000"), genre));
     }
 
+    /// <summary>
+    /// The pairing bug (release A3). Claude's own scene list (one beat here) was zipped against the
+    /// detected scenes (two here) by position, so the second scene printed nothing and any mismatch
+    /// shifted every later verdict. Now every detected scene is judged on its own, and each block prints
+    /// its own scene's verdict.
+    /// </summary>
     [Fact]
-    public async Task EverySixteenReadsRunOnceAndTheSynthesisSeesThemAll()
+    public async Task EachSceneIsJudgedOnItsOwnAndItsBlockCarriesItsOwnVerdict()
+    {
+        const string text = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        var id = SeedManuscript(text);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal([1, 2], judgedScenes.Select(scene => scene.Number).Order());
+        Assert.Contains(judgedScenes, scene => scene.Text.Contains("At the gate", StringComparison.Ordinal));
+
+        var report = ReportText(id);
+        Assert.Contains("Scene 1 does its own job.", report, StringComparison.Ordinal);
+        Assert.Contains("Scene 2 does its own job.", report, StringComparison.Ordinal);
+        Assert.True(
+            report.IndexOf("At the gate", StringComparison.Ordinal) < report.IndexOf("Scene 2 does its own job.", StringComparison.Ordinal),
+            "Scene two's verdict should follow scene two's prose.");
+        Assert.DoesNotContain("Opens the confrontation.", report, StringComparison.Ordinal);
+    }
+
+    // ---- Batches (owner's ruling, R39): the scene calls go to the batch tier at half the cost ---------
+
+    private const string TwoScenes = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+
+    /// <summary>
+    /// The scene judgements go in one batch; while it runs, the pipeline polls and carries on; when it
+    /// ends, each judgement lands on its own scene (by key, never by position), and no scene is judged
+    /// one at a time.
+    /// </summary>
+    [Fact]
+    public async Task SceneJudgementsAreBatchedAndLandOnTheirOwnScenes()
+    {
+        var polls = 0;
+        claude.Setup(c => c.SubmitSceneJudgements(It.IsAny<IReadOnlyList<SceneToJudge>>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("batch-judgements");
+        claude.Setup(c => c.BatchEnded("batch-judgements", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ++polls >= 2);
+        claude.Setup(c => c.SceneJudgementResults("batch-judgements", It.IsAny<IReadOnlyDictionary<int, string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, IReadOnlyDictionary<int, string> chapters, CancellationToken _) =>
+                chapters.Keys.Reverse().Select(number => new BatchItem<SceneJudgement>(number,
+                    new SceneJudgement(number, chapters[number], $"Batched scene {number} does its job.", SceneCall.Keep, 0.5, "v", []), null)).ToList());
+
+        var id = SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Empty(judgedScenes);
+        Assert.True(polls >= 2, "The batch should have been polled until it ended.");
+        var report = ReportText(id);
+        Assert.True(report.IndexOf("At the gate", StringComparison.Ordinal) < report.IndexOf("Batched scene 2 does its job.", StringComparison.Ordinal));
+        Assert.True(report.IndexOf("Batched scene 1 does its job.", StringComparison.Ordinal) < report.IndexOf("At the gate", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The reads (R39): for each model, one pass runs on its own to write the manuscript to the cache, then
+    /// the rest of that model's passes go in one batch. A pass the batch did not complete runs one at a time.
+    /// </summary>
+    [Fact]
+    public async Task ReadsWarmTheCacheOnceThenGoInOneBatchPerModel()
+    {
+        var submitted = new List<string[]>();
+        claude.Setup(c => c.SubmitReads(It.IsAny<IReadOnlyList<Persona>>(), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Persona> personas, string _, ReadingFrame _, CancellationToken _) =>
+            {
+                submitted.Add([.. personas.Select(persona => persona.Id)]);
+                return $"batch-{submitted.Count}";
+            });
+        claude.Setup(c => c.BatchEnded(It.Is<string>(id => id.StartsWith("batch-")), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        claude.Setup(c => c.ReadResults(It.IsAny<string>(), It.IsAny<IReadOnlyList<Persona>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, IReadOnlyList<Persona> personas, CancellationToken _) =>
+                personas.Select(persona => persona.Id == "harsh-critic"
+                    ? new PassBatchItem(persona.Id, null, "errored: overloaded")
+                    : new PassBatchItem(persona.Id, persona.Kind == PersonaKind.Reader
+                        ? JsonSerializer.Serialize(new Review(persona.Id, "v", "a", ["s"], ["w"], "c") { Score = 6, ScoreReason = "r" })
+                        : JsonSerializer.Serialize(new SectionRead(persona.Id, "s", [])), null)).ToList());
+
+        SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        // One direct pass per model warms the cache, then one batch per model.
+        Assert.Equal([PersonaCatalogue.Sections[0].Id], sectionReads);
+        Assert.Equal([PersonaCatalogue.Readers[0].Id, "harsh-critic"], readerReads);
+        Assert.Equal(2, submitted.Count);
+        Assert.Equal(PersonaCatalogue.Sections.Skip(1).Select(persona => persona.Id), submitted[0]);
+        Assert.Equal(PersonaCatalogue.Readers.Skip(1).Select(persona => persona.Id), submitted[1]);
+    }
+
+    /// <summary>A scene the batch could not judge goes one at a time afterwards; the batch is never resubmitted.</summary>
+    [Fact]
+    public async Task ASceneTheBatchMissedIsJudgedOneAtATime()
+    {
+        var submits = 0;
+        claude.Setup(c => c.SubmitSceneJudgements(It.IsAny<IReadOnlyList<SceneToJudge>>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => { submits++; return "batch-judgements"; });
+        claude.Setup(c => c.BatchEnded("batch-judgements", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        claude.Setup(c => c.SceneJudgementResults("batch-judgements", It.IsAny<IReadOnlyDictionary<int, string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, IReadOnlyDictionary<int, string> chapters, CancellationToken _) =>
+            [
+                new BatchItem<SceneJudgement>(1, new SceneJudgement(1, chapters[1], "Batched.", SceneCall.Keep, 0.5, "v", []), null),
+                new BatchItem<SceneJudgement>(2, null, "errored: overloaded"),
+            ]);
+
+        SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(1, submits);
+        Assert.Equal([2], judgedScenes.Select(scene => scene.Number));
+    }
+
+    /// <summary>The image prompts go in one batch too; each prompt lands on its own scene and drives its render.</summary>
+    [Fact]
+    public async Task ImagePromptsAreBatchedAndRenderTheirOwnScenes()
+    {
+        claude.Setup(c => c.SubmitSceneImagePrompts(It.IsAny<IReadOnlyList<SceneImageRequest>>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("batch-prompts");
+        claude.Setup(c => c.BatchEnded("batch-prompts", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        claude.Setup(c => c.SceneImagePromptResults("batch-prompts", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new BatchItem<string>(2, "Prompt for scene two.", null), new BatchItem<string>(1, "Prompt for scene one.", null)]);
+
+        SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        claude.Verify(c => c.DescribeSceneImage(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()), Times.Never());
+        using var context = database.NewContext();
+        var prompts = context.Scenes.OrderBy(scene => scene.Number).Select(scene => scene.ImagePrompt).ToList();
+        Assert.Equal(["Prompt for scene one.", "Prompt for scene two."], prompts);
+    }
+
+    [Fact]
+    public async Task EveryPassRunsOnceAndTheSynthesisSeesThemAll()
     {
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor());
@@ -261,12 +410,12 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(["todo", "verdict"], synthesisReads);
 
         Assert.Equal(8, sectionsSeenBySynthesis);
-        Assert.Equal(6, readersSeenBySynthesis);
+        Assert.Equal(7, readersSeenBySynthesis);
 
         // One row per pass, all settled, so a re-run bills nothing again.
         using var context = database.NewContext();
         var rows = context.PassReads.Where(pass => pass.NovelId == id).ToList();
-        Assert.Equal(16, rows.Count);
+        Assert.Equal(ReadingPlan.Passes.Count, rows.Count);
         Assert.All(rows, row => Assert.NotNull(row.Json));
     }
 
@@ -302,8 +451,8 @@ public class ReviewProcessorTests : IDisposable
     {
         var count = 0;
         claude.Setup(c => c.ReadSection(
-                It.Is<Persona>(persona => persona.Id == pass.Id), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) =>
+                It.Is<Persona>(persona => persona.Id == pass.Id), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, ReadingFrame _, CancellationToken _) =>
             {
                 count++;
                 calls?.Add(count);
@@ -940,8 +1089,8 @@ public class ReviewProcessorTests : IDisposable
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(),
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExpansionReport.Empty);
-        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) => Task.FromResult(SectionRead.Silent(persona.Id)));
+        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, ReadingFrame _, CancellationToken _) => Task.FromResult(SectionRead.Silent(persona.Id)));
 
         var id = SeedManuscript("The knight rode to the castle and knocked on the gate.");
         await DriveToCompletion(NewProcessor());
@@ -1236,6 +1385,22 @@ public class ReviewProcessorTests : IDisposable
         context.Novels.Add(book);
         context.SaveChanges();
         return book.Id;
+    }
+
+    /// <summary>A sequel's readers are given the earlier book's canon (R27); a first book's are given none.</summary>
+    [Fact]
+    public async Task ASequelsReadersGetTheEarlierBooksCanon()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        Assert.All(readerFrames, frame => Assert.Equal(string.Empty, frame.SeriesCanon));
+
+        readerFrames.Clear();
+        SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(PersonaCatalogue.Readers.Count, readerFrames.Count);
+        Assert.All(readerFrames, frame => Assert.Contains("Quest", frame.SeriesCanon, StringComparison.Ordinal));
     }
 
     [Fact]

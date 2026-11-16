@@ -59,6 +59,29 @@ public class EpubTextExtractorTests
         Assert.Contains("knocked & waited.", text);
     }
 
+    /// <summary>An ePub marks a scene break with an &lt;hr/&gt;, which used to be stripped like any tag.</summary>
+    [Fact]
+    public void WritesAHorizontalRule_AsADividerLine()
+    {
+        var container =
+            "<?xml version=\"1.0\"?><container xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">" +
+            "<rootfiles><rootfile full-path=\"content.opf\" media-type=\"application/oebps-package+xml\"/>" +
+            "</rootfiles></container>";
+        var opf =
+            "<?xml version=\"1.0\"?><package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\">" +
+            "<manifest><item id=\"c1\" href=\"ch1.xhtml\" media-type=\"application/xhtml+xml\"/></manifest>" +
+            "<spine><itemref idref=\"c1\"/></spine></package>";
+        var ch1 = "<html><body><p>Scene one.</p><hr class=\"break\"/><p>Scene two.</p></body></html>";
+
+        var text = EpubTextExtractor.Extract(BuildEpub(
+            ("mimetype", "application/epub+zip"),
+            ("META-INF/container.xml", container),
+            ("content.opf", opf),
+            ("ch1.xhtml", ch1)));
+
+        Assert.Equal(2, new SceneDetector().Detect(text, []).Count);
+    }
+
     [Fact]
     public void EmptyInput_ReturnsEmpty()
     {

@@ -886,8 +886,11 @@ public sealed class ProjectService
 
         var current = scored[^1];
         var previous = scored.Count > 1 ? reads[scored[^2].Id] : [];
-        return (ReaderScores.Compare(reads[current.Id], previous, ManuscriptLength.Classify(current.WordCount)),
-            current.DraftNumber);
+        var history = ReaderScores.History(scored.Select(draft => (draft.DraftNumber, reads[draft.Id])));
+        var scores = ReaderScores.Compare(reads[current.Id], previous, ManuscriptLength.Classify(current.WordCount))
+            .Select(score => score with { History = history.TryGetValue(score.PersonaId, out var line) ? line : [] })
+            .ToList();
+        return (scores, current.DraftNumber);
     }
 
     private static Review? TryReview(string json)
@@ -1138,7 +1141,11 @@ public sealed class ProjectService
             SeriesPending: novel.PreviousBookId is not null && book?.SeriesContinuityJson is null,
             reads.Done, reads.Total, next?.Name,
             JacketPending: novel.CoverPath is null && !novel.CoverAttempted,
-            Rendered: rendered));
+            Rendered: rendered)
+        {
+            ScenesJudged = await db.Scenes.CountAsync(s => s.NovelId == novel.Id && s.JudgementJson != null, cancellationToken),
+            ScenesTotal = await db.Scenes.CountAsync(s => s.NovelId == novel.Id, cancellationToken),
+        });
         return (reads, step);
     }
 

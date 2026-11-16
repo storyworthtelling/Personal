@@ -25,6 +25,47 @@ public interface IClaudeAnalysisClient
     // visual prompt for the image model (no lettering). Best-effort: empty when it can't be derived, so a
     // scene image is never blocked on art direction. `avoidMoments` names beats already tried and refused,
     // so a retry can target a different moment of the same scene.
+    /// <summary>
+    /// Judges one detected scene on its own (release A3–A4): what it accomplishes, a keep / tighten /
+    /// rewrite / cut call, its tension, and any inconsistencies in voice, tense, characterisation or
+    /// setting. Throws when the judgement comes back without a call or without what the scene
+    /// accomplishes, so the pass is retried rather than printed half-made.
+    /// </summary>
+    Task<Scenes.SceneJudgement> JudgeScene(Scenes.SceneToJudge scene, DesignBible bible, CancellationToken cancellationToken);
+
+    // The batch tier (owner's ruling, R39): the same requests as the direct calls, submitted together at
+    // half the cost and read back by key. A submit that cannot be made returns null, and the caller goes
+    // one at a time instead.
+
+    /// <summary>Submits one scene-judgement request per scene, keyed by scene number. Returns the batch id.</summary>
+    Task<string?> SubmitSceneJudgements(
+        IReadOnlyList<Scenes.SceneToJudge> scenes, DesignBible bible, CancellationToken cancellationToken);
+
+    /// <summary>Submits one image-prompt request per scene, keyed by scene number. Returns the batch id.</summary>
+    Task<string?> SubmitSceneImagePrompts(
+        IReadOnlyList<Scenes.SceneImageRequest> scenes, DesignBible bible, string artStyle, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Submits whole-book passes (sections or readers) as one batch, each built exactly as its direct call,
+    /// keyed by persona id. Returns the batch id.
+    /// </summary>
+    Task<string?> SubmitReads(
+        IReadOnlyList<Reading.Persona> personas, string manuscript, Reading.ReadingFrame frame, CancellationToken cancellationToken);
+
+    /// <summary>A finished batch's passes, parsed as the direct calls parse them, matched by persona id.</summary>
+    Task<IReadOnlyList<Pipeline.PassBatchItem>> ReadResults(
+        string batchId, IReadOnlyList<Reading.Persona> personas, CancellationToken cancellationToken);
+
+    /// <summary>Whether the batch has finished processing.</summary>
+    Task<bool> BatchEnded(string batchId, CancellationToken cancellationToken);
+
+    /// <summary>A finished batch's scene judgements, matched to scenes by key; chapters names each scene's chapter.</summary>
+    Task<IReadOnlyList<Pipeline.BatchItem<Scenes.SceneJudgement>>> SceneJudgementResults(
+        string batchId, IReadOnlyDictionary<int, string> chapters, CancellationToken cancellationToken);
+
+    /// <summary>A finished batch's image prompts, matched to scenes by key.</summary>
+    Task<IReadOnlyList<Pipeline.BatchItem<string>>> SceneImagePromptResults(string batchId, CancellationToken cancellationToken);
+
     Task<string> DescribeSceneImage(
         string sceneText,
         DesignBible bible,
@@ -123,14 +164,14 @@ public interface IClaudeAnalysisClient
     ///
     /// <para>A section is allowed to come back silent; a reader is not.</para>
     /// </summary>
-    Task<SectionRead> ReadSection(Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken);
+    Task<SectionRead> ReadSection(Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken);
 
     /// <summary>
     /// One reader's whole-book pass, in character. The reply must carry a verdict, a review, pros,
     /// cons and a condition — a short read is a failed pass, not a shorter one (F44, F46), so this
     /// throws rather than returning a thinner review and letting the page print it.
     /// </summary>
-    Task<Review> ReadAsReader(Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken);
+    Task<Review> ReadAsReader(Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken);
 
     /// <summary>
     /// The two synthesis passes, which read the other fourteen rather than the manuscript: the revision

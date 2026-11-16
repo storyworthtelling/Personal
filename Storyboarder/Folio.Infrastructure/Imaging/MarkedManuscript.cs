@@ -1,4 +1,5 @@
 using Folio.Domain.Imaging;
+using Folio.Domain.Scenes;
 using Folio.Domain.Markup;
 using Folio.Domain.Readiness;
 using Folio.Domain.Report;
@@ -119,10 +120,26 @@ internal static class MarkedManuscript
         else
             writer.Paragraph("Image unavailable for this scene.", italic, ReportPalette.InkMuted);
 
-        if (!string.IsNullOrWhiteSpace(scene.Purpose))
-            writer.Paragraph(scene.Purpose, body, ReportPalette.Ink);
-        if (!string.IsNullOrWhiteSpace(scene.Verdict))
-            writer.Paragraph(scene.Verdict, italic, ReportPalette.InkMuted);
+        if (scene.Judgement is { } judgement)
+        {
+            // The scene's own judgement (R4): the call and its tension first, then what it accomplishes,
+            // why, and each inconsistency by kind.
+            using var bold = ReportType.BodyBold();
+            writer.Paragraph($"{SceneWords.Call(judgement.Call)} · {SceneWords.Tension(judgement.Tension)}", bold, ReportPalette.Ink);
+            if (!string.IsNullOrWhiteSpace(judgement.Accomplishes))
+                writer.Paragraph(judgement.Accomplishes, body, ReportPalette.Ink);
+            if (!string.IsNullOrWhiteSpace(judgement.Verdict))
+                writer.Paragraph(judgement.Verdict, italic, ReportPalette.InkMuted);
+            foreach (var inconsistency in judgement.Inconsistencies ?? [])
+                writer.Paragraph($"{SceneWords.Kind(inconsistency.Kind)}: {inconsistency.Detail}", body, ReportPalette.InkMuted);
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(scene.Purpose))
+                writer.Paragraph(scene.Purpose, body, ReportPalette.Ink);
+            if (!string.IsNullOrWhiteSpace(scene.Verdict))
+                writer.Paragraph(scene.Verdict, italic, ReportPalette.InkMuted);
+        }
 
         writer.Hairline();
         writer.Gap(PageGeometry.BlockGap);

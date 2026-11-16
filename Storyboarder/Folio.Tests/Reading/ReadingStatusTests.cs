@@ -47,7 +47,7 @@ public class ReadingStatusTests
             .Select((pass, index) => ReadingStatus.Sentence(pass, index, ReadingPlan.Passes.Count))
             .ToList();
 
-        Assert.Equal(16, lines.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(17, lines.Distinct(StringComparer.Ordinal).Count());
         Assert.All(lines, line => Assert.False(string.IsNullOrWhiteSpace(line)));
     }
 

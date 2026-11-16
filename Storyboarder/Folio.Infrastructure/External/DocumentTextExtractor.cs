@@ -1,4 +1,5 @@
 using System.Text;
+using Folio.Domain.Text;
 using Google.Apis.Docs.v1.Data;
 
 namespace Folio.Infrastructure.External;
@@ -20,6 +21,16 @@ public static class DocumentTextExtractor
 
             foreach (var paragraphElement in element.Paragraph.Elements)
             {
+                // A horizontal rule or a page break carries no text; it is the author's scene break (R1),
+                // written as a divider line of its own.
+                if (paragraphElement.HorizontalRule is not null || paragraphElement.PageBreak is not null)
+                {
+                    if (builder.Length > 0 && builder[^1] != '\n')
+                        builder.Append('\n');
+                    builder.Append(SceneBreak.Divider).Append('\n');
+                    continue;
+                }
+
                 var run = paragraphElement.TextRun?.Content;
                 if (!string.IsNullOrEmpty(run))
                     builder.Append(run);

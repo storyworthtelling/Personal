@@ -29,16 +29,23 @@ public static class ReadingPrompt
     /// The system blocks for one pass. Block one is the manuscript and carries the cache breakpoint;
     /// everything persona-specific sits after it, where changing it costs nothing.
     /// </summary>
-    public static IReadOnlyList<PromptBlock> System(string manuscript, Persona persona, GenreFrame genre)
+    public static IReadOnlyList<PromptBlock> System(string manuscript, Persona persona, ReadingFrame frame)
     {
-        ArgumentNullException.ThrowIfNull(genre);
         ArgumentNullException.ThrowIfNull(persona);
+        ArgumentNullException.ThrowIfNull(frame);
 
-        return
-        [
-            new PromptBlock("MANUSCRIPT\n\n" + manuscript, Cached: true),
-            new PromptBlock(Instruction(persona, ManuscriptLength.CountWords(manuscript), genre), Cached: false),
-        ];
+        // A series book's canon (R27) is the same for every pass of the draft, so it is cached with the
+        // manuscript, after it: the prefix stays byte-identical whichever persona is reading.
+        var instruction = new PromptBlock(
+            Instruction(persona, ManuscriptLength.CountWords(manuscript), frame.Genre, frame.HasSeriesCanon), Cached: false);
+        return frame.HasSeriesCanon
+            ?
+            [
+                new PromptBlock("MANUSCRIPT\n\n" + manuscript, Cached: true),
+                new PromptBlock(frame.SeriesCanon, Cached: true),
+                instruction,
+            ]
+            : [new PromptBlock("MANUSCRIPT\n\n" + manuscript, Cached: true), instruction];
     }
 
     /// <summary>The part of the prompt that is the same for every pass, and must stay so.</summary>
@@ -55,7 +62,7 @@ public static class ReadingPrompt
     /// looking for novel-scale structure and counted the story's length against it, so a short story
     /// is told outright to be read as one.
     /// </summary>
-    public static string Instruction(Persona persona, int wordCount, GenreFrame genre)
+    public static string Instruction(Persona persona, int wordCount, GenreFrame genre, bool seriesCanon = false)
     {
         ArgumentNullException.ThrowIfNull(persona);
         ArgumentNullException.ThrowIfNull(genre);
@@ -73,20 +80,27 @@ public static class ReadingPrompt
                 "Read it as a novella: judge it by what a novella can do, not by what a novel would. ",
             _ => string.Empty,
         };
-        var brief = length == StoryLength.ShortStory && persona.ShortStoryBrief is { } own ? own + " " : string.Empty;
+        var brief = length == StoryLength.ShortStory && persona.ShortStoryBrief is { } own
+            ? own + " "
+            : persona.Brief is { } general ? general + " " : string.Empty;
+        var purpose = length == StoryLength.Novel && persona.NovelPurpose is { } more ? more + " " : string.Empty;
         var genreLine = GenreLine(genre, length);
         var fan = persona.FanOfTheGenre ? FanBrief(genre) : string.Empty;
         var score = ScoreBrief(persona, length);
+        var series = seriesCanon
+            ? "The series bible above is the canon of the earlier book in this series; weigh this book against it where it bears on your question. "
+            : string.Empty;
 
         return persona.Kind switch
         {
             PersonaKind.Reader =>
-                $"You are {Article(persona.Name)} {persona.Name} reading the complete {noun} manuscript above, in character. "
-                + words + genreLine + scale + fan + brief + score
+                $"You are {persona.ReaderName ?? persona.Name}, the {persona.Name.ToLowerInvariant()}, reading the complete {noun} manuscript above, in character. "
+                + (persona.Voice is { } voice ? $"Your voice: {voice}. Let it shape how you write, never what you judge. " : string.Empty)
+                + words + genreLine + series + scale + fan + brief + purpose + NoLineEdits + score
                 + "Nobody else's notes are available to you, and you are not summarising the book.",
             PersonaKind.Section =>
                 $"You are reading the complete {noun} manuscript above for one thing only: {persona.Name}. "
-                + words + genreLine + scale + fan + brief
+                + words + genreLine + series + scale + fan + brief
                 + "Leave every other concern to the reader whose job it is.",
             _ => throw new ArgumentOutOfRangeException(nameof(persona), persona.Kind, "Unhandled persona kind."),
         };
@@ -143,8 +157,12 @@ public static class ReadingPrompt
             + "and give one sentence saying why the score is that number. ";
     }
 
-    private static string Article(string name) =>
-        name.Length > 0 && "AEIOUaeiou".Contains(name[0]) ? "an" : "a";
+    // The owner's ruling (R11): readers make no line edits, even where the line work is costing the score.
+    // The marked manuscript already carries the line-level notes; general terms and real blockers stay.
+    private const string NoLineEdits =
+        "Make no line edits: do not comment on word choice, grammar, punctuation, typos or single sentences. "
+        + "You may say in general terms that the prose needs work (\"the prose is sloppy\"), and name a "
+        + "line-level problem only when it blocks your answer (\"tense shifts that a line editor should catch\"). ";
 
     /// <summary>The question this pass is asked, which is the last thing the model reads.</summary>
     public static string Question(Persona persona, StoryLength length) => persona.QuestionFor(length);

@@ -8,7 +8,7 @@ public enum PersonaKind
     /// <summary>One of the eight whole-book sections. Prints as a section; silent when it has nothing to say.</summary>
     Section,
 
-    /// <summary>One of the six readers. Gets a page of its own, in character.</summary>
+    /// <summary>One of the seven readers. Gets a page of its own, in character.</summary>
     Reader,
 }
 
@@ -66,6 +66,24 @@ public sealed record Persona(string Id, string Name, string Question, PersonaKin
 
     /// <summary>The anchors for a short story, where this persona's question is different; null where it is not.</summary>
     public IReadOnlyList<string>? ShortStoryScoreAnchors { get; init; }
+
+    /// <summary>The reader's invented name (R42), e.g. "Hugo Hook". Null for a section.</summary>
+    public string? ReaderName { get; init; }
+
+    /// <summary>
+    /// The reader's voice and personality (R42): how it talks, never what it judges. Null for a section.
+    /// </summary>
+    public string? Voice { get; init; }
+
+    /// <summary>
+    /// What this reader is for at every length, where its question alone does not say it (R35): the
+    /// Agent's road to a sellable manuscript, the Acquiring editor's edit letter. A short story's brief,
+    /// where one is set, takes its place.
+    /// </summary>
+    public string? Brief { get; init; }
+
+    /// <summary>At novel length, what this reader writes more about (R12, R36), distinct per reader.</summary>
+    public string? NovelPurpose { get; init; }
 
     /// <summary>The anchors this persona scores a manuscript of this length against.</summary>
     public IReadOnlyList<string> AnchorsFor(StoryLength length) =>

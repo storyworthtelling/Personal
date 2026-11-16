@@ -41,6 +41,52 @@ public class DocxTextExtractorTests
         Assert.Equal("One.\n\nTwo.", DocxTextExtractor.Extract(docx));
     }
 
+    /// <summary>Two or more empty paragraphs are the author's scene break (R1), so they survive as two blank lines.</summary>
+    [Fact]
+    public void KeepsTwoOrMoreEmptyParagraphs_AsASceneBreak()
+    {
+        var docx = BuildDocx(
+            "<w:p><w:r><w:t>One.</w:t></w:r></w:p>" +
+            "<w:p></w:p><w:p></w:p>" +
+            "<w:p><w:r><w:t>Two.</w:t></w:r></w:p>");
+
+        var text = DocxTextExtractor.Extract(docx);
+
+        Assert.Equal("One.\n\n\nTwo.", text);
+        Assert.Equal(2, new SceneDetector().Detect(text, []).Count);
+    }
+
+    [Fact]
+    public void WritesAPageBreak_AsADividerLine()
+    {
+        var docx = BuildDocx(
+            "<w:p><w:r><w:t>One.</w:t></w:r></w:p>" +
+            "<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>" +
+            "<w:p><w:r><w:t>Two.</w:t></w:r></w:p>" +
+            "<w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>Three.</w:t></w:r></w:p>");
+
+        var text = DocxTextExtractor.Extract(docx);
+
+        Assert.Equal(3, new SceneDetector().Detect(text, []).Count);
+    }
+
+    /// <summary>Word draws a horizontal rule as an empty paragraph with a border, or as a VML rule.</summary>
+    [Fact]
+    public void WritesAHorizontalRule_AsADividerLine()
+    {
+        var docx = BuildDocx(
+            "<w:p><w:r><w:t>One.</w:t></w:r></w:p>" +
+            "<w:p><w:pPr><w:pBdr><w:bottom w:val=\"single\" w:sz=\"6\"/></w:pBdr></w:pPr></w:p>" +
+            "<w:p><w:r><w:t>Two.</w:t></w:r></w:p>" +
+            "<w:p><w:r><w:pict><v:rect xmlns:v=\"urn:schemas-microsoft-com:vml\" xmlns:o=\"urn:schemas-microsoft-com:office:office\" o:hr=\"t\"/></w:pict></w:r></w:p>" +
+            "<w:p><w:r><w:t>Three.</w:t></w:r></w:p>");
+
+        var text = DocxTextExtractor.Extract(docx);
+
+        Assert.Equal(3, new SceneDetector().Detect(text, []).Count);
+        Assert.Contains(SceneBreak.Divider, text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Reaches_TextNestedInTablesAndHyperlinks()
     {

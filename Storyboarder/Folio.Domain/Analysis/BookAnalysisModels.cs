@@ -338,6 +338,16 @@ public sealed record BookAnalysisResult(
         SceneBreakdown = craft.SceneBreakdown
     };
 
+    /// <summary>
+    /// Each detected scene's own judgement (release A3–A4), folded in at render time so the marked
+    /// manuscript can write each inconsistency at its line. Empty for a report made before scenes were
+    /// judged one by one.
+    /// </summary>
+    public IReadOnlyList<Scenes.SceneJudgement> SceneJudgements { get; init; } = [];
+
+    public BookAnalysisResult WithSceneJudgements(IReadOnlyList<Scenes.SceneJudgement> judgements) =>
+        this with { SceneJudgements = judgements };
+
     public BookAnalysisResult WithVoiceConsistency(VoiceConsistency voice) =>
         this with { VoiceConsistency = voice };
 

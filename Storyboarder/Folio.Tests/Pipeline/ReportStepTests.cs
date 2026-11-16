@@ -70,4 +70,13 @@ public class ReportStepTests
         Assert.Equal("Painting the jacket", ReportStep.Describe(Everything with { JacketPending = true }));
         Assert.Equal("Composing the report", ReportStep.Describe(Everything));
     }
+
+    /// <summary>Each scene is judged in its own call before the reads begin, and the desk says which.</summary>
+    [Fact]
+    public void WhileScenesRemainItSaysWhichSceneIsBeingJudged()
+    {
+        var step = ReportStep.Describe(Everything with { ScenesJudged = 3, ScenesTotal = 40, ReadsDone = 0 });
+
+        Assert.Equal("Judging the scenes — scene 4 of 40", step);
+    }
 }

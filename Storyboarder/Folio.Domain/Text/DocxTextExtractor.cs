@@ -12,6 +12,7 @@ namespace Folio.Domain.Text;
 public static class DocxTextExtractor
 {
     private static readonly XNamespace W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    private static readonly XNamespace O = "urn:schemas-microsoft-com:office:office";
     private const string DocumentEntry = "word/document.xml";
 
     public static string Extract(byte[] content)
@@ -38,31 +39,62 @@ public static class DocxTextExtractor
             using var entryStream = entry.Open();
             var document = XDocument.Load(entryStream);
 
-            var paragraphs = document
-                .Descendants(W + "p")
-                .Select(ParagraphText);
-
-            // Blank-line-separated paragraphs, matching what the chunker expects; drop empties so a run
-            // of spacing paragraphs doesn't become a wall of blank lines.
-            var text = string.Join("\n\n", paragraphs.Where(p => p.Length > 0));
-            return text.Trim();
+            // Blank-line-separated paragraphs, matching what the chunker expects. Empty paragraphs are
+            // dropped so spacing doesn't become a wall of blank lines, except that two or more in a row
+            // are the author's scene break (R1) and are kept as two blank lines.
+            var builder = new StringBuilder();
+            var emptyRun = 0;
+            foreach (var paragraph in document.Descendants(W + "p"))
+            {
+                var text = ParagraphText(paragraph);
+                if (text.Length == 0)
+                {
+                    emptyRun++;
+                    continue;
+                }
+                if (builder.Length > 0)
+                    builder.Append(emptyRun >= 2 ? "\n\n\n" : "\n\n");
+                builder.Append(text);
+                emptyRun = 0;
+            }
+            return builder.ToString().Trim();
         }
     }
 
     // Concatenates a paragraph's runs in document order: text nodes as-is, tabs and breaks as their
     // whitespace. Descendants() reaches text nested under hyperlinks, smart tags, and table cells too.
+    //
+    // A page break (a page-type <w:br>, or a paragraph set to start a new page) and a horizontal rule (an
+    // empty bordered paragraph, or a VML rule marked o:hr) are the author's scene breaks (R1), written as
+    // a divider line of their own.
     private static string ParagraphText(XElement paragraph)
     {
         var builder = new StringBuilder();
+        var properties = paragraph.Element(W + "pPr");
+        if (properties?.Element(W + "pageBreakBefore") is { } before && IsOn(before))
+            builder.Append(SceneBreak.Divider).Append('\n');
+
         foreach (var node in paragraph.Descendants())
         {
             if (node.Name == W + "t")
                 builder.Append(node.Value);
             else if (node.Name == W + "tab")
                 builder.Append('\t');
+            else if (node.Name == W + "br" && (string?)node.Attribute(W + "type") == "page")
+                builder.Append('\n').Append(SceneBreak.Divider).Append('\n');
             else if (node.Name == W + "br" || node.Name == W + "cr")
                 builder.Append('\n');
+            else if ((string?)node.Attribute(O + "hr") is "t" or "true")
+                builder.Append('\n').Append(SceneBreak.Divider).Append('\n');
         }
-        return builder.ToString().TrimEnd();
+
+        var text = builder.ToString().Trim('\n', ' ', '\t');
+        if (text.Length == 0 && properties?.Element(W + "pBdr") is { } border
+            && (border.Element(W + "bottom") is not null || border.Element(W + "top") is not null))
+            return SceneBreak.Divider;
+        return text.TrimEnd();
     }
+
+    private static bool IsOn(XElement toggle) =>
+        (string?)toggle.Attribute(W + "val") is null or "1" or "true" or "on";
 }

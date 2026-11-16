@@ -50,8 +50,10 @@ is why release A comes first.
 ## 2. Rulings (owner's answers, numbered for reference)
 
 **Scenes**
-- R1. Scene breaks come only from the text: **chapter breaks, divider glyph lines, two or more blank
-  lines, and horizontal rules**. A single blank line is a paragraph break, not a scene break.
+- R1. Scene breaks come only from the text: **chapter breaks, page breaks, divider glyph lines, two or
+  more blank lines, and horizontal rules**. A single blank line is a paragraph break, not a scene break.
+  (Page breaks were in the owner's first answer; the plan had dropped them.) A PDF's page edges are
+  layout, not authorship, so a PDF source breaks on its text alone.
 - R2. A chapter with **no breaks is one scene** (one block, one image). No splitting by length, and no
   Claude fallback.
 - R3. The scene block stays **after** the scene.
@@ -156,7 +158,7 @@ because it carries a live bug. Every release is test-first, keeps the existing g
 compiles the Android head before it is called done. None of it is verified on a device until the owner
 runs a real draft through.
 
-### Release A — Scenes from the text (R1–R5)
+### Release A — Scenes from the text (R1–R5) — **built**
 1. **`SceneDetector`**:
    - Breaks on chapter starts, divider lines, two or more blank lines, and horizontal rules.
    - Remove the length split (`TargetSceneChars`/`MaxSceneChars`), so a chapter with no breaks is one scene.
@@ -181,7 +183,12 @@ runs a real draft through.
    - Fewer, longer scenes means fewer images and longer image prompts.
    - Log the first real run's scene count and image cost against the last.
 
-### Release B — Readers (R10–R14, R27)
+### Release B — Readers (R10–R14, R27) — **built**
+
+Rulings taken when B began: Hugo Hook keeps "Could I sell it" and its selling anchors but writes about what
+gets the manuscript to a sellable state, never where to pitch it; Edie Torial's edit-letter anchors are
+approved; each reader page leads with the name, then the role.
+
 1. **Fellow writer.**
    - A seventh persona on the strong model: "What would I steal, and what would I do differently".
    - Anchors as approved in R34.

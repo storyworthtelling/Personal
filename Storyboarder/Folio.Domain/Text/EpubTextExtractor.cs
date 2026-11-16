@@ -116,6 +116,7 @@ public static class EpubTextExtractor
     private static readonly Regex BlockClose = new(
         @"</(p|div|h[1-6]|li|blockquote|section|article|br\s*/?)>|<br\s*/?>",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex HorizontalRule = new(@"<hr\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex AnyTag = new(@"<[^>]+>", RegexOptions.CultureInvariant);
     private static readonly Regex Blanks = new(@"[ \t]+", RegexOptions.CultureInvariant);
     private static readonly Regex ExtraBlankLines = new(@"\n{3,}", RegexOptions.CultureInvariant);
@@ -126,6 +127,8 @@ public static class EpubTextExtractor
         // remaining tags, decode entities, and tidy whitespace.
         html = Regex.Replace(html, @"<(head|style|script)[^>]*>.*?</\1>", string.Empty,
             RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        // An <hr> is the ePub's scene break (R1): a divider line of its own, before tags are stripped.
+        html = HorizontalRule.Replace(html, "\n\n" + SceneBreak.Divider + "\n\n");
         html = BlockClose.Replace(html, "\n\n");
         html = AnyTag.Replace(html, string.Empty);
         html = WebUtility.HtmlDecode(html);
