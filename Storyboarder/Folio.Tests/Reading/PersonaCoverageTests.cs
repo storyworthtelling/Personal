@@ -20,9 +20,9 @@ public class PersonaCoverageTests
     }
 
     [Fact]
-    public void TheSixReadersEachHaveOne()
+    public void TheSevenReadersEachHaveOne()
     {
-        Assert.Equal(6, PersonaCatalogue.Readers.Count);
+        Assert.Equal(7, PersonaCatalogue.Readers.Count);
         Assert.All(PersonaCatalogue.Readers, persona => Assert.Equal(PersonaKind.Reader, persona.Kind));
     }
 
@@ -44,13 +44,13 @@ public class PersonaCoverageTests
     /// manuscript. The Gate-3 mockup still shows seven; this is the amendment, not a drift from it.
     /// </summary>
     [Fact]
-    public void TheReadersAreTheApprovedSixInTheApprovedOrder()
+    public void TheReadersAreTheApprovedSevenInTheApprovedOrder()
     {
         Assert.Equal(
             new[]
             {
                 "Developmental editor", "Agent", "Acquiring editor", "Genre fan",
-                "Harsh but fair critic", "Graduate literature professor",
+                "Harsh but fair critic", "Graduate literature professor", "Fellow writer",
             },
             PersonaCatalogue.Readers.Select(persona => persona.Name).ToArray());
     }
@@ -96,4 +96,58 @@ public class PersonaCoverageTests
     {
         Assert.Throws<KeyNotFoundException>(() => PersonaCatalogue.ById("continuity-elf"));
     }
+
+    /// <summary>
+    /// The approved cast (R42, owner's rulings): each reader has an invented punny name and a voice of its
+    /// own, no two alike. The names are wire-visible on every reader page, so a change is a decision.
+    /// </summary>
+    [Fact]
+    public void EveryReaderHasItsApprovedNameAndAVoiceOfItsOwn()
+    {
+        Assert.Equal(
+            ["Archie Tecture", "Hugo Hook", "Edie Torial", "Rhea Dalot", "Nick Picker", "Prof. Craft", "Ina Kwell"],
+            PersonaCatalogue.Readers.Select(persona => persona.ReaderName));
+        Assert.All(PersonaCatalogue.Readers, persona => Assert.False(string.IsNullOrWhiteSpace(persona.Voice)));
+        Assert.Equal(7, PersonaCatalogue.Readers.Select(persona => persona.Voice).Distinct().Count());
+    }
+
+    [Fact]
+    public void SectionsHaveNoNameAndNoVoice() =>
+        Assert.All(PersonaCatalogue.Sections, persona =>
+        {
+            Assert.Null(persona.ReaderName);
+            Assert.Null(persona.Voice);
+        });
+
+    /// <summary>The seventh reader (R10, R34): the Fellow writer, scoring on what they'd steal.</summary>
+    [Fact]
+    public void TheFellowWriterReadsForWhatToStealAndWhatToDoDifferently()
+    {
+        var writer = PersonaCatalogue.ById("fellow-writer");
+
+        Assert.Equal("What would I steal, and what would I do differently", writer.Question);
+        Assert.Equal(ModelTier.Strong, writer.Tier);
+        Assert.Equal("I wish I'd written it; I'd steal everything and change nothing", writer.ScoreAnchors[^1]);
+    }
+
+    /// <summary>The Acquiring editor writes the edit letter (R35): its question and its approved anchors.</summary>
+    [Fact]
+    public void TheAcquiringEditorAsksWhatWouldMostRaiseIt()
+    {
+        var editor = PersonaCatalogue.ById("acquiring-editor");
+
+        Assert.Equal("What would most raise it", editor.Question);
+        Assert.Equal(
+            ["it needs rebuilding before an edit letter could help",
+             "the letter would be long; the problems are structural",
+             "three substantive changes would lift it a level",
+             "a light letter; the changes are refinements",
+             "I'd have nothing to ask for"],
+            editor.ScoreAnchors);
+    }
+
+    /// <summary>The Agent keeps "Could I sell it" (owner's ruling); its craft focus is in the brief, not the question.</summary>
+    [Fact]
+    public void TheAgentStillAsksCouldISellIt() =>
+        Assert.Equal("Could I sell it", PersonaCatalogue.ById("agent").Question);
 }

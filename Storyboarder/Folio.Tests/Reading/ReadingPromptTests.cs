@@ -241,11 +241,77 @@ public class ReadingPromptTests
         Assert.DoesNotContain("70,000-90,000", instruction, StringComparison.Ordinal);
     }
 
+    /// <summary>Each reader is addressed by its name and role, and told its voice (R42).</summary>
     [Fact]
-    public void AReaderIsNamedWithTheRightArticle()
+    public void AReaderIsAddressedByNameRoleAndVoice()
     {
-        Assert.Contains("You are an Agent", ReadingPrompt.Instruction(PersonaCatalogue.ById("agent"), NovelWords, GenreFrame.Unknown), StringComparison.Ordinal);
-        Assert.Contains("You are a Genre fan", ReadingPrompt.Instruction(PersonaCatalogue.ById("genre-fan"), NovelWords, GenreFrame.Unknown), StringComparison.Ordinal);
+        foreach (var persona in PersonaCatalogue.Readers)
+        {
+            var instruction = ReadingPrompt.Instruction(persona, NovelWords, GenreFrame.Unknown);
+            Assert.StartsWith($"You are {persona.ReaderName}, the {persona.Name.ToLowerInvariant()},", instruction, StringComparison.Ordinal);
+            Assert.Contains(persona.Voice!, instruction, StringComparison.Ordinal);
+            Assert.Contains("never what you judge", instruction, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// No reader makes line edits (R11), however much the line work costs the score; general terms and
+    /// real blockers are allowed. Sections are not told this: the line-level marks come from elsewhere.
+    /// </summary>
+    [Fact]
+    public void EveryReaderIsToldNotToMakeLineEdits()
+    {
+        foreach (var persona in PersonaCatalogue.Readers)
+        {
+            var instruction = ReadingPrompt.Instruction(persona, ShortStoryWords, GenreFrame.Unknown);
+            Assert.Contains("Make no line edits", instruction, StringComparison.Ordinal);
+            Assert.Contains("a line editor should catch", instruction, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// The Agent judges whether it could sell the manuscript, but writes about what would get it to a
+    /// sellable state, not where to pitch it (owner's ruling). On a short story the talent brief stands.
+    /// </summary>
+    [Fact]
+    public void TheAgentWritesAboutGettingToSellableNotWhereToPitch()
+    {
+        var agent = PersonaCatalogue.ById("agent");
+        var novel = ReadingPrompt.Instruction(agent, NovelWords, GenreFrame.Unknown);
+
+        Assert.Contains("sellable state", novel, StringComparison.Ordinal);
+        Assert.Contains("Do not discuss where to pitch", novel, StringComparison.Ordinal);
+        Assert.Contains("magazine publication", ReadingPrompt.Instruction(agent, ShortStoryWords, GenreFrame.Unknown), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheAcquiringEditorWritesTheEditLetterAtEveryLength()
+    {
+        var editor = PersonaCatalogue.ById("acquiring-editor");
+        foreach (var words in new[] { ShortStoryWords, 20_000, NovelWords })
+            Assert.Contains("developmental edit letter", ReadingPrompt.Instruction(editor, words, GenreFrame.Unknown), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// At novel length each reader writes more, each for its own purpose (R12, R36): the developmental
+    /// editor traces plot, the professor traces character. A short story and a novella are not asked.
+    /// </summary>
+    [Fact]
+    public void EachReaderHasItsOwnNovelLengthPurpose()
+    {
+        var purposes = PersonaCatalogue.Readers.Select(persona => persona.NovelPurpose).ToList();
+        Assert.All(purposes, purpose => Assert.False(string.IsNullOrWhiteSpace(purpose)));
+        Assert.Equal(purposes.Count, purposes.Distinct().Count());
+
+        Assert.Contains("plot thread", PersonaCatalogue.ById("developmental-editor").NovelPurpose!, StringComparison.Ordinal);
+        Assert.Contains("character's arc", PersonaCatalogue.ById("literature-professor").NovelPurpose!, StringComparison.Ordinal);
+
+        foreach (var persona in PersonaCatalogue.Readers)
+        {
+            Assert.Contains(persona.NovelPurpose!, ReadingPrompt.Instruction(persona, NovelWords, GenreFrame.Unknown), StringComparison.Ordinal);
+            Assert.DoesNotContain(persona.NovelPurpose!, ReadingPrompt.Instruction(persona, ShortStoryWords, GenreFrame.Unknown), StringComparison.Ordinal);
+            Assert.DoesNotContain(persona.NovelPurpose!, ReadingPrompt.Instruction(persona, 20_000, GenreFrame.Unknown), StringComparison.Ordinal);
+        }
     }
 
     [Fact]

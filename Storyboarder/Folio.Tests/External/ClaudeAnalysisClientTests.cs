@@ -370,6 +370,32 @@ public class ClaudeAnalysisClientTests
         Assert.Contains("ART STYLE: linocut", requests[0].GetProperty("params").GetProperty("messages")[0].GetProperty("content").GetString(), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A reader writes more at novel length (R12), so its pass gets more room; a short story's or a
+    /// section's pass keeps the ordinary ceiling.
+    /// </summary>
+    [Fact]
+    public async Task AReaderOnANovelGetsTheNovelCeiling()
+    {
+        var (client, handler) = Create();
+        var whole = "{\"verdict\":\"v\",\"assessment\":\"a\",\"strengths\":[\"s\"],\"weaknesses\":[\"w\"],\"condition\":\"c\",\"score\":7,\"scoreReason\":\"r\"}";
+        handler.EnqueueOk(Reply(whole));
+        handler.EnqueueOk(Reply(whole));
+        handler.EnqueueOk(Reply("{\"summary\":\"\",\"findings\":[]}"));
+        var novel = string.Join(' ', Enumerable.Repeat("word", 90_000));
+        var options = new ClaudeOptions();
+
+        await client.ReadAsReader(PersonaCatalogue.ById("agent"), novel, GenreFrame.Unknown, CancellationToken.None);
+        await client.ReadAsReader(PersonaCatalogue.ById("agent"), "A short story.", GenreFrame.Unknown, CancellationToken.None);
+        await client.ReadSection(PersonaCatalogue.Sections[0], novel, GenreFrame.Unknown, CancellationToken.None);
+
+        int MaxTokens(int i) => JsonDocument.Parse(handler.RequestBodies[i]).RootElement.GetProperty("max_tokens").GetInt32();
+        Assert.Equal(options.NovelReaderMaxTokens, MaxTokens(0));
+        Assert.Equal(options.PassMaxTokens, MaxTokens(1));
+        Assert.Equal(options.PassMaxTokens, MaxTokens(2));
+        Assert.True(options.NovelReaderMaxTokens > options.PassMaxTokens);
+    }
+
     [Fact]
     public async Task AReadingPass_RequestsItsOwnEffortSetting()
     {

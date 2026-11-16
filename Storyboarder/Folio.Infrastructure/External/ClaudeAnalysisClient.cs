@@ -678,7 +678,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                     r.Strengths ?? [],
                     r.Weaknesses ?? [],
                     r.Condition ?? r.Recommendation ?? string.Empty))
-                // The omnibus reduce's reviews are never scored; the six readers replace them.
+                // The omnibus reduce's reviews are never scored; the seven readers replace them.
                 .Where(review => ReaderRead.IsWhole(review, scored: false)).ToList(),
             (dto.RevisionPlan ?? []).Select(r =>
                 new RevisionItem(r.Priority ?? string.Empty, r.Chapter ?? string.Empty,
@@ -948,16 +948,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     // Built rather than a const: the noun has to name what this manuscript actually is (a 1,200-word
     // short story is not "one novel"), and that depends on the measured word count these passes never
     // see the manuscript to derive for themselves.
+    // The counts in the synthesis instructions come from the catalogue, so a reader added or dropped
+    // cannot leave the prompt describing a panel that no longer exists.
+    private static string Spelled(int count) => Folio.Domain.Shelf.BookLines.Spell(count);
+
     private static string RevisionPlanInstruction(StoryLength length) =>
-        $"You are given fourteen independent reads of one {ManuscriptLength.Noun(length)}: eight structural "
-        + "sections and six readers, none of whom saw the others' notes. Produce the author's revision plan. "
+        $"You are given {Spelled(PersonaCatalogue.All.Count)} independent reads of one {ManuscriptLength.Noun(length)}: "
+        + $"{Spelled(PersonaCatalogue.Sections.Count)} structural sections and {Spelled(PersonaCatalogue.Readers.Count)} readers, none of whom saw the others' notes. Produce the author's revision plan. "
         + "Where several reads name the same thing, that is one item and it ranks higher for it. Reply with "
         + "JSON only: {\"revisionPlan\": [{\"priority\": \"Must|Should|Consider\", \"chapter\": \"Ch. 12-15\", "
         + "\"issue\": \"what is wrong\", \"suggestedFix\": \"what to do about it — a direction, never "
         + "replacement prose\"}]}. You diagnose and point; you never write the author's sentences for them.";
 
     private static string VerdictInstruction(StoryLength length) =>
-        $"You are given fourteen independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
+        $"You are given {Spelled(PersonaCatalogue.All.Count)} independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
         + "state of this draft. "
         // "standing" is the line the author repeats to themselves afterwards, so it is asked for as a
         // sentence rather than as a rating: a page that opens on a number is read as a mark.
@@ -1082,7 +1086,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
         var model = persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel;
         return SendRaw(system, ReadingPrompt.Question(persona, ManuscriptLength.Classify(manuscript)) + "\n\n" + format,
-            options.PassMaxTokens, model, $"{call}[{persona.Id}]", options.PassEffort, cancellationToken);
+            persona.Kind == PersonaKind.Reader && ManuscriptLength.Classify(manuscript) == StoryLength.Novel
+                ? options.NovelReaderMaxTokens
+                : options.PassMaxTokens,
+            model, $"{call}[{persona.Id}]", options.PassEffort, cancellationToken);
     }
 
     private Task<string> SendMessage(

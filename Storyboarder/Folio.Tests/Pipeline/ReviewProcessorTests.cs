@@ -361,7 +361,7 @@ public class ReviewProcessorTests : IDisposable
     }
 
     [Fact]
-    public async Task EverySixteenReadsRunOnceAndTheSynthesisSeesThemAll()
+    public async Task EveryPassRunsOnceAndTheSynthesisSeesThemAll()
     {
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor());
@@ -373,12 +373,12 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(["todo", "verdict"], synthesisReads);
 
         Assert.Equal(8, sectionsSeenBySynthesis);
-        Assert.Equal(6, readersSeenBySynthesis);
+        Assert.Equal(7, readersSeenBySynthesis);
 
         // One row per pass, all settled, so a re-run bills nothing again.
         using var context = database.NewContext();
         var rows = context.PassReads.Where(pass => pass.NovelId == id).ToList();
-        Assert.Equal(16, rows.Count);
+        Assert.Equal(ReadingPlan.Passes.Count, rows.Count);
         Assert.All(rows, row => Assert.NotNull(row.Json));
     }
 

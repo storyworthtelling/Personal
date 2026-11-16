@@ -73,7 +73,10 @@ public static class ReadingPrompt
                 "Read it as a novella: judge it by what a novella can do, not by what a novel would. ",
             _ => string.Empty,
         };
-        var brief = length == StoryLength.ShortStory && persona.ShortStoryBrief is { } own ? own + " " : string.Empty;
+        var brief = length == StoryLength.ShortStory && persona.ShortStoryBrief is { } own
+            ? own + " "
+            : persona.Brief is { } general ? general + " " : string.Empty;
+        var purpose = length == StoryLength.Novel && persona.NovelPurpose is { } more ? more + " " : string.Empty;
         var genreLine = GenreLine(genre, length);
         var fan = persona.FanOfTheGenre ? FanBrief(genre) : string.Empty;
         var score = ScoreBrief(persona, length);
@@ -81,8 +84,9 @@ public static class ReadingPrompt
         return persona.Kind switch
         {
             PersonaKind.Reader =>
-                $"You are {Article(persona.Name)} {persona.Name} reading the complete {noun} manuscript above, in character. "
-                + words + genreLine + scale + fan + brief + score
+                $"You are {persona.ReaderName ?? persona.Name}, the {persona.Name.ToLowerInvariant()}, reading the complete {noun} manuscript above, in character. "
+                + (persona.Voice is { } voice ? $"Your voice: {voice}. Let it shape how you write, never what you judge. " : string.Empty)
+                + words + genreLine + scale + fan + brief + purpose + NoLineEdits + score
                 + "Nobody else's notes are available to you, and you are not summarising the book.",
             PersonaKind.Section =>
                 $"You are reading the complete {noun} manuscript above for one thing only: {persona.Name}. "
@@ -143,8 +147,12 @@ public static class ReadingPrompt
             + "and give one sentence saying why the score is that number. ";
     }
 
-    private static string Article(string name) =>
-        name.Length > 0 && "AEIOUaeiou".Contains(name[0]) ? "an" : "a";
+    // The owner's ruling (R11): readers make no line edits, even where the line work is costing the score.
+    // The marked manuscript already carries the line-level notes; general terms and real blockers stay.
+    private const string NoLineEdits =
+        "Make no line edits: do not comment on word choice, grammar, punctuation, typos or single sentences. "
+        + "You may say in general terms that the prose needs work (\"the prose is sloppy\"), and name a "
+        + "line-level problem only when it blocks your answer (\"tense shifts that a line editor should catch\"). ";
 
     /// <summary>The question this pass is asked, which is the last thing the model reads.</summary>
     public static string Question(Persona persona, StoryLength length) => persona.QuestionFor(length);

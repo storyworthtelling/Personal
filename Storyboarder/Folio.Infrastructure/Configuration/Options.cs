@@ -64,6 +64,10 @@ public sealed class ClaudeOptions
     // thrown away wholesale, not trimmed — a truncated read costs the whole pass.
     public int PassMaxTokens { get; set; } = 16_000;
 
+    // A reader on a novel writes more (R12: each reader's own novel-length purpose), so its pass gets more
+    // room. The reasoning shares the budget, which is how a too-small ceiling truncated a read before.
+    public int NovelReaderMaxTokens { get; set; } = 24_000;
+
     // The two models the sixteen passes run on (the finding's reversal 2). Judgement — the six
     // readers and the two synthesis passes — goes to the strong one, because there the judgement is
     // the product; the eight structural sections go to the standard one.

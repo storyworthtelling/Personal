@@ -1,14 +1,14 @@
 namespace Folio.Domain.Reading;
 
-/// <summary>One pass of a read. Sixteen of these make one: fourteen over the manuscript, two over those.</summary>
+/// <summary>One pass of a read. Seventeen of these make one: fifteen over the manuscript, two over those.</summary>
 public sealed record ReadingPass(string Id, string Name, ModelTier Tier, Persona? Persona)
 {
-    /// <summary>True for the two passes that read the other fourteen rather than the manuscript.</summary>
+    /// <summary>True for the two passes that read the other fifteen rather than the manuscript.</summary>
     public bool IsSynthesis => Persona is null;
 }
 
 /// <summary>
-/// The order the sixteen passes run in, and how long they take.
+/// The order the seventeen passes run in, and how long they take.
 ///
 /// <para><b>The durations are measured, not guessed</b> (F49). On a real 90,000-word novel a
 /// Sonnet section pass took 37–44 seconds and an Opus reader pass 64–66, and those figures are what
@@ -30,7 +30,7 @@ public static class ReadingPlan
     /// <summary>Measured: a whole-manuscript reader pass on the strong model, capped at 4,000 tokens.</summary>
     public static readonly TimeSpan ReaderPass = TimeSpan.FromSeconds(65);
 
-    /// <summary>The two passes that read the fourteen reads: the to-do list and the verdict.</summary>
+    /// <summary>The two passes that read the fifteen reads: the to-do list and the verdict.</summary>
     public static IReadOnlyList<ReadingPass> Synthesis { get; } =
     [
         new("todo", "Drawing the to-do list together", ModelTier.Strong, null),
