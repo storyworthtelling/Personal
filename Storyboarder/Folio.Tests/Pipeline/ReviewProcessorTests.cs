@@ -8,6 +8,7 @@ using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
 using Folio.Domain.Scenes;
 using Folio.Domain.Series;
+using Folio.Domain.Text;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
@@ -40,6 +41,9 @@ public class ReviewProcessorTests : IDisposable
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int chapterAnalysisCalls;
     private readonly List<string> biblesSeen = [];
+    private int hostCalls;
+    private int speakCalls;
+    private IReadOnlyList<Review> roundTablePanel = [];
     private readonly List<IReadOnlyList<string>> placementBooks = [];
     private readonly List<string> sectionReads = [];
     private readonly List<string> readerReads = [];
@@ -95,16 +99,12 @@ public class ReviewProcessorTests : IDisposable
                 CancellationToken _) =>
             {
                 synthesisReads.Add(passId);
-                if (passId != "verdict")
-                {
-                    findingsSeenByPlan = findings;
-                    previousPlanSeen = previousPlan;
-                }
+                findingsSeenByPlan = findings;
+                previousPlanSeen = previousPlan;
                 sectionsSeenBySynthesis = sections.Count;
                 readersSeenBySynthesis = readers.Count;
-                return Task.FromResult(passId == "verdict"
-                    ? new SynthesisRead([], new Verdict(["a strength"], ["a problem"], "the middle compressed"))
-                    : new SynthesisRead([new RevisionItem("Must", "Ch. 12", "The middle", "Compress it.")], Verdict.Empty));
+                return Task.FromResult(
+                    new SynthesisRead([new RevisionItem("Must", "Ch. 12", "The middle", "Compress it.")], Verdict.Empty));
             });
 
         // The first chapter-analysis call is rate-limited; the worker must reschedule and succeed on retry.
@@ -201,6 +201,28 @@ public class ReviewProcessorTests : IDisposable
                 return Task.FromResult<IReadOnlyList<BibleFact>>(
                     [new BibleFact(BibleKind.Character, "Hero", [], "", "Now a knight errant.", "The knight's son rode out")]);
             });
+
+        // Default round table (release H): the host hands to Hugo Hook once, then closes.
+        claude.Setup(c => c.RoundTableHost(
+                It.IsAny<IReadOnlyList<Review>>(), It.IsAny<RoundTable>(), It.IsAny<IReadOnlyList<RoundTableCue>>(),
+                It.IsAny<int>(), It.IsAny<StoryLength>(), It.IsAny<CancellationToken>()))
+            .Returns((IReadOnlyList<Review> reviews, RoundTable _, IReadOnlyList<RoundTableCue> _, int _, StoryLength _, CancellationToken _) =>
+            {
+                hostCalls++;
+                roundTablePanel = reviews;
+                return Task.FromResult(hostCalls == 1
+                    ? new HostMove("Welcome to the round table.", "agent", "Hugo, what sold you?", "", false)
+                    : new HostMove("That's the show.", "", "", "", true));
+            });
+        claude.Setup(c => c.RoundTableSpeak(
+                It.IsAny<Persona>(), It.IsAny<IReadOnlyList<Review>>(), It.IsAny<RoundTable>(), It.IsAny<RoundTableCue>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, IReadOnlyList<Review> _, RoundTable _, RoundTableCue _, CancellationToken _) =>
+            {
+                speakCalls++;
+                return Task.FromResult($"{persona.ReaderName} says the gate scene sold them.");
+            });
+        claude.Setup(c => c.RoundTableClose(It.IsAny<IReadOnlyList<Review>>(), It.IsAny<RoundTable>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RoundTableClosing("Goodnight, everyone.", new RoundTableSummary(["The gate scene works"], ["Whether it sells"])));
 
         // Default placement guess (release G, R21): after the latest-written other book.
         claude.Setup(c => c.PlaceInSeries(
@@ -439,7 +461,8 @@ public class ReviewProcessorTests : IDisposable
             PersonaCatalogue.Sections.Select(persona => persona.Id).ToList(), sectionReads);
         Assert.Equal(
             PersonaCatalogue.Readers.Select(persona => persona.Id).ToList(), readerReads);
-        Assert.Equal(["todo", "verdict"], synthesisReads);
+        // The verdict pass is gone: the round table replaces it (R32).
+        Assert.Equal(["todo"], synthesisReads);
 
         Assert.Equal(8, sectionsSeenBySynthesis);
         Assert.Equal(7, readersSeenBySynthesis);
@@ -455,6 +478,72 @@ public class ReviewProcessorTests : IDisposable
         var rows = context.PassReads.Where(pass => pass.NovelId == id).ToList();
         Assert.Equal(ReadingPlan.Passes.Count, rows.Count);
         Assert.All(rows, row => Assert.NotNull(row.Json));
+    }
+
+    /// <summary>
+    /// The round table runs after the reads (R28), every reader on the panel, and is kept on the draft
+    /// turn by turn: the host's welcome, the reader it handed to, the host's close and the summary.
+    /// </summary>
+    [Fact]
+    public async Task TheRoundTableRunsAfterTheReadsAndIsKeptOnTheDraft()
+    {
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(PersonaCatalogue.Readers.Select(persona => persona.Id), roundTablePanel.Select(review => review.PersonaId));
+        using var context = database.NewContext();
+        var table = RoundTableCodec.Read(context.BookAnalyses.Single(a => a.NovelId == id).RoundTableJson);
+        Assert.True(table.Closed);
+
+        // The panel agrees (every reader scored 7), so the show goes straight to the open discussion. The host
+        // asks to close early on every move after the first; each early close raises the next agenda topic
+        // instead, a reader answers it, and only once every topic has had its exchange does the show close.
+        var agenda = table.Agenda.Select(item => item.Topic).ToList();
+        Assert.Equal(["Structure", "Themes", "Characters"], agenda.Take(3));
+        Assert.Contains("Pacing", agenda);
+        Assert.Equal(agenda, table.Covered);
+        Assert.Equal(1 + agenda.Count, speakCalls);
+        Assert.Equal(agenda, table.Turns.Where(turn => turn.Speaker == RoundTablePlan.HostId && turn.Topic.Length > 0)
+            .Select(turn => turn.Topic).Distinct());
+        Assert.Equal("Goodnight, everyone.", table.Turns[^1].Words);
+        Assert.Equal(["Whether it sells"], table.Summary!.StillDiffer);
+        Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
+
+        // And the report prints it in the verdict's place.
+        var report = ReportText(id);
+        Assert.Contains("Hugo Hook says the gate scene sold them.", report, StringComparison.Ordinal);
+        Assert.Contains("Where they still differ", report, StringComparison.Ordinal);
+    }
+
+    /// <summary>A turn that fails is tried again on its own: the show resumes, it does not start over.</summary>
+    [Fact]
+    public async Task AFailedTurnIsTriedAgainWithoutRestartingTheShow()
+    {
+        var failed = false;
+        claude.Setup(c => c.RoundTableSpeak(
+                It.IsAny<Persona>(), It.IsAny<IReadOnlyList<Review>>(), It.IsAny<RoundTable>(), It.IsAny<RoundTableCue>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                speakCalls++;
+                if (!failed)
+                {
+                    failed = true;
+                    return Task.FromException<string>(new HttpRequestException("connection dropped"));
+                }
+                return Task.FromResult("Second time lucky.");
+            });
+
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        // The failed turn was tried again on its own: the host was not asked again for it, and the reader's
+        // first line is the retried one.
+        using var context = database.NewContext();
+        var table = RoundTableCodec.Read(context.BookAnalyses.Single(a => a.NovelId == id).RoundTableJson);
+        Assert.True(table.Closed);
+        Assert.Equal(hostCalls, table.Turns.Count(turn => turn.Speaker == RoundTablePlan.HostId) - 1);
+        Assert.Equal(speakCalls - 1, table.Turns.Count(turn => turn.Speaker != RoundTablePlan.HostId));
+        Assert.Equal("Second time lucky.", table.Turns.First(turn => turn.Speaker != RoundTablePlan.HostId).Words);
     }
 
     private async Task DriveToCompletion(ReviewProcessor processor)

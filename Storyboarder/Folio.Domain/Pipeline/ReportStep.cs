@@ -11,6 +11,11 @@ public sealed record ReportProgress(
     /// <summary>How many detected scenes have their own judgement, and how many there are (release A3).</summary>
     public int ScenesJudged { get; init; }
     public int ScenesTotal { get; init; }
+
+    /// <summary>The round table's turns so far and its cap (release H); a cap of zero means it is not tracked.</summary>
+    public int RoundTableTurns { get; init; }
+    public int RoundTableCap { get; init; }
+    public bool RoundTableClosed { get; init; }
 }
 
 /// <summary>
@@ -37,6 +42,10 @@ public static class ReportStep
             return $"Reading the whole book through — read {progress.ReadsDone + 1} of {progress.ReadsTotal}" +
                    (string.IsNullOrWhiteSpace(progress.NextRead) ? string.Empty : $": {progress.NextRead}");
         }
+
+        // Past the cap the owed rebuttals still run, so "about" is honest and the number never runs backwards.
+        if (progress.RoundTableCap > 0 && !progress.RoundTableClosed)
+            return $"Round table — turn {progress.RoundTableTurns + 1} of about {Math.Max(progress.RoundTableCap, progress.RoundTableTurns + 1)}";
 
         return progress.JacketPending ? "Painting the jacket" : "Composing the report";
     }

@@ -34,9 +34,9 @@ public class ReadingStatusTests
     [Fact]
     public void ASynthesisPassSaysWhatItIsDoing()
     {
-        var line = ReadingStatus.Sentence(Pass("verdict"), done: 15, total: 16);
+        var line = ReadingStatus.Sentence(Pass("todo"), done: 15, total: 16);
 
-        Assert.Equal("Writing the verdict — 16 of 16.", line);
+        Assert.Equal("Drawing the to-do list together — 16 of 16.", line);
     }
 
     /// <summary>Sixteen passes, sixteen different sentences — the thing a spinner cannot do.</summary>
@@ -47,7 +47,7 @@ public class ReadingStatusTests
             .Select((pass, index) => ReadingStatus.Sentence(pass, index, ReadingPlan.Passes.Count))
             .ToList();
 
-        Assert.Equal(17, lines.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(16, lines.Distinct(StringComparer.Ordinal).Count());
         Assert.All(lines, line => Assert.False(string.IsNullOrWhiteSpace(line)));
     }
 

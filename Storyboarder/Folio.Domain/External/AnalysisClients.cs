@@ -178,6 +178,36 @@ public interface IClaudeAnalysisClient
     // (each entry with the book that established it and its quoted passage), the earlier-written book is
     // canon, and each finding is one of ContinuityKinds with the earlier book and its quote. placement is
     // where this book sits; while it is a guess, the result says what it assumed.
+    /// <summary>
+    /// The round table's host (release H, R40) makes its next move: what it says aloud, whom it hands to and
+    /// what it asks, whom they are to answer, or that it would close. Told the turns left and the rebuttals
+    /// still owed (R30). Throws on a reply it cannot read, so the turn is tried again.
+    /// </summary>
+    Task<Folio.Domain.Reading.HostMove> RoundTableHost(
+        IReadOnlyList<Review> reviews,
+        Folio.Domain.Reading.RoundTable table,
+        IReadOnlyList<Folio.Domain.Reading.RoundTableCue> owed,
+        int turnsLeft,
+        Folio.Domain.Text.StoryLength length,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One reader's turn at the round table (R40): in its own voice, from its own read, replying to what was
+    /// said. It may concede in words; its score stays the independent one (R31).
+    /// </summary>
+    Task<string> RoundTableSpeak(
+        Folio.Domain.Reading.Persona persona,
+        IReadOnlyList<Review> reviews,
+        Folio.Domain.Reading.RoundTable table,
+        Folio.Domain.Reading.RoundTableCue cue,
+        CancellationToken cancellationToken);
+
+    /// <summary>The host closes the show and says where the readers ended up, without ruling (R32).</summary>
+    Task<Folio.Domain.Reading.RoundTableClosing> RoundTableClose(
+        IReadOnlyList<Review> reviews,
+        Folio.Domain.Reading.RoundTable table,
+        CancellationToken cancellationToken);
+
     Task<SeriesContinuity> AssessSeriesContinuity(
         string title,
         SeriesCanon priorCanon,

@@ -398,6 +398,11 @@ public class BookAnalysis
     // Set once the series bible, as this draft left it, has been sent to the tablet and Drive (R26), or
     // given up on. Best-effort: the bible is a convenience beside the report, never a reason to hold it.
     public bool SeriesBibleDelivered { get; set; }
+
+    // The round table (release H, R28–R33, R40), serialized as a RoundTable: the transcript so far, the cue
+    // waiting for its speaker and, once closed, the summary. Null until it starts; rewritten after every turn,
+    // so a worker stopped mid-show resumes at the next turn.
+    public string? RoundTableJson { get; set; }
 }
 
 /// <summary>

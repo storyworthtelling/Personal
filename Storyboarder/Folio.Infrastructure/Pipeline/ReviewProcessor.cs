@@ -1244,13 +1244,11 @@ public sealed class ReviewProcessor : IPipelineStep
                             await ReadSections(db, novel.Id, cancellationToken),
                             await ReadReaders(db, novel.Id, cancellationToken),
                             novel.WordCount,
-                            due.Id == "verdict"
-                                ? []
-                                : Folio.Domain.Markup.FindingCatalogue.Of(await FoldReport(
-                                    db, novel, analysis, novel.WordCount,
-                                    await SceneJudgements(db, novel.Id, cancellationToken),
-                                    SynthesisRead.Empty, cancellationToken)),
-                            due.Id == "verdict" ? [] : await PreviousPlan(db, novel, cancellationToken),
+                            Folio.Domain.Markup.FindingCatalogue.Of(await FoldReport(
+                                db, novel, analysis, novel.WordCount,
+                                await SceneJudgements(db, novel.Id, cancellationToken),
+                                SynthesisRead.Empty, cancellationToken)),
+                            await PreviousPlan(db, novel, cancellationToken),
                             cancellationToken),
                         JsonResponse.CaseInsensitive)
                     : due.Persona!.Kind == PersonaKind.Reader
@@ -1285,6 +1283,14 @@ public sealed class ReviewProcessor : IPipelineStep
         if (novel.SeriesId is { } seriesId && !analysis.SeriesBibleUpdated)
         {
             return await UpdateSeriesBible(db, novel, analysis, seriesId, cancellationToken);
+        }
+
+        // 2g3) The round table (release H, R28–R33, R40): the readers talk about the book, one turn a cycle,
+        // the table persisted after each. It is the one unattended step that is not batched (R39): every turn
+        // depends on the one before.
+        if (!RoundTableCodec.Read(analysis.RoundTableJson).Closed)
+        {
+            return await RoundTableTurn(db, novel, analysis, cancellationToken);
         }
 
         // 2h) Paint the jacket (a Gemini call), if nothing has painted or set one yet. Its own resumable
@@ -1978,6 +1984,64 @@ public sealed class ReviewProcessor : IPipelineStep
             .ToList();
     }
 
+    // One turn of the round table: the host's move, a reader's turn on its cue, or the close. The table is
+    // saved after every turn; a failed call is retried on its own, so the show resumes rather than restarts.
+    private async Task<ProcessResult> RoundTableTurn(
+        FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
+    {
+        var reviews = await ReadReaders(db, novel.Id, cancellationToken);
+        var length = ManuscriptLength.Classify(novel.WordCount);
+        var table = RoundTableCodec.Read(analysis.RoundTableJson);
+        // The agenda and cap are fixed as the show begins (owner's ruling: disagreements first, then structure,
+        // themes, characters and whatever else the reads raised).
+        if (table.Turns.Count == 0 && table.Agenda.Count == 0)
+            table = RoundTablePlan.Begin(RoundTableAgenda.For(await ReadSections(db, novel.Id, cancellationToken)), RoundTablePlan.TurnCap(length));
+        var step = RoundTablePlan.Next(table, reviews, length);
+        if (reviews.Count == 0 || step.Kind == RoundTableStepKind.Done)
+        {
+            // Nobody to talk: the table closes empty rather than holding the report.
+            analysis.RoundTableJson = RoundTableCodec.Write(table with { Summary = table.Summary ?? new RoundTableSummary([], []) });
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        if (!claudeLimiter.TryAcquire())
+            return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+        try
+        {
+            switch (step.Kind)
+            {
+                case RoundTableStepKind.HostTurn:
+                    var move = await claude.RoundTableHost(
+                        reviews, table, RoundTablePlan.Owed(table, reviews),
+                        Math.Max(0, table.Cap - table.Turns.Count), length, cancellationToken);
+                    table = RoundTablePlan.Apply(table, move, reviews);
+                    break;
+                case RoundTableStepKind.ReaderTurn:
+                    var cued = table with { Next = step.Cue };
+                    var words = await claude.RoundTableSpeak(
+                        PersonaCatalogue.ById(step.Cue!.Speaker), reviews, cued, step.Cue, cancellationToken);
+                    table = RoundTablePlan.Spoken(cued, words);
+                    break;
+                default:
+                    var closing = await claude.RoundTableClose(reviews, table, cancellationToken);
+                    table = RoundTablePlan.Closed(table, closing.Says, closing.Summary);
+                    break;
+            }
+            ClearCallFailures(novel);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return await DeferAfterFailedCall(db, novel, ex, $"Round table turn {table.Turns.Count + 1}", cancellationToken);
+        }
+
+        analysis.RoundTableJson = RoundTableCodec.Write(table);
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
+    }
+
     // Merges this draft's read into its series' bible. Earlier books not yet in the bible are seeded from
     // their stored canon first, at no cost, so a series reviewed before the bible existed is not read again.
     // A stored bible that will not read is never written over: this draft settles without it, and the
@@ -2217,6 +2281,9 @@ public sealed class ReviewProcessor : IPipelineStep
                 synthesis.Verdict);
 
         // What the last draft's plan asked for that no read raises now (R19).
+        var table = RoundTableCodec.Read(analysis.RoundTableJson);
+        if (table.Closed)
+            folded = folded with { RoundTable = table };
         return synthesis.Fixed is { Count: > 0 } ? folded with { FixedSincePrevious = synthesis.Fixed } : folded;
     }
 

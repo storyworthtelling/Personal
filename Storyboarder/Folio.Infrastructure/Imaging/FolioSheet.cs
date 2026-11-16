@@ -27,9 +27,10 @@ public static class FolioSheet
     public static readonly ReportSection Readers = new("Readers", "The readers", "folio-readers");
     public static readonly ReportSection Plan = new("Plan", "What to do about it", "folio-plan");
     public static readonly ReportSection Verdict = new("Verdict", "Verdict", "folio-verdict");
+    public static readonly ReportSection RoundTable = new("Round table", "Round table", "folio-round-table");
 
     /// <summary>The report's parts in the order it binds them; a report has a tab for each it actually prints.</summary>
-    public static readonly IReadOnlyList<ReportSection> All = [Frame, Notes, Manuscript, Readers, Plan, Verdict];
+    public static readonly IReadOnlyList<ReportSection> All = [Frame, Notes, Manuscript, Readers, Plan, RoundTable, Verdict];
 
     public static IReadOnlyList<BinderTab> Tabs(IReadOnlyList<ReportSection> present) =>
         present.Select(section => new BinderTab(section.Tab, section.Destination, Signature.Cloth, Signature.Deep)).ToList();

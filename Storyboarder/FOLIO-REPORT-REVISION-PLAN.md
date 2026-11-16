@@ -378,7 +378,40 @@ How it was built:
    - The bible is delivered as its own document to the tablet and Drive.
    - An app screen lets the owner correct an entry, and a correction wins over the books.
 
-### Release H — The round table: the readers in conversation (R28–R33, R40–R41)
+### Release H — The round table: the readers in conversation (R28–R33, R40–R41) — **built**
+
+How it was built:
+- **The rules** (`RoundTablePlan`) decide who may speak and when the show ends; the model decides what is
+  said.
+  - The host, Tae Boll, opens and speaks between readers, handing the floor to whom it names. When it
+    names nobody on the panel, the quietest reader gets the floor.
+  - Every pair of scored readers three or more points apart owes two rebuttals, one each way. The host
+    cannot close while one is owed.
+  - The cap is 15, 30 or 50 turns, host's included. Past the cap, owed rebuttals are cued straight, with
+    no host turn between, then the show closes.
+  - A silent host still takes a turn, so the show cannot loop short of its cap.
+- **The calls** (`RoundTableHost`, `RoundTableSpeak`, `RoundTableClose`, strong model) all open with the
+  same cached block, the panel's independent reads, then the speaker's own cached instruction. The
+  transcript is the message.
+  - Readers speak in their own voices, may concede in words, and keep their scores.
+  - The host never rules.
+- **The pipeline** runs one turn a cycle after the reads and the series bible step.
+  - The table is saved on the draft after every turn (`BookAnalysis.RoundTableJson`), so a failed or
+    stopped turn resumes rather than restarts.
+  - The desk says "Round table — turn 12 of about 30".
+- **The verdict pass is gone** (sixteen passes). The readiness chart still counts Greats from the
+  consolidated report.
+- **On the page:** a Round table section and tab in the verdict's place. It prints the transcript, each
+  line under its speaker's name, then "Where they agree" and "Where they still differ". A report from
+  before H keeps its verdict.
+- **Two parts, in order (owner's ruling, after the first build).** Tae runs the panel through the
+  disagreements first. Then comes an open discussion through an agenda: structure, themes and characters
+  always, then whatever else the section reads raised, each with that read's summary.
+  - The host cannot close while a topic is unraised. An early close raises the next topic itself, and a
+    reader answers it.
+  - Running long is accepted: past the cap every unraised topic still gets its exchange.
+  - The page heads each part of the show.
+- **Not yet run against the live model**, so the real length and cost of a show are unmeasured.
 1. **Second round.**
    - After all seven independent reads, the readers talk about the book.
    - Their first-round reviews and scores are unchanged (R28).

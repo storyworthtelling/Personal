@@ -1207,6 +1207,7 @@ public sealed class ProjectService
             .Select(pass => pass.PassId)
             .ToListAsync(cancellationToken);
 
+        var table = RoundTableCodec.Read(book?.RoundTableJson);
         var passes = ReadingPlan.Passes;
         var reads = new PhaseProgress(passes.Count(pass => finished.Contains(pass.Id)), passes.Count);
         var next = passes.FirstOrDefault(pass => !finished.Contains(pass.Id));
@@ -1224,6 +1225,9 @@ public sealed class ProjectService
         {
             ScenesJudged = await db.Scenes.CountAsync(s => s.NovelId == novel.Id && s.JudgementJson != null, cancellationToken),
             ScenesTotal = await db.Scenes.CountAsync(s => s.NovelId == novel.Id, cancellationToken),
+            RoundTableTurns = table.Turns.Count,
+            RoundTableCap = table.Cap > 0 ? table.Cap : RoundTablePlan.TurnCap(ManuscriptLength.Classify(novel.WordCount)),
+            RoundTableClosed = table.Closed,
         });
         return (reads, step);
     }
