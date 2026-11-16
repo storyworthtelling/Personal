@@ -234,7 +234,11 @@ public class VaultActivity : Activity
         {
             services.Diagnostics.Warn(LogSources.Vault, "Google sign-in did not complete.", exception);
             ShowStatus(null);
-            Raise(VaultOutcomes.SignInFailed(DateTimeOffset.UtcNow));
+            // Google not knowing this build is a console setting, not a retry: name it, as first run does.
+            var at = DateTimeOffset.UtcNow;
+            Raise(GoogleSignInFailure.IsUnregistered(exception.ToString())
+                ? VaultOutcomes.SignInNotRegistered(at)
+                : VaultOutcomes.SignInFailed(at));
         }
     }
 
