@@ -1,6 +1,7 @@
 using Android.Content;
 using Android.Graphics;
 using Android.Views;
+using Codex.Domain.Design;
 using Codex.Ui;
 
 namespace Flyleaf;
@@ -8,7 +9,7 @@ namespace Flyleaf;
 /// <summary>
 /// The Flyleaf book cover, drawn as structural vectors: the warm identity ground, an ex-libris
 /// bookplate (fine double-rule + corner flourishes), the "arch-into-study" illustration window,
-/// the lower title band ("FLYLEAF" / "STORYWORTHTELLING"), and an embossed maker's mark. The
+/// the lower title band ("Flyleaf" / "Storyworthtelling"), and an embossed maker's mark. The
 /// illustration window holds the Gemini-painted arch-into-study cover art (committed drawable
 /// cover_flyleaf), center-cropped to fill; it falls back to a firelight wash only if the bitmap
 /// can't be decoded. Shown full-bleed on the cover-load overlay; the anatomy matches the approved mockup.
@@ -163,15 +164,15 @@ public class CoverView : View
     {
         using var title = new Paint(PaintFlags.AntiAlias) { Color = PaperTheme.Ink, TextAlign = Paint.Align.Center };
         title.SetTypeface(PaperTheme.SerifSemibold(Context!));
-        title.TextSize = Math.Min(plate.Width() * 0.16f, 44 * density);
+        title.TextSize = Math.Min(plate.Width() * 0.16f, DesignTokens.TypeSp.CoverTitle * density);
         var titleY = top + (plate.Bottom - top) * 0.42f;
-        canvas.DrawText("FLYLEAF", plate.CenterX(), titleY, title);
+        canvas.DrawText("Flyleaf", plate.CenterX(), titleY, title);
 
         using var sub = new Paint(PaintFlags.AntiAlias) { Color = PaperTheme.InkMuted, TextAlign = Paint.Align.Center };
         sub.SetTypeface(PaperTheme.SansRegular(Context!));
-        sub.TextSize = Math.Min(plate.Width() * 0.035f, 12 * density);
-        sub.LetterSpacing = 0.25f;
-        canvas.DrawText("STORYWORTHTELLING", plate.CenterX(), titleY + 22 * density, sub);
+        sub.TextSize = Math.Min(plate.Width() * 0.035f, DesignTokens.TypeSp.Label * density);
+        // Sentence case and no letterspacing (DESIGN.md §4, §14; owner's ruling, W8.5).
+        canvas.DrawText("Storyworthtelling", plate.CenterX(), titleY + 22 * density, sub);
     }
 
     private void DrawMakersMark(Canvas canvas, float cx, float cy)

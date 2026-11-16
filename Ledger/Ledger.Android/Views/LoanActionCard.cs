@@ -1,4 +1,5 @@
 using Microsoft.Maui.Controls.Shapes;
+using Index.Domain.Design;
 using Storyworthtelling.Maui;
 
 namespace Index.Android.Views;
@@ -38,7 +39,7 @@ public static class LoanActionCard
             BackgroundColor = PaperResources.Colour("PaperBright"),
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = 1,
-            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
+            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard) },
             WidthRequest = 300,
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
@@ -47,7 +48,8 @@ public static class LoanActionCard
 
         var scrim = new Grid
         {
-            BackgroundColor = Colors.Black.WithAlpha(0.35f),
+            // Paper does not go dark (§5): the same PaperDeep haze every action card sits over.
+            BackgroundColor = PaperResources.Colour("PaperDeep").WithAlpha((float)MaterialTokens.HazeAlpha),
             Children = { card },
         };
         var dismissTap = new TapGestureRecognizer();

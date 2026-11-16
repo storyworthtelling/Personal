@@ -497,11 +497,11 @@ public partial class MainPage : FolioBinderPage
         // said "Draft 1 is complete" over a book that had stopped part-way through its reads).
         var lines = new List<View>
         {
-            new Label { Text = row.Title, FontFamily = "SerifSemibold", FontSize = 17, LineHeight = 1.15 },
+            new Label { Text = row.Title, FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize"), LineHeight = 1.15 },
             new Label
             {
                 Text = row.Summary,
-                FontSize = 14,
+                FontSize = PaperResources.Token<double>("SecondarySize"),
                 TextColor = PaperResources.Colour(status.NeedsAttention ? "ProblemMark" : "InkBlue"),
                 Margin = new Thickness(0, 8, 0, 0),
             },
@@ -512,7 +512,7 @@ public partial class MainPage : FolioBinderPage
             lines.Add(new Label
             {
                 Text = row.Problem,
-                FontSize = 13,
+                FontSize = PaperResources.Token<double>("LabelSize"),
                 TextColor = PaperResources.Colour("ProblemMark"),
                 Margin = new Thickness(0, 6, 0, 0),
             });

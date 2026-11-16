@@ -239,7 +239,6 @@ public static class AddToPicker
     private static TextView GroupLabel(Context context, string text)
     {
         var label = PaperUi.Label(context, text);
-        label.SetAllCaps(true);
         label.SetPadding(0, PaperTheme.Dp(context, DesignTokens.Space.X4), 0, PaperTheme.Dp(context, DesignTokens.Space.X1));
         return label;
     }

@@ -4,6 +4,7 @@ using Android.Views;
 using Android.Widget;
 using Codex.Domain.Apps;
 using Codex.Domain.Home;
+using Codex.Domain.Design;
 using Codex.Ui;
 
 namespace Flyleaf;
@@ -496,7 +497,7 @@ public class BookshelfView : View, IDrawnControls
     {
         using var text = new Paint(PaintFlags.AntiAlias) { Color = WithAlpha(marks, 245), TextAlign = Paint.Align.Center };
         text.SetTypeface(PaperTheme.SerifSemibold(Context!));
-        text.TextSize = Math.Min((bottom - top) * 0.40f, 13 * density);
+        text.TextSize = Math.Min((bottom - top) * 0.40f, DesignTokens.TypeSp.Label * density);
         // The halo is the opposite of the lettering, so it lifts the title off the cloth
         // either way round rather than smudging ink into ink.
         text.SetShadowLayer(2f * density, 0, 0.5f * density,
@@ -555,7 +556,7 @@ public class BookshelfView : View, IDrawnControls
         using var text = new Paint(PaintFlags.AntiAlias)
         {
             Color = PaperTheme.PaperBright,
-            TextSize = Math.Min(spine.Width() * 0.64f, 13 * density),
+            TextSize = Math.Min(spine.Width() * 0.64f, DesignTokens.TypeSp.Label * density),
             TextAlign = Paint.Align.Left,
         };
         text.SetTypeface(PaperTheme.SerifSemibold(Context!));
@@ -699,7 +700,7 @@ public class BookshelfView : View, IDrawnControls
     {
         using var text = new Paint(PaintFlags.AntiAlias) { Color = PaperTheme.Ink, TextAlign = Paint.Align.Center };
         text.SetTypeface(PaperTheme.SerifRegular(Context!));
-        text.TextSize = Math.Min((bottom - top) * 0.5f, 12 * density);
+        text.TextSize = Math.Min((bottom - top) * 0.5f, DesignTokens.TypeSp.Label * density);
         var trimmed = Ellipsize(label, text, left, right);
         canvas.DrawText(trimmed, (left + right) / 2, (top + bottom) / 2 + text.TextSize / 3f, text);
     }

@@ -1,3 +1,4 @@
+using Storyworthtelling.Paper;
 using Storyworthtelling.Maui;
 using Storyworthtelling.Maui.Views;
 
@@ -52,27 +53,27 @@ public enum LedgerArea
 /// </summary>
 public static class LedgerAreas
 {
-    // ---- D115/D117: the bookplate-green identity, committed in Tools/IconStudio/Tokens.cs as
-    // IndexMarkHex/IndexFillHex. Retyped as literals per this file's own remark above. ----
-    private const string AccountsMarkHex = "#596C45";
-    private const string AccountsFillHex = "#B6C3A9";
+    // ---- D115/D117: the bookplate-green identity, Storyworthtelling.Paper.AppIdentityTokens' Index ladder, and D120's
+    // three role hues, PaperColorTokens' tiers. Named, never retyped (audit W8.5, report 04 §6: a second hand-typed
+    // copy of the palette is the failure DESIGN.md §19 describes). ----
+    private const string AccountsMarkHex = AppIdentityTokens.IndexMarkHex;
+    private const string AccountsFillHex = AppIdentityTokens.IndexFillHex;
 
     // D122's graph paper is drawn in this same identity colour (mockup-02's background-image is not a
-    // second, separately-chosen green) — public so MainPage can read it without this file's hex
-    // literals leaking a second copy into a non-registered file.
-    public const string AccountsGroundHex = "#839372";
+    // second, separately-chosen green).
+    public const string AccountsGroundHex = AppIdentityTokens.IndexGroundHex;
 
     // ---- D120: Snowball's in-progress teal. ----
-    private const string SnowballMarkHex = "#18717C";
-    private const string SnowballFillHex = "#9BC7CD";
+    private const string SnowballMarkHex = PaperColorTokens.ProgressMark;
+    private const string SnowballFillHex = PaperColorTokens.ProgressFill;
 
     // ---- D120: Budget's caution ochre. ----
-    private const string BudgetMarkHex = "#805F00";
-    private const string BudgetFillHex = "#D0BB91";
+    private const string BudgetMarkHex = PaperColorTokens.CautionMark;
+    private const string BudgetFillHex = PaperColorTokens.CautionFill;
 
     // ---- D120: Savings' reference slate-blue. ----
-    private const string SavingsMarkHex = "#4C6787";
-    private const string SavingsFillHex = "#AEC0D5";
+    private const string SavingsMarkHex = PaperColorTokens.ReferenceMark;
+    private const string SavingsFillHex = PaperColorTokens.ReferenceFill;
 
     // A pediment roof, a base ledge, and four columns — the fill-path redraw of mockup-02's
     // bank-columns stroke icon (see this class's remarks).

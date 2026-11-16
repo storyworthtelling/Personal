@@ -82,7 +82,7 @@ public partial class DraftDiffPage : FolioBinderPage
             {
                 Stroke = PaperResources.Colour("Hairline"),
                 StrokeThickness = 1,
-                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 },
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard },
                 Padding = 0,
                 Content = new Image { Source = ImageSource.FromStream(() => new MemoryStream(image)), Aspect = Aspect.AspectFit }
             }

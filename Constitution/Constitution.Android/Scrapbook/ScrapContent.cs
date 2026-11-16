@@ -36,11 +36,10 @@ public static class ScrapContent
         return column;
     }
 
-    /// <summary>A small caps label in the muted ink.</summary>
+    /// <summary>A small label in the muted ink, in sentence case (DESIGN.md §14; owner's ruling, W8.5).</summary>
     public static TextView Label(Context context, string text)
     {
         var view = Text(context, text, PaperTheme.SansSemibold(context), DesignTokens.TypeSp.Label, PaperTheme.InkMuted);
-        view.SetAllCaps(true);
         return view;
     }
 
@@ -84,7 +83,6 @@ public static class ScrapContent
         view.SetTextSize(ComplexUnitType.Sp, DesignTokens.TypeSp.Label);
         view.SetTextColor(PaperTheme.Ink);
         view.Typeface = PaperTheme.SansSemibold(context);
-        view.SetAllCaps(true);
         view.SetPadding(0, PaperTheme.Dp(context, KickerRuleDp + KickerGapDp), 0, 0);
         return view;
     }

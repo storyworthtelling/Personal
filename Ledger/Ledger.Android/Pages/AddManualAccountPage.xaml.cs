@@ -186,7 +186,7 @@ public partial class AddManualAccountPage : LedgerBinderPage
             BackgroundColor = Color.FromArgb(SharedMaterials.NoteCardHex),
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = 1,
-            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(3) },
+            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard) },
             Padding = new Thickness(20, 10, 20, 14),
             Shadow = null,
             Content = body,

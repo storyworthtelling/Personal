@@ -354,6 +354,7 @@ Push stays almost silent (§1): only new comms earn a buzz; everything else wait
 ## 14. Voice, copy & formats
 
 - **American English**, sentence case everywhere (including buttons). No emoji, no ⚠ glyphs.
+- **No forced capitals and no letterspacing, anywhere** (owner's ruling, audit W8.5): not a small section label, not a cover's title band, and not where a mockup draws capitals (Index's mockup 7 does; the code follows this rule, not the drawing). `RepoGuards.Tests/DesignLiteralsTests` refuses `ToUpper`, `SetAllCaps(true)` and a non-zero letterspacing in every head, beside a number for a type size, a number for a corner radius (a drawn object such as Folio's cloth book keeps its own shape, named in the guard) and black or white paint.
 - **Time is 12-hour** with an analog sensibility ("7:42 pm"); the home shows a drawn analog face.
 - **List timestamps are relative** ("just now" → "5m ago" → "2h ago" → "yesterday" → "Tuesday" → "Jun 30").
 - **Error template (binding):** *what happened* + *what to do next*.

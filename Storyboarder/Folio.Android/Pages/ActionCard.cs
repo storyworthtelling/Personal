@@ -84,11 +84,11 @@ public static class ActionCard
         Padding = new Thickness(18, 14, 18, 11),
         Children =
         {
-            new Label { Text = title, FontFamily = "SerifSemibold", FontSize = 17, LineHeight = 1.15 },
+            new Label { Text = title, FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize"), LineHeight = 1.15 },
             new Label
             {
                 Text = subtitle,
-                FontSize = 12.5,
+                FontSize = PaperResources.Token<double>("LabelSize"),
                 TextColor = PaperResources.Colour("InkMuted"),
                 Margin = new Thickness(0, 2, 0, 0),
             },
@@ -125,7 +125,7 @@ public static class ActionCard
         var label = new Label
         {
             Text = action.Label,
-            FontSize = 15,
+            FontSize = PaperResources.Token<double>("BodySize"),
             TextColor = ink,
             FontFamily = action.Weight == ActionWeight.Primary ? "SansSemibold" : null,
             VerticalOptions = LayoutOptions.Center,
