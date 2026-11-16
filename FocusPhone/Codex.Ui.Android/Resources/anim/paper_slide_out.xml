@@ -5,7 +5,7 @@
 <set xmlns:android="http://schemas.android.com/apk/res/android"
     android:interpolator="@android:interpolator/decelerate_quad">
     <rotate android:fromDegrees="0" android:toDegrees="-11"
-        android:pivotX="0%" android:pivotY="50%" android:duration="240" />
-    <translate android:fromXDelta="0" android:toXDelta="-14%" android:duration="240" />
-    <alpha android:fromAlpha="1.0" android:toAlpha="0.35" android:duration="240" />
+        android:pivotX="0%" android:pivotY="50%" android:duration="200" />
+    <translate android:fromXDelta="0" android:toXDelta="-14%" android:duration="200" />
+    <alpha android:fromAlpha="1.0" android:toAlpha="0.35" android:duration="200" />
 </set>

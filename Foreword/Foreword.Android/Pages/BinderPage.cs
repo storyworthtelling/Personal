@@ -44,12 +44,7 @@ public abstract class BinderPage : PaperBinderPage
     {
         var chosen = (ForewordArea)index;
 
-        await Navigation.PopToRootAsync(animated: false);
-
-        if (chosen != ForewordArea.Today)
-        {
-            await Navigation.PushAsync(Root(chosen), animated: false);
-        }
+        await TurnToAreaAsync(chosen == ForewordArea.Today ? null : Root(chosen));
     }
 
     private static Page Root(ForewordArea area) => area switch

@@ -60,7 +60,7 @@ internal sealed class CuisineCardView
         scrim.AddView(card, layout);
         scrim.Alpha = 0f;
         frame.AddView(scrim, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
-        scrim.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.StandardMs).Start();
+        scrim.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.InkMs).Start();
     }
 
     public void Dismiss()
