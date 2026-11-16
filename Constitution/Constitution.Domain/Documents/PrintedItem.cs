@@ -17,7 +17,7 @@ public enum PrintedRole
     /// <summary>The body size in the semibold: names in a list, "Done", "Still sore?".</summary>
     Strong,
 
-    /// <summary>The owner's voice (Pinyon Script). Only the encouragement seat prints in it.</summary>
+    /// <summary>The owner's voice (Italianno). Only the encouragement seat prints in it.</summary>
     Voice,
 
     /// <summary>A circled word's face: the rating and the mobility choices.</summary>

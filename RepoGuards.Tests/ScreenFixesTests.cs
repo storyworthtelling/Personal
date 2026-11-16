@@ -18,7 +18,7 @@ public class ScreenFixesTests
     [InlineData("FocusPhone/Flyleaf.Android/HomeActivity.cs")]
     [InlineData("FocusPhone/Post.Android/MailboxArea.cs")]
     public void AVoicedSeatIsInTheVoiceHand(string file) =>
-        // §4, §14: a voiced line is Pinyon Script in ink-blue.
+        // §4, §14: a voiced line is Italianno in ink-blue.
         Assert.Contains("PaperUi.Voice(", Read(file), StringComparison.Ordinal);
 
     [Fact]

@@ -73,7 +73,7 @@ internal static class PdfProbe
 
     /// <summary>A letter of the frame's signature, the app's name in the owner's hand: its flourish may overhang the edge.</summary>
     public static bool IsSignature(UglyToad.PdfPig.Content.Letter letter) =>
-        (letter.FontName ?? string.Empty).Contains("Pinyon", StringComparison.OrdinalIgnoreCase);
+        (letter.FontName ?? string.Empty).Contains("Italianno", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Every filled bar (a rectangle much wider than tall) on the page, with its fill colour, in board points.</summary>
     public static List<(float Left, float Top, float Right, float Bottom, (double R, double G, double B) Color)> Bars(Page page) =>

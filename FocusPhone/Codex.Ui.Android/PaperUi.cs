@@ -84,7 +84,7 @@ public static class PaperUi
         Text(context, text, DesignTokens.TypeSp.Label, PaperTheme.InkSoft, PaperTheme.SansSemibold(context));
 
     /// <summary>
-    /// The owner's voice: Pinyon Script in ink-blue (DESIGN.md §4 reserves the
+    /// The owner's voice: Italianno in ink-blue (DESIGN.md §4 reserves the
     /// calligraphy hand for this and nothing else). Wraps, because a voiced line is
     /// prose rather than a label.
     /// </summary>

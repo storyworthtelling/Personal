@@ -78,7 +78,7 @@ internal sealed class SkiaPageLayout : IDisposable
     }
 
     /// <summary>
-    /// Pinyon Script — the owner's voice, and nothing else (DESIGN.md §4). Every other line on a
+    /// Italianno — the owner's voice, and nothing else (DESIGN.md §4). Every other line on a
     /// sheet is Serif or Sans; this hand is what marks a sentence as theirs rather than the app's.
     /// </summary>
     public static SKFont Script(float size) =>

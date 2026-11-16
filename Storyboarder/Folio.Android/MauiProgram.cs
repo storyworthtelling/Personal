@@ -39,7 +39,7 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>()
             // All eight faces, from the kit. This head registered six of them by hand and shipped the
-            // other two — Serif Black, which DESIGN.md §4 gives every screen header, and Pinyon
+            // other two — Serif Black, which DESIGN.md §4 gives every screen header, and Italianno
             // Script, the owner's voice — with no alias at all. Neither failed: MAUI substitutes the
             // system face for an unknown family and reports nothing.
             .ConfigureFonts(Storyworthtelling.Maui.PaperFonts.Register);

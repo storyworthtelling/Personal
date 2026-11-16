@@ -71,7 +71,7 @@ public static class ScrapContent
     public static TextView Body(Context context, string text) =>
         Text(context, text, PaperTheme.SansRegular(context), DesignTokens.TypeSp.Secondary, PaperTheme.InkSoft);
 
-    /// <summary>The owner's voice on the notepad leaf: Pinyon Script in ink-blue, always.</summary>
+    /// <summary>The owner's voice on the notepad leaf: Italianno in ink-blue, always.</summary>
     public static TextView Voice(Context context, string text) =>
         Text(context, text, PaperTheme.Script(context), DesignTokens.TypeSp.Voice, PaperTheme.InkBlue);
 

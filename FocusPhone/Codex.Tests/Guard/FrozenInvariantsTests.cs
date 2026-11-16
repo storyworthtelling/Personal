@@ -657,7 +657,7 @@ public class FrozenInvariantsTests
     /// bug can pack one under a wrong literal name and Assets.Open then fails silently at
     /// runtime. The two the older checks omit are the two most visible in the suite:
     /// SourceSerif4-Black, which every PaperUi.ScreenHeader renders in, and
-    /// PinyonScript-Regular, which is the owner's voice.
+    /// Italianno-Regular, which is the owner's voice.
     /// </summary>
     [Fact]
     public void PlateWorkflowChecksEveryPackagedFont()

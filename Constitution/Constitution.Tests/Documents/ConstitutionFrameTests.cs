@@ -67,7 +67,7 @@ public class ConstitutionFrameTests
         var page = pdf.GetPage(2);
         var scale = ConstitutionSheet.Frame.Scale;
 
-        Assert.Contains("Constitution", string.Concat(page.Letters.Where(l => (l.FontName ?? "").Contains("Pinyon", StringComparison.Ordinal)).Select(l => l.Value)));
+        Assert.Contains("Constitution", string.Concat(page.Letters.Where(l => (l.FontName ?? "").Contains("Italianno", StringComparison.Ordinal)).Select(l => l.Value)));
         Assert.Contains($"2 of {pages.Count}", string.Join(" ", page.GetWords().Select(w => w.Text)));
         Assert.Empty(page.GetImages());
         Assert.Contains(page.Paths, path => path.GetBoundingRectangle() is { } r

@@ -157,7 +157,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
         // The empty Mailbox is Post's one voiced seat (EmptyMailbox): its lines are the owner's own, so they are set
-        // in the owner's hand, Pinyon Script in ink-blue (DESIGN.md §4, §14), centred where the list would be.
+        // in the owner's hand, Italianno in ink-blue (DESIGN.md §4, §14), centred where the list would be.
         emptyView = PaperUi.Voice(Host, emptyLine);
         emptyView.Gravity = GravityFlags.Center;
         frame.AddView(emptyView, new FrameLayout.LayoutParams(

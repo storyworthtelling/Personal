@@ -31,7 +31,7 @@ internal static class ForewordPage
         var kickerFont = SkiaPageLayout.Sans(PaperTypeScale.Label, bold: true);
         var nameFont = SkiaPageLayout.Serif(PaperTypeScale.Display, black: true);
         var dateFont = SkiaPageLayout.Serif(PaperTypeScale.Heading);
-        var voiceFont = SkiaPageLayout.Script(PaperTypeScale.Title);
+        var voiceFont = SkiaPageLayout.Script(PaperTypeScale.Voice);
 
         layout.MoveTo(SkiaPageLayout.Margin * 1.5);
 

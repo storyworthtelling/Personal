@@ -405,13 +405,13 @@ public class DesignTokensTests
         Assert.Equal(14f, DesignTokens.TypeSp.Secondary);
         Assert.Equal(13f, DesignTokens.TypeSp.Label);
         Assert.Equal(14f, DesignTokens.TypeSp.Mono);
-        Assert.Equal(26f, DesignTokens.TypeSp.Voice);
+        Assert.Equal(34f, DesignTokens.TypeSp.Voice); // Italianno, set larger than Italianno was (owner, W10)
         Assert.Equal(40f, DesignTokens.TypeSp.Countdown);
         Assert.Equal(72f, DesignTokens.TypeSp.CoverTitle);
     }
 
     // All six faces ship in every APK via the Fonts/*.ttf glob; Serif Black and
-    // Pinyon were packaged but unreachable, so Display could not be set in Black
+    // Italianno were packaged but unreachable, so Display could not be set in Black
     // and the owner's voice had no hand to be written in.
     [Fact]
     public void EveryPackagedFaceIsDeclared()

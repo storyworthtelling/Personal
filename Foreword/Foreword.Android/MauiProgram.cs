@@ -44,7 +44,7 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>()
             // All eight faces, under the aliases the role table names. This head used to list six
-            // of them itself; Serif Black and Pinyon Script shipped inside the APK with no alias,
+            // of them itself; Serif Black and Italianno shipped inside the APK with no alias,
             // so Display could not draw in the face DESIGN.md §4 gives it and the owner's voice had
             // nowhere to live. An unregistered family is not an error in MAUI — the platform
             // substitutes the system face and says nothing.

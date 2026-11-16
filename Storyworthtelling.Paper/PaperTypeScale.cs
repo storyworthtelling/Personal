@@ -36,6 +36,12 @@ public static class PaperTypeScale
     public const float Mono = 14f * Ratio;         // 10.5
 
     /// <summary>
+    /// The owner's voice: Italianno at the screen's 34 (owner's choice, W10). It runs small for its size, so it has
+    /// its own rung above Title rather than sharing Title as Italianno did.
+    /// </summary>
+    public const float Voice = 34f * Ratio;        // 25.5
+
+    /// <summary>
     /// The dose (PC5, DESIGN.md section 19): the one large figure a dose card prints, 54 points. It is
     /// <b>printed-only</b> — it has no screen size to multiply, because the phone never draws a dose
     /// this large — so it is the single rung that is a number rather than a product, and the parity

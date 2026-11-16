@@ -91,8 +91,8 @@ public class SheetFrameTests
 
         using var pdf = PdfDocument.Open(sink.Close());
         var page = pdf.GetPage(1);
-        var serif = page.Letters.Where(l => !(l.FontName ?? "").Contains("Pinyon", StringComparison.Ordinal)).ToList();
-        var script = page.Letters.Where(l => (l.FontName ?? "").Contains("Pinyon", StringComparison.Ordinal)).ToList();
+        var serif = page.Letters.Where(l => !(l.FontName ?? "").Contains("Italianno", StringComparison.Ordinal)).ToList();
+        var script = page.Letters.Where(l => (l.FontName ?? "").Contains("Italianno", StringComparison.Ordinal)).ToList();
         Assert.EndsWith("…", string.Concat(serif.Select(l => l.Value)));
         Assert.True(serif.Max(l => l.GlyphRectangle.Right) < script.Min(l => l.GlyphRectangle.Left));
         Assert.Equal("The Juniper", SheetFrame.Fit("The Juniper", SheetFrame.Serif(PaperTypeScale.Title), 400f));

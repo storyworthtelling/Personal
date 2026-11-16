@@ -111,7 +111,7 @@ public class FolioFrameTests
 
         foreach (var page in pdf.GetPages().Skip(1))
         {
-            var script = string.Concat(page.Letters.Where(l => (l.FontName ?? "").Contains("Pinyon", StringComparison.Ordinal)).Select(l => l.Value));
+            var script = string.Concat(page.Letters.Where(l => (l.FontName ?? "").Contains("Italianno", StringComparison.Ordinal)).Select(l => l.Value));
             Assert.Contains("Folio", script);
             Assert.Contains("The Salt Line", page.Text);
             Assert.Contains(page.Paths, path => path.GetBoundingRectangle() is { } r

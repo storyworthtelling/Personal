@@ -274,7 +274,7 @@ public static class DesignTokens
         public const float Display = 44f;
         public const float Countdown = 40f;
         public const float Title = 28f;
-        public const float Voice = 26f;
+        public const float Voice = 34f; // Italianno runs small; owner asked for it larger (W10)
         public const float Heading = 18f;
         public const float Body = 16f;
         public const float Secondary = 14f;
@@ -381,7 +381,7 @@ public static class DesignTokens
     /// <summary>
     /// Font asset paths as packaged by Codex.Ui.Android, whose csproj globs
     /// <c>Fonts/*.ttf</c> — so every face here already ships in every APK.
-    /// <b>Black</b> anchors the reworked Display size and <b>Script</b> (Pinyon) is
+    /// <b>Black</b> anchors the reworked Display size and <b>Script</b> (Italianno) is
     /// the calligraphy hand DESIGN.md §4 reserves for the owner's voice; both were
     /// being packaged and never declared, so neither could be used.
     /// </summary>
@@ -394,6 +394,6 @@ public static class DesignTokens
         public const string SansRegular = "fonts/SourceSans3-Regular.ttf";
         public const string SansSemibold = "fonts/SourceSans3-Semibold.ttf";
         public const string Mono = "fonts/CascadiaCode-Regular.ttf";
-        public const string Script = "fonts/PinyonScript-Regular.ttf";
+        public const string Script = "fonts/Italianno-Regular.ttf";
     }
 }

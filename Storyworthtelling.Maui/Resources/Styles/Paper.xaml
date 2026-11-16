@@ -74,7 +74,7 @@
     <x:Double x:Key="SecondarySize">14</x:Double>
     <x:Double x:Key="LabelSize">13</x:Double>
     <x:Double x:Key="MonoSize">14</x:Double>
-    <x:Double x:Key="VoiceSize">26</x:Double>
+    <x:Double x:Key="VoiceSize">34</x:Double>
 
     <!-- Layout -->
     <!-- The well's padding: 24 at the sides and foot, nothing at the top, where the header's own spacing
@@ -134,8 +134,8 @@
         <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
         <Setter Property="HorizontalTextAlignment" Value="Center" />
     </Style>
-    <!-- The owner's voice: Pinyon Script at 26 in the pen's blue. The ninth role, and the only one
-         with no style anywhere in MAUI — Pinyon shipped in every APK unregistered, so an app that
+    <!-- The owner's voice: Italianno at 26 in the pen's blue. The ninth role, and the only one
+         with no style anywhere in MAUI — Italianno shipped in every APK unregistered, so an app that
          wanted to speak in the owner's hand had nothing to ask for. -->
     <Style x:Key="VoiceLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="Script" />

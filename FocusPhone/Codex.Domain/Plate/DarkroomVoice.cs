@@ -2,7 +2,7 @@ namespace Codex.Domain.Plate;
 
 /// <summary>
 /// The owner's voice in Plate, which gets exactly one seat: the empty Darkroom — as Post's
-/// gets the empty Mailbox. Set in Pinyon Script in ink-blue, the one place in the whole
+/// gets the empty Mailbox. Set in Italianno in ink-blue, the one place in the whole
 /// suite that hand appears.
 ///
 /// <para>The lines never nag. The owner was offered auto-send, expiry and a fold that

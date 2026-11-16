@@ -92,7 +92,7 @@ public class HomeActivity : Activity
         overlay.AddView(new CoverView(this), new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
-        // §4, §14: a voiced line is the owner's hand, Pinyon Script in ink-blue, and it sits on a slip of
+        // §4, §14: a voiced line is the owner's hand, Italianno in ink-blue, and it sits on a slip of
         // paper laid on the cover, since ink-blue on the warm identity ground would not read.
         var hello = PaperUi.Voice(this, string.Empty);
         hello.Gravity = GravityFlags.Center;

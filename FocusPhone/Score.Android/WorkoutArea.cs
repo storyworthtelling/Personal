@@ -179,7 +179,7 @@ public sealed class WorkoutArea : ScoreArea
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         column.AddView(PaperUi.Title(Host, playback.CurrentTitle ?? "…"));
 
-        // Pinyon, per track. Hidden until there is a line — no key, no profile, or a
+        // Italianno, per track. Hidden until there is a line — no key, no profile, or a
         // call that failed leaves the screen as it was.
         if (!string.IsNullOrWhiteSpace(note))
         {
