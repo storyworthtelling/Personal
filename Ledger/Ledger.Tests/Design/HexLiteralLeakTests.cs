@@ -12,20 +12,15 @@ namespace Index.Tests.Design;
 /// the shared kit's <c>Storyworthtelling.Maui/Resources/Styles/Paper.xaml</c>, outside this head's
 /// own tree — so there was nothing left in Ledger's own source allowed to hold a hex literal.</para>
 ///
-/// <para>Release B's Part 1/2 (five tabs with their own hues, three new materials) reopened that list
-/// by exactly two files, the same way <c>Tools/IconStudio/Tokens.cs</c> is the suite's registered home
-/// for an identity ladder: <c>LedgerAreas.cs</c> holds D115/D117/D120's five area hues (retyped from
-/// IconStudio's committed values rather than referenced, per that file's own remarks — Ledger.Android
-/// takes no project reference on Tools/IconStudio), and <c>Ledger.Domain/Design/MaterialTokens.cs</c>
-/// holds D122/D126/D127/D129/D131/D141's card/graph-paper/post-it hex. Both are registered token
-/// files in the DESIGN.md §16 sense — a place a colour is DECIDED, not a screen that merely uses one
-/// — which is the same bar every other entry on this allow-list has to clear.</para>
+/// <para>Release B's Part 1/2 reopened that list for <c>Ledger.Domain/Design/MaterialTokens.cs</c>, which holds
+/// D122/D126/D127/D129/D131/D141's card/graph-paper/post-it hex — a registered token file in the DESIGN.md §16
+/// sense, a place a colour is DECIDED. <c>LedgerAreas.cs</c> was on it too, holding the five area hues retyped;
+/// it now names <c>AppIdentityTokens</c> and <c>PaperColorTokens</c> instead (audit W8.5) and holds no hex.</para>
 /// </summary>
 public class HexLiteralLeakTests
 {
     private static readonly string[] AllowedSuffixes =
     [
-        Path.Combine("Ledger.Android", "Pages", "LedgerAreas.cs"),
         Path.Combine("Ledger.Domain", "Design", "MaterialTokens.cs"),
         // A single file, not a directory: PlaidClientTests' GetInstitution_ParsesPrimaryColor stubs a
         // Plaid wire response carrying a sample primary_color — Plaid's own hex, not a colour Index

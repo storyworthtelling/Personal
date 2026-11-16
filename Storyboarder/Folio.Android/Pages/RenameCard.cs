@@ -23,7 +23,7 @@ public static class RenameCard
             Text = current ?? string.Empty,
             Placeholder = prompt,
             FontFamily = "Serif",
-            FontSize = 17,
+            FontSize = PaperResources.Token<double>("HeadingSize"),
             ReturnType = ReturnType.Done,
         };
 
@@ -58,14 +58,14 @@ public static class RenameCard
                 Spacing = DesignTokens.Space.X3,
                 Children =
                 {
-                    new Label { Text = title, FontFamily = "SerifSemibold", FontSize = 17, LineHeight = 1.15 },
+                    new Label { Text = title, FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize"), LineHeight = 1.15 },
                     field,
                     // Clearing the field is how a series goes back to being called after its first
                     // book, so the empty case is said rather than left to be discovered.
                     new Label
                     {
                         Text = "Leave it empty to go back to naming it after the first book.",
-                        FontSize = 12.5,
+                        FontSize = PaperResources.Token<double>("LabelSize"),
                         TextColor = PaperResources.Colour("InkMuted"),
                     },
                     save,

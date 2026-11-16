@@ -115,7 +115,8 @@ public static class PostItView
         {
             HeightRequest = AdhesiveStripHeightDp,
             VerticalOptions = LayoutOptions.Start,
-            Color = Colors.Black.WithAlpha(AdhesiveStripAlpha),
+            // The adhesive band is a shade of the ink, not black: paper does not go dark (§5).
+            Color = PaperResources.Colour("Ink").WithAlpha(AdhesiveStripAlpha),
         });
 
         return new Border
