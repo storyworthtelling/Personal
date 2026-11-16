@@ -62,7 +62,7 @@ public class RestrictedBrowserActivity : Activity
         var layout = new LinearLayout(this) { Orientation = Orientation.Vertical };
 
         addressDisplay = PaperUi.Mono(this, "");
-        addressDisplay.SetTextColor(PaperTheme.InkMuted);
+        addressDisplay.SetTextColor(PaperTheme.InkSoft);
         addressDisplay.SetSingleLine(true);
         addressDisplay.Ellipsize = Android.Text.TextUtils.TruncateAt.End;
         addressDisplay.SetPadding(

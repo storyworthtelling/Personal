@@ -22,13 +22,23 @@ public static class PaperUi
     // ---- Text ----
 
     public static TextView Display(Context context, string text) =>
-        Text(context, text, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
+        Headed(Text(context, text, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context)));
 
     public static TextView Title(Context context, string text) =>
-        Text(context, text, DesignTokens.TypeSp.Title, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
+        Headed(Text(context, text, DesignTokens.TypeSp.Title, PaperTheme.Ink, PaperTheme.SerifSemibold(context)));
 
     public static TextView Heading(Context context, string text) =>
-        Text(context, text, DesignTokens.TypeSp.Heading, PaperTheme.Ink, PaperTheme.SerifSemibold(context));
+        Headed(Text(context, text, DesignTokens.TypeSp.Heading, PaperTheme.Ink, PaperTheme.SerifSemibold(context)));
+
+    /// <summary>
+    /// Marks a header as a heading (§17, audit 10 §2), so TalkBack's heading navigation can move between them. Every
+    /// Serif header the kit makes goes through here.
+    /// </summary>
+    public static TextView Headed(TextView view)
+    {
+        view.AccessibilityHeading = true;
+        return view;
+    }
 
     public static TextView Body(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Body, PaperTheme.Ink, PaperTheme.SansRegular(context));
@@ -41,6 +51,9 @@ public static class PaperUi
     {
         var line = Secondary(context, text);
         line.SetTextColor(PaperTheme.ProgressText);
+        // A polite live region: TalkBack reads the new words when they change, which is what a spinner's arrival
+        // used to tell a sighted person (§6, §17).
+        line.AccessibilityLiveRegion = AccessibilityLiveRegion.Polite;
         return line;
     }
 
@@ -52,21 +65,23 @@ public static class PaperUi
     {
         var line = Secondary(context, text);
         line.SetTextColor(PaperTheme.ProblemText);
+        line.AccessibilityLiveRegion = AccessibilityLiveRegion.Polite;
         return line;
     }
 
     public static TextView Secondary(Context context, string text) =>
-        Text(context, text, DesignTokens.TypeSp.Secondary, PaperTheme.InkMuted, PaperTheme.SansRegular(context));
+        Text(context, text, DesignTokens.TypeSp.Secondary, PaperTheme.InkSoft, PaperTheme.SansRegular(context));
 
     public static TextView Mono(Context context, string text) =>
         Text(context, text, DesignTokens.TypeSp.Mono, PaperTheme.Ink, PaperTheme.Mono(context));
 
     /// <summary>
     /// Field labels, chips and tab labels (DESIGN.md §4): Sans SemiBold at the
-    /// smallest step. Muted by default — a label names a thing, it is not the thing.
+    /// smallest step. Soft by default — a label names a thing, it is not the thing — and InkSoft rather than the
+    /// muted grey, which is a stroke colour and only 2.8:1 on the grain (audit 10 §3, owner's ruling).
     /// </summary>
     public static TextView Label(Context context, string text) =>
-        Text(context, text, DesignTokens.TypeSp.Label, PaperTheme.InkMuted, PaperTheme.SansSemibold(context));
+        Text(context, text, DesignTokens.TypeSp.Label, PaperTheme.InkSoft, PaperTheme.SansSemibold(context));
 
     /// <summary>
     /// The owner's voice: Pinyon Script in ink-blue (DESIGN.md §4 reserves the
@@ -87,7 +102,7 @@ public static class PaperUi
     /// <summary>Centered Serif-Italic invitation per the empty-state recipe.</summary>
     public static TextView EmptyState(Context context, string text)
     {
-        var view = Text(context, text, DesignTokens.TypeSp.Body, PaperTheme.InkMuted, PaperTheme.SerifItalic(context));
+        var view = Text(context, text, DesignTokens.TypeSp.Body, PaperTheme.InkSoft, PaperTheme.SerifItalic(context));
         view.Gravity = Android.Views.GravityFlags.Center;
         return view;
     }
@@ -124,7 +139,7 @@ public static class PaperUi
 
     public static Button QuietButton(Context context, string label, Action onClick)
     {
-        var button = ButtonBase(context, label, onClick, PaperTheme.InkMuted, PaperTheme.SansSemibold(context));
+        var button = ButtonBase(context, label, onClick, PaperTheme.InkSoft, PaperTheme.SansSemibold(context));
         button.Background = null;
         return button;
     }
@@ -209,7 +224,7 @@ public static class PaperUi
     private static void StyleField(Context context, EditText field, Color fill)
     {
         field.SetTextColor(PaperTheme.Ink);
-        field.SetHintTextColor(PaperTheme.InkMuted);
+        field.SetHintTextColor(PaperTheme.InkSoft);
         field.Background = Outline(context, fill, PaperTheme.Hairline, DesignTokens.Shape.RadiusInput);
         var horizontal = PaperTheme.Dp(context, DesignTokens.Space.X4);
         var vertical = PaperTheme.Dp(context, DesignTokens.Space.X3);
@@ -311,7 +326,7 @@ public static class PaperUi
     {
         var column = new LinearLayout(context) { Orientation = Orientation.Vertical };
 
-        var text = Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context));
+        var text = Headed(Text(context, title, DesignTokens.TypeSp.Display, PaperTheme.Ink, PaperTheme.SerifBlack(context)));
         column.AddView(text, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
 
@@ -356,7 +371,9 @@ public static class PaperUi
                 var live = enabled is null || i >= enabled.Count || enabled[i];
                 var active = i == selected && live;
                 cells[i].Background = active ? Highlight(context, tint) : null;
-                cells[i].SetTextColor(active ? PaperTheme.Ink : PaperTheme.InkMuted);
+                cells[i].SetTextColor(active ? PaperTheme.Ink : PaperTheme.InkSoft);
+                // TalkBack hears which segment is showing, not only a sighted person seeing the band (§17).
+                cells[i].Selected = active;
                 cells[i].SetTypeface(
                     active ? PaperTheme.SansSemibold(context) : PaperTheme.SansRegular(context),
                     TypefaceStyle.Normal);
@@ -366,7 +383,7 @@ public static class PaperUi
         for (var i = 0; i < labels.Count; i++)
         {
             var index = i;
-            var cell = Text(context, labels[i], DesignTokens.TypeSp.Label, PaperTheme.InkMuted,
+            var cell = Text(context, labels[i], DesignTokens.TypeSp.Label, PaperTheme.InkSoft,
                 PaperTheme.SansRegular(context));
             cell.Gravity = GravityFlags.Center;
             cell.SetMinimumHeight(PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp));
@@ -380,6 +397,8 @@ public static class PaperUi
             {
                 cell.Alpha = DesignTokens.Alpha.DisabledOpacity;
                 cell.Clickable = false;
+                // Faint is for the eye; Enabled is what TalkBack reads as "disabled" (§17, audit 10 §6).
+                cell.Enabled = false;
             }
             else
             {
@@ -448,7 +467,7 @@ public static class PaperUi
         }
 
         var line = Text(activity, BuildLine.Format(appName, versionName, activity.PackageName),
-            DesignTokens.TypeSp.Label, PaperTheme.InkMuted, PaperTheme.Mono(activity));
+            DesignTokens.TypeSp.Label, PaperTheme.InkSoft, PaperTheme.Mono(activity));
 
         var row = new LinearLayout(activity) { Orientation = Orientation.Horizontal };
         row.SetGravity(GravityFlags.CenterHorizontal);

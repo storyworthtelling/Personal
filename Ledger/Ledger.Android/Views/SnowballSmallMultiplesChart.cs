@@ -47,6 +47,16 @@ public sealed class SnowballSmallMultiplesChart : GraphicsView
         painter.Weeks = weeks;
         painter.Series = series;
         HeightRequest = SmallMultipleLayout.TotalHeight(series.Count, PanelHeight, PanelGap);
+
+        // What the panels show, in one sentence a screen reader can say (§17, audit 10 §8): each loan's first and last
+        // recorded balance over the weeks drawn.
+        SemanticProperties.SetDescription(this, weeks.Count == 0 || series.Count == 0
+            ? null
+            : $"One small chart per loan, {SnowballHistoryCopy.WeekCaption(weeks[0])} to {SnowballHistoryCopy.WeekCaption(weeks[^1])}: "
+              + string.Join("; ", series.Select(loan => loan.IsPaidOff || loan.Balances.Count == 0
+                  ? $"{loan.Name}{(loan.IsPaidOff ? ", paid off" : string.Empty)}"
+                  : $"{loan.Name}, {PlanMoney.Balance(loan.Balances[0])} to {PlanMoney.Balance(loan.Balances[^1])}"))
+              + ".");
         Invalidate();
     }
 

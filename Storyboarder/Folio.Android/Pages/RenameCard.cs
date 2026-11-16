@@ -66,7 +66,7 @@ public static class RenameCard
                     {
                         Text = "Leave it empty to go back to naming it after the first book.",
                         FontSize = PaperResources.Token<double>("LabelSize"),
-                        TextColor = PaperResources.Colour("InkMuted"),
+                        TextColor = PaperResources.Colour("InkSoft"),
                     },
                     save,
                 },

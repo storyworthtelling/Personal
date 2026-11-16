@@ -115,7 +115,7 @@ public class ThisWeekSourceTests
         var page = Read("Constitution.Android/MealsTab/ThisWeekPage.cs");
 
         Assert.Contains("line.IsPast", page, StringComparison.Ordinal);
-        Assert.Contains("PaperTheme.InkMuted", page, StringComparison.Ordinal);
+        Assert.Contains("PaperTheme.InkSoft", page, StringComparison.Ordinal);
     }
 
     [Fact]

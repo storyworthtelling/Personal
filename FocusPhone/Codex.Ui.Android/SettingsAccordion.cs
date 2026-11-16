@@ -88,7 +88,7 @@ public sealed class SettingsAccordion
         {
             var line = PaperUi.Label(context, meta);
             line.Typeface = PaperTheme.SansRegular(context);
-            line.SetTextColor(PaperTheme.InkMuted);
+            line.SetTextColor(PaperTheme.InkSoft);
             line.SetSingleLine(true);
             line.Ellipsize = Android.Text.TextUtils.TruncateAt.End;
             header.AddView(line, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent)

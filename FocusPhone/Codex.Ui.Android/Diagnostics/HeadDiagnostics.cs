@@ -102,6 +102,10 @@ public sealed class HeadDiagnostics
 
         CrashReporter.Install(application, setup.Label, head.Log);
         head.LogLaunch();
+
+        // Every undo window in the head honours "Time to take action" from launch (audit 10 §5); the dog-ear reads
+        // it again each time it opens one, so a change in Settings is picked up at the next undo.
+        DogEar.UndoWindow(application);
         ExitTrail.Record(application, (problem, line) =>
         {
             if (problem)

@@ -112,6 +112,8 @@ public class BinderTabs : ViewGroup
 
         var glyph = new ImageView(Context!);
         glyph.SetImageDrawable(new PencilGlyphDrawable(Context!, area.Glyph));
+        // The glyph is the label's picture; TalkBack reads the tab's words, not an unnamed image.
+        glyph.ImportantForAccessibility = ImportantForAccessibility.No;
         var size = PaperTheme.Dp(Context!, DesignTokens.Shape.TabGlyphDp);
         tab.AddView(glyph, new LinearLayout.LayoutParams(size, size));
 
@@ -125,6 +127,7 @@ public class BinderTabs : ViewGroup
         });
 
         tab.Click += (_, _) => AreaSelected?.Invoke(index);
+        tab.ContentDescription = $"{area.Label} tab";
         PaintTab(tab, area, index == activeIndex);
         return tab;
     }
@@ -136,6 +139,9 @@ public class BinderTabs : ViewGroup
         // inactive tab is cut from its own area's cloth, so the strip reads as coded
         // dividers at rest — the tab carries the colour, not the glyph on it.
         var fill = active ? PaperTheme.Paper : area.Cloth;
+
+        // TalkBack says which tab is open (§17, audit 10 §6); the paper fill says it only to the eye.
+        tab.Selected = active;
         var shape = new GradientDrawable();
         shape.SetColor(fill);
         shape.SetStroke(PaperTheme.Dp(Context!, DesignTokens.Shape.HairlineDp), PaperTheme.Hairline);

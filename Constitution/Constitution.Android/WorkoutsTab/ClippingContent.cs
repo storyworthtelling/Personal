@@ -50,7 +50,7 @@ internal static class ClippingContent
     public static View Row(Context context, DayClipping day)
     {
         var row = new LinearLayout(context) { Orientation = Orientation.Horizontal };
-        var label = Line(context, day.DayLabel, PaperTheme.Mono(context), DesignTokens.TypeSp.Label, PaperTheme.InkMuted);
+        var label = Line(context, day.DayLabel, PaperTheme.Mono(context), DesignTokens.TypeSp.Label, PaperTheme.InkSoft);
         label.SetWidth(PaperTheme.Dp(context, DesignTokens.Space.X8));
         row.AddView(label);
 
@@ -91,14 +91,14 @@ internal static class ClippingContent
     }
 
     private static TextView Note(Context context, string text) =>
-        Line(context, text, PaperTheme.SansRegular(context), DesignTokens.TypeSp.Label, PaperTheme.InkMuted);
+        Line(context, text, PaperTheme.SansRegular(context), DesignTokens.TypeSp.Label, PaperTheme.InkSoft);
 
     private static void Strike(IEnumerable<TextView> lines)
     {
         foreach (var line in lines)
         {
             line.PaintFlags |= PaintFlags.StrikeThruText;
-            line.SetTextColor(PaperTheme.InkMuted);
+            line.SetTextColor(PaperTheme.InkSoft);
         }
     }
 

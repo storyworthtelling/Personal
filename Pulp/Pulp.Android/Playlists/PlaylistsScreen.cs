@@ -456,6 +456,7 @@ internal sealed class PlaylistsScreen
         var rowView = LibraryRows.Row(host, grip, poster, LibraryRows.PlaylistPosterWidthDp, lines, DesignTokens.Space.X3);
         if (row.Dim != RowDim.None)
         {
+            // Faded to say the entry is not out yet or caught up; not disabled — the row still opens its title.
             rowView.Alpha = DesignTokens.Alpha.DisabledOpacity;
         }
 

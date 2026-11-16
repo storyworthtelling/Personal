@@ -99,12 +99,16 @@ public sealed class PaperSegmented : Border
             // The picked segment carries the highlighter band and the full ink; the rest stay quiet. Not dimmed:
             // a dimmed segment means DISABLED, and every one of these is available.
             PaperMaterials.Highlight((Grid)row.Children[i], PaperResources.Colour("ActionMark"), isPicked);
-            labels[i].TextColor = PaperResources.Colour(isPicked ? "Ink" : "InkMuted");
+            labels[i].TextColor = PaperResources.Colour(isPicked ? "Ink" : "InkSoft");
 
             // The FAMILY changes, not FontAttributes. Source Sans 3 ships Regular and SemiBold as
             // separate faces and has no bold axis — asking the platform to embolden Regular gets a
             // synthesised weight that is not the one in the type ladder.
             labels[i].FontFamily = isPicked ? "SansSemibold" : "Sans";
+
+            // The band says which is showing to the eye; this says it to TalkBack (§17, audit 10 §6).
+            SemanticProperties.SetDescription((Grid)row.Children[i],
+                isPicked ? $"{choice.Options[i]}, selected" : choice.Options[i]);
         }
     }
 }

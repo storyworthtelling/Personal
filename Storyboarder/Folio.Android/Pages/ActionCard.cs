@@ -89,7 +89,7 @@ public static class ActionCard
             {
                 Text = subtitle,
                 FontSize = PaperResources.Token<double>("LabelSize"),
-                TextColor = PaperResources.Colour("InkMuted"),
+                TextColor = PaperResources.Colour("InkSoft"),
                 Margin = new Thickness(0, 4, 0, 0),
             },
         },
@@ -100,7 +100,7 @@ public static class ActionCard
         var ink = action.Weight switch
         {
             ActionWeight.Primary => PaperResources.Colour("ActionMark"),
-            ActionWeight.Quiet => PaperResources.Colour("InkMuted"),
+            ActionWeight.Quiet => PaperResources.Colour("InkSoft"),
             _ => PaperResources.Colour("Ink"),
         };
 

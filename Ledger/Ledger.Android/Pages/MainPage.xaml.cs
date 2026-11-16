@@ -1389,7 +1389,7 @@ public partial class MainPage : LedgerBinderPage
             $"Removed {account.Name}",
             reverse: () => _ = UndoRemoveAccountAsync(captured),
             DateTimeOffset.Now,
-            TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs));
+            Storyworthtelling.Maui.Views.DogEar.UndoWindow());
         dogEar.Refresh();
     }
 
@@ -1526,11 +1526,11 @@ public partial class MainPage : LedgerBinderPage
             $"Disconnected {institution.Name}",
             reverse: () => _ = UndoDisconnectAsync(disconnected),
             DateTimeOffset.Now,
-            TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs));
+            Storyworthtelling.Maui.Views.DogEar.UndoWindow());
         dogEar.Refresh();
 
         pendingDisconnectReleaseTimer = Dispatcher.CreateTimer();
-        pendingDisconnectReleaseTimer.Interval = TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs);
+        pendingDisconnectReleaseTimer.Interval = Storyworthtelling.Maui.Views.DogEar.UndoWindow();
         pendingDisconnectReleaseTimer.IsRepeating = false;
         pendingDisconnectReleaseTimer.Tick += (_, _) => _ = ClosePendingDisconnectAsync();
         pendingDisconnectReleaseTimer.Start();

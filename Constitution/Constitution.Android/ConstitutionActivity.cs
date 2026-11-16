@@ -333,7 +333,7 @@ public abstract class ConstitutionActivity : Activity
             // Muted Serif under the title, in the header and so outside the well (D43).
             var line = new TextView(this) { Text = subtitle };
             line.SetTextSize(Android.Util.ComplexUnitType.Sp, DesignTokens.TypeSp.Heading);
-            line.SetTextColor(PaperTheme.InkMuted);
+            line.SetTextColor(PaperTheme.InkSoft);
             line.Typeface = PaperTheme.SerifSemibold(this);
             line.SetPadding(0, PaperTheme.Dp(this, DesignTokens.Space.X1), 0, 0);
             header.AddView(line, new LinearLayout.LayoutParams(

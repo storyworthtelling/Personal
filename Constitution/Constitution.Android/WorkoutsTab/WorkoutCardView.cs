@@ -84,7 +84,7 @@ internal sealed class WorkoutCardView
         {
             var row = Row();
             var label = PaperUi.Mono(host, choice.DayLabel);
-            label.SetTextColor(PaperTheme.InkMuted);
+            label.SetTextColor(PaperTheme.InkSoft);
             label.SetWidth(PaperTheme.Dp(host, DesignTokens.Space.X8));
             var text = PaperUi.Body(host, choice.Text);
             if (choice.IsEnabled)

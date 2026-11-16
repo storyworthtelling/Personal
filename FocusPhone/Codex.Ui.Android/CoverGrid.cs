@@ -105,7 +105,7 @@ public class CoverGrid : GridView
                 Typeface = PaperTheme.SansRegular(context),
                 Ellipsize = Android.Text.TextUtils.TruncateAt.End,
             };
-            subtitle.SetTextColor(PaperTheme.InkMuted);
+            subtitle.SetTextColor(PaperTheme.InkSoft);
             subtitle.SetSingleLine(true);
             AddView(subtitle, new LayoutParams(size, ViewGroup.LayoutParams.WrapContent));
         }

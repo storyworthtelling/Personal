@@ -39,7 +39,7 @@ public class DesignTokensTests
     [Theory]
     [InlineData("Ink", "Paper", 7.0)]          // AAA body text
     [InlineData("InkSoft", "Paper", 4.5)]      // AA body text
-    [InlineData("InkMuted", "Paper", 3.0)]     // large/secondary text
+    [InlineData("InkMuted", "Paper", 3.0)]     // strokes and control boundaries only (1.4.11); text is InkSoft (W9.1)
     [InlineData("Accent", "Paper", 3.0)]       // UI components, large text
     [InlineData("AccentDeep", "Paper", 4.5)]   // accent text at any size
     [InlineData("PaperBright", "Accent", 4.5)] // primary button text

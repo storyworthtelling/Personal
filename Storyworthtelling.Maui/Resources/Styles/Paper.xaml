@@ -114,14 +114,14 @@
     <Style x:Key="SecondaryLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="Sans" />
         <Setter Property="FontSize" Value="{StaticResource SecondarySize}" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
     </Style>
     <!-- The Label role: Sans Semibold at 13 in the MUTED ink. It carried the full ink here, which
          reads as a slightly heavy screen rather than as a mistake — the quietest kind of drift. -->
     <Style x:Key="FieldLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="SansSemibold" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
     </Style>
     <Style x:Key="MonoLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="Mono" />
@@ -131,7 +131,7 @@
     <Style x:Key="EmptyStateLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="SerifItalic" />
         <Setter Property="FontSize" Value="{StaticResource BodySize}" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
         <Setter Property="HorizontalTextAlignment" Value="Center" />
     </Style>
     <!-- The owner's voice: Pinyon Script at 26 in the pen's blue. The ninth role, and the only one
@@ -190,7 +190,7 @@
         <Setter Property="FontFamily" Value="SansSemibold" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
         <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="18,11" />
         <Setter Property="MinimumHeightRequest" Value="48" />
@@ -202,14 +202,14 @@
         <Setter Property="FontSize" Value="{StaticResource BodySize}" />
         <Setter Property="BackgroundColor" Value="{StaticResource PaperBright}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
-        <Setter Property="PlaceholderColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource InkSoft}" />
     </Style>
     <Style x:Key="MonoEntry" TargetType="Entry">
         <Setter Property="FontFamily" Value="Mono" />
         <Setter Property="FontSize" Value="{StaticResource MonoSize}" />
         <Setter Property="BackgroundColor" Value="{StaticResource PaperDeep}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
-        <Setter Property="PlaceholderColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource InkSoft}" />
     </Style>
 
     <!-- The same mono treatment for a multi-line Editor. A Style's TargetType must match the
@@ -219,7 +219,7 @@
         <Setter Property="FontSize" Value="{StaticResource MonoSize}" />
         <Setter Property="BackgroundColor" Value="{StaticResource PaperDeep}" />
         <Setter Property="TextColor" Value="{StaticResource Ink}" />
-        <Setter Property="PlaceholderColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource InkSoft}" />
     </Style>
 
     <!-- Cards -->
@@ -258,7 +258,7 @@
     <Style x:Key="CardRowDescription" TargetType="Label">
         <Setter Property="FontFamily" Value="Sans" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
         <Setter Property="Margin" Value="0,4,0,0" />
     </Style>
 
@@ -271,13 +271,13 @@
 
     <!-- AddNavRow's chevron: a row that leads somewhere says so. -->
     <Style x:Key="CardRowChevron" TargetType="Label" BasedOn="{StaticResource CardRowValue}">
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
     </Style>
 
     <Style x:Key="CardCaption" TargetType="Label">
         <Setter Property="FontFamily" Value="Sans" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
         <Setter Property="Margin" Value="0,8,0,0" />
     </Style>
 
@@ -307,7 +307,7 @@
     <Style x:Key="ChipLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="Sans" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
     </Style>
     <Style x:Key="ChipLabelActive" TargetType="Label">
         <Setter Property="FontFamily" Value="SansSemibold" />
@@ -319,7 +319,7 @@
     <Style x:Key="SegmentLabel" TargetType="Label">
         <Setter Property="FontFamily" Value="Sans" />
         <Setter Property="FontSize" Value="{StaticResource LabelSize}" />
-        <Setter Property="TextColor" Value="{StaticResource InkMuted}" />
+        <Setter Property="TextColor" Value="{StaticResource InkSoft}" />
         <Setter Property="HorizontalTextAlignment" Value="Center" />
         <Setter Property="VerticalTextAlignment" Value="Center" />
     </Style>

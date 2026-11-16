@@ -59,8 +59,11 @@ public class DogEarNativeTests
     {
         var source = DogEarSource();
 
+        // Drawn at 40dp inside a 48dp touch box (W9.1, audit 10 §5): both folds take the box, the painter the fold.
         Assert.DoesNotContain("PaperTheme.Dp(context, 72)", source, StringComparison.Ordinal);
-        Assert.Equal(2, Regex.Matches(source, @"PaperTheme\.Dp\(context, DogEarGeometry\.SizeDp\)").Count);
+        Assert.Equal(2, Regex.Matches(source, @"var size = TargetSize\(context\);").Count);
+        Assert.Contains("PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp)", source, StringComparison.Ordinal);
+        Assert.Contains("var drawn = DogEarGeometry.SizeDp * density;", source, StringComparison.Ordinal);
     }
 
     /// <summary>Finding 6: the arrow is a stroked path from the shared geometry, not the glyph.</summary>

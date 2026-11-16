@@ -136,7 +136,7 @@ public class PaperKitTests
 
     /// <summary>
     /// The nine roles, each with the face the table gives it. Display is <b>Serif Black</b> — the
-    /// face DESIGN.md §4 reserves for every screen header — and the Label role takes the muted ink,
+    /// face DESIGN.md §4 reserves for every screen header — and the Label role takes the soft ink (InkSoft since W9.1: muted is a stroke colour),
     /// not the full one. Both were wrong in all three MAUI heads, and the Label one is the sort of
     /// mistake that reads as a slightly heavy screen rather than as a bug.
     /// </summary>
@@ -144,10 +144,10 @@ public class PaperKitTests
     [InlineData("DisplayLabel", "SerifBlack", "Ink")]
     [InlineData("TitleLabel", "SerifSemibold", "Ink")]
     [InlineData("HeadingLabel", "SerifSemibold", "Ink")]
-    [InlineData("SecondaryLabel", "Sans", "InkMuted")]
-    [InlineData("FieldLabel", "SansSemibold", "InkMuted")]
+    [InlineData("SecondaryLabel", "Sans", "InkSoft")]
+    [InlineData("FieldLabel", "SansSemibold", "InkSoft")]
     [InlineData("MonoLabel", "Mono", "Ink")]
-    [InlineData("EmptyStateLabel", "SerifItalic", "InkMuted")]
+    [InlineData("EmptyStateLabel", "SerifItalic", "InkSoft")]
     [InlineData("VoiceLabel", "Script", "InkBlue")]
     public void TheRoleTableIsWhatPaperUiSays(string style, string family, string colour)
     {

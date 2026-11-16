@@ -117,14 +117,14 @@ internal sealed class SeasonAccordion : LinearLayout
         line.SetGravity(GravityFlags.CenterVertical);
 
         var number = PaperUi.Mono(context, episode.Episode.Number.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        number.SetTextColor(PaperTheme.InkMuted);
+        number.SetTextColor(PaperTheme.InkSoft);
         number.SetMinWidth(PaperTheme.Dp(context, DesignTokens.Space.X6));
         line.AddView(number);
 
         var name = PaperUi.Body(context, string.IsNullOrWhiteSpace(episode.Name) ? $"Episode {episode.Episode.Number}" : episode.Name.Trim());
         if (isWatched)
         {
-            name.SetTextColor(PaperTheme.InkMuted);
+            name.SetTextColor(PaperTheme.InkSoft);
         }
 
         line.AddView(name, new LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
