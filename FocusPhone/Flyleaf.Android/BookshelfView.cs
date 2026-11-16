@@ -560,14 +560,16 @@ public class BookshelfView : View, IDrawnControls
         }
 
         // Vertical serif title above the icon, reading top-to-bottom.
-        DrawVerticalTitle(canvas, art.Label(item.Key), rect, iy - 6 * density);
+        DrawVerticalTitle(canvas, art.Label(item.Key), rect, iy - 6 * density, art.SpineTakesInk(item.Key));
     }
 
-    private void DrawVerticalTitle(Canvas canvas, string label, RectF spine, float bottomLimit)
+    // The title is written in whichever of ink or paper-white reads better on the cloth (owner's approval, W9 mock-up
+    // item 6; report 10 §14): paper-white on the warm cloth was 3.17:1.
+    private void DrawVerticalTitle(Canvas canvas, string label, RectF spine, float bottomLimit, bool inInk)
     {
         using var text = new Paint(PaintFlags.AntiAlias)
         {
-            Color = PaperTheme.PaperBright,
+            Color = inInk ? PaperTheme.Ink : PaperTheme.PaperBright,
             TextSize = Math.Min(spine.Width() * 0.64f, DesignTokens.TypeSp.Label * density),
             TextAlign = Paint.Align.Left,
         };
@@ -577,7 +579,7 @@ public class BookshelfView : View, IDrawnControls
         // Pass the Color struct directly — never Color.ToArgb(). The int overload-resolves to
         // SetShadowLayer(float,float,float,long), where the value is read as a wide-gamut ColorLong
         // and Android rejects the non-RGB colorspace ("colorSpace must be an RGB color space").
-        text.SetShadowLayer(2.4f * density, 0, 0, PaperTheme.WalnutDeep);
+        text.SetShadowLayer(2.4f * density, 0, 0, inInk ? PaperTheme.PaperBright : PaperTheme.WalnutDeep);
 
         var top = spine.Top + 8 * density;
         var trimmed = Ellipsize(label, text, 0, bottomLimit - top);

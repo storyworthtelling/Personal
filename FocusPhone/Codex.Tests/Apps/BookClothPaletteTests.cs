@@ -251,4 +251,28 @@ public class BookClothPaletteTests
             .Where(value => value.StartsWith(PolicyContext.OwnerPackagePrefix, StringComparison.Ordinal)
                             && value.Length > PolicyContext.OwnerPackagePrefix.Length)
             .Distinct();
+
+    /// <summary>
+    /// A spine's title takes whichever ink reads better on its cloth (owner's approval, W9 mock-up item 6; report 10
+    /// §14): the warm cloth that put paper-white at 3.17:1 takes ink at 4.5:1, a dark cloth keeps paper.
+    /// </summary>
+    [Theory]
+    [InlineData(DesignTokens.Identity.Flyleaf.Warm, true)]
+    [InlineData(DesignTokens.ProblemFill, true)]
+    [InlineData(DesignTokens.ProgressFill, true)]
+    [InlineData(DesignTokens.ReferenceMark, false)]
+    [InlineData(DesignTokens.ProblemDeep, false)]
+    public void ASpineTitleTakesTheInkThatReadsBetter(string cloth, bool ink) =>
+        Assert.Equal(ink, BookClothPalette.SpineTakesInk(cloth));
+
+    [Fact]
+    public void TheTitleItTakesIsTheMoreLegibleOfTheTwo()
+    {
+        foreach (var cloth in new[] { DesignTokens.Identity.Flyleaf.Warm, DesignTokens.ReferenceMark, DesignTokens.ProblemFill, DesignTokens.ProblemDeep })
+        {
+            var chosen = BookClothPalette.SpineTakesInk(cloth) ? DesignTokens.Ink : DesignTokens.PaperBright;
+            var other = chosen == DesignTokens.Ink ? DesignTokens.PaperBright : DesignTokens.Ink;
+            Assert.True(BookClothPalette.Contrast(chosen, cloth) >= BookClothPalette.Contrast(other, cloth), cloth);
+        }
+    }
 }

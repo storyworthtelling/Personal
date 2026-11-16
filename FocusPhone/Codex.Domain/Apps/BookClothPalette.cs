@@ -108,6 +108,36 @@ public static class BookClothPalette
     /// </summary>
     public static bool MarksInvertToInk(string clothHex) => Luminance(clothHex) > 0.6;
 
+    /// <summary>
+    /// Whether a spine's title is written in ink rather than paper-white on this cloth: whichever reads better
+    /// (owner's approval, W9 mock-up item 6; report 10 §14). The cover's luma threshold is not used here, because a
+    /// mid cloth such as the warm one sits under it yet takes ink at 4.5:1 against paper's 3.2:1.
+    /// </summary>
+    public static bool SpineTakesInk(string clothHex) =>
+        Contrast(Design.DesignTokens.Ink, clothHex) >= Contrast(Design.DesignTokens.PaperBright, clothHex);
+
+    /// <summary>The WCAG 2 contrast ratio between two sRGB colours, 1 to 21.</summary>
+    public static double Contrast(string firstHex, string secondHex)
+    {
+        var first = RelativeLuminance(firstHex);
+        var second = RelativeLuminance(secondHex);
+        return (Math.Max(first, second) + 0.05) / (Math.Min(first, second) + 0.05);
+    }
+
+    private static double RelativeLuminance(string hex)
+    {
+        var value = hex.TrimStart('#');
+        static double Channel(int byteValue)
+        {
+            var c = byteValue / 255.0;
+            return c <= 0.03928 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
+        }
+
+        return (0.2126 * Channel(Convert.ToInt32(value[..2], 16)))
+            + (0.7152 * Channel(Convert.ToInt32(value.Substring(2, 2), 16)))
+            + (0.0722 * Channel(Convert.ToInt32(value.Substring(4, 2), 16)));
+    }
+
     // Rec. 601 luma over the sRGB bytes. Good enough for "is this cloth light",
     // which is the only question being asked, and it needs no colour-space types in
     // a Domain that deliberately has none.

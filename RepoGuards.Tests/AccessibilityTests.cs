@@ -177,6 +177,10 @@ public partial class AccessibilityTests
         Assert.Contains("DarkroomWords.Cell(", Read("FocusPhone/Plate.Android", "DarkroomArea.cs"), StringComparison.Ordinal);
         Assert.Contains("row.Spans", Read("Storyboarder/Folio.Android", "Pages/ShelfPage.cs"), StringComparison.Ordinal);
         Assert.Contains("PaperMotion.ReadingTime(", Read("FocusPhone/Flyleaf.Android", "HomeActivity.cs"), StringComparison.Ordinal);
+
+        // The two drawn changes the owner approved from the W9 mock-up (items 5 and 6).
+        Assert.Contains("tick.SetPicked(true)", Read("FocusPhone/Plate.Android", "DarkroomArea.cs"), StringComparison.Ordinal);
+        Assert.Contains("art.SpineTakesInk(item.Key)", Read("FocusPhone/Flyleaf.Android", "BookshelfView.cs"), StringComparison.Ordinal);
     }
 
     /// <summary>A glyph standing in for words is a glyph button with those words (report 10 §18).</summary>
