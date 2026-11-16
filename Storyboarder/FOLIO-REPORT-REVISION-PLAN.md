@@ -109,6 +109,36 @@ is why release A comes first.
 - R32. It **lays the splits out** and does not rule on them. It **replaces the verdict**.
 - R33. Its length **scales with the manuscript**, and it runs on **every draft**.
 
+**Follow-up rulings (open questions answered)**
+- R34. The **Fellow writer's anchors** are approved as drafted:
+  - 2 = nothing I'd steal; I'd write it differently from the ground up.
+  - 4 = a trick or two worth noting, but I'd rework most of it.
+  - 6 = solid craft I'd learn from in places, and I'd change the approach in others.
+  - 8 = several moves I'd steal outright; I'd change only a little.
+  - 10 = I wish I'd written it; I'd steal everything and change nothing.
+- R35. The **Agent and Acquiring editor talk craft, not market**, on novels **and short stories**. Their
+  market questions are no use until the owner is ready to try for publication.
+  - Agent: what would make this compelling to someone who reads hundreds of openings — the hook, the
+    voice on page one, the premise's promise and whether the book keeps it. On a short story the
+    magazine path stays.
+  - Acquiring editor: the developmental edit letter they would write — the three craft changes that would
+    most raise the book, each with the chapters that show it.
+- R36. On a novel the **developmental editor traces plot** (each thread from setup to payoff, beside its
+  act-by-act map) and the **literature professor traces character** (each main character's arc, beside
+  themes and motifs). No new readers.
+- R37. The **score history chart is on the phone only**. The report keeps its "up from 5 last draft" line.
+- R38. A **novella with three or more chapters** gets the pacing chart; a short story never does.
+- R39. **Every unattended call is batched.** The one exception is the round table (R40), whose turns
+  depend on each other.
+- R40. The conversation is a **podcast between agents**: each reader is its own agent, and they **reply
+  to each other**, not just to the question posed, as a transcribed podcast would.
+  - A **host steers**: opens, picks who speaks next from what was just said, follows up, and closes.
+  - Length is **scaled by the manuscript**: about 15 turns for a short story, 30 for a novella, 50 for
+    a novel.
+  - On the page it is a **transcript followed by a summary** of where the readers ended up agreeing and
+    still disagreeing.
+- R41. The section and its tab are called **Round table**.
+
 **Not wanted:** a per-piece goal setting; a summary page before the frame; a sensitivity or
 target-age reader (for YA, the genre fan already is one); the line editor back.
 
@@ -147,27 +177,31 @@ runs a real draft through.
 ### Release B — Readers (R10–R14, R27)
 1. **Fellow writer.**
    - A seventh persona on the strong model: "What would I steal, and what would I do differently".
-   - Anchors to draft and confirm with the owner (open question 1).
+   - Anchors as approved in R34.
    - `ReadingPlan`, `PersonaCoverageTests`, the score tests and the readers' contents grow to seven.
    - Cost: one more strong pass, about 65 seconds, reading the manuscript from cache.
 2. **No line edits** (R11).
    - One sentence in every reader's instruction says what is out (word choice, grammar, punctuation,
      single sentences) and what is in (general terms, blockers, by example).
    - A live check runs the bad-prose fixture and confirms no reader lists line fixes.
-3. **Novel depth** (R12). At novel length each reader is given its own extra purpose, which the owner
-   approves (open question 2):
-   - Developmental editor: an act-by-act map of what holds and what sags.
-   - Agent: the pitch, comparable titles, and what a query letter would lead with.
-   - Acquiring editor: list fit and the edit letter's three priorities.
+3. **Novel depth** (R12, R35, R36). At novel length each reader is given its own extra purpose:
+   - Developmental editor: an act-by-act map of what holds and what sags, and **each plot thread traced
+     from setup to payoff**.
+   - Agent (craft, R35): what would make the book compelling to someone who reads hundreds of openings —
+     the hook, the voice on page one, the premise's promise and whether the book keeps it.
+   - Acquiring editor (craft, R35): the developmental edit letter — the three craft changes that would
+     most raise the book, each with the chapters that show it.
    - Genre fan: where engagement rose and fell, chapter by chapter.
    - Harsh critic: the three biggest failures, each with the chapters that show it.
-   - Literature professor: themes and motifs traced through the book.
+   - Literature professor: themes and motifs traced through the book, and **each main character's arc**.
    - Fellow writer: techniques worth stealing, each with the chapter it is in.
 
-   `PassMaxTokens` rises for novels only, and short-story reads are unchanged.
+   `PassMaxTokens` rises for novels only, and short-story reads keep their length. The Agent's and the
+   Acquiring editor's **craft framing applies to short stories too** (R35), with the Agent's magazine
+   path kept. Their score anchors are rewritten to match, so a score measures craft rather than
+   saleability; the new anchors are drafted for the owner's approval at the start of B.
 4. **Score history chart** (R13): each reader's score across drafts.
-   - On the phone's book page, beside the readiness chart.
-   - On each reader's report page as a small trend line (open question 3).
+   - On the phone's book page only, beside the readiness chart (R37).
    - Data: the `PassRead` rows already kept per draft.
 5. **The bible in the readers' prompt** (R27), when the book is in a series.
    - It is the same for every pass of a draft, so it goes inside the cached prefix, after the manuscript.
@@ -201,7 +235,7 @@ runs a real draft through.
    only what is true of the whole piece.
    - Enforced by a page-count test on a short-story fixture.
 2. Pacing chart:
-   - Novels only (open question 4 covers novellas).
+   - Novels, and novellas with three or more chapters (R38); never a short story.
    - Chapter numbers on the x-axis.
    - Each point labelled with a few words on what drives or drains its tension, a new field on
      `ChapterTension`.
@@ -243,29 +277,46 @@ runs a real draft through.
    - The bible is delivered as its own document to the tablet and Drive.
    - An app screen lets the owner correct an entry, and a correction wins over the books.
 
-### Release H — The readers in conversation (R28–R33)
-1. **Second round.** After all seven reads, a conversation pass over the reviews and scores, not the
-   manuscript, on the strong model.
-2. **Shape.**
-   - The moderator frames each split.
-   - Each split gets a debate between the readers on either side.
-   - A roundtable covers what all seven see differently.
-   - Every pair with scores three or more apart gets rebuttals, each answering the other once.
-   - Readers may concede in words; scores do not change.
-3. **Distinct voices.** To keep the seven as distinct as they are now:
-   - Each reader speaks in its own call, given the others' reviews.
-   - The moderator's call plans the splits and assembles the transcript.
-   - Cost: a handful of strong calls over about 20k tokens of reviews, small next to the reads.
-
-   Open question 5 offers a single call instead.
-4. **In the report.**
-   - It replaces the verdict section and its tab, laying the splits out without ruling.
-   - Its length is scaled by `ManuscriptLength`.
+### Release H — The round table: the readers in conversation (R28–R33, R40–R41)
+1. **Second round.**
+   - After all seven independent reads, the readers talk about the book.
+   - Their first-round reviews and scores are unchanged (R28).
+   - Readers may concede in words; scores do not change (R31).
+2. **Each reader is its own agent.**
+   - **Its persona and instruction**, as in its first read.
+   - **Its own review and score**, as its memory of the book.
+   - **The others' reviews**, so it knows the panel.
+   - **The transcript so far**, so it replies to what was actually said: to a named speaker, agreeing,
+     pushing back, conceding (R40).
+   - The manuscript is not re-sent. The readers argue from what they wrote, which keeps each turn small.
+3. **A host steers**, as a podcast host would.
+   - **Turns.** A host agent opens, then after each turn picks who speaks next and what to put to them,
+     from what was just said.
+   - **Coverage.** The host makes sure every split, and every pair of readers whose scores differ by three
+     or more, gets its back-and-forth (R30).
+   - **Closing.** The host closes the show.
+   - **Neutral.** It never rules on a split (R32).
+4. **Length scales with the manuscript** (R40): about 15 turns for a short story, 30 for a novella, 50 for
+   a novel.
+   - The host may close early once the splits have been aired.
+   - The turn count is a cap, not a quota.
+5. **On the page** (R41): a section and tab called **Round table**, replacing the verdict.
+   - **Transcript:** speaker name, then what they said; no stage directions.
+   - **Summary:** where the readers ended up agreeing, and where they still disagree.
    - The revision plan stays.
    - The verdict's "standing" sentence is checked for other users (the desk and the book page) before
      the verdict is removed.
-5. **Status.** `ReadingPlan`, the desk's "read N of M" status and the run estimate are updated for the
-   new passes.
+6. **Run as a loop, not a batch.** Each turn depends on the one before, so the round table is the one
+   unattended step that cannot be batched (R39).
+   - **Caching.** Each speaker's instructions and memory are a stable cached prefix; the transcript only
+     grows at the end, so its earlier turns read from the cache.
+   - **Cost.** About 30–100 strong-model calls (a host turn and a speaker turn per exchange) over tens of
+     thousands of tokens of reviews and transcript. Small next to the reads, and logged per call like
+     every other.
+   - **Resuming.** The transcript is persisted turn by turn, so a worker stopped mid-show resumes at the
+     next turn rather than restarting.
+7. **Status.** `ReadingPlan`, the desk's status (for example "Round table — turn 12 of about 30") and the
+   run estimate are updated for the new passes.
 
 ### Release R — Regenerate the books already reviewed (owner's request)
 When releases A–H have landed, every book Folio has already reviewed gets a fresh report in the new
@@ -329,12 +380,12 @@ Batch where the calls are independent and nobody is waiting; keep the rest as th
 | Scene image prompts (`DescribeSceneImage`, one per scene) | Independent of each other; the largest share of input in the first logged book | A |
 | Scene verdicts | Once the craft call takes the detected scene list (A3), the verdicts can be asked per chapter in one batch, keyed by scene id | A |
 | The sections and the seven readers (`ReadSection`, `ReadAsReader`) | Each reads the same manuscript and none depends on another | B |
-| The two synthesis passes (plan and verdict, later the conversation's moderator plan) | Independent of each other | D, H |
-| The conversation's per-reader turns, rebuttals included | Independent once the moderator has planned the splits | H |
+| The revision-plan synthesis | Nobody is waiting | D |
 | Updating the series bible from a finished book | Nobody is waiting | G |
 
 **Not batched:**
 - **Chapter notes** (`AnalyzeChapter`). Each carries the story-so-far from the one before, so they run in order.
+- **The round table** (release H). Each turn replies to the one before.
 - **Anything the owner is waiting on in the app.**
 
 **How it works:**
@@ -357,25 +408,15 @@ Batch where the calls are independent and nobody is waiting; keep the rest as th
   making it the default.
 - If cache hits inside the batch are poor, the 1-hour cache lifetime is the fallback to try.
 
-**What the owner gives up:** a report that arrives in about fifteen minutes. A batched read usually comes
-back well inside the hour, but may take up to a day (open question 7).
+**What the owner gives up (accepted, R39):** a report that arrives in about fifteen minutes. A batched
+read usually comes back well inside the hour, but may take up to a day.
 
 **Gemini's image generation** is a separate provider. Whether it has an equivalent batch mode is to be
 checked, not assumed.
 
 ## 4. Open questions for the owner
-1. The **Fellow writer's anchors** for 2, 4, 6, 8 and 10. A first draft will be written for approval in
-   release B.
-2. The **novel-length purposes** listed in B3: approve, change or replace each.
-3. Should the **score history** show on each reader's page in the report, or only on the phone?
-4. Should a **novella** get the pacing chart (it usually has chapters), or only a novel?
-5. Should the conversation be **one call writing every voice** (cheaper, and risks the voices blurring) or
-   **one call per voice** (recommended)?
-6. Should the conversation **section** be called "The conversation" or "The panel"? Its tab replaces
-   *Verdict*.
-7. **Batching trades speed for half the cost.** Should every unattended call be batched? A report may
-   then take hours (rarely up to a day) instead of about fifteen minutes for the reads. Or should only the
-   scene prompts and verdicts be batched, keeping the reads quick?
+All answered (R34–R41). New questions will come up when release B begins: the craft anchors for the
+Agent and the Acquiring editor (R35).
 
 ## 5. Order and size
 - **A, Scenes:** medium. A live bug, so it goes first.
@@ -385,7 +426,7 @@ checked, not assumed.
 - **E, Notes and chart:** small.
 - **F, Between drafts:** small. Needs A and D.
 - **G, Series bible:** large. Feeds B5.
-- **H, Conversation:** medium. Best after B, so the Fellow writer takes part.
+- **H, Round table:** medium. Best after B, so the Fellow writer takes part.
 - **R, Regenerate reviewed books:** small to build, and the largest single API spend in the plan.
   - Last, after A–H.
   - Its cost is shown and approved in the app before it runs.
