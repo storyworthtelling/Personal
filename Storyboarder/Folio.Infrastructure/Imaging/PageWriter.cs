@@ -87,6 +87,36 @@ internal sealed class PageWriter : IDisposable
         canvas.DrawNamedDestinationAnnotation(new SKPoint(0, 0), section.Destination);
     }
 
+    /// <summary>
+    /// Where each finding was written, by its key (R15): the named destination a plan item links to, the
+    /// folio it is on, and the order it was written in, so an item drawing on several goes to the first.
+    /// </summary>
+    private readonly Dictionary<string, (int Order, int Folio)> places = new(StringComparer.Ordinal);
+
+    /// <summary>The named destination for a finding's place.</summary>
+    public static string PlaceOf(string key) => "finding-" + key;
+
+    /// <summary>Marks where a finding is written, the first time it is: a named destination at this point.</summary>
+    public void MarkPlace(string key, float x, float top)
+    {
+        if (string.IsNullOrEmpty(key) || places.ContainsKey(key))
+            return;
+
+        places[key] = (places.Count, Folio);
+        canvas.DrawNamedDestinationAnnotation(new SKPoint(x, top), PlaceOf(key));
+    }
+
+    /// <summary>The earliest-written of these findings, or null when none of them is written anywhere.</summary>
+    public (string Destination, int Folio)? FirstPlace(IEnumerable<string> keys)
+    {
+        var found = (keys ?? [])
+            .Where(places.ContainsKey)
+            .Select(key => (Key: key, Place: places[key]))
+            .OrderBy(entry => entry.Place.Order)
+            .FirstOrDefault();
+        return found.Key is null ? null : (PlaceOf(found.Key), found.Place.Folio);
+    }
+
     /// <summary>Records that a reader's page starts on this sheet.</summary>
     public void BeginReader() => readerFolios.Add(Folio);
 
@@ -533,6 +563,10 @@ internal sealed class PageWriter : IDisposable
                 var baseline = origin + ((i - first) * lineHeight) + prose.Size;
                 canvas.DrawText(manuscript[span.Start..span.End], textLeft, baseline, prose, ink);
 
+                // Where each finding anchored here is written, for the plan's links (R15).
+                foreach (var mark in anchored[i])
+                    MarkPlace(mark.FindingKey, textLeft, baseline - prose.Size);
+
                 foreach (var mark in drawnOn[i])
                     DrawMarkOn(manuscript, new LineSpan(i, span.Start, span.End), mark, textLeft, baseline, prose);
             }
@@ -843,12 +877,13 @@ internal sealed class PageWriter : IDisposable
     /// </summary>
     public void Continues(string? heading) => continuation = heading;
 
-    public void CheckItem(string action, string citation, SKColor chip)
+    public void CheckItem(string action, string citation, SKColor chip, string? destination = null)
     {
         using var body = ReportType.Body();
         using var small = ReportType.Small();
 
-        var indent = 18f;
+        // The box is sized for a pen on the tablet (R15), so the text clears it.
+        var indent = PageGeometry.PenBox + 9f;
         var chipWidth = 16f;
         var width = ContentWidth - indent - chipWidth;
         var lines = SkiaText.Wrap(body, action, width);
@@ -856,8 +891,9 @@ internal sealed class PageWriter : IDisposable
             ? new List<string>()
             : SkiaText.Wrap(small, citation, width);
 
-        var height = (lines.Count * body.Size * PageGeometry.LineSpacing)
-            + (cited.Count * small.Size * PageGeometry.LineSpacing) + 10f;
+        var height = Math.Max(
+            (lines.Count * body.Size * PageGeometry.LineSpacing) + (cited.Count * small.Size * PageGeometry.LineSpacing),
+            PageGeometry.PenBox + 2f) + 10f;
         var before = PageCount;
         KeepTogether(height);
 
@@ -876,7 +912,8 @@ internal sealed class PageWriter : IDisposable
             Style = SKPaintStyle.Stroke, StrokeWidth = 1f,
         };
         canvas.DrawRoundRect(
-            new SKRect(ContentLeft, top + 2f, ContentLeft + 9f, top + 11f), 1.4f, 1.4f, boxPaint);
+            new SKRect(ContentLeft, top + 1f, ContentLeft + PageGeometry.PenBox, top + 1f + PageGeometry.PenBox),
+            1.4f, 1.4f, boxPaint);
 
         using var ink = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true };
         using var muted = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };
@@ -890,6 +927,12 @@ internal sealed class PageWriter : IDisposable
             canvas.DrawText(line, ContentLeft + indent, y + small.Size, small, muted);
             y += small.Size * PageGeometry.LineSpacing;
         }
+
+        // The words, not the box, carry the link: a pen ticking the box should tick it, not turn the page.
+        y = Math.Max(y, top + PageGeometry.PenBox + 2f);
+        if (destination is not null)
+            canvas.DrawLinkDestinationAnnotation(
+                new SKRect(ContentLeft + indent, top, ContentRight - chipWidth, y), destination);
 
         using var chipPaint = new SKPaint { Color = chip, IsAntialias = true };
         canvas.DrawRoundRect(

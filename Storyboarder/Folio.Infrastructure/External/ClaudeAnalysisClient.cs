@@ -10,6 +10,7 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
+using Folio.Domain.Markup;
 using Folio.Domain.Reading;
 using Folio.Domain.Scenes;
 using Folio.Domain.External;
@@ -1016,7 +1017,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "Where several reads name the same thing, that is one item and it ranks higher for it. Reply with "
         + "JSON only: {\"revisionPlan\": [{\"priority\": \"Must|Should|Consider\", \"chapter\": \"Ch. 12-15\", "
         + "\"issue\": \"what is wrong\", \"suggestedFix\": \"what to do about it — a direction, never "
-        + "replacement prose\"}]}. You diagnose and point; you never write the author's sentences for them.";
+        + "replacement prose\", \"draws\": [\"f1a2b3c4d\"]}]}. You diagnose and point; you never write the author's sentences for them. "
+        + "You are also given \"findings\": every note written on the manuscript, each with an \"id\". In "
+        + "\"draws\", copy the ids of the findings each item rests on, most telling first — the author follows "
+        + "the first one to the page — and leave it empty when no listed finding is behind the item.";
 
     private static string VerdictInstruction(StoryLength length) =>
         $"You are given {Spelled(PersonaCatalogue.All.Count)} independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
@@ -1104,11 +1108,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         IReadOnlyList<SectionRead> sections,
         IReadOnlyList<Review> readers,
         int wordCount,
+        IReadOnlyList<FindingEntry> findings,
         CancellationToken cancellationToken)
     {
         // The synthesis passes read the other fourteen rather than the manuscript, so they carry no
-        // cached prefix and cost nothing to run against either model.
-        var evidence = JsonSerializer.Serialize(new { sections, readers }, JsonResponse.CaseInsensitive);
+        // cached prefix and cost nothing to run against either model. The plan is also shown the keyed
+        // findings (R15), as id, kind, chapter and words, so its items can name the ones they rest on.
+        var listed = (findings ?? []).Select(entry => new
+        {
+            id = entry.Key, kind = entry.Label, chapter = entry.Chapter, severity = entry.Severity.ToString(), note = entry.Text,
+        });
+        var evidence = JsonSerializer.Serialize(new { sections, readers, findings = listed }, JsonResponse.CaseInsensitive);
+        var known = (findings ?? []).Select(entry => entry.Key).ToHashSet(StringComparer.Ordinal);
         var length = ManuscriptLength.Classify(wordCount);
         var instruction = passId == "verdict" ? VerdictInstruction(length) : RevisionPlanInstruction(length);
         var reply = await SendMessage(
@@ -1124,7 +1135,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return new SynthesisRead(
             (dto?.RevisionPlan ?? []).Select(item => new RevisionItem(
                 item.Priority ?? string.Empty, item.Chapter ?? string.Empty,
-                item.Issue ?? string.Empty, item.SuggestedFix ?? string.Empty)).ToList(),
+                item.Issue ?? string.Empty, item.SuggestedFix ?? string.Empty)
+                {
+                    // Only ids it was shown: a made-up one would be a link to nowhere.
+                    Draws = [.. (item.Draws ?? []).Where(key => known.Contains(key)).Distinct()],
+                }).ToList(),
             dto?.Verdict is { } verdict
                 ? new Verdict(verdict.Strengths ?? [], verdict.Problems ?? [], verdict.MostNeeds ?? string.Empty)
                 {
@@ -1706,6 +1721,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class RevisionItemDto
     {
+        public List<string>? Draws { get; set; }
         public string? Priority { get; set; }
         public string? Chapter { get; set; }
         public string? Issue { get; set; }

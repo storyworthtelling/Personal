@@ -190,7 +190,15 @@ public sealed record RevisionItem(
     string Priority,
     string Chapter,
     string Issue,
-    string SuggestedFix);
+    string SuggestedFix)
+{
+    /// <summary>
+    /// The keys (<see cref="Markup.FindingKey"/>) of the findings this item draws on, as the plan's synthesis
+    /// named them (R15): the report links the item to the first of them that is written on the manuscript.
+    /// Empty on a plan written before items carried them.
+    /// </summary>
+    public IReadOnlyList<string> Draws { get; init; } = [];
+}
 
 // What is actually wrong with a line edit's sentence — so the manuscript's margin note can say
 // something specific rather than the single catch-all "Unclear" every edit used to carry regardless

@@ -189,7 +189,8 @@ public static partial class MarkSource
                 : finding.Detail;
             placer.Place(
                 source, MarkKind.Query, label, finding.Excerpt, detail, finding.Chapter,
-                Severity(finding.Severity, finding.Chapter, analysis), fallsBackToChapter: true, unplaced: detail);
+                Severity(finding.Severity, finding.Chapter, analysis), fallsBackToChapter: true, unplaced: detail,
+                keyText: finding.Detail);
         }
     }
 
@@ -270,6 +271,7 @@ public static partial class MarkSource
         private readonly List<Mark> marks = [];
         private readonly List<UnplacedNote> unplaced = [];
         private readonly List<(int Chapter, int Order, ChapterNote Note)> chapterNotes = [];
+        private readonly List<FindingEntry> findings = [];
 
         public Placer(string manuscript, BookAnalysisResult analysis, IReadOnlyList<ChapterSpan> chapters)
         {
@@ -281,15 +283,21 @@ public static partial class MarkSource
 
         public void Place(
             string source, MarkKind kind, string label, string? excerpt, string? reason, string? chapter,
-            ReadinessTier severity, bool fallsBackToChapter, string? unplaced)
+            ReadinessTier severity, bool fallsBackToChapter, string? unplaced, string? keyText = null)
         {
+            // The key is the finding as it was found — before any draft-status tag is added to the reason,
+            // since the plan is written before the report is drawn (R15).
+            var said = keyText ?? reason;
+            var key = FindingKey.Of(source, label, chapter, excerpt, said);
+            findings.Add(new FindingEntry(key, source, label, chapter ?? string.Empty, Join(Quoted(excerpt), said), severity));
+
             if (index?.Find(excerpt) is { } span)
             {
                 // A caret is a point, not a run: it says something belongs *here*, at the head of the
                 // passage that only summarises it. Drawn over the whole quotation it appears once per
                 // line of it, which reads as several missing things rather than one.
                 var end = kind == MarkKind.Caret ? span.Start : span.End;
-                marks.Add(new Mark(kind, severity, span.Start, end, label, reason ?? string.Empty, source));
+                marks.Add(new Mark(kind, severity, span.Start, end, label, reason ?? string.Empty, source) { FindingKey = key });
                 return;
             }
 
@@ -297,7 +305,7 @@ public static partial class MarkSource
             {
                 // A list at the chapter's head (R7), keeping the words it tried to quote.
                 chapterNotes.Add((cited.Number, chapterNotes.Count,
-                    new ChapterNote(severity, label, Join(Quoted(excerpt), reason), source)));
+                    new ChapterNote(severity, label, Join(Quoted(excerpt), reason), source) { FindingKey = key }));
                 return;
             }
 
@@ -312,10 +320,14 @@ public static partial class MarkSource
             var label = AdditionLabel(addition.Kind);
             var reason = Join(addition.Missing, addition.Why);
             var severity = ChapterCitation.Tier(addition.Priority);
+            var key = FindingKey.Of("Scenes to add", label, addition.Location, addition.Excerpt, reason);
+            findings.Add(new FindingEntry(
+                key, "Scenes to add", label, addition.Location ?? string.Empty,
+                Join(Quoted(addition.Excerpt), reason), severity));
 
             if (index?.Find(addition.Excerpt) is { } span)
             {
-                marks.Add(new Mark(MarkKind.Caret, severity, span.Start, span.Start, label, reason, "Scenes to add"));
+                marks.Add(new Mark(MarkKind.Caret, severity, span.Start, span.Start, label, reason, "Scenes to add") { FindingKey = key });
                 return;
             }
 
@@ -326,7 +338,7 @@ public static partial class MarkSource
                 var at = After().IsMatch(addition.Location ?? string.Empty)
                     ? Math.Min(chapter.EndOffset, manuscript.Length)
                     : Math.Min(chapter.StartOffset, manuscript.Length);
-                marks.Add(new Mark(MarkKind.Caret, severity, at, at, label, reason, "Scenes to add"));
+                marks.Add(new Mark(MarkKind.Caret, severity, at, at, label, reason, "Scenes to add") { FindingKey = key });
                 return;
             }
 
@@ -338,6 +350,7 @@ public static partial class MarkSource
         public MarkedReport Finish() =>
             new([.. marks.OrderBy(mark => mark.StartOffset)], [.. unplaced])
             {
+                Findings = [.. findings],
                 ChapterNotes =
                 [
                     .. chapterNotes
@@ -354,7 +367,7 @@ public static partial class MarkSource
         /// Where a chapter's list goes: past its title when the first line is one — short, on a line
         /// of its own, not ending like a sentence — else before its first word.
         /// </summary>
-        private ChapterNotes Notes(int number, IReadOnlyList<ChapterNote> notes)
+        private ChapterNoteList Notes(int number, IReadOnlyList<ChapterNote> notes)
         {
             var chapter = chapters.First(candidate => candidate.Number == number);
             var head = ChapterHead(chapter)!.Value;
@@ -363,7 +376,7 @@ public static partial class MarkSource
                 && manuscript[head.End] == '\n'
                 && line.Length > 0
                 && !".!?\"”’…:;,".Contains(line[^1]);
-            return new ChapterNotes(number, isTitle ? head.End : head.Start, isTitle, notes);
+            return new ChapterNoteList(number, isTitle ? head.End : head.Start, isTitle, notes);
         }
 
         private ChapterSpan? ChapterOf(string? citation) =>

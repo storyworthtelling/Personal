@@ -53,6 +53,12 @@ public static class PageGeometry
     public const float BulletIndent = 16f;
 
     /// <summary>
+    /// A revision-plan item's check box: about four millimetres on the tablet's glass, so a pen can tick it
+    /// (R15). The old nine-point box printed at about two.
+    /// </summary>
+    public const float PenBox = 17f;
+
+    /// <summary>
     /// The three amounts of air the report puts between things, named rather than typed.
     ///
     /// <para>They were 18–20, 12 and 8 — <b>pixels</b> at 150 DPI, which is 8.6, 5.8 and 3.8 points.

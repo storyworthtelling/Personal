@@ -316,6 +316,28 @@ public class ClaudeAnalysisClientTests
         Assert.All(severities, severity => Assert.Equal("Must", severity));
     }
 
+    /// <summary>
+    /// The plan's synthesis is shown every keyed finding and says, per item, which it draws on (R15) — so
+    /// the report can link the item to the place. A key the model made up is dropped, not followed.
+    /// </summary>
+    [Fact]
+    public async Task ThePlanIsShownTheKeyedFindingsAndNamesTheOnesEachItemDrawsOn()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"revisionPlan\":[{\"priority\":\"Must\",\"chapter\":\"Ch. 2\",\"issue\":\"i\","
+            + "\"suggestedFix\":\"s\",\"draws\":[\"f0000beef\",\"fdeadbeef\"]}]}"));
+        IReadOnlyList<Folio.Domain.Markup.FindingEntry> findings =
+            [new("f0000beef", "Plot holes", "Plot hole", "Chapter 2", "Nobody reacts.", Folio.Domain.Readiness.ReadinessTier.Must)];
+
+        var read = await client.Synthesise("todo", [], [], 90_000, findings, CancellationToken.None);
+
+        var body = Assert.Single(handler.RequestBodies);
+        Assert.Contains("f0000beef", body, StringComparison.Ordinal);
+        Assert.Contains("Nobody reacts.", body, StringComparison.Ordinal);
+        Assert.Contains("draws", body, StringComparison.Ordinal);
+        Assert.Equal(["f0000beef"], Assert.Single(read.RevisionPlan).Draws);
+    }
+
     /// <summary>A judgement with no call or nothing accomplished is a failed pass, retried, never printed half-made.</summary>
     [Theory]
     [InlineData("{\"accomplishes\":\"x\",\"call\":\"Maybe\",\"tension\":0.5,\"verdict\":\"v\"}")]

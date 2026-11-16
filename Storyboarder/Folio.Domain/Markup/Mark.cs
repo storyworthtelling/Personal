@@ -54,4 +54,10 @@ public sealed record Mark(
     public bool IsPoint => EndOffset <= StartOffset;
 
     public int Length => Math.Max(EndOffset - StartOffset, 0);
+
+    /// <summary>
+    /// The finding's short name (<see cref="Markup.FindingKey"/>), so a revision-plan item that draws on it
+    /// can link to this place (R15). A name, not words: it cannot carry a line for the author.
+    /// </summary>
+    public string FindingKey { get; init; } = string.Empty;
 }
