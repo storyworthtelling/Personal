@@ -18,6 +18,7 @@ using Pulp.Domain.Services;
 using Pulp.Domain.Title;
 using Pulp.Favorites;
 using Pulp.Infrastructure.Catalogue;
+using Pulp.Domain.Shell;
 
 namespace Pulp.Shell;
 
@@ -51,7 +52,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
         }
 
         root = new LinearLayout(host) { Orientation = Orientation.Vertical };
-        field = new FilterField(host, DiscoverPageInput.Hint, Android.Graphics.Color.ParseColor(DesignTokens.Identity.Pulp.Mark));
+        field = new FilterField(host, DiscoverPageInput.Hint, AreaPalette.For(PulpAreas.For(PulpArea.Discover).Hue).Rule);
         field.QueryChanged += _ =>
         {
             editedAt = DateTimeOffset.UtcNow;

@@ -144,7 +144,7 @@ public sealed class PlayingArea : ScoreArea
                 RenderPanel();
             },
             (int)showing,
-            PaperTheme.ScoreMark,
+            Tab.Hue,
             [true, playback.Queued().Count > 0, hasWords]);
     }
 

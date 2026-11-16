@@ -19,6 +19,8 @@ using Pulp.HandOffs;
 using Pulp.Infrastructure.Sports;
 using Pulp.Library;
 using Pulp.Trailer;
+using Pulp.Shell;
+using Pulp.Domain.Shell;
 
 namespace Pulp.Sports;
 
@@ -266,7 +268,7 @@ internal sealed class SportsScreen
     {
         if (finder is null)
         {
-            finder = new FilterField(host, "Find a team to follow", Android.Graphics.Color.ParseColor(DesignTokens.Identity.Pulp.Mark));
+            finder = new FilterField(host, "Find a team to follow", AreaPalette.For(PulpAreas.For(PulpArea.Sports).Hue).Rule);
             finder.QueryChanged += _ => OnQuery();
         }
 

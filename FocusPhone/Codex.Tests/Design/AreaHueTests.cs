@@ -134,27 +134,18 @@ public class AreaHueTests
     }
 
     /// <summary>
-    /// <b>The page does not inherit its own tab's hue</b> (§9, stated outright).
-    ///
-    /// <para>An area colour that happens to be a role hue is a tab, not a state — so a control on
-    /// the page must not take it. The tempting change, once the tabs are coded, is to make the
-    /// filter field in Podcasts match the Podcasts tab; that is the moment a role hue stops being a
-    /// divider and starts looking like a status, which §3 forbids. In-page accents stay the app's
-    /// identity hue.</para>
-    ///
-    /// <para><b>Only the area's own hue, and only when that is a role.</b> This took two goes to
-    /// state. The first version flagged every role hue on every page, which named Mailbox's problem
-    /// red and Rolodex's caution ochre — genuine <i>statuses</i>, and exactly what role hues exist
-    /// for. The second flagged the home areas, whose tab hue is the app's identity and whose pages
-    /// are meant to wear it. What is left is the real rule, and it is narrow: a page must not wear
-    /// a <b>role</b> hue that is the colour of the tab it is sitting behind.</para>
+    /// <b>A page's accents wear its tab's colour</b> (owner's ruling, W8, one approach for the whole suite; DESIGN.md
+    /// §9). This reverses the restraint rule this test used to hold, under which a role-hued tab's page kept the
+    /// app's identity for its filter field, Dial and tempo bands. Now a page sitting behind a role tab must not
+    /// reach for the identity hue: its accents take the tab's (<c>Tab.Hue</c>). The home area's tab IS the
+    /// identity, so its page wearing it is the same rule, not an exception.
     /// </summary>
     [Theory]
-    [InlineData("Score.Android")]
-    [InlineData("Post.Android")]
-    public void NoControlOnThePageWearsItsOwnAreasRoleHue(string head)
+    [InlineData("Score.Android", "Score")]
+    [InlineData("Post.Android", "Post")]
+    public void EveryAccentOnThePageWearsItsOwnTabsHue(string head, string identity)
     {
-        string[] Roles = ["Reference", "Progress", "Positive", "Caution", "Problem", "Resolved"];
+        string[] Roles = ["Reference", "Progress", "Positive", "Caution", "Problem", "Resolved", "Action"];
 
         var offenders = new List<string>();
 
@@ -168,53 +159,29 @@ public class AreaHueTests
                 ?? string.Join(" ", lines);
 
             var match = Regex.Match(tab, @"PaperTheme\.(?<hue>\w+?)(Mark|Fill)");
-            if (!match.Success)
-            {
-                continue;
-            }
-
-            var own = match.Groups["hue"].Value;
-
-            // The home area's tab hue IS the app's identity, and the page is meant to wear that —
-            // it is the accent every control in the app already uses. Only a ROLE hue is forbidden
-            // on the page beneath it, because only a role hue can be mistaken for a status.
-            if (!Roles.Contains(own))
+            if (!match.Success || !Roles.Contains(match.Groups["hue"].Value))
             {
                 continue;
             }
 
             foreach (var line in lines)
             {
-                if (line.Contains("BinderArea", StringComparison.Ordinal)
-                    || line.Contains("TabGlyphs.", StringComparison.Ordinal))
+                if (line.Contains("BinderArea", StringComparison.Ordinal) || line.Contains("TabGlyphs.", StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                if (line.Contains($"PaperTheme.{own}Mark", StringComparison.Ordinal)
-                    || line.Contains($"PaperTheme.{own}Fill", StringComparison.Ordinal))
+                if (line.Contains($"PaperTheme.{identity}Mark", StringComparison.Ordinal)
+                    || line.Contains($"PaperTheme.{identity}Fill", StringComparison.Ordinal))
                 {
-                    offenders.Add($"{Path.GetFileName(file)} is an {own} tab: {line.Trim()}");
+                    offenders.Add($"{Path.GetFileName(file)} is a {match.Groups["hue"].Value} tab: {line.Trim()}");
                 }
             }
         }
 
-        // Post's Filed and Rolodex filter fields each take their own tab's hue. Found by this
-        // guard rather than by looking, and NOT changed here: Post's areas went through the P7
-        // gate, so whether that was approved or missed is the owner's to say, and quietly
-        // recolouring another app's approved screens on the strength of one sentence would be
-        // worse than leaving it visible. Anything NEW in Post still fails.
-        string[] standing =
-        [
-            "FiledArea.cs is an Caution tab: filter = new FilterField(Host, \"Find something filed\", PaperTheme.CautionMark);",
-            "RolodexArea.cs is an Positive tab: filter = new FilterField(Host, \"Find a person\", PaperTheme.PositiveMark);",
-        ];
-
-        var unexpected = offenders.Except(standing).ToArray();
-
-        Assert.True(unexpected.Length == 0,
-            "A page wearing its own tab's hue reads as a status rather than a divider (§9/§3). "
-            + "In-page accents take the app's identity hue:\n" + string.Join("\n", unexpected));
+        Assert.True(offenders.Count == 0,
+            "A page's accents take its tab's hue (§9, owner's ruling); use Tab.Hue, not the identity:\n"
+            + string.Join("\n", offenders));
     }
 
     /// <summary>Apps whose cloths may share a hue with each other or with a role (D84).</summary>

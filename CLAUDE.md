@@ -486,19 +486,7 @@ guard, and it holds the whole §9 rule rather than just this one fix: no two are
 exactly one carries the identity, Settings alone is the grey, and an area's ink and cloth are the
 same hue.
 
-**The restraint is the point, and it is guarded too.** §9 says an area colour that happens to be a
-role hue is *a tab, not a state, and nothing on the page inherits it* — so Score's in-page accents
-(the filter field, the Dial, the tempo bands, the budget meter) **keep the identity hue** and must
-not be recoloured to match their tab. Writing that guard took three goes: flagging every role hue
-on a page wrongly named Post's genuine status reds and ochres, and flagging an area's own hue
-wrongly named the home areas, whose tab hue *is* the identity and whose pages are meant to wear it.
-The rule that survives is narrow — a page must not wear a **role** hue that is the colour of the
-tab it sits behind.
-
-**One thing surfaced, not changed:** Post's Filed and Rolodex filter fields each take their own
-tab's role hue, which that rule forbids. Found by the guard rather than by looking. Post's areas
-went through the P7 gate, so whether that was approved or missed is the owner's call; the two are
-listed in the guard as standing exceptions, so anything *new* in Post still fails.
+**The restraint was reversed (owner's ruling, W8; audit W8.9a).** Score's in-page accents once kept the identity hue whatever tab they sat behind. Now **a page's accents wear its tab's colour** across the suite (DESIGN.md §9): Podcasts' filter field, Workout's tempo bands and Dial, and Playing's panel switch take `Tab.Hue`; Pulp's Discover filter and mode chips, the child Discover page, the Sports team finder and the Playlists filter chip take their area's mark through `AreaPalette.For(PulpAreas.For(area).Hue).Rule`; Post's Filed and Rolodex, once the guard's two standing exceptions, were already right. `AreaHueTests.EveryAccentOnThePageWearsItsOwnTabsHue` refuses the identity hue on a page behind a role tab, and `RepoGuards.Tests/ScreenFixesTests.APulpPageWearsItsTabsHue` holds Pulp. Score's download budget meter keeps the identity: it lives on the Downloads screen, which belongs to no one tab.
 
 ---
 

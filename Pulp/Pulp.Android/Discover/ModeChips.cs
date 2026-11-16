@@ -5,6 +5,8 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Pulp.Domain.Discover;
+using Pulp.Shell;
+using Pulp.Domain.Shell;
 
 namespace Pulp.Discover;
 
@@ -18,7 +20,8 @@ namespace Pulp.Discover;
 internal sealed class ModeChips : LinearLayout
 {
     private readonly Dictionary<DiscoverSearchMode, TextView> chips = [];
-    private readonly Color hue = Color.ParseColor(DesignTokens.Identity.Pulp.Mark);
+    // The page's accents wear its tab's colour (DESIGN.md §9, owner's ruling).
+    private readonly Color hue = AreaPalette.For(PulpAreas.For(PulpArea.Discover).Hue).Rule;
 
     public ModeChips(Context context, DiscoverSearchMode initial, Action<DiscoverSearchMode> onTap) : base(context)
     {
