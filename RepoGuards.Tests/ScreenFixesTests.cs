@@ -52,5 +52,23 @@ public class ScreenFixesTests
         Assert.Contains("loansSideRoot.Children.Add(extraHintLabel)", page, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A Pulp page behind a role tab takes that tab's hue for its accents (owner's ruling, W8; DESIGN.md §9): the
+    /// Discover filter and mode chips, the child Discover page, the Sports team finder and the Playlists filter chip
+    /// used to name the amber identity directly.
+    /// </summary>
+    [Theory]
+    [InlineData("Pulp/Pulp.Android/Shell/DiscoverArea.cs")]
+    [InlineData("Pulp/Pulp.Android/Shell/ChildDiscoverPage.cs")]
+    [InlineData("Pulp/Pulp.Android/Discover/ModeChips.cs")]
+    [InlineData("Pulp/Pulp.Android/Sports/SportsScreen.cs")]
+    [InlineData("Pulp/Pulp.Android/Playlists/PlaylistsScreen.cs")]
+    public void APulpPageWearsItsTabsHue(string file)
+    {
+        var text = Read(file);
+        Assert.DoesNotContain("DesignTokens.Identity.Pulp.Mark", text, StringComparison.Ordinal);
+        Assert.Contains("AreaPalette.For(PulpAreas.For(PulpArea.", text, StringComparison.Ordinal);
+    }
+
     private static string Read(string file) => File.ReadAllText(Path.Combine(GuardScan.RepoRoot(), file));
 }

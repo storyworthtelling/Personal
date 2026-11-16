@@ -16,6 +16,8 @@ using Pulp.Domain.People;
 using Pulp.Domain.Voice;
 using Pulp.Library;
 using Pulp.Title;
+using Pulp.Shell;
+using Pulp.Domain.Shell;
 
 namespace Pulp.Playlists;
 
@@ -395,7 +397,7 @@ internal sealed class PlaylistsScreen
         chip.Background = PaperUi.FilterChip(
             host,
             PaperTheme.InkMuted,
-            Android.Graphics.Color.ParseColor(DesignTokens.Identity.Pulp.Mark),
+            AreaPalette.For(PulpAreas.For(PulpArea.Playlists).Hue).Rule,
             hideWatched,
             DesignTokens.Shape.RadiusInput);
         var padX = PaperTheme.Dp(host, DesignTokens.Space.X3);

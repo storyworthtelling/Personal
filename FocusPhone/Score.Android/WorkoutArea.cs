@@ -77,9 +77,9 @@ public sealed class WorkoutArea : ScoreArea
             [.. TempoBands.Names],
             index => ChooseBand((TempoBand)index),
             (int)band,
-            PaperTheme.ScoreMark));
+            Tab.Hue));
 
-        dial = new Dial(Host, new DialGeometry(TempoBands.Slowest, TempoBands.Fastest), tempo, PaperTheme.ScoreMark);
+        dial = new Dial(Host, new DialGeometry(TempoBands.Slowest, TempoBands.Fastest), tempo, Tab.Hue);
 
         // Turning keeps the count under the dial honest as the finger moves; settling
         // is what actually changes the music, so a drag across thirty BPM is one

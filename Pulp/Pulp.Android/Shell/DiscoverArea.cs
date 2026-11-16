@@ -114,7 +114,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
 
         root = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
-        field = new FilterField(Host, DiscoverPageInput.Hint, Android.Graphics.Color.ParseColor(DesignTokens.Identity.Pulp.Mark));
+        field = new FilterField(Host, DiscoverPageInput.Hint, AreaPalette.For(PulpAreas.For(PulpArea.Discover).Hue).Rule);
         field.QueryChanged += _ =>
         {
             editedAt = DateTimeOffset.UtcNow;
