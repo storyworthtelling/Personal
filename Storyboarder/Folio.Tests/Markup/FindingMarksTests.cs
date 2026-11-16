@@ -113,19 +113,47 @@ public class FindingMarksTests
 
     // ---- the chapter, when the quote fails ------------------------------------------------------
 
+    /// <summary>
+    /// A finding that cannot find its passage is not a query in the margin any more (R7): pinned to a
+    /// chapter's opening line it read as a note about that line. It goes to a list at the chapter's
+    /// head, "Notes on this chapter", which says exactly what it is.
+    /// </summary>
     [Fact]
-    public void AFindingWithNoQuoteIsWrittenOnTheOpeningOfItsChapterAndSaysSo()
+    public void AFindingWithNoQuoteGoesToItsChaptersNotesNotTheMargin()
     {
         var finding = new ReportFinding("Chapter 2", "Nobody reacts to her return.");
         var report = MarkSource.Build(Manuscript, WithFinding("plot", finding), Chapters);
 
-        var mark = Assert.Single(report.Marks);
-        Assert.Equal(MarkKind.Query, mark.Kind);
-        Assert.Equal(One.Length, mark.StartOffset);
-        Assert.Equal("Chapter Two", Manuscript[mark.StartOffset..mark.EndOffset]);
-        Assert.StartsWith("In this chapter", mark.Reason, StringComparison.Ordinal);
-        Assert.Contains("Nobody reacts to her return.", mark.Reason, StringComparison.Ordinal);
+        Assert.Empty(report.Marks);
         Assert.Empty(report.Unplaced);
+        var chapter = Assert.Single(report.ChapterNotes);
+        Assert.Equal(2, chapter.Chapter);
+        var note = Assert.Single(chapter.Notes);
+        Assert.Equal("Plot hole", note.Label);
+        Assert.Equal("Nobody reacts to her return.", note.Text);
+    }
+
+    /// <summary>
+    /// A chapter that opens with a title gets its list under the title; one that opens straight into
+    /// prose gets it before the first line, rather than after the first line of a paragraph.
+    /// </summary>
+    [Fact]
+    public void TheListFollowsAChaptersTitleAndPrecedesItsProse()
+    {
+        var analysis = BookAnalysisResult.Empty with
+        {
+            PlotHoles = [new ReportFinding("Chapter 1", "a"), new ReportFinding("Chapter 2", "b")],
+        };
+
+        var notes = MarkSource.Build(Manuscript, analysis, Chapters).ChapterNotes;
+
+        var first = Assert.Single(notes, n => n.Chapter == 1);
+        Assert.False(first.FollowsTitle);
+        Assert.Equal(0, first.Offset);
+
+        var second = Assert.Single(notes, n => n.Chapter == 2);
+        Assert.True(second.FollowsTitle);
+        Assert.Equal("Chapter Two", Manuscript[One.Length..second.Offset]);
     }
 
     /// <summary>
@@ -138,10 +166,27 @@ public class FindingMarksTests
         var edit = new LineEdit("Chapter 3", "He mounted his horse and rode north.", "x", "Reads as a cliché.");
         var report = MarkSource.Build(Manuscript, BookAnalysisResult.Empty with { LineEdits = [edit] }, Chapters);
 
-        var mark = Assert.Single(report.Marks);
-        Assert.Equal(One.Length + Two.Length, mark.StartOffset);
-        Assert.Contains("He mounted his horse and rode north.", mark.Reason, StringComparison.Ordinal);
-        Assert.Contains("Reads as a cliché.", mark.Reason, StringComparison.Ordinal);
+        Assert.Empty(report.Marks);
+        var note = Assert.Single(Assert.Single(report.ChapterNotes).Notes);
+        Assert.Contains("He mounted his horse and rode north.", note.Text, StringComparison.Ordinal);
+        Assert.Contains("Reads as a cliché.", note.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AChaptersNotesAreOneListInReadingOrderMostSevereFirst()
+    {
+        var analysis = BookAnalysisResult.Empty with
+        {
+            PlotHoles =
+            [
+                new ReportFinding("Chapter 2", "minor") { Severity = "Consider" },
+                new ReportFinding("Chapter 2", "major") { Severity = "Must" },
+                new ReportFinding("Chapter 2", "middling") { Severity = "Should" },
+            ],
+        };
+
+        var chapter = Assert.Single(MarkSource.Build(Manuscript, analysis, Chapters).ChapterNotes);
+        Assert.Equal(["major", "middling", "minor"], chapter.Notes.Select(note => note.Text));
     }
 
     [Fact]
@@ -262,7 +307,7 @@ public class FindingMarksTests
         {
             PlotHoles = [new ReportFinding("Chapter 3", "late") { Excerpt = "the boats lay" }],
             PacingNotes = [new ReportFinding("Chapter 1", "early") { Excerpt = "Ruth came back" }],
-            Inaccuracies = [new ReportFinding("Chapter 2", "middle")],
+            Inaccuracies = [new ReportFinding("Chapter 2", "middle") { Excerpt = "sea wall" }],
         };
 
         var offsets = MarkSource.Build(Manuscript, analysis, Chapters).Marks.Select(mark => mark.StartOffset).ToList();
@@ -280,6 +325,75 @@ public class FindingMarksTests
         };
 
         Assert.Equal(Folio.Domain.Readiness.ReadinessTier.Must,
+            Assert.Single(MarkSource.Build(Manuscript, analysis, Chapters).Marks).Severity);
+    }
+
+    // ---- severity (R8) -------------------------------------------------------------------------
+
+    /// <summary>
+    /// A finding's own severity, asked for in the prompt that produced it, outranks the chapter proxy:
+    /// a small slip inside a chapter a Must covers is not itself a Must.
+    /// </summary>
+    [Theory]
+    [InlineData("Must", Folio.Domain.Readiness.ReadinessTier.Must)]
+    [InlineData("should", Folio.Domain.Readiness.ReadinessTier.Should)]
+    [InlineData("Consider", Folio.Domain.Readiness.ReadinessTier.Consider)]
+    public void AFindingsOwnSeverityOutranksTheRevisionPlansChapter(string severity, Folio.Domain.Readiness.ReadinessTier tier)
+    {
+        var analysis = WithFinding("plot", new ReportFinding("Chapter 2", "x") { Excerpt = "nobody spoke to her", Severity = severity }) with
+        {
+            RevisionPlan = [new RevisionItem("Must", "Ch. 1-3", "The opening does not commit", "x")],
+        };
+
+        Assert.Equal(tier, Assert.Single(MarkSource.Build(Manuscript, analysis, Chapters).Marks).Severity);
+    }
+
+    [Fact]
+    public void EveryKindOfNoteCarriesItsOwnSeverity()
+    {
+        const string Must = "Must";
+        var analysis = BookAnalysisResult.Empty with
+        {
+            LineEdits = [new LineEdit("Chapter 2", "nobody spoke to her", "x", "r") { Severity = Must }],
+            ProseNotes = [new ProseNote("Chapter 3", "p", "The tide was out", "f") { Severity = Must }],
+            DialogueNotes = [new DialogueNote("Chapter 2", "s", "o", "f") { Excerpt = "She walked the sea wall", Severity = Must }],
+            VoiceConsistency = new VoiceConsistency("v", [new VoiceDivergence("Chapter 3", "the boats lay on their sides", "d", "s") { Severity = Must }]),
+            SeriesContinuity = new SeriesContinuity("Book One",
+                [new SeriesBreak("Chapter 1", "e", "c") { Excerpt = "Ruth came back", Severity = Must }], []),
+            Expansion = new ExpansionReport([], [new ShowTellNote("Chapter 1", "The water had taken her brother", ShowTellDirection.Dramatize, "s") { Severity = Must }], LengthAssessment.Empty),
+        };
+
+        var marks = MarkSource.Build(Manuscript, analysis, Chapters).Marks;
+
+        Assert.Equal(6, marks.Count);
+        Assert.All(marks, mark => Assert.Equal(Folio.Domain.Readiness.ReadinessTier.Must, mark.Severity));
+    }
+
+    [Fact]
+    public void ASceneInconsistencyCarriesItsOwnSeverity()
+    {
+        var analysis = BookAnalysisResult.Empty with
+        {
+            SceneJudgements =
+            [
+                new Folio.Domain.Scenes.SceneJudgement(1, "Chapter 2", "a", Folio.Domain.Scenes.SceneCall.Keep, 0.5, "v",
+                    [new Folio.Domain.Scenes.SceneInconsistency(Folio.Domain.Scenes.SceneInconsistencyKind.Tense, "d", "nobody spoke to her") { Severity = "Should" }]),
+            ],
+        };
+
+        Assert.Equal(Folio.Domain.Readiness.ReadinessTier.Should,
+            Assert.Single(MarkSource.Build(Manuscript, analysis, Chapters).Marks).Severity);
+    }
+
+    [Fact]
+    public void ASeverityTheModelDidNotSendFallsBackToTheChapterProxy()
+    {
+        var analysis = WithFinding("plot", new ReportFinding("Chapter 2", "x") { Excerpt = "nobody spoke to her", Severity = "Urgent!" }) with
+        {
+            RevisionPlan = [new RevisionItem("Should", "Ch. 2", "t", "x")],
+        };
+
+        Assert.Equal(Folio.Domain.Readiness.ReadinessTier.Should,
             Assert.Single(MarkSource.Build(Manuscript, analysis, Chapters).Marks).Severity);
     }
 

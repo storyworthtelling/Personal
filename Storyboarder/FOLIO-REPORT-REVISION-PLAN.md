@@ -249,7 +249,14 @@ approved; each reader page leads with the name, then the role.
    - The independence guard is updated: the bible is canon, not another reader's notes.
    - Lands with release G; until then, the existing prior-book canon is passed the same way.
 
-### Release C — Clear mark anchors (R6–R8)
+### Release C — Clear mark anchors (R6–R8) — **built**
+
+Found while building C: on the rM2's greys, Problem rose and Caution ochre print as the same grey (both
+near 0.41 luma), so colour alone could not tell a Must from a Should. The note's bracket and leader also
+carry the pacing chart's severity dash (`SeverityCue.Leader`: solid, dashed, dotted, at half the chart's
+weight), and the contrast test accepts a pair that differs in grey or in dash. Also fixed: every note on a
+line took the colour of that line's first mark.
+
 1. **Leaders.** A heavier leader drawn to the start of the anchored phrase, not the line.
    - Tested by geometry: the leader ends inside the phrase's box.
    - Check the rM2 in greys.

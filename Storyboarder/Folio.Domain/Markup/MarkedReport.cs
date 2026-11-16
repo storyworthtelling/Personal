@@ -1,3 +1,5 @@
+using Folio.Domain.Readiness;
+
 namespace Folio.Domain.Markup;
 
 /// <summary>
@@ -14,8 +16,25 @@ public readonly record struct ChapterSpan(int Number, int StartOffset, int EndOf
 /// </summary>
 public sealed record UnplacedNote(string Source, string Chapter, string Text);
 
+/// <summary>One note in a chapter's list: its severity, the word naming it, and what it says.</summary>
+public sealed record ChapterNote(ReadinessTier Severity, string Label, string Text, string Source);
+
+/// <summary>
+/// The notes about one chapter that found no passage of their own (R7), printed as a list —
+/// "Notes on this chapter" — at the chapter's head rather than as queries on its first line, which read
+/// as notes about that line.
+///
+/// <para><see cref="Offset"/> is where the list goes: just past the chapter's title when it opens with
+/// one (<see cref="FollowsTitle"/>), else at its first character, so the list is never printed after
+/// the first line of a paragraph. Notes run most severe first, then in the order they were found.</para>
+/// </summary>
+public sealed record ChapterNotes(int Chapter, int Offset, bool FollowsTitle, IReadOnlyList<ChapterNote> Notes);
+
 /// <summary>What the report's findings come to once they are written on the manuscript.</summary>
 public sealed record MarkedReport(IReadOnlyList<Mark> Marks, IReadOnlyList<UnplacedNote> Unplaced)
 {
     public static MarkedReport Empty { get; } = new([], []);
+
+    /// <summary>Each chapter's list of notes that could not be tied to a passage, in reading order.</summary>
+    public IReadOnlyList<ChapterNotes> ChapterNotes { get; init; } = [];
 }

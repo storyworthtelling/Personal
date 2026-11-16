@@ -264,6 +264,58 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("nobody spoke", inconsistency.Excerpt);
     }
 
+    /// <summary>
+    /// Every call that produces findings asks for each one's severity — Must, Should or Consider — and
+    /// the answer reaches the finding (R8), so a mark's colour is the model's judgement of that note
+    /// rather than the revision plan's verdict on the chapter it happens to sit in.
+    /// </summary>
+    [Fact]
+    public async Task EveryCallThatWritesFindingsAsksForEachOnesSeverityAndKeepsIt()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"plotHoles\":[{\"chapter\":\"Chapter 1\",\"detail\":\"d\",\"excerpt\":\"\",\"severity\":\"Must\"}]}"));
+        handler.EnqueueOk(Reply("{\"lineEdits\":[{\"chapter\":\"Chapter 1\",\"excerpt\":\"e\",\"suggestion\":\"s\",\"reason\":\"r\",\"severity\":\"Must\"}],"
+            + "\"proseNotes\":[{\"chapter\":\"Chapter 1\",\"pattern\":\"p\",\"evidence\":\"e\",\"fix\":\"f\",\"severity\":\"Must\"}],"
+            + "\"dialogueNotes\":[{\"chapter\":\"Chapter 1\",\"speakers\":\"s\",\"observation\":\"o\",\"fix\":\"f\",\"severity\":\"Must\"}]}"));
+        handler.EnqueueOk(Reply("{\"dominantVoice\":\"v\",\"divergences\":[{\"chapter\":\"Chapter 1\",\"excerpt\":\"e\",\"divergence\":\"d\",\"suggestion\":\"s\",\"severity\":\"Must\"}]}"));
+        handler.EnqueueOk(Reply("{\"scenesToAdd\":[],\"showVsTell\":[{\"chapter\":\"Chapter 1\",\"excerpt\":\"e\",\"direction\":\"Tighten\",\"suggestion\":\"s\",\"severity\":\"Must\"}],\"targetLow\":0,\"targetHigh\":0}"));
+        handler.EnqueueOk(Reply("{\"breaks\":[{\"chapter\":\"Chapter 1\",\"established\":\"e\",\"contradiction\":\"c\",\"excerpt\":\"\",\"severity\":\"Must\"}],\"carriedThreads\":[]}"));
+        handler.EnqueueOk(Reply("{\"summary\":\"s\",\"findings\":[{\"chapter\":\"Chapter 1\",\"detail\":\"d\",\"excerpt\":\"\",\"severity\":\"Must\"}]}"));
+        handler.EnqueueOk(Reply("{\"accomplishes\":\"a\",\"call\":\"Keep\",\"tension\":0.5,\"verdict\":\"v\","
+            + "\"inconsistencies\":[{\"kind\":\"Tense\",\"detail\":\"d\",\"excerpt\":\"e\",\"severity\":\"Must\"}]}"));
+
+        var analysis = await client.ConsolidateAnalysis("Title", [ChapterNotes.Empty], new DesignBible([], []), "", CancellationToken.None);
+        var craft = await client.ConsolidateCraft("Title", [ChapterNotes.Empty], CancellationToken.None);
+        var voice = await client.AssessVoiceConsistency([new ChapterSample("Chapter 1", "a"), new ChapterSample("Chapter 2", "b")], CancellationToken.None);
+        var expansion = await client.ProposeExpansion("Title", [ChapterNotes.Empty], "", 1000, "Mystery", CancellationToken.None);
+        var series = await client.AssessSeriesContinuity("Title", new SeriesCanon("Book One", [], [], "", []), [ChapterNotes.Empty], "", CancellationToken.None);
+        var section = await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", GenreFrame.Unknown, CancellationToken.None);
+        var scene = await client.JudgeScene(new SceneToJudge(1, "Chapter 1", "t", "", ""), new DesignBible([], []), CancellationToken.None);
+
+        Assert.Equal(7, handler.RequestBodies.Count);
+        foreach (var body in handler.RequestBodies)
+        {
+            Assert.Contains("severity", body, StringComparison.Ordinal);
+            Assert.Contains("Must", body, StringComparison.Ordinal);
+            Assert.Contains("Should", body, StringComparison.Ordinal);
+            Assert.Contains("Consider", body, StringComparison.Ordinal);
+        }
+
+        string[] severities =
+        [
+            Assert.Single(analysis.PlotHoles).Severity,
+            Assert.Single(craft.LineEdits).Severity,
+            Assert.Single(craft.ProseNotes).Severity,
+            Assert.Single(craft.DialogueNotes).Severity,
+            Assert.Single(voice.Divergences).Severity,
+            Assert.Single(expansion.ShowVsTell).Severity,
+            Assert.Single(series.Breaks).Severity,
+            Assert.Single(section.Findings).Severity,
+            Assert.Single(scene.Inconsistencies).Severity,
+        ];
+        Assert.All(severities, severity => Assert.Equal("Must", severity));
+    }
+
     /// <summary>A judgement with no call or nothing accomplished is a failed pass, retried, never printed half-made.</summary>
     [Theory]
     [InlineData("{\"accomplishes\":\"x\",\"call\":\"Maybe\",\"tension\":0.5,\"verdict\":\"v\"}")]
