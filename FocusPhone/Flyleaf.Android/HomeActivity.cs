@@ -700,6 +700,9 @@ public class HomeActivity : Activity
         public bool MarksInvertToInk(string packageKey) =>
             BookClothPalette.MarksInvertToInk(BookClothPalette.ForPackage(packageKey));
 
+        public bool SpineTakesInk(string packageKey) =>
+            BookClothPalette.SpineTakesInk(BookClothPalette.ForPackage(packageKey));
+
         public bool HasNotification(string packageKey) => notifications().ContainsKey(packageKey);
 
         // Priority, not cloth: DESIGN.md §9's role hues, so an urgent notification reads as

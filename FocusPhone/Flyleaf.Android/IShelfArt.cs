@@ -29,6 +29,9 @@ public interface IShelfArt
     /// </summary>
     bool MarksInvertToInk(string packageKey);
 
+    /// <summary>True when the spine's title reads better in ink than in paper-white on this book's cloth (§17).</summary>
+    bool SpineTakesInk(string packageKey);
+
     /// <summary>True while the app has an active notification, so a bookmark tab is drawn.</summary>
     bool HasNotification(string packageKey);
 
