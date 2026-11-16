@@ -195,17 +195,17 @@ public class BookshelfLayoutTests
     }
 
     /// <summary>
-    /// No spine is narrower than 30dp (owner's approval, W9 mock-up item 6; report 10 §14): the least-used apps had
-    /// the smallest targets. The four sizes stay distinct, so usage still reads as width.
+    /// The spines keep their original widths (owner's ruling: the W9.4 widening to a 30dp minimum read too big on the
+    /// shelf). A finger still gets 48dp, because the touch box widens about each spine (W9.2), not the drawing. The
+    /// four sizes stay distinct, so usage still reads as width.
     /// </summary>
     [Fact]
-    public void NoSpineIsNarrowerThanThirty()
+    public void TheSpinesKeepTheirOriginalWidths()
     {
         var widths = new[] { SpineSizing.Size.Slim, SpineSizing.Size.Regular, SpineSizing.Size.Wide, SpineSizing.Size.Broad }
             .Select(size => M.SpineWidths[size])
             .ToArray();
 
-        Assert.True(widths[0] >= 30f, $"Slim is {widths[0]}dp");
-        Assert.True(widths.Zip(widths.Skip(1)).All(pair => pair.First < pair.Second), "the sizes must stay distinct");
+        Assert.Equal([22f, 30f, 40f, 52f], widths);
     }
 }

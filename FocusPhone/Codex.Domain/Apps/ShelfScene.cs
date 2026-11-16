@@ -77,11 +77,11 @@ public readonly record struct ShelfMetrics(
         BookendStatueHeightRatio: 0.55f,
         SpineWidths: new Dictionary<SpineSizing.Size, float>
         {
-            // At least 30dp (owner's approval, W9 mock-up item 6): the least-used apps had 22dp targets. The four
-            // sizes stay distinct so usage still reads as width.
-            [SpineSizing.Size.Slim] = 30f,
-            [SpineSizing.Size.Regular] = 36f,
-            [SpineSizing.Size.Wide] = 44f,
+            // The original widths (owner's ruling: W9.4's 30dp minimum read too big). A finger still gets 48dp,
+            // since the touch box widens about the spine (ShelfAccess), not the drawing.
+            [SpineSizing.Size.Slim] = 22f,
+            [SpineSizing.Size.Regular] = 30f,
+            [SpineSizing.Size.Wide] = 40f,
             [SpineSizing.Size.Broad] = 52f,
         });
 }
