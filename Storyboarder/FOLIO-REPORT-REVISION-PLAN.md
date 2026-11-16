@@ -217,7 +217,8 @@ runs a real draft through.
      - The voice sits after the breakpoint.
      - A live check on the fixtures confirms the seven read as seven people.
 
-   Each reader also gets an invented **punny name** (owner's request). The samples are about an invented
+   Each reader also gets an invented **punny name** (owner's request; names and voices **approved**, with the
+   professor renamed Prof. Craft and the host Tae Boll). The samples are about an invented
    book, a lighthouse keeper's daughter, and show the voice, not the verdict.
 
    | Reader | Name | Voice and personality (draft) | Sample |
@@ -227,9 +228,9 @@ runs a real draft through.
    | Acquiring editor | Edie Torial | Seasoned and dry; protective of the book; edit-letter cadence; diplomatic but firm | "What I'd ask you for is three things. First, let us see Elin want the mainland before chapter fifteen." |
    | Genre fan | Rhea Dalot | Enthusiastic and chatty; heart on sleeve; compares to the genre at its best; disappointed out loud | "Oh, I loved the fog-bell chapter, I read it twice! But the brother turning up alive? Every lighthouse book does that." |
    | Harsh but fair critic | Nick Picker | Dry, exacting, wry; precise to the word; never cruel, never effusive; concedes only to evidence | "The prose is careful. The plot is not. A keeper who checks the lamp hourly does not miss a ship for three chapters." |
-   | Literature professor | Prof. Theo Matic | Curious, generous, digressive; reaches for patterns; asks questions back; long, looping sentences | "Isn't it interesting that the light is the one thing Elin tends and never looks at? I wonder if that's the book telling us what she can't say about her father." |
+   | Literature professor | Prof. Craft | Curious, generous, digressive; reaches for patterns; asks questions back; long, looping sentences | "Isn't it interesting that the light is the one thing Elin tends and never looks at? I wonder if that's the book telling us what she can't say about her father." |
    | Fellow writer | Ina Kwell | Collegial shop-talk; practical and candid; how a move was pulled off and what they'd have tried | "The way you held the drowning offstage and let the logbook tell it? I'm stealing that. I'd have ended on the lamp." |
-   | Round-table host | Paul Cast | Warm, neutral, curious; keeps it moving; draws out the quiet voice; sums up without ruling | "Hugo, you put it down on page three; Rhea read the fog-bell chapter twice. What did Rhea see that you didn't? Ina, you've been quiet." |
+   | Round-table host | Tae Boll | Warm, neutral, curious; keeps it moving; draws out the quiet voice; sums up without ruling | "Hugo, you put it down on page three; Rhea read the fog-bell chapter twice. What did Rhea see that you didn't? Ina, you've been quiet." |
 
 6. **The bible in the readers' prompt** (R27), when the book is in a series.
    - It is the same for every pass of a draft, so it goes inside the cached prefix, after the manuscript.
