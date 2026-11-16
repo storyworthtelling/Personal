@@ -1,5 +1,6 @@
 using Folio.Domain.Shelf;
 using Microsoft.Maui.Graphics;
+using Storyworthtelling.Maui;
 
 namespace Folio.Android.Pages;
 
@@ -99,8 +100,11 @@ public sealed class ShelfDrawable : IDrawable
         canvas.SaveState();
         canvas.ClipRectangle(x, top, width, height);
 
-        var lift = (darkCloth ? Colors.White : Colors.Black).WithAlpha(0.05f);
-        var shadow = (darkCloth ? Colors.Black : Colors.White).WithAlpha(0.045f);
+        // The cloth's tooth is lifted with the bright paper and shaded with the ink, never pure white or black (§5).
+        var bright = PaperResources.Colour("PaperBright");
+        var ink = PaperResources.Colour("Ink");
+        var lift = (darkCloth ? bright : ink).WithAlpha(0.05f);
+        var shadow = (darkCloth ? ink : bright).WithAlpha(0.045f);
 
         canvas.StrokeSize = 2;
         for (var offset = 0f; offset < width; offset += 4f)

@@ -764,16 +764,14 @@ public class FrozenInvariantsTests
     [Fact]
     public void TheSuiteHasExactlyOneSettingsGlyph()
     {
-        // Post and Score each carried a byte-identical copy of area_settings.xml, which is
-        // how a shared kit stops being shared: the third head to want it copies it again,
-        // and the day the glyph changes, two of the three quietly keep the old one. It lives
-        // in Codex.Ui.Android, whose resources every head already merges — the Paper theme's
-        // window background is a drawable from that same folder.
+        // Post and Score each once carried a byte-identical copy of area_settings.xml, which is how a
+        // shared kit stops being shared: the third head to want it copies it again, and the day the glyph
+        // changes, two of the three quietly keep the old one. Since W8.8 every Settings tab, native and
+        // MAUI, draws Storyworthtelling.Materials.TabGlyphs.Settings, so no head keeps a drawable of it.
         var glyphs = EnumerateRepoFiles("area_settings.xml").Select(RepoRelative).Order().ToList();
 
-        Assert.True(glyphs.Count == 1,
-            "The Settings glyph must live once, in the shared kit. Found:\n" + string.Join("\n", glyphs));
-        Assert.Contains("Codex.Ui.Android", glyphs[0], StringComparison.Ordinal);
+        Assert.True(glyphs.Count == 0,
+            "The Settings glyph is TabGlyphs.Settings, not a drawable. Found:\n" + string.Join("\n", glyphs));
     }
 
     /// <summary>

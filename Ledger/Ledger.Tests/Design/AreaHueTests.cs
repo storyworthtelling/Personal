@@ -119,16 +119,21 @@ public class AreaHueTests
 
     // ---- helpers ----
 
-    private static (string MarkHex, string FillHex) ReadPair(string area)
+    // The table names its tokens (audit W8.5); the pair is resolved through the named constant, so the
+    // assertions still compare the hexes the strip actually paints.
+    private static (string MarkHex, string FillHex) ReadPair(string area) => (Resolve(area, "Mark"), Resolve(area, "Fill"));
+
+    private static string Resolve(string area, string tier)
     {
         var source = LedgerAreasSource();
-        var markConst = Regex.Match(source, $@"{area}MarkHex\s*=\s*""(#[0-9A-Fa-f]{{6}})""");
-        var fillConst = Regex.Match(source, $@"{area}FillHex\s*=\s*""(#[0-9A-Fa-f]{{6}})""");
-
-        Assert.True(markConst.Success, $"No {area}MarkHex constant found in LedgerAreas.cs.");
-        Assert.True(fillConst.Success, $"No {area}FillHex constant found in LedgerAreas.cs.");
-
-        return (markConst.Groups[1].Value, fillConst.Groups[1].Value);
+        var named = Regex.Match(source, $@"{area}{tier}Hex\s*=\s*(?<type>AppIdentityTokens|PaperColorTokens)\.(?<member>\w+);");
+        Assert.True(named.Success, $"{area}{tier}Hex in LedgerAreas.cs does not name a token constant.");
+        var type = named.Groups["type"].Value == "AppIdentityTokens"
+            ? typeof(Storyworthtelling.Paper.AppIdentityTokens)
+            : typeof(Storyworthtelling.Paper.PaperColorTokens);
+        var field = type.GetField(named.Groups["member"].Value);
+        Assert.NotNull(field);
+        return (string)field!.GetRawConstantValue()!;
     }
 
     private static string LedgerAreasSource() => File.ReadAllText(LedgerAreasPath());

@@ -52,7 +52,7 @@ internal static class SmsNotifications
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
 
         var notification = new NotificationCompat.Builder(context, ChannelId)
-            .SetSmallIcon(Resource.Drawable.area_mailbox)!
+            .SetSmallIcon(Resource.Drawable.glyph_mailbox)!
             .SetContentTitle(displayName)!
             .SetContentText(message.Body)!
             .SetStyle(new NotificationCompat.BigTextStyle().BigText(message.Body))!

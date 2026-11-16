@@ -9,6 +9,7 @@ using Codex.Domain.Music;
 using Codex.Ui;
 using Codex.Ui.Voice;
 using Score.Google;
+using Storyworthtelling.Materials;
 
 namespace Score;
 
@@ -43,7 +44,7 @@ public sealed class MusicArea : ScoreArea
         library.Changed += Invalidate;
     }
 
-    public override BinderArea Tab => new("Music", Resource.Drawable.area_music, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
+    public override BinderArea Tab => new("Music", TabGlyphs.Note, PaperTheme.ScoreMark, PaperTheme.ScoreFill);
 
     public override bool GoBack()
     {

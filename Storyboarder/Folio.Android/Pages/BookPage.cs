@@ -243,18 +243,18 @@ public class BookPage : FolioBinderPage
             VerticalOptions = LayoutOptions.Start,
             Children =
             {
-                new Label { Text = book.Standing, FontFamily = "SerifSemibold", FontSize = 18, LineHeight = 1.2 },
+                new Label { Text = book.Standing, FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize"), LineHeight = 1.2 },
                 new Label
                 {
                     Text = book.Drafts,
-                    FontSize = 14,
+                    FontSize = PaperResources.Token<double>("SecondarySize"),
                     TextColor = PaperResources.Colour("InkMuted"),
-                    Margin = new Thickness(0, 3, 0, 0),
+                    Margin = new Thickness(0, 4, 0, 0),
                 },
                 new Label
                 {
                     Text = book.Measure,
-                    FontSize = 14,
+                    FontSize = PaperResources.Token<double>("SecondarySize"),
                     TextColor = PaperResources.Colour("InkSoft"),
                     Margin = new Thickness(0, 8, 0, 0),
                 },
@@ -278,7 +278,7 @@ public class BookPage : FolioBinderPage
                 entry => $"{entry.Value} {Latest(readiness, entry.Key)}"),
         },
         HeightRequest = ReadinessChartDrawable.FrameHeight,
-        Margin = new Thickness(0, 10, 0, 0),
+        Margin = new Thickness(0, 12, 0, 0),
         InputTransparent = true,
     };
 
@@ -293,7 +293,7 @@ public class BookPage : FolioBinderPage
     /// </summary>
     private static View Legend(IReadOnlyList<DraftFindings> readiness)
     {
-        var row = new HorizontalStackLayout { Spacing = 12, Margin = new Thickness(0, 6, 0, 0) };
+        var row = new HorizontalStackLayout { Spacing = 12, Margin = new Thickness(0, 8, 0, 0) };
 
         foreach (var tier in Enum.GetValues<ReadinessTier>())
         {
@@ -304,7 +304,7 @@ public class BookPage : FolioBinderPage
 
             row.Children.Add(new HorizontalStackLayout
             {
-                Spacing = 5,
+                Spacing = 4,
                 Children =
                 {
                     new Border
@@ -313,13 +313,13 @@ public class BookPage : FolioBinderPage
                         HeightRequest = 9,
                         StrokeThickness = 0,
                         BackgroundColor = ReadinessChartDrawable.InkFor(tier),
-                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 2 },
+                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard },
                         VerticalOptions = LayoutOptions.Center,
                     },
                     new Label
                     {
                         Text = TierNames[tier],
-                        FontSize = 11.5,
+                        FontSize = PaperResources.Token<double>("LabelSize"),
                         TextColor = PaperResources.Colour("InkSoft"),
                         VerticalOptions = LayoutOptions.Center,
                     },
@@ -341,14 +341,14 @@ public class BookPage : FolioBinderPage
                 new ColumnDefinition(GridLength.Auto),
                 new ColumnDefinition(GridLength.Auto),
             ],
-            ColumnSpacing = 10,
+            ColumnSpacing = 12,
         };
-        var who = new Label { Text = row.Name, FontFamily = "SerifSemibold", FontSize = 17 };
+        var who = new Label { Text = row.Name, FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize") };
         var number = new Label
         {
             Text = row.Line,
             Style = PaperResources.Token<Style>("MonoLabel"),
-            FontSize = 13,
+            FontSize = PaperResources.Token<double>("LabelSize"),
             HorizontalOptions = LayoutOptions.End,
             VerticalOptions = LayoutOptions.Center,
         };
@@ -379,11 +379,11 @@ public class BookPage : FolioBinderPage
             Children =
             {
                 line,
-                new Label { Text = row.Question, FontSize = 13, TextColor = PaperResources.Colour("InkMuted") },
+                new Label { Text = row.Question, FontSize = PaperResources.Token<double>("LabelSize"), TextColor = PaperResources.Colour("InkMuted") },
                 new Label
                 {
                     Text = row.Reason,
-                    FontSize = 14,
+                    FontSize = PaperResources.Token<double>("SecondarySize"),
                     TextColor = PaperResources.Colour("InkSoft"),
                     Margin = new Thickness(0, 4, 0, 0),
                 },
@@ -404,12 +404,11 @@ public class BookPage : FolioBinderPage
 
     private static View SectionLabel(string text) => new Label
     {
-        Text = text.ToUpperInvariant(),
+        Text = text,
         FontFamily = "SansSemibold",
-        FontSize = 13,
-        CharacterSpacing = 0.1,
+        FontSize = PaperResources.Token<double>("LabelSize"),
         TextColor = PaperResources.Colour("InkMuted"),
-        Margin = new Thickness(0, 20, 0, 8),
+        Margin = new Thickness(0, 24, 0, 8),
     };
 
     // A draft: its number, when it arrived, and how long it was. The count is monospaced and
@@ -424,15 +423,15 @@ public class BookPage : FolioBinderPage
                 new ColumnDefinition(GridLength.Auto),
                 new ColumnDefinition(GridLength.Star),
             ],
-            ColumnSpacing = 10,
+            ColumnSpacing = 12,
             Padding = new Thickness(0, 12),
         };
 
-        var number = new Label { Text = row.Number.ToString(), FontFamily = "SerifSemibold", FontSize = 17 };
+        var number = new Label { Text = row.Number.ToString(), FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize") };
         var date = new Label
         {
             Text = row.Date,
-            FontSize = 13,
+            FontSize = PaperResources.Token<double>("LabelSize"),
             TextColor = PaperResources.Colour("InkMuted"),
             VerticalOptions = LayoutOptions.End,
         };
@@ -440,7 +439,7 @@ public class BookPage : FolioBinderPage
         {
             Text = row.Words,
             Style = PaperResources.Token<Style>("MonoLabel"),
-            FontSize = 13,
+            FontSize = PaperResources.Token<double>("LabelSize"),
             TextColor = PaperResources.Colour("InkMuted"),
             HorizontalOptions = LayoutOptions.End,
             VerticalOptions = LayoutOptions.End,
@@ -448,7 +447,7 @@ public class BookPage : FolioBinderPage
 
         var mark = new Label
         {
-            FontSize = 11,
+            FontSize = PaperResources.Token<double>("LabelSize"),
             TextColor = PaperResources.Colour("InkMuted"),
             VerticalOptions = LayoutOptions.Center,
         };
@@ -457,7 +456,7 @@ public class BookPage : FolioBinderPage
         pick.Tapped += (_, _) => SelectDraft(row.Id);
         line.GestureRecognizers.Add(pick);
 
-        var label = new HorizontalStackLayout { Spacing = 6, Children = { number, mark } };
+        var label = new HorizontalStackLayout { Spacing = 8, Children = { number, mark } };
         line.Children.Add(label);
         line.Children.Add(date);
         line.Children.Add(words);

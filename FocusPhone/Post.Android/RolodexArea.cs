@@ -7,6 +7,7 @@ using Codex.Domain.Plate;
 using Codex.Domain.Policy;
 using Codex.Domain.Timeline;
 using Codex.Ui;
+using Storyworthtelling.Materials;
 
 namespace Post;
 
@@ -23,7 +24,7 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
     private (int Total, int WithoutPhoto) photos;
 
     public override BinderArea Tab =>
-        new("Rolodex", Resource.Drawable.area_rolodex, PaperTheme.PositiveMark, PaperTheme.PositiveFill);
+        new("Rolodex", TabGlyphs.Rolodex, PaperTheme.PositiveMark, PaperTheme.PositiveFill);
 
     public override void Resume()
     {

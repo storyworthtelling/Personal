@@ -81,16 +81,16 @@ public static class ActionCard
 
     private static View Head(string title, string subtitle) => new VerticalStackLayout
     {
-        Padding = new Thickness(18, 14, 18, 11),
+        Padding = new Thickness(16, 16, 16, 12),
         Children =
         {
-            new Label { Text = title, FontFamily = "SerifSemibold", FontSize = 17, LineHeight = 1.15 },
+            new Label { Text = title, FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize"), LineHeight = 1.15 },
             new Label
             {
                 Text = subtitle,
-                FontSize = 12.5,
+                FontSize = PaperResources.Token<double>("LabelSize"),
                 TextColor = PaperResources.Colour("InkMuted"),
-                Margin = new Thickness(0, 2, 0, 0),
+                Margin = new Thickness(0, 4, 0, 0),
             },
         },
     };
@@ -107,8 +107,8 @@ public static class ActionCard
         var row = new Grid
         {
             ColumnDefinitions = [new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star)],
-            ColumnSpacing = 11,
-            Padding = new Thickness(18, 13),
+            ColumnSpacing = 12,
+            Padding = new Thickness(16, 12),
             // §5: every row clears the touch minimum, whatever its type size.
             MinimumHeightRequest = DesignTokens.Shape.TouchTargetDp,
         };
@@ -125,7 +125,7 @@ public static class ActionCard
         var label = new Label
         {
             Text = action.Label,
-            FontSize = 15,
+            FontSize = PaperResources.Token<double>("BodySize"),
             TextColor = ink,
             FontFamily = action.Weight == ActionWeight.Primary ? "SansSemibold" : null,
             VerticalOptions = LayoutOptions.Center,

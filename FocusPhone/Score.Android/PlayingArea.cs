@@ -7,6 +7,7 @@ using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Ui;
 using Codex.Ui.Http;
+using Storyworthtelling.Materials;
 
 namespace Score;
 
@@ -75,7 +76,7 @@ public sealed class PlayingArea : ScoreArea
         podcastArtwork = new PodcastArtworkCache(host);
     }
 
-    public override BinderArea Tab => new("Playing", Resource.Drawable.area_playing, PaperTheme.ProgressMark, PaperTheme.ProgressFill);
+    public override BinderArea Tab => new("Playing", TabGlyphs.PlayCircle, PaperTheme.ProgressMark, PaperTheme.ProgressFill);
 
     /// <summary>Named for the area, not for the track — the track has the page below.</summary>
     public override string Title => "Now playing";

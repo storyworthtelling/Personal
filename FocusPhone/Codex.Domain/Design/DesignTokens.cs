@@ -352,6 +352,19 @@ public static class DesignTokens
     {
         public const int QuickMs = 150;
         public const int StandardMs = 200;
+
+        /// <summary>The ink-spread on hero moments and overlays only: a paper card's haze, the cover handing over (DESIGN.md §6–§7).</summary>
+        public const int InkMs = 320;
+
+        /// <summary>How long Flyleaf's cover waits for its voiced hello before handing over without one.</summary>
+        public const int CoverHelloWaitMs = 2500;
+
+        /// <summary>The beat the cover holds a hello so it can be read.</summary>
+        public const int CoverReadBeatMs = 1400;
+
+        /// <summary>The cover's beat when there is no hello to read.</summary>
+        public const int CoverBeatMs = 700;
+
         public const int UndoWindowMs = Storyworthtelling.Folds.FoldTiming.UndoWindowMs;
         public const int CutoverCountdownSeconds = 10;
     }

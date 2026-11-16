@@ -129,7 +129,7 @@ public static class IndexCardView
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(CornerRadiusDp) },
-            Padding = new Thickness(12, 7, 12, 2),
+            Padding = new Thickness(12, 8, 12, 4),
             Shadow = null, // DESIGN.md §5 — a hairline edge, never a shadow
             Content = new VerticalStackLayout { Children = { header, body } },
         };
@@ -274,7 +274,7 @@ public static class IndexCardView
             Stroke = Colors.Transparent,
             HeightRequest = MeterHeightDp,
             VerticalOptions = LayoutOptions.Center,
-            Margin = new Thickness(0, 0, 10, 0),
+            Margin = new Thickness(0, 0, 12, 0),
             Content = columns,
         };
     }

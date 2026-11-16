@@ -156,8 +156,14 @@ public class DogEar : GraphicsView
     {
         var fold = state.Fold(DateTimeOffset.Now);
         painter.Fold = fold;
+        var wasShowing = IsVisible;
         IsVisible = fold is not null;
         Invalidate();
+
+        if (fold is not null && !wasShowing)
+        {
+            FoldIn();
+        }
 
         // One timer, always for the fold currently showing. Cancelling the outgoing one matters:
         // a timer left running from a fold being replaced would flatten its replacement early, so
@@ -181,6 +187,25 @@ public class DogEar : GraphicsView
         window.IsRepeating = false;
         window.Tick += (_, _) => Refresh();
         window.Start();
+    }
+
+    // The corner turns down from the page's corner rather than appearing (DESIGN.md §13), over the Standard
+    // duration the native dog-ear fades in by. Before the view is on screen there is nothing to animate.
+    private void FoldIn()
+    {
+        if (Handler is null)
+        {
+            Opacity = 1;
+            Scale = 1;
+            return;
+        }
+
+        AnchorX = 1;
+        AnchorY = 0;
+        Opacity = 0;
+        Scale = 0.5;
+        _ = this.FadeTo(1, DesignTokens.Motion.StandardMs, Easing.CubicOut);
+        _ = this.ScaleTo(1, DesignTokens.Motion.StandardMs, Easing.CubicOut);
     }
 
     private void Turn()

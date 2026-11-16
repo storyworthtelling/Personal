@@ -28,6 +28,7 @@ using Constitution.WorkoutsTab;
 using Storyworthtelling.Remarkable;
 using Codex.Ui.Http;
 using Storyworthtelling.Updates;
+using Storyworthtelling.Materials;
 
 namespace Constitution;
 
@@ -43,7 +44,7 @@ namespace Constitution;
 /// is not built (spike D96). Success is an inline change of the text, never a toast.</para>
 /// </summary>
 public sealed class SettingsArea(Activity host)
-    : ConstitutionAreaBase(host, "settings", Resource.Drawable.area_settings), IUndoableArea
+    : ConstitutionAreaBase(host, "settings", TabGlyphs.Settings), IUndoableArea
 {
     private const string PillarsGroup = "Pillars";
     private const string EquipmentGroup = "Equipment";

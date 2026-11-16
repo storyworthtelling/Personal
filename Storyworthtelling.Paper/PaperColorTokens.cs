@@ -97,9 +97,9 @@ public static class PaperColorTokens
     /// <summary>Paper grain: deterministic seeded ink noise (DESIGN.md §6). Identical inputs → identical bytes.</summary>
     public static class Grain
     {
-        public const int TileSize = 256;
-        public const int Alpha = 32;   // of 255 — ~12.5% ink
-        public const int Density = 6;  // ~1 in Density pixels carries grain
-        public const uint Seed = 1913;
+        public const int TileSize = Storyworthtelling.Materials.Grain.TileSize;
+        public const int Alpha = Storyworthtelling.Materials.Grain.Alpha;     // of 255 — ~12.5% ink
+        public const int Density = Storyworthtelling.Materials.Grain.Density; // ~1 in Density pixels carries grain
+        public const uint Seed = Storyworthtelling.Materials.Grain.Seed;
     }
 }

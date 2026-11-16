@@ -39,8 +39,8 @@ public sealed class LaunchFaultPage : ContentPage
 
         var column = new VerticalStackLayout
         {
-            Spacing = 14,
-            Padding = new Thickness(24, 60, 24, 24),
+            Spacing = 16,
+            Padding = new Thickness(24, 64, 24, 24),
             Children = { heading, copy, ReportView(report), copyButton, copyStatus },
         };
 

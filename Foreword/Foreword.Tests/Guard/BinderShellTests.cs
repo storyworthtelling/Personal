@@ -94,8 +94,8 @@ public class BinderShellTests
             Assert.Contains($"new {page}()", shell, StringComparison.Ordinal);
         }
 
-        // Today is the navigation root, so turning to it is a pop rather than a push.
-        Assert.Contains("PopToRootAsync", shell, StringComparison.Ordinal);
+        // Today is the navigation root, so turning to it hands the kit's page turn no root to push.
+        Assert.Contains("TurnToAreaAsync(chosen == ForewordArea.Today ? null : Root(chosen))", shell, StringComparison.Ordinal);
     }
 
     private static IEnumerable<string> Pages(string pattern) =>

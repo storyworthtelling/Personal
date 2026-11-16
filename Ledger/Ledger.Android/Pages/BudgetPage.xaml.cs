@@ -250,7 +250,7 @@ public partial class BudgetPage : LedgerBinderPage
 
     private static View BuildEmptyState() => new VerticalStackLayout
     {
-        Margin = new Thickness(24, 160, 24, 0),
+        Margin = new Thickness(24, 96, 24, 0),
         Children =
         {
             new Label
@@ -267,17 +267,18 @@ public partial class BudgetPage : LedgerBinderPage
 
     private static View BuildMonthLine(string yearMonth, bool trackingOnly, decimal spent, decimal agreed, int daysLeft)
     {
-        var monthName = BudgetPeriod.DisplayMonthName(yearMonth).ToUpperInvariant();
+        // Sentence case (DESIGN.md §14; owner's ruling, W8.5), though mockup 7 draws this line in capitals.
+        var monthName = BudgetPeriod.DisplayMonthName(yearMonth);
 
         var kicker = new Label
         {
-            Text = trackingOnly ? $"{monthName} · TRACKING ONLY" : monthName,
+            Text = trackingOnly ? $"{monthName} · tracking only" : monthName,
             Style = PaperResources.Token<Style>("FieldLabel"),
         };
 
         var value = new Label
         {
-            FontSize = 22,
+            FontSize = PaperResources.Token<double>("HeadingSize"),
             FormattedText = new FormattedString
             {
                 Spans =
@@ -513,7 +514,7 @@ public partial class BudgetPage : LedgerBinderPage
 
         var row = new VerticalStackLayout
         {
-            Children = { grid, new BoxView { HeightRequest = 1, Color = Colors.Black.WithAlpha(0.08f) } },
+            Children = { grid, new BoxView { HeightRequest = Storyworthtelling.Maui.DesignTokens.Shape.HairlineDp, Color = PaperResources.Colour("Hairline") } },
         };
 
         var tap = new TapGestureRecognizer();
@@ -606,7 +607,7 @@ public partial class BudgetPage : LedgerBinderPage
         return new Grid
         {
             ColumnSpacing = 8,
-            Padding = new Thickness(0, 5),
+            Padding = new Thickness(0, 4),
             ColumnDefinitions =
             {
                 new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto),
@@ -630,7 +631,7 @@ public partial class BudgetPage : LedgerBinderPage
             TextColor = PaperResources.Colour("InkSoft"),
             MinimumHeightRequest = 40,
             VerticalTextAlignment = TextAlignment.Center,
-            Margin = new Thickness(0, 6, 0, 0),
+            Margin = new Thickness(0, 8, 0, 0),
         };
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) =>

@@ -118,23 +118,23 @@ public class HomeActivity : Activity
         // The part of the day rather than the minute, so the line is kept and reused until the next part (efficiency §4).
         var timeContext = $"the owner just opened Flyleaf; it is {Codex.Domain.Voice.GreetingCache.PartOfDay(DateTime.Now)}";
         var compose = greeting!.ComposeAsync("welcome", timeContext, CancellationToken.None);
-        var finished = await Task.WhenAny(compose, Task.Delay(2500));
+        var finished = await Task.WhenAny(compose, Task.Delay(DesignTokens.Motion.CoverHelloWaitMs));
         var message = ReferenceEquals(finished, compose) && compose.IsCompletedSuccessfully ? compose.Result : string.Empty;
         if (!string.IsNullOrWhiteSpace(message))
         {
             hello.Text = message;
             hello.Visibility = ViewStates.Visible;
-            await Task.Delay(1400); // a beat to read it
+            await Task.Delay(DesignTokens.Motion.CoverReadBeatMs); // a beat to read it
         }
         else
         {
-            await Task.Delay(700); // a brief cover beat, then reveal the shelf
+            await Task.Delay(DesignTokens.Motion.CoverBeatMs); // a brief cover beat, then reveal the shelf
         }
         if (IsFinishing)
         {
             return;
         }
-        overlay.Animate()!.Alpha(0f)!.SetDuration(450)!
+        overlay.Animate()!.Alpha(0f)!.SetDuration(DesignTokens.Motion.InkMs)!
             .WithEndAction(new Java.Lang.Runnable(() => (overlay.Parent as ViewGroup)?.RemoveView(overlay)))!.Start();
     }
 

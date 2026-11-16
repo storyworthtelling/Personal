@@ -49,7 +49,7 @@ public class BrandAssetsTests : IDisposable
             for (var y = 0; y < bitmap.Height; y++)
             {
                 var alpha = bitmap.GetPixel(x, y).Alpha;
-                Assert.True(alpha == 0 || alpha == GrainTile.Alpha, $"unexpected alpha {alpha}");
+                Assert.True(alpha == 0 || alpha == Storyworthtelling.Materials.Grain.Alpha, $"unexpected alpha {alpha}");
                 if (alpha > 0)
                 {
                     grainPixels++;

@@ -187,12 +187,7 @@ public abstract class LedgerBinderPage : PaperBinderPage
             await BeforeLeavingAsync();
         }
 
-        await Navigation.PopToRootAsync(animated: false);
-
-        if (chosen != LedgerArea.Accounts)
-        {
-            await Navigation.PushAsync(Root(chosen), animated: false);
-        }
+        await TurnToAreaAsync(chosen == LedgerArea.Accounts ? null : Root(chosen));
     }
 
     // Savings is real as of Release G (mockups 9/16); Snowball (Release D, mockup 6) and Budget

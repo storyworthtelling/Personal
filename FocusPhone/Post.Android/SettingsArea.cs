@@ -11,6 +11,7 @@ using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Secrets;
 using Storyworthtelling.Updates;
+using Storyworthtelling.Materials;
 
 namespace Post;
 
@@ -33,7 +34,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
     private EditText? passphrase;
 
     public override BinderArea Tab =>
-        new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
+        new("Settings", TabGlyphs.Settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
 
     public override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {

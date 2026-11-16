@@ -6,6 +6,7 @@ using Constitution.Domain.Workouts.Screens;
 using Constitution.Infrastructure.Workouts;
 using Constitution.Settings;
 using Constitution.WorkoutsTab;
+using Storyworthtelling.Materials;
 
 namespace Constitution;
 
@@ -50,7 +51,7 @@ public sealed class WorkoutsArea : ConstitutionAreaBase, IUndoableArea
     private int loadNumber;
 
     public WorkoutsArea(Activity host)
-        : base(host, "workouts", Resource.Drawable.areaworkouts)
+        : base(host, "workouts", TabGlyphs.Dumbbell)
     {
         log = new WorkoutsLog(host);
         WorkoutsTabServices.Wire(host, this);

@@ -55,13 +55,13 @@ public static class ActionCardHaze
         var row = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
-            ColumnSpacing = 11,
-            Padding = new Thickness(18, 13),
+            ColumnSpacing = 12,
+            Padding = new Thickness(16, 12),
             MinimumHeightRequest = Storyworthtelling.Maui.DesignTokens.Shape.TouchTargetDp,
             Opacity = enabled ? 1.0 : 0.55,
         };
         var glyph = new ActionIcon(icon, iconInk);
-        glyph.Margin = new Thickness(0, 2, 0, 0);
+        glyph.Margin = new Thickness(0, 4, 0, 0);
         row.Children.Add(glyph);
         Grid.SetColumn(glyph, 0);
         content.VerticalOptions = LayoutOptions.Center;

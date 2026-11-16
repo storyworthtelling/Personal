@@ -19,6 +19,7 @@
        composes it (root upload) with the Drive archive so every app delivers the same way. -->
   <ItemGroup>
     <ProjectReference Include="..\Storyworthtelling.Remarkable\Storyworthtelling.Remarkable.csproj" />
+    <ProjectReference Include="..\Storyworthtelling.Materials\Storyworthtelling.Materials.csproj" />
   </ItemGroup>
 
   <!-- The shared Paper & Ink fonts, embedded for the Skia renderers (identical on the desktop test

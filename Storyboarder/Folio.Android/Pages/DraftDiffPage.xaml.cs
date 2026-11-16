@@ -62,7 +62,7 @@ public partial class DraftDiffPage : FolioBinderPage
         return new Border
         {
             Style = PaperResources.Token<Style>("HairlineCard"),
-            Margin = new Thickness(0, 6, 0, 0),
+            Margin = new Thickness(0, 8, 0, 0),
             Content = new VerticalStackLayout { Spacing = 4, Children = { caption, grid } }
         };
     }
@@ -82,7 +82,7 @@ public partial class DraftDiffPage : FolioBinderPage
             {
                 Stroke = PaperResources.Colour("Hairline"),
                 StrokeThickness = 1,
-                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 },
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard },
                 Padding = 0,
                 Content = new Image { Source = ImageSource.FromStream(() => new MemoryStream(image)), Aspect = Aspect.AspectFit }
             }

@@ -1,4 +1,5 @@
 using Microsoft.Maui.Controls.Shapes;
+using Index.Domain.Design;
 using Storyworthtelling.Maui;
 
 namespace Index.Android.Views;
@@ -39,7 +40,7 @@ public static class RecategorizeActionCard
         {
             Text = $"{merchantName} goes to the category you pick from now on. Earlier transactions stay where they are.",
             Style = PaperResources.Token<Style>("SecondaryLabel"),
-            Padding = new Thickness(18, 10, 18, 14),
+            Padding = new Thickness(16, 12, 16, 16),
         });
 
         var card = new Border
@@ -47,7 +48,7 @@ public static class RecategorizeActionCard
             BackgroundColor = PaperResources.Colour("PaperBright"),
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = 1,
-            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
+            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard) },
             WidthRequest = 300,
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
@@ -56,7 +57,8 @@ public static class RecategorizeActionCard
 
         var scrim = new Grid
         {
-            BackgroundColor = Colors.Black.WithAlpha(0.35f),
+            // Paper does not go dark (§5): the same PaperDeep haze every action card sits over.
+            BackgroundColor = PaperResources.Colour("PaperDeep").WithAlpha((float)MaterialTokens.HazeAlpha),
             Children = { card },
         };
         var dismissTap = new TapGestureRecognizer();
@@ -68,7 +70,7 @@ public static class RecategorizeActionCard
 
     private static View BuildHeader(string summary, string subtitle) => new VerticalStackLayout
     {
-        Padding = new Thickness(18, 14, 18, 11),
+        Padding = new Thickness(16, 16, 16, 12),
         Children =
         {
             new Label { Text = summary, Style = PaperResources.Token<Style>("HeadingLabel") },
@@ -81,8 +83,8 @@ public static class RecategorizeActionCard
         var row = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
-            ColumnSpacing = 10,
-            Padding = new Thickness(18, 13),
+            ColumnSpacing = 12,
+            Padding = new Thickness(16, 12),
         };
 
         var check = new Label
