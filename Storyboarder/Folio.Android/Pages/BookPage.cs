@@ -242,7 +242,7 @@ public class BookPage : FolioBinderPage
                     Text = book.Drafts,
                     FontSize = PaperResources.Token<double>("SecondarySize"),
                     TextColor = PaperResources.Colour("InkMuted"),
-                    Margin = new Thickness(0, 3, 0, 0),
+                    Margin = new Thickness(0, 4, 0, 0),
                 },
                 new Label
                 {
@@ -271,7 +271,7 @@ public class BookPage : FolioBinderPage
                 entry => $"{entry.Value} {Latest(readiness, entry.Key)}"),
         },
         HeightRequest = ReadinessChartDrawable.FrameHeight,
-        Margin = new Thickness(0, 10, 0, 0),
+        Margin = new Thickness(0, 12, 0, 0),
         InputTransparent = true,
     };
 
@@ -286,7 +286,7 @@ public class BookPage : FolioBinderPage
     /// </summary>
     private static View Legend(IReadOnlyList<DraftFindings> readiness)
     {
-        var row = new HorizontalStackLayout { Spacing = 12, Margin = new Thickness(0, 6, 0, 0) };
+        var row = new HorizontalStackLayout { Spacing = 12, Margin = new Thickness(0, 8, 0, 0) };
 
         foreach (var tier in Enum.GetValues<ReadinessTier>())
         {
@@ -297,7 +297,7 @@ public class BookPage : FolioBinderPage
 
             row.Children.Add(new HorizontalStackLayout
             {
-                Spacing = 5,
+                Spacing = 4,
                 Children =
                 {
                     new Border
@@ -329,7 +329,7 @@ public class BookPage : FolioBinderPage
         var line = new Grid
         {
             ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto)],
-            ColumnSpacing = 10,
+            ColumnSpacing = 12,
         };
         var who = new Label { Text = row.Name, FontFamily = "SerifSemibold", FontSize = PaperResources.Token<double>("HeadingSize") };
         var number = new Label
@@ -380,7 +380,7 @@ public class BookPage : FolioBinderPage
         FontFamily = "SansSemibold",
         FontSize = PaperResources.Token<double>("LabelSize"),
         TextColor = PaperResources.Colour("InkMuted"),
-        Margin = new Thickness(0, 20, 0, 8),
+        Margin = new Thickness(0, 24, 0, 8),
     };
 
     // A draft: its number, when it arrived, and how long it was. The count is monospaced and
@@ -395,7 +395,7 @@ public class BookPage : FolioBinderPage
                 new ColumnDefinition(GridLength.Auto),
                 new ColumnDefinition(GridLength.Star),
             ],
-            ColumnSpacing = 10,
+            ColumnSpacing = 12,
             Padding = new Thickness(0, 12),
         };
 
@@ -428,7 +428,7 @@ public class BookPage : FolioBinderPage
         pick.Tapped += (_, _) => SelectDraft(row.Id);
         line.GestureRecognizers.Add(pick);
 
-        var label = new HorizontalStackLayout { Spacing = 6, Children = { number, mark } };
+        var label = new HorizontalStackLayout { Spacing = 8, Children = { number, mark } };
         line.Children.Add(label);
         line.Children.Add(date);
         line.Children.Add(words);

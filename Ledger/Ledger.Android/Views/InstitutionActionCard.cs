@@ -41,7 +41,7 @@ public static class InstitutionActionCard
 
     private static View BuildHeader(string institutionName, string subtitle) => new VerticalStackLayout
     {
-        Padding = new Thickness(18, 14, 18, 11),
+        Padding = new Thickness(16, 16, 16, 12),
         Children =
         {
             new Label { Text = institutionName, Style = PaperResources.Token<Style>("HeadingLabel") },

@@ -29,7 +29,7 @@ internal static class HouseholdPages
         Style = PaperResources.Token<Style>("EmptyStateLabel"),
         HorizontalTextAlignment = TextAlignment.Center,
         VerticalOptions = LayoutOptions.Center,
-        Margin = new Thickness(34, 120, 34, 0),
+        Margin = new Thickness(32, 96, 32, 0),
     };
 
     public static async Task<HouseholdView> LoadAsync(InstallRoleService roles, HouseholdSnapshotReader reader)

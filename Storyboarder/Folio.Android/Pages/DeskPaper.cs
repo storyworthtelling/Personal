@@ -19,7 +19,7 @@ public static class DeskPaper
         StrokeThickness = DesignTokens.Shape.HairlineDp,
         BackgroundColor = Color.FromArgb(MaterialTokens.NoteCardHex),
         StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard },
-        Padding = new Thickness(9, 3),
+        Padding = new Thickness(8, 4),
         HorizontalOptions = LayoutOptions.Start,
         Content = new Label
         {
@@ -37,7 +37,7 @@ public static class DeskPaper
         StrokeThickness = DesignTokens.Shape.HairlineDp,
         BackgroundColor = Color.FromArgb(MaterialTokens.NoteCardHex),
         StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard },
-        Padding = new Thickness(12, 10),
+        Padding = new Thickness(12, 12),
         Content = new VerticalStackLayout { Children = { } }.With(lines),
     };
 
@@ -48,13 +48,13 @@ public static class DeskPaper
         StrokeThickness = DesignTokens.Shape.HairlineDp,
         BackgroundColor = Color.FromArgb(MaterialTokens.PostItHex),
         StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard },
-        Padding = new Thickness(8, 7, 8, 8),
+        Padding = new Thickness(8, 8, 8, 8),
         Content = new VerticalStackLayout
         {
             Children =
             {
                 new Label { Text = caption, FontSize = PaperResources.Token<double>("LabelSize"), TextColor = PaperResources.Colour("InkSoft") },
-                new Label { Text = state, FontSize = PaperResources.Token<double>("LabelSize"), TextColor = stateInk, Margin = new Thickness(0, 1, 0, 0) },
+                new Label { Text = state, FontSize = PaperResources.Token<double>("LabelSize"), TextColor = stateInk, Margin = new Thickness(0, 0, 0, 0) },
             },
         },
     };

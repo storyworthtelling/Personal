@@ -62,7 +62,7 @@ public partial class DraftDiffPage : FolioBinderPage
         return new Border
         {
             Style = PaperResources.Token<Style>("HairlineCard"),
-            Margin = new Thickness(0, 6, 0, 0),
+            Margin = new Thickness(0, 8, 0, 0),
             Content = new VerticalStackLayout { Spacing = 4, Children = { caption, grid } }
         };
     }

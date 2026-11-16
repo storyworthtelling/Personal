@@ -69,7 +69,7 @@ public static class PostItView
                 Text = NotePaging.MoreLabel(moreCount),
                 Style = PaperResources.Token<Style>("SecondaryLabel"),
                 TextColor = softInk,
-                Margin = new Thickness(0, 6, 0, 0),
+                Margin = new Thickness(0, 8, 0, 0),
             };
             if (onMore is not null)
             {
@@ -139,7 +139,7 @@ public static class PostItView
     // frame 1 draws only AVAILABLE for one — so no APR column, and no gap where it would have been.
     private static View BuildFacts(string? aprText, string availableText, Color softInk, string edgeHex)
     {
-        var facts = new HorizontalStackLayout { Spacing = 18 };
+        var facts = new HorizontalStackLayout { Spacing = 16 };
         foreach (var fact in PostItFacts.For(aprText, availableText))
         {
             facts.Children.Add(BuildFact(fact.Label, fact.Value, softInk));
@@ -150,7 +150,7 @@ public static class PostItView
             Children =
             {
                 facts,
-                new BoxView { HeightRequest = 1, Color = Color.FromArgb(edgeHex), Margin = new Thickness(0, 6, 0, 0) },
+                new BoxView { HeightRequest = 1, Color = Color.FromArgb(edgeHex), Margin = new Thickness(0, 8, 0, 0) },
             },
         };
     }

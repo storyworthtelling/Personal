@@ -20,7 +20,7 @@
             <VerticalStackLayout x:Name="Desk" />
 
             <Label x:Name="LastRunLabel" Style="{StaticResource StatusLine}"
-                   HorizontalTextAlignment="Center" Margin="0,20,0,0" />
+                   HorizontalTextAlignment="Center" Margin="0,24,0,0" />
 
         </VerticalStackLayout>
     </ScrollView>

@@ -5,7 +5,7 @@
              xmlns:local="clr-namespace:Folio.Android.Pages"
              x:Class="Folio.Android.Pages.SetupPage">
     <ScrollView>
-        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="14">
+        <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="16">
 
 
             <kit:PaperWarningCard x:Name="MigrationErrorCard" IsVisible="False" Margin="0,8,0,0">
@@ -15,11 +15,11 @@
             <!-- The suite's Settings anatomy (audit W8.4b; owner's rulings): folding groups drawn as Pulp's ruled rows,
                  in the order Connections, Vault, Folio's own, Diagnostics, then the build line. -->
             <kit:SettingsGroup Title="Connections" IsOpen="True">
-                <VerticalStackLayout Spacing="14">
+                <VerticalStackLayout Spacing="16">
                     <!-- A key appears only when it is missing or a call with it was just rejected; a working one is
                          not on the screen at all (owner's ruling, audit W8.4b). -->
-                    <VerticalStackLayout x:Name="ApiKeysSection" Spacing="14" IsVisible="False">
-                        <VerticalStackLayout x:Name="ClaudeKeyBlock" Spacing="14" IsVisible="False">
+                    <VerticalStackLayout x:Name="ApiKeysSection" Spacing="16" IsVisible="False">
+                        <VerticalStackLayout x:Name="ClaudeKeyBlock" Spacing="16" IsVisible="False">
                             <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" />
                             <Label x:Name="ClaudeStatusLabel" IsVisible="False" Style="{StaticResource ErrorLabel}" />
                             <Entry x:Name="ClaudeKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="sk-ant-..."
@@ -29,7 +29,7 @@
                             <ContentView x:Name="ClaudeConsoleLink" />
                         </VerticalStackLayout>
 
-                        <VerticalStackLayout x:Name="GeminiKeyBlock" Spacing="14" IsVisible="False">
+                        <VerticalStackLayout x:Name="GeminiKeyBlock" Spacing="16" IsVisible="False">
                             <Label Text="Gemini API key" Style="{StaticResource FieldLabel}" />
                             <Label x:Name="GeminiStatusLabel" IsVisible="False" Style="{StaticResource ErrorLabel}" />
                             <Entry x:Name="GeminiKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="AIza..."
@@ -59,7 +59,7 @@
                     <Label x:Name="CopyStatusLabel" Style="{StaticResource StatusLine}" />
 
                     <!-- The pairing appears only when it needs doing; a working one is not on the screen (audit W8.4b). -->
-                    <VerticalStackLayout x:Name="RemarkablePairingBlock" Spacing="14">
+                    <VerticalStackLayout x:Name="RemarkablePairingBlock" Spacing="16">
                         <Label Text="reMarkable" Style="{StaticResource FieldLabel}" />
                         <Label Text="Register the tablet once with a one-time code from my.remarkable.com/device/mobile/connect."
                                Style="{StaticResource SecondaryLabel}" />
@@ -72,7 +72,7 @@
             </kit:SettingsGroup>
 
             <kit:SettingsGroup Title="Vault">
-                <VerticalStackLayout Spacing="14">
+                <VerticalStackLayout Spacing="16">
                     <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
                            Style="{StaticResource SecondaryLabel}" />
                     <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" />
@@ -85,7 +85,7 @@
             </kit:SettingsGroup>
 
             <kit:SettingsGroup Title="Delivery">
-                <VerticalStackLayout Spacing="14">
+                <VerticalStackLayout Spacing="16">
                     <Label Text="When a book finishes, copy its volume PDFs and revision report into a folder beside the manuscript in your Google Drive. Needs the Drive permission — sign in again after turning this on, and if Google doesn't ask for it, the app's OAuth client still needs the drive.file scope added."
                            Style="{StaticResource SecondaryLabel}" />
                     <Grid ColumnDefinitions="*,Auto">
@@ -108,7 +108,7 @@
             </kit:SettingsGroup>
 
             <kit:SettingsGroup Title="Progress backup">
-                <VerticalStackLayout Spacing="14">
+                <VerticalStackLayout Spacing="16">
                     <Label Text="Save your whole library — every conversion and rendered page — to a file you choose. If you reinstall the app or move to a new phone, restore the file to pick up a long conversion where you left off."
                            Style="{StaticResource SecondaryLabel}" />
                     <Button x:Name="BackupButton" Text="Back up progress"
@@ -122,7 +122,7 @@
             </kit:SettingsGroup>
 
             <kit:SettingsGroup Title="Diagnostics">
-                <VerticalStackLayout Spacing="14">
+                <VerticalStackLayout Spacing="16">
                     <Label Text="See what each project is doing and what's gone wrong. Status snapshot is the quickest read; Export bundles the snapshot and both logs into one file to share."
                            Style="{StaticResource SecondaryLabel}" />
                     <Button x:Name="StatusSnapshotButton" Text="Status snapshot"

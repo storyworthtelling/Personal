@@ -38,7 +38,7 @@ public static class AddAccountChooserCard
 
     private static View BuildHeader() => new VerticalStackLayout
     {
-        Padding = new Thickness(18, 14, 18, 11),
+        Padding = new Thickness(16, 16, 16, 12),
         Children = { new Label { Text = "Add an account", Style = PaperResources.Token<Style>("HeadingLabel") } },
     };
 
@@ -46,7 +46,7 @@ public static class AddAccountChooserCard
     {
         var text = new VerticalStackLayout
         {
-            Spacing = 2,
+            Spacing = 4,
             Children =
             {
                 new Label

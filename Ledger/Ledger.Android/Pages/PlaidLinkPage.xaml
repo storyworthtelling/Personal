@@ -11,7 +11,7 @@
          class's own remarks for why). -->
     <Grid x:Name="Ground">
         <ScrollView>
-            <VerticalStackLayout x:Name="BodyStack" Padding="{StaticResource ScreenPadding}" Spacing="14" VerticalOptions="Start" />
+            <VerticalStackLayout x:Name="BodyStack" Padding="{StaticResource ScreenPadding}" Spacing="16" VerticalOptions="Start" />
         </ScrollView>
     </Grid>
 </pages:LedgerBinderPage>

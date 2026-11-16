@@ -61,7 +61,7 @@ public static class LoanActionCard
 
     private static View BuildHeader(string loanName, string subtitle) => new VerticalStackLayout
     {
-        Padding = new Thickness(18, 14, 18, 11),
+        Padding = new Thickness(16, 16, 16, 12),
         Children =
         {
             new Label { Text = loanName, Style = PaperResources.Token<Style>("HeadingLabel") },
@@ -76,7 +76,7 @@ public static class LoanActionCard
             Text = text,
             Style = PaperResources.Token<Style>("CardRowTitle"),
             Opacity = enabled ? 1.0 : 0.55,
-            Padding = new Thickness(18, 13),
+            Padding = new Thickness(16, 12),
         };
 
         if (enabled)

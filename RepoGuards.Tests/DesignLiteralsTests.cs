@@ -54,6 +54,65 @@ public partial class DesignLiteralsTests
     [Fact]
     public void ARadiusIsAToken() => AssertNone(Radius(), "a radius token, not a number", DrawnObjects);
 
+    /// <summary>
+    /// DESIGN.md §5's spacing scale (report 04 §18): every padding, margin and gap in the MAUI heads is a step of
+    /// 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 · 96, or zero, or a step taken back (a negative bleed).
+    /// </summary>
+    [Fact]
+    public void EveryGapIsOnTheSpacingScale()
+    {
+        var found = Sources()
+            .Where(file => MauiHeads.Any(head => Relative(file).StartsWith(head + "/", StringComparison.Ordinal)))
+            .SelectMany(file => File.ReadLines(file).Select((line, index) => (file, line, index)))
+            .Where(hit => !hit.line.TrimStart().StartsWith("//", StringComparison.Ordinal) && OffScale(hit.line).Any())
+            .Select(hit => $"{Relative(hit.file)}:{hit.index + 1} ({string.Join(", ", OffScale(hit.line))})")
+            .ToList();
+        Assert.True(found.Count == 0, "Use a step of the spacing scale:\n" + string.Join("\n", found));
+    }
+
+    [Theory]
+    [InlineData("<VerticalStackLayout Spacing=\"14\">", "14")]
+    [InlineData("Padding = new Thickness(9, 3),", "9")]
+    [InlineData("<Grid Margin=\"0,8,0,10\" />", "10")]
+    public void TheSpacingDetectorCatchesAnOffScaleStep(string line, string step) => Assert.Contains(step, OffScale(line));
+
+    [Theory]
+    [InlineData("<VerticalStackLayout Spacing=\"12\" Padding=\"24,0,24,24\">")]
+    [InlineData("Margin = new Thickness(-24, 0),")]
+    [InlineData("Padding = new Thickness(DesignTokens.Space.X4),")]
+    public void TheSpacingDetectorLetsAStepThrough(string line) => Assert.Empty(OffScale(line));
+
+    private static readonly string[] MauiHeads = ["Ledger/Ledger.Android", "Storyboarder/Folio.Android", "Foreword/Foreword.Android", "Storyworthtelling.Maui"];
+
+    private static readonly double[] Scale = [0, 4, 8, 12, 16, 24, 32, 48, 64, 96];
+
+    private static IEnumerable<string> OffScale(string line)
+    {
+        var values = new List<string>();
+        foreach (Match match in XamlGap().Matches(line))
+        {
+            values.AddRange(match.Groups["values"].Value.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        foreach (Match match in CodeGap().Matches(line))
+        {
+            values.AddRange(match.Groups["thickness"].Success
+                ? match.Groups["thickness"].Value.Split([',', ' '], StringSplitOptions.RemoveEmptyEntries)
+                : [match.Groups["gap"].Value]);
+        }
+
+        return values
+            .Select(value => value.TrimEnd('f'))
+            .Where(value => double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var step)
+                && !Scale.Contains(Math.Abs(step)));
+    }
+
+    [GeneratedRegex(@"\b(Padding|Margin|Spacing|RowSpacing|ColumnSpacing)=""(?<values>[-0-9.,\s]+)""")]
+    private static partial Regex XamlGap();
+
+    [GeneratedRegex(@"new Thickness\((?<thickness>[-0-9.,\sf]+)\)|\b(Spacing|RowSpacing|ColumnSpacing)\s*=\s*(?<gap>[0-9.]+)\b")]
+    private static partial Regex CodeGap();
+
     [Theory]
     [InlineData("label.FontSize = 12;")]
     [InlineData("<Label FontSize=\"11.5\" />")]

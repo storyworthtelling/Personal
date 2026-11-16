@@ -143,7 +143,7 @@ public partial class AddManualAccountPage : LedgerBinderPage
                 new ColumnDefinition(new GridLength(2, GridUnitType.Star)),
                 new ColumnDefinition(new GridLength(3, GridUnitType.Star)),
             },
-            ColumnSpacing = 14,
+            ColumnSpacing = 16,
         };
         var aprColumn = FieldRow("APR", aprBox);
         var paymentColumn = FieldRow("Payment", paymentBox);
@@ -187,7 +187,7 @@ public partial class AddManualAccountPage : LedgerBinderPage
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = 1,
             StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(Storyworthtelling.Maui.DesignTokens.Shape.RadiusCard) },
-            Padding = new Thickness(20, 10, 20, 14),
+            Padding = new Thickness(24, 12, 24, 16),
             Shadow = null,
             Content = body,
         };

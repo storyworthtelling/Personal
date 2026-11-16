@@ -371,7 +371,7 @@ public partial class SavingsPage : LedgerBinderPage
     {
         var totalColumn = new VerticalStackLayout
         {
-            Spacing = 2,
+            Spacing = 4,
             Children =
             {
                 new Label { Text = "Saved", Style = PaperResources.Token<Style>("FieldLabel") },
@@ -436,7 +436,7 @@ public partial class SavingsPage : LedgerBinderPage
         Style = PaperResources.Token<Style>("EmptyStateLabel"),
         HorizontalOptions = LayoutOptions.Fill,
         VerticalOptions = LayoutOptions.Center,
-        Margin = new Thickness(34, 0),
+        Margin = new Thickness(32, 0),
     };
 
     /// <summary>D131: balance, how far to its goal, a meter against the goal, and when it should get
@@ -493,7 +493,7 @@ public partial class SavingsPage : LedgerBinderPage
     private View BuildGoalPostIt(SavingsAccountView view)
     {
         var softInk = PaperResources.Colour("InkSoft");
-        var content = new VerticalStackLayout { Spacing = 6 };
+        var content = new VerticalStackLayout { Spacing = 8 };
 
         var factsHost = new ContentView();
         content.Children.Add(factsHost);
@@ -522,7 +522,7 @@ public partial class SavingsPage : LedgerBinderPage
                 FontSize = PaperResources.Token<double>("SecondarySize"),
             };
 
-            var facts = new HorizontalStackLayout { Spacing = 18 };
+            var facts = new HorizontalStackLayout { Spacing = 16 };
             facts.Children.Add(FactColumn("Pace", PlanText.Pace(view.MonthlyPace), softInk));
             facts.Children.Add(new VerticalStackLayout
             {
@@ -593,7 +593,7 @@ public partial class SavingsPage : LedgerBinderPage
 
         content.Children.Add(new VerticalStackLayout
         {
-            Spacing = 2,
+            Spacing = 4,
             Children =
             {
                 new Label { Text = "Goal", Style = PaperResources.Token<Style>("FieldLabel"), TextColor = softInk },
@@ -608,7 +608,7 @@ public partial class SavingsPage : LedgerBinderPage
                 Text = "Remove goal",
                 Style = PaperResources.Token<Style>("SecondaryLabel"),
                 TextColor = PaperResources.Colour("ProblemMark"),
-                Margin = new Thickness(0, 6, 0, 0),
+                Margin = new Thickness(0, 8, 0, 0),
             };
             var removeTap = new TapGestureRecognizer();
             removeTap.Tapped += (_, _) => RemoveGoal(view.AccountId, view.AccountName);
