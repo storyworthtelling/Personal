@@ -275,6 +275,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "\"Addressed\", \"Ignored\", \"Contradicted\". Give one carriedThreads entry per open thread provided. " +
         "Use [] when there are no breaks. No prose outside the JSON.";
 
+    // Appended when the book is checked against the series bible (R22–R24).
+    private const string SeriesBibleCheckInstruction =
+        " You are given the SERIES BIBLE of the books written before this one, in place of the prior book's canon: each " +
+        "entry with the book that established it, the story time it holds as of, and that book's own words. Where this " +
+        "book and the bible disagree, the EARLIER-WRITTEN book is canon and this book is the one to flag, even when this " +
+        "book is set earlier in story time. Read the bible against where this book sits in story time: a character " +
+        "younger, a place not yet built or a thread not yet opened is no clash in a book set before it. Check four things " +
+        "and give each break a kind: \"Contradicted fact\" (a fact this book cannot share with the bible), \"Character " +
+        "drift\" (a character who acts, speaks or is described unlike the bible's without the story earning it), \"Dropped " +
+        "thread\" (an open thread this book should take up and does not, or abandons), \"Timeline error\" (an order, age, " +
+        "date or interval that cannot be true). For each break also give \"book\" (the title of the earlier book it " +
+        "contradicts) and \"quote\" (that book's own words for what it established, copied from the bible's quoted " +
+        "passage, or \"\" when the bible has none).";
+
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
     private readonly ICredentialHealthSink? healthSink;
@@ -990,22 +1004,36 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "for era, else an empty string\"}";
 
     public async Task<SeriesContinuity> AssessSeriesContinuity(
-        string title, SeriesCanon priorCanon, IReadOnlyList<ChapterNotes> notes, string continuitySummary,
-        CancellationToken cancellationToken)
+        string title, SeriesCanon priorCanon, string bibleText, StoryPlacement? placement,
+        IReadOnlyList<ChapterNotes> notes, string continuitySummary, CancellationToken cancellationToken)
     {
         var canonJson = JsonSerializer.Serialize(priorCanon, JsonResponse.CaseInsensitive);
         var notesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
+        // The bible, when the series has one, is what the book is checked against (R24); the prior book's
+        // canon is still sent for its open threads, which the carried-thread verdicts answer one by one.
+        var against = string.IsNullOrWhiteSpace(bibleText)
+            ? $"PRIOR BOOK'S CANON (JSON):\n{canonJson}\n\n"
+            : $"{bibleText}\n\nTHE PRIOR BOOK'S OPEN THREADS (JSON):\n"
+              + JsonSerializer.Serialize(priorCanon.OpenThreads, JsonResponse.CaseInsensitive) + "\n\n";
+        var where = placement is null
+            ? string.Empty
+            : $"WHERE THIS BOOK SITS IN THE SERIES' STORY TIME: {placement.Where}"
+              + (placement.Confirmed ? " (the author's word)" : " (Folio's guess, not yet confirmed by the author)") + "\n\n";
         var userContent =
             $"THIS BOOK'S TITLE: {title}\n\n" +
-            $"PRIOR BOOK'S CANON (JSON):\n{canonJson}\n\n" +
+            where +
+            against +
             $"THIS BOOK'S STORY STATE:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(none)" : continuitySummary)}\n\n" +
             $"THIS BOOK'S PER-CHUNK NOTES (JSON array, in reading order):\n{notesJson}";
 
         // Best-effort: a malformed or empty reply yields no breaks/threads (keeping the prior book's title), so
         // the continuity read never blocks the report.
-        var empty = SeriesContinuity.Empty with { PriorBookTitle = priorCanon.PriorBookTitle };
+        var assumption = placement?.Assumption ?? string.Empty;
+        var empty = SeriesContinuity.Empty with { PriorBookTitle = priorCanon.PriorBookTitle, Assumption = assumption };
 
-        var reply = await SendMessage(SeriesContinuityInstruction, userContent, cancellationToken, options.AnalysisMaxTokens);
+        var reply = await SendMessage(
+            SeriesContinuityInstruction + (string.IsNullOrWhiteSpace(bibleText) ? string.Empty : SeriesBibleCheckInstruction),
+            userContent, cancellationToken, options.AnalysisMaxTokens);
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
             return empty;
@@ -1017,14 +1045,21 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var breaks = (dto.Breaks ?? [])
             .Where(b => !string.IsNullOrWhiteSpace(b.Contradiction))
             .Select(b => new SeriesBreak(b.Chapter ?? string.Empty, b.Established ?? string.Empty, b.Contradiction!)
-            { Excerpt = b.Excerpt ?? string.Empty, Severity = b.Severity ?? string.Empty })
+            {
+                Excerpt = b.Excerpt ?? string.Empty,
+                Severity = b.Severity ?? string.Empty,
+                // Only a read against the bible sorts its findings into the four kinds and quotes the earlier book.
+                Kind = string.IsNullOrWhiteSpace(bibleText) ? string.Empty : ContinuityKinds.Normalize(b.Kind),
+                Book = b.Book?.Trim() ?? string.Empty,
+                Quote = b.Quote?.Trim() ?? string.Empty,
+            })
             .ToList();
         var carried = (dto.CarriedThreads ?? [])
             .Where(t => !string.IsNullOrWhiteSpace(t.Established))
             .Select(t => new CarriedThread(t.Established!, NormalizeThreadStatus(t.Status)))
             .ToList();
 
-        return new SeriesContinuity(priorCanon.PriorBookTitle, breaks, carried);
+        return new SeriesContinuity(priorCanon.PriorBookTitle, breaks, carried) { Assumption = assumption };
     }
 
     // Snap a carried-thread status to the three the report speaks; an unrecognized value reads as "Ignored"
@@ -1689,6 +1724,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class SeriesBreakDto
     {
+        public string? Kind { get; set; }
+        public string? Book { get; set; }
+        public string? Quote { get; set; }
         public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Established { get; set; }

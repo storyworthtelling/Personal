@@ -288,7 +288,7 @@ public class ClaudeAnalysisClientTests
         var craft = await client.ConsolidateCraft("Title", [ChapterNotes.Empty], CancellationToken.None);
         var voice = await client.AssessVoiceConsistency([new ChapterSample("Chapter 1", "a"), new ChapterSample("Chapter 2", "b")], CancellationToken.None);
         var expansion = await client.ProposeExpansion("Title", [ChapterNotes.Empty], "", 1000, "Mystery", CancellationToken.None);
-        var series = await client.AssessSeriesContinuity("Title", new SeriesCanon("Book One", [], [], "", []), [ChapterNotes.Empty], "", CancellationToken.None);
+        var series = await client.AssessSeriesContinuity("Title", new SeriesCanon("Book One", [], [], "", []), "", null, [ChapterNotes.Empty], "", CancellationToken.None);
         var section = await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", GenreFrame.Unknown, CancellationToken.None);
         var scene = await client.JudgeScene(new SceneToJudge(1, "Chapter 1", "t", "", ""), new DesignBible([], []), CancellationToken.None);
 
@@ -790,7 +790,7 @@ public class ClaudeAnalysisClientTests
             [new ReportFinding("Chapter 3", "the gate mechanism")]);
 
         var result = await client.AssessSeriesContinuity(
-            "Book Two", canon, [ChapterNotes.Empty], "the hero rests", CancellationToken.None);
+            "Book Two", canon, "", null, [ChapterNotes.Empty], "the hero rests", CancellationToken.None);
 
         Assert.Equal("Book One", result.PriorBookTitle);
         // The blank-contradiction break is dropped (nothing to report).
@@ -806,6 +806,39 @@ public class ClaudeAnalysisClientTests
         Assert.Contains("the gate mechanism", handler.RequestBodies[0]);
     }
 
+    /// <summary>
+    /// Against the series bible (R22–R24): the bible is sent rather than the bare canon, the earlier-written
+    /// book is named canon, each finding comes back with its kind, the earlier book and its quote, and a
+    /// guessed placement is sent and said back as the read's assumption.
+    /// </summary>
+    [Fact]
+    public async Task AssessSeriesContinuity_ChecksAgainstTheBibleAndCarriesKindBookQuoteAndAssumption()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"breaks\":[{\"kind\":\"character drift\",\"chapter\":\"Chapter 3\",\"established\":\"scarred left hand\","
+            + "\"contradiction\":\"her right hand is scarred\",\"book\":\"The Salt Road\",\"quote\":\"her scarred left hand\"},"
+            + "{\"kind\":\"nonsense\",\"contradiction\":\"the flood comes early\"}],\"carriedThreads\":[]}"));
+        var placement = Folio.Domain.Series.StoryPlacement.After("The Salt Road");
+
+        var result = await client.AssessSeriesContinuity(
+            "The Tide Ledger", new SeriesCanon("The Salt Road", [], [], "", []),
+            "SERIES BIBLE: Wren Abernay, quoted \"her scarred left hand\"", placement,
+            [ChapterNotes.Empty], "", CancellationToken.None);
+
+        var body = Assert.Single(handler.RequestBodies);
+        Assert.Contains("SERIES BIBLE: Wren Abernay", body);
+        Assert.Contains("canon", body);
+        Assert.Contains("Timeline error", body);
+        Assert.Contains("not yet confirmed by the author", body);
+
+        Assert.Equal(ContinuityKinds.CharacterDrift, result.Breaks[0].Kind);
+        Assert.Equal("The Salt Road", result.Breaks[0].Book);
+        Assert.Equal("her scarred left hand", result.Breaks[0].Quote);
+        Assert.Equal(ContinuityKinds.ContradictedFact, result.Breaks[1].Kind);
+        Assert.Equal(placement.Assumption, result.Assumption);
+    }
+
     [Fact]
     public async Task AssessSeriesContinuity_BlankReply_DegradesToEmpty_KeepingThePriorTitle()
     {
@@ -814,7 +847,7 @@ public class ClaudeAnalysisClientTests
 
         var canon = new SeriesCanon("Book One", [], [], "", []);
         var result = await client.AssessSeriesContinuity(
-            "Book Two", canon, [ChapterNotes.Empty], "", CancellationToken.None);
+            "Book Two", canon, "", null, [ChapterNotes.Empty], "", CancellationToken.None);
 
         Assert.Equal("Book One", result.PriorBookTitle);
         Assert.False(result.HasContent);

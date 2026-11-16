@@ -173,9 +173,16 @@ public interface IClaudeAnalysisClient
         string continuitySummary,
         CancellationToken cancellationToken);
 
+    //
+    // Against the series bible (release G, R22–R24) when there is one: bibleText is the earlier books' bible
+    // (each entry with the book that established it and its quoted passage), the earlier-written book is
+    // canon, and each finding is one of ContinuityKinds with the earlier book and its quote. placement is
+    // where this book sits; while it is a guess, the result says what it assumed.
     Task<SeriesContinuity> AssessSeriesContinuity(
         string title,
         SeriesCanon priorCanon,
+        string bibleText,
+        Folio.Domain.Series.StoryPlacement? placement,
         IReadOnlyList<ChapterNotes> notes,
         string continuitySummary,
         CancellationToken cancellationToken);

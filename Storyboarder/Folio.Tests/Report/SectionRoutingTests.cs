@@ -140,6 +140,42 @@ public class SectionRoutingTests
         Assert.DoesNotContain("Whole-book notes", text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Series findings appear in the Series section as well as on the text (R25): each with its kind,
+    /// where it is, and the earlier book's own words; and what the read assumed about the book's place.
+    /// </summary>
+    [Fact]
+    public void TheSeriesSectionListsEachContinuityFindingWithTheEarlierBooksWords()
+    {
+        var analysis = SampleAnalysis.Of() with
+        {
+            SeriesContinuity = new SeriesContinuity("The Salt Road",
+            [
+                new SeriesBreak("Ch. 3", "Wren's left hand is scarred.", "Her right hand is the scarred one.")
+                {
+                    Kind = ContinuityKinds.CharacterDrift, Book = "The Salt Road", Quote = "her scarred left hand",
+                },
+                new SeriesBreak("", "The ledger was lost at sea.", "Nobody looks for the ledger.")
+                {
+                    Kind = ContinuityKinds.DroppedThread, Book = "The Salt Road",
+                },
+            ], [])
+            {
+                Assumption = "This assumes the book takes place after \u201CThe Salt Road\u201D, which has not been confirmed.",
+            },
+        };
+
+        var page = PagesOf(Render(analysis)).Single(text => text.Contains("Series continuity", StringComparison.Ordinal)
+            && text.Contains("Character drift", StringComparison.Ordinal));
+        var flat = page.Replace(" ", string.Empty, StringComparison.Ordinal);
+
+        Assert.Contains("Ch.3", flat, StringComparison.Ordinal);
+        Assert.Contains("herscarredleft", flat, StringComparison.Ordinal);
+        Assert.Contains("Droppedthread", flat, StringComparison.Ordinal);
+        Assert.Contains("Nobodylooksfortheledger.", flat, StringComparison.Ordinal);
+        Assert.Contains("hasnotbeenconfirmed", flat, StringComparison.Ordinal);
+    }
+
     private static byte[] Render(BookAnalysisResult analysis) =>
         new AnalysisDocumentRenderer().Render(analysis, Cover, Array.Empty<SceneEvidence>());
 

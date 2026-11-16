@@ -187,9 +187,9 @@ public class ReviewProcessorTests : IDisposable
         // Default cross-book continuity read: nothing to flag (a standalone book never calls this; a sequel with
         // this default folds an empty — and therefore unrendered — series section). Tests that care set their own.
         claude.Setup(c => c.AssessSeriesContinuity(
-                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, SeriesCanon canon, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+            .Returns((string _, SeriesCanon canon, string _, StoryPlacement? _, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
                 Task.FromResult(SeriesContinuity.Empty with { PriorBookTitle = canon.PriorBookTitle }));
 
         // Default series bible read (release G): the book establishes one character.
@@ -1544,6 +1544,37 @@ public class ReviewProcessorTests : IDisposable
         Assert.True(StoryPlacementCodec.Read(check.Novels.Single(n => n.Id == second).PlacementJson)!.Confirmed);
     }
 
+    /// <summary>
+    /// A sequel is checked against the series bible (R24), seeded from the earlier book, with its guessed
+    /// place in the series (R21); its readers are given the bible too (R27).
+    /// </summary>
+    [Fact]
+    public async Task ASequelsContinuityReadAndReadersAreGivenTheSeriesBibleAndItsPlacement()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        string? bibleSent = null;
+        StoryPlacement? placementSent = null;
+        claude.Setup(c => c.AssessSeriesContinuity(
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(),
+                It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, SeriesCanon canon, string bible, StoryPlacement? placement, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+            {
+                bibleSent = bible;
+                placementSent = placement;
+                return Task.FromResult(SeriesContinuity.Empty with { PriorBookTitle = canon.PriorBookTitle });
+            });
+
+        readerFrames.Clear();
+        SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.StartsWith("SERIES BIBLE", bibleSent, StringComparison.Ordinal);
+        Assert.Contains("\"Quest\"", bibleSent, StringComparison.Ordinal);
+        Assert.Equal("after \u201CQuest\u201D", placementSent!.Where);
+        Assert.All(readerFrames, frame => Assert.StartsWith("SERIES BIBLE", frame.SeriesCanon, StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task AStandaloneBookHasNoSeriesBible()
     {
@@ -1643,7 +1674,7 @@ public class ReviewProcessorTests : IDisposable
         await DriveToCompletion(NewProcessor());
 
         claude.Verify(c => c.AssessSeriesContinuity(
-            It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+            It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
             It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
         using var context = database.NewContext();
@@ -1658,9 +1689,9 @@ public class ReviewProcessorTests : IDisposable
 
         // The sequel finds a contradiction of book one's canon and leaves one of its threads open.
         claude.Setup(c => c.AssessSeriesContinuity(
-                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, SeriesCanon canon, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+            .Returns((string _, SeriesCanon canon, string _, StoryPlacement? _, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
                 Task.FromResult(new SeriesContinuity(
                     canon.PriorBookTitle,
                     [new SeriesBreak("Chapter 1", "The hero's eyes were grey", "Now they are green")],
@@ -1671,7 +1702,7 @@ public class ReviewProcessorTests : IDisposable
 
         claude.Verify(c => c.AssessSeriesContinuity(
             It.IsAny<string>(), It.Is<SeriesCanon>(canon => canon.OpenThreads.Count > 0),
-            It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
 
         using (var context = database.NewContext())
         {
@@ -1699,7 +1730,7 @@ public class ReviewProcessorTests : IDisposable
         await DriveToCompletion(NewProcessor());
 
         claude.Setup(c => c.AssessSeriesContinuity(
-                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Claude is down"));
 

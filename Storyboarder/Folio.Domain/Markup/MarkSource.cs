@@ -145,11 +145,21 @@ public static partial class MarkSource
 
         foreach (var brk in analysis.SeriesContinuity?.Breaks ?? [])
         {
-            var reason = Join(brk.Contradiction, string.IsNullOrWhiteSpace(brk.Established)
+            // A finding against the series bible (R22–R25) names its kind and cites the earlier book in its
+            // own words; one stored before the bible keeps the older label.
+            var bible = !string.IsNullOrWhiteSpace(brk.Kind);
+            var cited = string.IsNullOrWhiteSpace(brk.Quote)
                 ? null
-                : $"Previously established: {brk.Established}");
+                : $"\u201C{brk.Quote}\u201D" + (string.IsNullOrWhiteSpace(brk.Book) ? string.Empty : $" ({brk.Book})");
+            var established = string.IsNullOrWhiteSpace(brk.Established)
+                ? null
+                : string.IsNullOrWhiteSpace(brk.Book) || cited is not null
+                    ? $"Previously established: {brk.Established}"
+                    : $"Established in {brk.Book}: {brk.Established}";
+            var reason = Join(brk.Contradiction, established, cited, analysis.SeriesContinuity!.Assumption);
             placer.Place(
-                "Series continuity", MarkKind.Query, "Contradicts the previous book", brk.Excerpt, reason,
+                "Series continuity", MarkKind.Query, bible ? ContinuityKinds.Normalize(brk.Kind) : "Contradicts the previous book",
+                brk.Excerpt, reason,
                 brk.Chapter, Severity(brk.Severity, brk.Chapter, analysis), fallsBackToChapter: true, unplaced: reason);
         }
 

@@ -82,6 +82,43 @@ public class FindingMarksTests
         Assert.Contains("Her brother drowned at sea.", mark.Reason, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A continuity finding against the series bible (R22–R25) is labelled by its kind, cites the earlier
+    /// book and quotes it, and says what it assumed while the book's placement is a guess.
+    /// </summary>
+    [Fact]
+    public void AContinuityFindingNamesItsKindCitesTheEarlierBookAndSaysWhatItAssumed()
+    {
+        var analysis = BookAnalysisResult.Empty with
+        {
+            SeriesContinuity = new SeriesContinuity("Salt", [
+                new SeriesBreak("Chapter 2", "Her brother drowned at sea.", "The water had taken her brother.")
+                {
+                    Excerpt = "The water had taken her brother", Kind = ContinuityKinds.CharacterDrift,
+                    Book = "The Salt Road", Quote = "he went under at the harbour mouth",
+                }], [])
+            {
+                Assumption = "This assumes the book takes place after \u201CThe Salt Road\u201D, which has not been confirmed.",
+            },
+        };
+
+        var mark = Assert.Single(MarkSource.Build(Manuscript, analysis, Chapters).Marks);
+
+        Assert.Equal("Character drift", mark.Label);
+        Assert.Contains("\u201Che went under at the harbour mouth\u201D (The Salt Road)", mark.Reason, StringComparison.Ordinal);
+        Assert.Contains("has not been confirmed", mark.Reason, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("character drift", "Character drift")]
+    [InlineData("TIMELINE ERROR", "Timeline error")]
+    [InlineData("dropped thread", "Dropped thread")]
+    [InlineData("contradicted fact", "Contradicted fact")]
+    [InlineData("something else", "Contradicted fact")]
+    [InlineData(null, "Contradicted fact")]
+    public void AContinuityKindIsOneOfTheFour(string? said, string kind) =>
+        Assert.Equal(kind, ContinuityKinds.Normalize(said));
+
     /// <summary>A scene to add is a caret — the mark for something that belongs here and is not here.</summary>
     [Fact]
     public void ASceneToAddIsACaretAtTheHeadOfThePassageItQuoted()
