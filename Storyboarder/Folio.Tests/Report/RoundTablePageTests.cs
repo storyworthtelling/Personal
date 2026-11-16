@@ -80,4 +80,31 @@ public class RoundTablePageTests
         Assert.Contains("Thebookisclose.", text, StringComparison.Ordinal);
         Assert.DoesNotContain("TaeBoll", text, StringComparison.Ordinal);
     }
+
+    /// <summary>The page shows the show's shape (owner's ruling): a heading for the splits, then one per topic.</summary>
+    [Fact]
+    public void ThePartsOfTheShowAreHeadedOnThePage()
+    {
+        var shaped = new RoundTable(
+        [
+            new RoundTableTurn(RoundTablePlan.HostId, "Hugo and Nick split.") { Topic = RoundTablePlan.SplitsTopic },
+            new RoundTableTurn("agent", "I loved it."),
+            new RoundTableTurn(RoundTablePlan.HostId, "Now structure.") { Topic = "Structure" },
+            new RoundTableTurn("developmental-editor", "The middle sags."),
+            new RoundTableTurn(RoundTablePlan.HostId, "And themes.") { Topic = "Themes" },
+            new RoundTableTurn("literature-professor", "Grief leads."),
+            new RoundTableTurn(RoundTablePlan.HostId, "Thanks, all.") { Topic = "Themes" },
+        ])
+        {
+            Summary = new RoundTableSummary(["a"], ["b"]),
+        };
+
+        var text = string.Concat(Pages(new AnalysisDocumentRenderer().Render(Analysis(shaped), Cover, [])));
+        var splits = text.IndexOf("Wheretheysplit", StringComparison.Ordinal);
+        var structure = text.IndexOf("StructureTaeBoll", StringComparison.Ordinal);
+        var themes = text.IndexOf("ThemesTaeBoll", StringComparison.Ordinal);
+
+        Assert.True(splits >= 0 && structure > splits && themes > structure, text);
+        Assert.Equal(themes, text.LastIndexOf("ThemesTaeBoll", StringComparison.Ordinal));
+    }
 }

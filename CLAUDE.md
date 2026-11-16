@@ -143,6 +143,12 @@ Four **load-bearing principles** survive from the pivot: **nudge never write** (
     - Every pair of scored readers three or more apart owes a rebuttal each way, and the host cannot close while one is owed.
     - The cap is 15, 30 or 50 turns by length, host's included, a ceiling not a target. Past it, owed rebuttals are cued straight, then it closes.
     - A silent host still takes a turn, so it cannot loop.
+    - **Two parts, in order (owner's ruling): the disagreements, then an open discussion through an agenda** (`RoundTableAgenda`).
+      - The agenda always has structure, themes and characters, then every other topic a section read had something to say about (story integrity, setup and payoff, pacing, voice, series continuity, length), each with that section's summary as its why.
+      - The agenda and cap are fixed when the show begins (`RoundTablePlan.Begin`). A topic counts only once the disagreements are done.
+      - The host may not close while a topic is unraised. An early close raises the next topic itself and cues the quietest reader to answer.
+      - Running long is accepted (owner's ruling): past the cap every unraised topic still gets a host turn and an answer.
+      - Host turns carry their part (`RoundTableTurn.Topic`), and the page heads each part ("Where they split", then each topic).
   - **The calls** (`RoundTableHost`, `RoundTableSpeak`, `RoundTableClose`, strong model, `ClaudeOptions.RoundTableMaxTokens`) open with one cached block, the panel's reads, then the speaker's cached instruction; the transcript is the message.
     - Readers keep their scores and may concede in words.
     - The host never rules.

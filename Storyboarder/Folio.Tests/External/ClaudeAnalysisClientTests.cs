@@ -1680,6 +1680,30 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("agent", move.Answering);
     }
 
+    /// <summary>
+    /// The host is told which part of the show it is in (owner's ruling): the disagreements, then the open
+    /// discussion through the agenda, with what is still to raise and why; it names its topic.
+    /// </summary>
+    [Fact]
+    public async Task TheHostIsToldThePartOfTheShowAndTheAgendaAndNamesItsTopic()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"says\":\"Structure.\",\"next\":\"agent\",\"ask\":\"Hugo?\",\"answering\":\"\",\"close\":false,\"topic\":\"Structure\"}"));
+        var agreeing = new[] { RoundTablePanel[0], RoundTablePanel[1] with { Score = 7 } };
+        var table = RoundTablePlan.Begin(
+            [new AgendaItem("Structure", "The middle sags."), new AgendaItem("Themes", ""), new AgendaItem("Characters", "")], 15)
+            with { Covered = ["Themes"] };
+
+        var move = await client.RoundTableHost(agreeing, table, [], 15, StoryLength.ShortStory, CancellationToken.None);
+
+        var user = UserOf(handler.RequestBodies[0]);
+        Assert.Contains("OPEN DISCUSSION", user);
+        Assert.Contains("Structure (still to raise): The middle sags.", user);
+        Assert.Contains("Themes (raised)", user);
+        Assert.Contains("disagreements", SystemOf(handler.RequestBodies[0])[1].Text);
+        Assert.Equal("Structure", move.Topic);
+    }
+
     [Fact]
     public async Task AHostMoveThatWillNotReadFailsSoTheTurnIsTriedAgain()
     {

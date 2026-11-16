@@ -1992,6 +1992,10 @@ public sealed class ReviewProcessor : IPipelineStep
         var reviews = await ReadReaders(db, novel.Id, cancellationToken);
         var length = ManuscriptLength.Classify(novel.WordCount);
         var table = RoundTableCodec.Read(analysis.RoundTableJson);
+        // The agenda and cap are fixed as the show begins (owner's ruling: disagreements first, then structure,
+        // themes, characters and whatever else the reads raised).
+        if (table.Turns.Count == 0 && table.Agenda.Count == 0)
+            table = RoundTablePlan.Begin(RoundTableAgenda.For(await ReadSections(db, novel.Id, cancellationToken)), RoundTablePlan.TurnCap(length));
         var step = RoundTablePlan.Next(table, reviews, length);
         if (reviews.Count == 0 || step.Kind == RoundTableStepKind.Done)
         {
@@ -2011,7 +2015,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 case RoundTableStepKind.HostTurn:
                     var move = await claude.RoundTableHost(
                         reviews, table, RoundTablePlan.Owed(table, reviews),
-                        Math.Max(0, RoundTablePlan.TurnCap(length) - table.Turns.Count), length, cancellationToken);
+                        Math.Max(0, table.Cap - table.Turns.Count), length, cancellationToken);
                     table = RoundTablePlan.Apply(table, move, reviews);
                     break;
                 case RoundTableStepKind.ReaderTurn:

@@ -491,14 +491,20 @@ public class ReviewProcessorTests : IDisposable
         await DriveToCompletion(NewProcessor());
 
         Assert.Equal(PersonaCatalogue.Readers.Select(persona => persona.Id), roundTablePanel.Select(review => review.PersonaId));
-        Assert.Equal(2, hostCalls);
-        Assert.Equal(1, speakCalls);
         using var context = database.NewContext();
         var table = RoundTableCodec.Read(context.BookAnalyses.Single(a => a.NovelId == id).RoundTableJson);
         Assert.True(table.Closed);
-        Assert.Equal(
-            [RoundTablePlan.HostId, "agent", RoundTablePlan.HostId, RoundTablePlan.HostId],
-            table.Turns.Select(turn => turn.Speaker));
+
+        // The panel agrees (every reader scored 7), so the show goes straight to the open discussion. The host
+        // asks to close early on every move after the first; each early close raises the next agenda topic
+        // instead, a reader answers it, and only once every topic has had its exchange does the show close.
+        var agenda = table.Agenda.Select(item => item.Topic).ToList();
+        Assert.Equal(["Structure", "Themes", "Characters"], agenda.Take(3));
+        Assert.Contains("Pacing", agenda);
+        Assert.Equal(agenda, table.Covered);
+        Assert.Equal(1 + agenda.Count, speakCalls);
+        Assert.Equal(agenda, table.Turns.Where(turn => turn.Speaker == RoundTablePlan.HostId && turn.Topic.Length > 0)
+            .Select(turn => turn.Topic).Distinct());
         Assert.Equal("Goodnight, everyone.", table.Turns[^1].Words);
         Assert.Equal(["Whether it sells"], table.Summary!.StillDiffer);
         Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
@@ -530,11 +536,14 @@ public class ReviewProcessorTests : IDisposable
         var id = SeedManuscript();
         await DriveToCompletion(NewProcessor());
 
-        Assert.Equal(2, hostCalls);
-        Assert.Equal(2, speakCalls);
+        // The failed turn was tried again on its own: the host was not asked again for it, and the reader's
+        // first line is the retried one.
         using var context = database.NewContext();
         var table = RoundTableCodec.Read(context.BookAnalyses.Single(a => a.NovelId == id).RoundTableJson);
-        Assert.Equal("Second time lucky.", Assert.Single(table.Turns, turn => turn.Speaker == "agent").Words);
+        Assert.True(table.Closed);
+        Assert.Equal(hostCalls, table.Turns.Count(turn => turn.Speaker == RoundTablePlan.HostId) - 1);
+        Assert.Equal(speakCalls - 1, table.Turns.Count(turn => turn.Speaker != RoundTablePlan.HostId));
+        Assert.Equal("Second time lucky.", table.Turns.First(turn => turn.Speaker != RoundTablePlan.HostId).Words);
     }
 
     private async Task DriveToCompletion(ReviewProcessor processor)

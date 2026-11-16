@@ -57,7 +57,8 @@ public class RoundTablePlanTests
         var table = RoundTablePlan.Apply(RoundTable.Empty,
             new HostMove("Welcome. Hugo, you loved it.", "agent", "What sold you?", "", Close: false), Panel);
 
-        Assert.Equal(new RoundTableTurn(RoundTablePlan.HostId, "Welcome. Hugo, you loved it."), Assert.Single(table.Turns));
+        Assert.Equal(new RoundTableTurn(RoundTablePlan.HostId, "Welcome. Hugo, you loved it.") { Topic = RoundTablePlan.SplitsTopic },
+            Assert.Single(table.Turns));
         Assert.Equal(new RoundTableCue("agent", "What sold you?"), table.Next);
         var step = RoundTablePlan.Next(table, Panel, StoryLength.Novel);
         Assert.Equal(RoundTableStepKind.ReaderTurn, step.Kind);
@@ -183,5 +184,95 @@ public class RoundTablePlanTests
         var table = RoundTablePlan.Apply(RoundTable.Empty, new HostMove("  ", "agent", "Go on.", "", false), Panel);
 
         Assert.Equal("Over to you, Hugo Hook.", Assert.Single(table.Turns).Words);
+    }
+
+    // The owner's ruling: Tae runs the panel through the disagreements first, then an open discussion
+    // through an agenda of structure, themes, characters and whatever else the earlier reads raised.
+
+    private static readonly IReadOnlyList<SectionRead> Sections =
+    [
+        new("structure", "The middle sags.", []),
+        new("theme-hierarchy", "Grief leads; duty follows.", []),
+        new("pacing", "Chapters seven to nine drag.", [new ReportFinding("Ch. 8", "Nothing moves.")]),
+        new("voice-consistency", string.Empty, []),
+        new("length", "Long for the genre.", []),
+    ];
+
+    [Fact]
+    public void TheAgendaIsStructureThemesAndCharactersThenWhateverElseTheReadsRaised()
+    {
+        var agenda = RoundTableAgenda.For(Sections);
+
+        Assert.Equal(["Structure", "Themes", "Characters", "Pacing", "Length"], agenda.Select(item => item.Topic));
+        Assert.Equal("The middle sags.", agenda[0].Why);
+        Assert.Equal("Grief leads; duty follows.", agenda[1].Why);
+    }
+
+    private static RoundTable Begun(IReadOnlyList<Review> panel, int cap = 50) =>
+        RoundTablePlan.Begin(RoundTableAgenda.For(Sections), cap);
+
+    [Fact]
+    public void WhileARebuttalIsOwedTheShowIsOnTheDisagreementsAndTopicsDoNotCount()
+    {
+        var table = RoundTablePlan.Apply(Begun(Panel),
+            new HostMove("Let's talk structure.", "agent", "Hugo?", "", false) { Topic = "Structure" }, Panel);
+
+        Assert.Equal(RoundTablePhase.Disagreements, RoundTablePlan.Phase(table, Panel));
+        Assert.Empty(table.Covered);
+        Assert.Equal(RoundTablePlan.SplitsTopic, table.Turns[^1].Topic);
+    }
+
+    [Fact]
+    public void OnceTheRebuttalsAreGivenTheHostWorksThroughTheAgenda()
+    {
+        var panel = new[] { Read("agent", 7), Read("harsh-critic", 6) };
+        var table = RoundTablePlan.Apply(Begun(panel),
+            new HostMove("On to structure.", "agent", "Hugo?", "", false) { Topic = "structure" }, panel);
+
+        Assert.Equal(RoundTablePhase.Discussion, RoundTablePlan.Phase(table, panel));
+        Assert.Equal(["Structure"], table.Covered);
+        Assert.Equal("Structure", table.Turns[^1].Topic);
+        Assert.Equal(["Themes", "Characters", "Pacing", "Length"], RoundTablePlan.Uncovered(table).Select(item => item.Topic));
+    }
+
+    [Fact]
+    public void TheHostCannotCloseWhileAnAgendaTopicIsUnraised()
+    {
+        var panel = new[] { Read("agent", 7), Read("harsh-critic", 6) };
+
+        var table = RoundTablePlan.Apply(Begun(panel), new HostMove("That's the show.", "", "", "", Close: true), panel);
+
+        // The close is refused and the next topic is raised instead, for a reader to answer.
+        Assert.False(table.CloseAsked);
+        Assert.Equal(["Structure"], table.Covered);
+        Assert.Equal("Structure", table.Turns[^1].Topic);
+        var step = RoundTablePlan.Next(table, panel, StoryLength.Novel);
+        Assert.Equal(RoundTableStepKind.ReaderTurn, step.Kind);
+        Assert.Contains("structure", step.Cue!.Ask);
+        Assert.Contains("The middle sags.", step.Cue.Ask);
+    }
+
+    /// <summary>
+    /// Running long is accepted (owner's ruling): past the cap each topic still unraised gets its own host
+    /// turn and a reader's answer, the host's turn counting for the topic whatever it said, so the show ends.
+    /// </summary>
+    [Fact]
+    public void PastTheCapEveryUnraisedTopicStillGetsItsExchangeThenTheShowCloses()
+    {
+        var panel = new[] { Read("agent", 7), Read("harsh-critic", 6) };
+        var table = Begun(panel, cap: 2);
+        table = table with { Turns = [new RoundTableTurn(RoundTablePlan.HostId, "Hi."), new RoundTableTurn("agent", "Hello.")] };
+
+        for (var topic = 0; topic < 5; topic++)
+        {
+            Assert.Equal(RoundTableStepKind.HostTurn, RoundTablePlan.Next(table, panel, StoryLength.Novel).Kind);
+            table = RoundTablePlan.Apply(table, new HostMove("Wrapping up.", "", "", "", Close: true), panel);
+            var step = RoundTablePlan.Next(table, panel, StoryLength.Novel);
+            Assert.Equal(RoundTableStepKind.ReaderTurn, step.Kind);
+            table = RoundTablePlan.Spoken(table, "An answer.");
+        }
+
+        Assert.Empty(RoundTablePlan.Uncovered(table));
+        Assert.Equal(RoundTableStepKind.Close, RoundTablePlan.Next(table, panel, StoryLength.Novel).Kind);
     }
 }

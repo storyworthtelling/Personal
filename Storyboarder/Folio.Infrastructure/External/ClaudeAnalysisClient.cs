@@ -1011,7 +1011,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         StoryLength length, CancellationToken cancellationToken)
     {
         var panelIds = string.Join("; ", reviews.Select(review => $"{review.PersonaId} = {RoundTablePlan.Name(review.PersonaId)}"));
+        var discussing = owed.Count == 0;
+        var agenda = table.Agenda.Count == 0
+            ? string.Empty
+            : "\nAGENDA FOR THE OPEN DISCUSSION:\n" + string.Join("\n", table.Agenda.Select(item =>
+                $"- {item.Topic} ({(table.Covered.Contains(item.Topic, StringComparer.OrdinalIgnoreCase) ? "raised" : "still to raise")})"
+                + (item.Why.Length > 0 ? $": {item.Why}" : string.Empty)));
         var user = Transcript(table)
+            + (discussing
+                ? "\n\nPART OF THE SHOW: OPEN DISCUSSION. The disagreements have been aired; take the panel through the "
+                  + "agenda, one topic at a time, and name the topic you are on."
+                : "\n\nPART OF THE SHOW: THE DISAGREEMENTS. Work through where the readers split before anything else.")
+            + agenda
             + $"\n\nTURNS LEFT: about {turnsLeft}."
             + (owed.Count == 0
                 ? "\nEvery rebuttal owed has been given; you may close when the conversation has run its course."
@@ -1025,7 +1036,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var dto = JsonResponse.Deserialize<HostMoveDto>(json)
                   ?? throw new InvalidOperationException("The round table host's move came back unreadable.");
         return new HostMove(dto.Says?.Trim() ?? string.Empty, dto.Next?.Trim() ?? string.Empty,
-            dto.Ask?.Trim() ?? string.Empty, dto.Answering?.Trim() ?? string.Empty, dto.Close);
+            dto.Ask?.Trim() ?? string.Empty, dto.Answering?.Trim() ?? string.Empty, dto.Close)
+        {
+            Topic = dto.Topic?.Trim() ?? string.Empty,
+        };
     }
 
     public async Task<string> RoundTableSpeak(
@@ -1074,15 +1088,18 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     private static string HostInstruction(StoryLength length) =>
         $"You are {RoundTablePlan.HostName}, the host of a podcast round table where seven readers talk about a "
         + $"{ManuscriptLength.Noun(length)} they have each read on their own. Your voice: {RoundTablePlan.HostVoice}. Their "
-        + "independent reads and scores are in the panel above. Steer the conversation as a podcast host would: open by "
-        + "welcoming the panel and naming where they split; then, after each turn, hand the floor to whoever was just named, "
-        + "challenged or disagreed with, and ask the follow-up a listener would want. Make sure every rebuttal still owed "
-        + "happens: hand the reader the floor and say whom to answer. Readers may concede in words; their scores do not "
-        + "change. You never say who is right and never rule on a split. When the splits have been aired and nothing owed "
-        + "remains, you may close early; the turns left are a ceiling, not a target.\n\n"
+        + "independent reads and scores are in the panel above. The show has two parts, in order. First the disagreements: "
+        + "open by welcoming the panel and naming where they split, then take them through each split, handing the floor to "
+        + "the readers who differ and saying whom to answer, until every rebuttal owed has happened. Then an open discussion "
+        + "through the agenda you are given (structure, themes and characters, then whatever else the reads raised), one "
+        + "topic at a time, drawing in whichever readers have the most to say about it and letting them reply to each other. "
+        + "Throughout, after each turn, hand the floor to whoever was just named, challenged or disagreed with, and ask the "
+        + "follow-up a listener would want. Readers may concede in words; their scores do not change. You never say who is "
+        + "right and never rule. Close only when every agenda topic has been raised.\n\n"
         + "Reply with JSON only: {\"says\": \"what you say aloud now, one to three sentences\", \"next\": \"the panel id "
         + "of who speaks next, or an empty string when closing\", \"ask\": \"what you ask them\", \"answering\": \"the "
-        + "panel id of whom they should answer, or an empty string\", \"close\": false}";
+        + "panel id of whom they should answer, or an empty string\", \"topic\": \"in the open discussion, the agenda "
+        + "topic you are on, exactly as the agenda names it; else an empty string\", \"close\": false}";
 
     // The panel's independent reads: the same text for every call of a show, so it is one cached prefix.
     private static string Panel(IReadOnlyList<Review> reviews) =>
@@ -1720,6 +1737,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         public string? Next { get; set; }
         public string? Ask { get; set; }
         public string? Answering { get; set; }
+        public string? Topic { get; set; }
         public bool Close { get; set; }
     }
 

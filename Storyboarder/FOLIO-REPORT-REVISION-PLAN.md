@@ -404,6 +404,13 @@ How it was built:
 - **On the page:** a Round table section and tab in the verdict's place. It prints the transcript, each
   line under its speaker's name, then "Where they agree" and "Where they still differ". A report from
   before H keeps its verdict.
+- **Two parts, in order (owner's ruling, after the first build).** Tae runs the panel through the
+  disagreements first. Then comes an open discussion through an agenda: structure, themes and characters
+  always, then whatever else the section reads raised, each with that read's summary.
+  - The host cannot close while a topic is unraised. An early close raises the next topic itself, and a
+    reader answers it.
+  - Running long is accepted: past the cap every unraised topic still gets its exchange.
+  - The page heads each part of the show.
 - **Not yet run against the live model**, so the real length and cost of a show are unmeasured.
 1. **Second round.**
    - After all seven independent reads, the readers talk about the book.

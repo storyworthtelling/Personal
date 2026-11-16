@@ -763,8 +763,16 @@ public sealed class AnalysisDocumentRenderer
             + "their own read; a point given up here is given up in words.", body, ReportPalette.InkSoft);
         writer.Gap(PageGeometry.TightGap);
 
+        // The show's shape (owner's ruling): a heading where it turns to the splits, and one per agenda topic.
+        var part = string.Empty;
         foreach (var turn in table.Turns)
         {
+            if (turn.Speaker == Folio.Domain.Reading.RoundTablePlan.HostId && turn.Topic.Length > 0 && turn.Topic != part)
+            {
+                part = turn.Topic;
+                writer.KeepTogether(h3.Size * PageGeometry.LineSpacing * 4);
+                writer.Heading(part, h3, Ink);
+            }
             writer.KeepTogether(bodyBold.Size * PageGeometry.LineSpacing * 2);
             writer.Paragraph(Folio.Domain.Reading.RoundTablePlan.Name(turn.Speaker), bodyBold, Ink);
             writer.Paragraph(turn.Words, body, Ink);
