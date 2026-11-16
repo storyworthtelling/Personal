@@ -29,16 +29,23 @@ public static class ReadingPrompt
     /// The system blocks for one pass. Block one is the manuscript and carries the cache breakpoint;
     /// everything persona-specific sits after it, where changing it costs nothing.
     /// </summary>
-    public static IReadOnlyList<PromptBlock> System(string manuscript, Persona persona, GenreFrame genre)
+    public static IReadOnlyList<PromptBlock> System(string manuscript, Persona persona, ReadingFrame frame)
     {
-        ArgumentNullException.ThrowIfNull(genre);
         ArgumentNullException.ThrowIfNull(persona);
+        ArgumentNullException.ThrowIfNull(frame);
 
-        return
-        [
-            new PromptBlock("MANUSCRIPT\n\n" + manuscript, Cached: true),
-            new PromptBlock(Instruction(persona, ManuscriptLength.CountWords(manuscript), genre), Cached: false),
-        ];
+        // A series book's canon (R27) is the same for every pass of the draft, so it is cached with the
+        // manuscript, after it: the prefix stays byte-identical whichever persona is reading.
+        var instruction = new PromptBlock(
+            Instruction(persona, ManuscriptLength.CountWords(manuscript), frame.Genre, frame.HasSeriesCanon), Cached: false);
+        return frame.HasSeriesCanon
+            ?
+            [
+                new PromptBlock("MANUSCRIPT\n\n" + manuscript, Cached: true),
+                new PromptBlock(frame.SeriesCanon, Cached: true),
+                instruction,
+            ]
+            : [new PromptBlock("MANUSCRIPT\n\n" + manuscript, Cached: true), instruction];
     }
 
     /// <summary>The part of the prompt that is the same for every pass, and must stay so.</summary>
@@ -55,7 +62,7 @@ public static class ReadingPrompt
     /// looking for novel-scale structure and counted the story's length against it, so a short story
     /// is told outright to be read as one.
     /// </summary>
-    public static string Instruction(Persona persona, int wordCount, GenreFrame genre)
+    public static string Instruction(Persona persona, int wordCount, GenreFrame genre, bool seriesCanon = false)
     {
         ArgumentNullException.ThrowIfNull(persona);
         ArgumentNullException.ThrowIfNull(genre);
@@ -80,17 +87,20 @@ public static class ReadingPrompt
         var genreLine = GenreLine(genre, length);
         var fan = persona.FanOfTheGenre ? FanBrief(genre) : string.Empty;
         var score = ScoreBrief(persona, length);
+        var series = seriesCanon
+            ? "The series bible above is the canon of the earlier book in this series; weigh this book against it where it bears on your question. "
+            : string.Empty;
 
         return persona.Kind switch
         {
             PersonaKind.Reader =>
                 $"You are {persona.ReaderName ?? persona.Name}, the {persona.Name.ToLowerInvariant()}, reading the complete {noun} manuscript above, in character. "
                 + (persona.Voice is { } voice ? $"Your voice: {voice}. Let it shape how you write, never what you judge. " : string.Empty)
-                + words + genreLine + scale + fan + brief + purpose + NoLineEdits + score
+                + words + genreLine + series + scale + fan + brief + purpose + NoLineEdits + score
                 + "Nobody else's notes are available to you, and you are not summarising the book.",
             PersonaKind.Section =>
                 $"You are reading the complete {noun} manuscript above for one thing only: {persona.Name}. "
-                + words + genreLine + scale + fan + brief
+                + words + genreLine + series + scale + fan + brief
                 + "Leave every other concern to the reader whose job it is.",
             _ => throw new ArgumentOutOfRangeException(nameof(persona), persona.Kind, "Unhandled persona kind."),
         };

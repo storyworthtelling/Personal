@@ -385,6 +385,36 @@ public class ReadingPromptTests
         Assert.Contains("more needs to happen", question, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// A series book's readers get the earlier book's canon (R27). It is the same for every pass of a
+    /// draft, so it sits inside the cached prefix, straight after the manuscript, and the prefix stays
+    /// byte-identical across every persona.
+    /// </summary>
+    [Fact]
+    public void ASeriesBooksCanonIsCachedAfterTheManuscriptAndSharedByEveryPass()
+    {
+        var frame = new ReadingFrame(GenreFrame.Unknown, "SERIES CANON: Elin's father kept the light for forty years.");
+        var prefixes = PersonaCatalogue.All
+            .Select(persona => string.Concat(ReadingPrompt.System(Manuscript, persona, frame)
+                .TakeWhile(block => block.Cached).Select(block => block.Text)))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        var prefix = Assert.Single(prefixes);
+        Assert.True(prefix.IndexOf(Manuscript, StringComparison.Ordinal) < prefix.IndexOf("forty years", StringComparison.Ordinal));
+        Assert.DoesNotContain("forty years", ReadingPrompt.System(Manuscript, PersonaCatalogue.ById("agent"), frame)[^1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AReaderIsToldTheCanonIsThereOnlyWhenItIs()
+    {
+        var agent = PersonaCatalogue.ById("agent");
+
+        Assert.Contains("series bible", ReadingPrompt.System(Manuscript, agent, new ReadingFrame(GenreFrame.Unknown, "Canon."))[^1].Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("series bible", ReadingPrompt.System(Manuscript, agent, GenreFrame.Unknown)[^1].Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(ReadingPrompt.System(Manuscript, agent, GenreFrame.Unknown), block => block.Cached);
+    }
+
     private static readonly GenreFrame CozyMystery = new("Cozy mystery", "70,000-90,000");
     private const int ShortStoryWords = 1_209;
     private const int NovelWords = 90_000;

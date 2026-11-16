@@ -40,6 +40,7 @@ public class ReviewProcessorTests : IDisposable
     private readonly List<string> sectionReads = [];
     private readonly List<string> readerReads = [];
     private readonly List<GenreFrame> readerGenres = [];
+    private readonly List<ReadingFrame> readerFrames = [];
     private readonly List<SceneToJudge> judgedScenes = [];
     private readonly List<string> synthesisReads = [];
     private int sectionsSeenBySynthesis;
@@ -58,8 +59,8 @@ public class ReviewProcessorTests : IDisposable
         // The sixteen passes. Stubbed for real rather than left to Moq's defaults: a default-valued
         // Task<T> completes with null, which the pipeline records as a finished pass — so the step
         // would appear to work while reading nothing, which is the failure PassPipelineTests names.
-        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) =>
+        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, ReadingFrame _, CancellationToken _) =>
             {
                 sectionReads.Add(persona.Id);
                 return Task.FromResult(new SectionRead(
@@ -67,11 +68,12 @@ public class ReviewProcessorTests : IDisposable
                     [new ReportFinding("Chapter 1", $"{persona.Name} found something.")]));
             });
 
-        claude.Setup(c => c.ReadAsReader(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, GenreFrame genre, CancellationToken _) =>
+        claude.Setup(c => c.ReadAsReader(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, ReadingFrame frame, CancellationToken _) =>
             {
                 readerReads.Add(persona.Id);
-                readerGenres.Add(genre);
+                readerGenres.Add(frame.Genre);
+                readerFrames.Add(frame);
                 return Task.FromResult(new Review(
                     persona.Id, "A verdict in one clause.", "A sustained read in character.",
                     ["what works"], ["what does not"], "what it would need")
@@ -414,8 +416,8 @@ public class ReviewProcessorTests : IDisposable
     {
         var count = 0;
         claude.Setup(c => c.ReadSection(
-                It.Is<Persona>(persona => persona.Id == pass.Id), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) =>
+                It.Is<Persona>(persona => persona.Id == pass.Id), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, ReadingFrame _, CancellationToken _) =>
             {
                 count++;
                 calls?.Add(count);
@@ -1052,8 +1054,8 @@ public class ReviewProcessorTests : IDisposable
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(),
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(ExpansionReport.Empty);
-        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<GenreFrame>(), It.IsAny<CancellationToken>()))
-            .Returns((Persona persona, string _, GenreFrame _, CancellationToken _) => Task.FromResult(SectionRead.Silent(persona.Id)));
+        claude.Setup(c => c.ReadSection(It.IsAny<Persona>(), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .Returns((Persona persona, string _, ReadingFrame _, CancellationToken _) => Task.FromResult(SectionRead.Silent(persona.Id)));
 
         var id = SeedManuscript("The knight rode to the castle and knocked on the gate.");
         await DriveToCompletion(NewProcessor());
@@ -1348,6 +1350,22 @@ public class ReviewProcessorTests : IDisposable
         context.Novels.Add(book);
         context.SaveChanges();
         return book.Id;
+    }
+
+    /// <summary>A sequel's readers are given the earlier book's canon (R27); a first book's are given none.</summary>
+    [Fact]
+    public async Task ASequelsReadersGetTheEarlierBooksCanon()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        Assert.All(readerFrames, frame => Assert.Equal(string.Empty, frame.SeriesCanon));
+
+        readerFrames.Clear();
+        SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(PersonaCatalogue.Readers.Count, readerFrames.Count);
+        Assert.All(readerFrames, frame => Assert.Contains("Quest", frame.SeriesCanon, StringComparison.Ordinal));
     }
 
     [Fact]

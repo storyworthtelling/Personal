@@ -971,9 +971,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "{\"standing\": \"\", \"reading\": \"\", \"strengths\": [], \"problems\": [], \"mostNeeds\": \"\"}}.";
 
     public async Task<SectionRead> ReadSection(
-        Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken)
+        Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
     {
-        var reply = await SendPass(persona, manuscript, genre, SectionFormat, cancellationToken);
+        var reply = await SendPass(persona, manuscript, frame, SectionFormat, cancellationToken);
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
         {
@@ -998,9 +998,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     }
 
     public async Task<Review> ReadAsReader(
-        Persona persona, string manuscript, GenreFrame genre, CancellationToken cancellationToken)
+        Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
     {
-        var reply = await SendPass(persona, manuscript, genre, ReaderFormat, cancellationToken);
+        var reply = await SendPass(persona, manuscript, frame, ReaderFormat, cancellationToken);
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException(
                 $"{persona.Name} replied with nothing this could read as a review. A reader's pass is "
@@ -1075,10 +1075,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     /// visible wrong. <c>ReadingPrompt</c> decides the order and a guard holds it.</para>
     /// </summary>
     private Task<string> SendPass(
-        Persona persona, string manuscript, GenreFrame genre, string format, CancellationToken cancellationToken,
+        Persona persona, string manuscript, ReadingFrame frame, string format, CancellationToken cancellationToken,
         [CallerMemberName] string call = "")
     {
-        var system = ReadingPrompt.System(manuscript, persona, genre)
+        var system = ReadingPrompt.System(manuscript, persona, frame)
             .Select(block => block.Cached
                 ? (object)new { type = "text", text = block.Text, cache_control = new { type = "ephemeral" } }
                 : new { type = "text", text = block.Text })

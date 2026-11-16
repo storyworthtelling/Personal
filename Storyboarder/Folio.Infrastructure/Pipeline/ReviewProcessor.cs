@@ -1204,11 +1204,11 @@ public sealed class ReviewProcessor : IPipelineStep
                     : due.Persona!.Kind == PersonaKind.Reader
                         ? JsonSerializer.Serialize(
                             await claude.ReadAsReader(due.Persona, await Manuscript(db, novel.Id, cancellationToken),
-                                Genre(analysis), cancellationToken),
+                                await Frame(db, novel, analysis, cancellationToken), cancellationToken),
                             JsonResponse.CaseInsensitive)
                         : JsonSerializer.Serialize(
                             await claude.ReadSection(due.Persona, await Manuscript(db, novel.Id, cancellationToken),
-                                Genre(analysis), cancellationToken),
+                                await Frame(db, novel, analysis, cancellationToken), cancellationToken),
                             JsonResponse.CaseInsensitive);
 
                 row.CompletedAtUtc = clock.UtcNow;
@@ -2303,6 +2303,15 @@ public sealed class ReviewProcessor : IPipelineStep
         var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive);
         return report is null ? GenreFrame.Unknown : new GenreFrame(report.Genre ?? string.Empty, report.WordCountRange ?? string.Empty);
     }
+
+    /// <summary>
+    /// What every whole-book pass of this draft is told besides the manuscript: the genre, and for a
+    /// series book the earlier book's canon (R27). The same for every pass, so the cached prefix holds.
+    /// </summary>
+    private async Task<ReadingFrame> Frame(FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken) =>
+        new(Genre(analysis), novel.PreviousBookId is { } prior
+            ? ReadingFrame.CanonText(await LoadSeriesCanon(db, prior, cancellationToken))
+            : string.Empty);
 
     private async Task<string> Manuscript(FolioDbContext db, Guid novelId, CancellationToken cancellationToken) =>
         await db.SourceTexts.Where(source => source.NovelId == novelId)
