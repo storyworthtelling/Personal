@@ -64,4 +64,30 @@ public class SceneBlockPlanTests
     {
         Assert.Null(SceneBlockPlan.LineAfter(Text, [], 5));
     }
+
+    // ---- a chapter's list of notes (R7) ---------------------------------------------------------
+
+    /// <summary>After a title, the list goes before the line that follows it.</summary>
+    [Fact]
+    public void AListFollowingATitleGoesBeforeTheNextLine()
+    {
+        var titleEnd = "One line.".Length;
+
+        Assert.Equal(1, SceneBlockPlan.LineBefore(Lines(), titleEnd, followsTitle: true));
+    }
+
+    /// <summary>A chapter that opens into prose gets its list before its first line.</summary>
+    [Fact]
+    public void AListBeforeProseGoesBeforeTheLineHoldingTheOffset()
+    {
+        var start = Text.IndexOf("Three line.", StringComparison.Ordinal);
+
+        Assert.Equal(5, SceneBlockPlan.LineBefore(Lines(), start, followsTitle: false));
+    }
+
+    [Fact]
+    public void AListAtTheVeryStartGoesBeforeTheFirstLine()
+    {
+        Assert.Equal(0, SceneBlockPlan.LineBefore(Lines(), 0, followsTitle: false));
+    }
 }

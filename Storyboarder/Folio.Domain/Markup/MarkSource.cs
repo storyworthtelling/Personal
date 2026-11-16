@@ -14,9 +14,10 @@ namespace Folio.Domain.Markup;
 /// there because the one above it can fail without anything erroring:</para>
 /// <list type="number">
 /// <item>the passage the finding <b>quoted</b>, found in the manuscript (<see cref="ExcerptIndex"/>);</item>
-/// <item>failing that, the <b>opening of the chapter it cited</b>, with the note saying so — "In this
-/// chapter" — and keeping the words it tried to quote, because they are the only way left to find the
-/// sentence;</item>
+/// <item>failing that, the <b>chapter it cited</b>: a list, "Notes on this chapter", printed at the
+/// chapter's head (R7), keeping the words it tried to quote, because they are the only way left to find
+/// the sentence. It used to be a query on the chapter's first line, which read as a note about that
+/// line;</item>
 /// <item>failing that, <b>unplaced</b>: handed back so the report can print it among the whole-book
 /// notes. A finding never simply stops appearing.</item>
 /// </list>
@@ -63,7 +64,7 @@ public static partial class MarkSource
         {
             placer.Place(
                 "Line-level edits", MarkKind.Query, Label(edit.Kind), edit.Excerpt, edit.Reason, edit.Chapter,
-                Severity(edit.Chapter, analysis), fallsBackToChapter: true,
+                Severity(edit.Severity, edit.Chapter, analysis), fallsBackToChapter: true,
                 unplaced: Join(Quoted(edit.Excerpt), edit.Reason));
         }
 
@@ -72,7 +73,7 @@ public static partial class MarkSource
             var tighten = note.Direction == ShowTellDirection.Tighten;
             placer.Place(
                 "Show vs tell", tighten ? MarkKind.Dele : MarkKind.Caret, tighten ? "Runs long" : "Summarized",
-                note.Excerpt, note.Suggestion, note.Chapter, Severity(note.Chapter, analysis),
+                note.Excerpt, note.Suggestion, note.Chapter, Severity(note.Severity, note.Chapter, analysis),
                 fallsBackToChapter: true, unplaced: Join(Quoted(note.Excerpt), note.Suggestion));
         }
 
@@ -83,7 +84,7 @@ public static partial class MarkSource
         {
             placer.Place(
                 "Prose style & voice", MarkKind.Query, "Prose", note.Evidence, note.Fix, note.Chapter,
-                Severity(note.Chapter, analysis), fallsBackToChapter: !string.IsNullOrWhiteSpace(note.Evidence),
+                Severity(note.Severity, note.Chapter, analysis), fallsBackToChapter: !string.IsNullOrWhiteSpace(note.Evidence),
                 unplaced: Join(note.Pattern, Quoted(note.Evidence), note.Fix));
         }
 
@@ -93,7 +94,7 @@ public static partial class MarkSource
         {
             placer.Place(
                 "Dialogue", MarkKind.Query, "Dialogue", note.Excerpt, note.Fix, note.Chapter,
-                Severity(note.Chapter, analysis), fallsBackToChapter: !string.IsNullOrWhiteSpace(note.Excerpt),
+                Severity(note.Severity, note.Chapter, analysis), fallsBackToChapter: !string.IsNullOrWhiteSpace(note.Excerpt),
                 unplaced: Join(note.Speakers, note.Observation, note.Fix));
         }
 
@@ -128,7 +129,7 @@ public static partial class MarkSource
         {
             placer.Place(
                 "Authorial voice consistency", MarkKind.Query, "Voice drift", divergence.Excerpt,
-                divergence.Divergence, divergence.Chapter, Severity(divergence.Chapter, analysis),
+                divergence.Divergence, divergence.Chapter, Severity(divergence.Severity, divergence.Chapter, analysis),
                 fallsBackToChapter: true, unplaced: Join(divergence.Chapter, Quoted(divergence.Excerpt), divergence.Divergence));
         }
 
@@ -139,7 +140,7 @@ public static partial class MarkSource
                 : $"Previously established: {brk.Established}");
             placer.Place(
                 "Series continuity", MarkKind.Query, "Contradicts the previous book", brk.Excerpt, reason,
-                brk.Chapter, Severity(brk.Chapter, analysis), fallsBackToChapter: true, unplaced: reason);
+                brk.Chapter, Severity(brk.Severity, brk.Chapter, analysis), fallsBackToChapter: true, unplaced: reason);
         }
 
         foreach (var addition in analysis.Expansion?.ScenesToAdd ?? [])
@@ -156,7 +157,7 @@ public static partial class MarkSource
             var earns = scene.Outcome == SceneVerdict.EarnsItsPlace;
             placer.Place(
                 "Scene by scene", earns ? MarkKind.Check : MarkKind.Dele, earns ? "Earns its place" : "Does no work",
-                scene.Excerpt, Join(scene.Purpose, scene.Verdict), scene.Chapter, Severity(scene.Chapter, analysis),
+                scene.Excerpt, Join(scene.Purpose, scene.Verdict), scene.Chapter, Severity(null, scene.Chapter, analysis),
                 fallsBackToChapter: false, unplaced: null);
         }
 
@@ -169,7 +170,7 @@ public static partial class MarkSource
                 placer.Place(
                     "Scene by scene", MarkKind.Query, Scenes.SceneWords.Kind(inconsistency.Kind),
                     inconsistency.Excerpt, inconsistency.Detail, judgement.Chapter,
-                    Severity(judgement.Chapter, analysis), fallsBackToChapter: true, unplaced: inconsistency.Detail);
+                    Severity(inconsistency.Severity, judgement.Chapter, analysis), fallsBackToChapter: true, unplaced: inconsistency.Detail);
             }
         }
 
@@ -188,7 +189,7 @@ public static partial class MarkSource
                 : finding.Detail;
             placer.Place(
                 source, MarkKind.Query, label, finding.Excerpt, detail, finding.Chapter,
-                Severity(finding.Chapter, analysis), fallsBackToChapter: true, unplaced: detail);
+                Severity(finding.Severity, finding.Chapter, analysis), fallsBackToChapter: true, unplaced: detail);
         }
     }
 
@@ -224,12 +225,17 @@ public static partial class MarkSource
         string.IsNullOrWhiteSpace(excerpt) ? string.Empty : $"“{excerpt.Trim()}”";
 
     /// <summary>
-    /// How much a mark matters, taken from the revision plan rather than invented: a mark inside the
-    /// chapters a Must covers is a Must. Neither source record carries a tier of its own, and the
-    /// alternative — one hue for every mark — would make the severity colours decorative.
+    /// How much a mark matters. The finding's own severity first (R8), asked for in the prompt that
+    /// wrote it; a report stored before findings carried one, or a word the model made up, falls back
+    /// to the revision plan: a mark inside the chapters a Must covers is a Must.
     /// </summary>
-    private static ReadinessTier Severity(string? chapter, BookAnalysisResult analysis)
+    private static ReadinessTier Severity(string? own, string? chapter, BookAnalysisResult analysis)
     {
+        if (ChapterCitation.TierOrNull(own) is { } stated)
+        {
+            return stated;
+        }
+
         if (ChapterCitation.Span(chapter) is not { } here)
         {
             return ReadinessTier.Consider;
@@ -263,6 +269,7 @@ public static partial class MarkSource
         private readonly ExcerptIndex? index;
         private readonly List<Mark> marks = [];
         private readonly List<UnplacedNote> unplaced = [];
+        private readonly List<(int Chapter, int Order, ChapterNote Note)> chapterNotes = [];
 
         public Placer(string manuscript, BookAnalysisResult analysis, IReadOnlyList<ChapterSpan> chapters)
         {
@@ -286,15 +293,11 @@ public static partial class MarkSource
                 return;
             }
 
-            if (fallsBackToChapter && ChapterHead(chapter) is { } head)
+            if (fallsBackToChapter && ChapterOf(chapter) is { } cited && ChapterHead(cited) is not null)
             {
-                // Always a query: a dele would strike through the chapter's heading, and a caret there
-                // would claim something is missing at a point nobody identified.
-                var where = string.IsNullOrWhiteSpace(excerpt)
-                    ? "In this chapter —"
-                    : $"In this chapter, {Quoted(excerpt)} —";
-                marks.Add(new Mark(
-                    MarkKind.Query, severity, head.Start, head.End, label, Join(where, reason), source));
+                // A list at the chapter's head (R7), keeping the words it tried to quote.
+                chapterNotes.Add((cited.Number, chapterNotes.Count,
+                    new ChapterNote(severity, label, Join(Quoted(excerpt), reason), source)));
                 return;
             }
 
@@ -333,7 +336,35 @@ public static partial class MarkSource
         }
 
         public MarkedReport Finish() =>
-            new([.. marks.OrderBy(mark => mark.StartOffset)], [.. unplaced]);
+            new([.. marks.OrderBy(mark => mark.StartOffset)], [.. unplaced])
+            {
+                ChapterNotes =
+                [
+                    .. chapterNotes
+                        .GroupBy(entry => entry.Chapter)
+                        .Select(group => Notes(group.Key, [.. group
+                            .OrderBy(entry => entry.Note.Severity)
+                            .ThenBy(entry => entry.Order)
+                            .Select(entry => entry.Note)]))
+                        .OrderBy(notes => notes.Offset),
+                ],
+            };
+
+        /// <summary>
+        /// Where a chapter's list goes: past its title when the first line is one — short, on a line
+        /// of its own, not ending like a sentence — else before its first word.
+        /// </summary>
+        private ChapterNotes Notes(int number, IReadOnlyList<ChapterNote> notes)
+        {
+            var chapter = chapters.First(candidate => candidate.Number == number);
+            var head = ChapterHead(chapter)!.Value;
+            var line = manuscript[head.Start..head.End].TrimEnd();
+            var isTitle = head.End < manuscript.Length
+                && manuscript[head.End] == '\n'
+                && line.Length > 0
+                && !".!?\"”’…:;,".Contains(line[^1]);
+            return new ChapterNotes(number, isTitle ? head.End : head.Start, isTitle, notes);
+        }
 
         private ChapterSpan? ChapterOf(string? citation) =>
             index is not null
@@ -347,13 +378,8 @@ public static partial class MarkSource
         /// not guessed at — a mark on chapter 20 for a problem the reader found in chapter 40 is
         /// indistinguishable on the page from a real one.
         /// </summary>
-        private TextRange? ChapterHead(string? citation)
+        private TextRange? ChapterHead(ChapterSpan chapter)
         {
-            if (ChapterOf(citation) is not { } chapter)
-            {
-                return null;
-            }
-
             var limit = Math.Min(chapter.EndOffset, manuscript.Length);
             var start = Math.Clamp(chapter.StartOffset, 0, limit);
             while (start < limit && char.IsWhiteSpace(manuscript[start]))

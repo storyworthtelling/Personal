@@ -1,3 +1,4 @@
+using Folio.Domain.Readiness;
 using SkiaSharp;
 using Storyworthtelling.Paper;
 
@@ -39,6 +40,18 @@ public static class ReportPalette
     public static readonly SKColor Should = Role(ColorRole.Caution);
     public static readonly SKColor Consider = Role(ColorRole.Reference);
     public static readonly SKColor Great = Role(ColorRole.Positive);
+
+    /// <summary>
+    /// What a mark, its note and its leader on the manuscript are drawn in (R8): Problem rose for a
+    /// Must, Caution ochre for a Should, muted ink for a Consider — and the Positive mark for praise.
+    /// </summary>
+    public static SKColor Severity(ReadinessTier tier) => tier switch
+    {
+        ReadinessTier.Must => MustFix,
+        ReadinessTier.Should => Should,
+        ReadinessTier.Great => Great,
+        _ => InkMuted,
+    };
 
     private static SKColor Role(ColorRole role) =>
         PaperPalette.ResolveRole(role, ColorTier.Mark, Profile);

@@ -188,7 +188,7 @@ public sealed class AnalysisDocumentRenderer
 
         RenderWholeBookNotes(writer, analysis, marked.Unplaced, body, bodyBold, bodyItalic, h2, h3);
 
-        RenderMarkedManuscript(writer, text, marked.Marks, scenes, bodyItalic, h2);
+        RenderMarkedManuscript(writer, text, marked, scenes, bodyItalic, h2);
 
         // The question each reader was asked depends on the manuscript's length (the Agent reads a short
         // story for a different thing), so the page names the one actually asked.
@@ -212,26 +212,30 @@ public sealed class AnalysisDocumentRenderer
     /// the book, not a reading of it.
     /// </summary>
     private static void RenderMarkedManuscript(
-        PageWriter writer, string manuscript, IReadOnlyList<Mark> marks, IReadOnlyList<SceneEvidence> scenes,
+        PageWriter writer, string manuscript, MarkedReport marked, IReadOnlyList<SceneEvidence> scenes,
         SKFont bodyItalic, SKFont h2)
     {
         scenes ??= [];
+        var marks = marked.Marks;
 
         // A hundred and forty pages of unmarked prose is a copy of the book, not a reading of it — but
         // a scene's block is a reading too, so a book with scenes and no marks still prints.
-        if (!string.IsNullOrWhiteSpace(manuscript) && (marks.Count > 0 || scenes.Count > 0))
+        if (!string.IsNullOrWhiteSpace(manuscript) && (marks.Count > 0 || scenes.Count > 0 || marked.ChapterNotes.Count > 0))
         {
             writer.BeginSection(FolioSheet.Manuscript);
             writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
             writer.Paragraph(
                 "Your pages with the findings on them. A caret is something missing, a struck line is "
                 + "something doing no work, an underline is something unclear, and a ticked underline is "
-                + "praise — and the note in the margin says why. None of them writes the line for you. "
+                + "praise — and the note in the margin says why. Its rule says how much it matters: a solid "
+                + "rose rule must be fixed, a dashed ochre one should be, a dotted grey one is worth "
+                + "considering. A note that is about a chapter rather "
+                + "than a line is listed at the chapter's head. None of them writes the line for you. "
                 + "At the end of each scene, a block shows the picture a reader forms from your words, "
                 + "and what the scene is doing.",
                 bodyItalic, Muted);
 
-            MarkedManuscript.Render(writer, manuscript, marks, scenes);
+            MarkedManuscript.Render(writer, manuscript, marks, scenes, marked.ChapterNotes);
 
             // Whatever follows starts on its own sheet: after a hundred and forty pages of marked prose, a heading four
             // lines under the last one reads as part of the book. Every part after it (readers, plan, verdict) turns its

@@ -40,8 +40,13 @@ internal static class MarkedManuscript
     /// manuscript is cut at those lines and carries on beneath each block, on the same sheet when
     /// there is room for it.
     /// </param>
+    /// <param name="chapterNotes">
+    /// Each chapter's notes that found no passage (R7), as a list at the chapter's head — under its
+    /// title, or before its first line when it opens straight into prose.
+    /// </param>
     public static void Render(
-        PageWriter writer, string manuscript, IReadOnlyList<Mark> marks, IReadOnlyList<SceneEvidence>? scenes = null)
+        PageWriter writer, string manuscript, IReadOnlyList<Mark> marks, IReadOnlyList<SceneEvidence>? scenes = null,
+        IReadOnlyList<ChapterNotes>? chapterNotes = null)
     {
         if (string.IsNullOrWhiteSpace(manuscript))
             return;
@@ -66,35 +71,65 @@ internal static class MarkedManuscript
             .ToLookup(placed => placed.Line, placed => placed.Mark);
         var anchored = Anchor(all, spans);
 
-        // Each block follows the line its scene ends on; one with no known end follows the last line
-        // rather than being lost. The sort is stable, so scenes ending on one line keep reading order.
-        var pending = new Queue<(int Line, SceneEvidence Scene)>(
+        // Every block is due before a line: a scene's block before the line after its last words (one
+        // with no known end after the last line, rather than being lost), a chapter's list before the
+        // line its title gives way to. Scenes come first, so a scene closing a chapter keeps its block
+        // ahead of the next chapter's list; the sort is stable, so blocks due together keep that order.
+        var pending = new Queue<(int Before, Action Draw)>(
             (scenes ?? [])
                 .Select(scene => (
-                    Line: SceneBlockPlan.LineAfter(manuscript, spans, scene.EndOffset) ?? lines.Count - 1,
-                    Scene: scene))
-                .OrderBy(placed => placed.Line));
+                    Before: (SceneBlockPlan.LineAfter(manuscript, spans, scene.EndOffset) ?? lines.Count - 1) + 1,
+                    Draw: (Action)(() => DrawSceneBlock(writer, scene))))
+                .Concat((chapterNotes ?? [])
+                    .Select(chapter => (
+                        Before: SceneBlockPlan.LineBefore(spans, chapter.Offset, chapter.FollowsTitle),
+                        Draw: (Action)(() => DrawChapterNotes(writer, chapter)))))
+                .OrderBy(placed => placed.Before));
 
         var first = 0;
         var continuePage = false;
         while (first < lines.Count)
         {
-            var limit = pending.Count > 0 ? Math.Max(pending.Peek().Line + 1, first + 1) : lines.Count;
-            first = writer.ManuscriptPage(manuscript, lines, first, limit, continuePage, drawnOn, anchored, prose, note);
-
             var drew = false;
-            while (pending.Count > 0 && pending.Peek().Line < first)
+            while (pending.Count > 0 && pending.Peek().Before <= first)
             {
-                DrawSceneBlock(writer, pending.Dequeue().Scene);
+                pending.Dequeue().Draw();
                 drew = true;
             }
 
-            // The next scene carries on under the block it just got, unless the block ended the sheet.
-            continuePage = drew && (writer.OnFreshPage || writer.Remaining >= MinimumRoomInLines * MarkupGeometry.LineHeight);
+            // The text carries on under the block it just got, unless the block ended the sheet.
+            if (drew)
+                continuePage = writer.OnFreshPage || writer.Remaining >= MinimumRoomInLines * MarkupGeometry.LineHeight;
+
+            var limit = pending.Count > 0 ? Math.Max(pending.Peek().Before, first + 1) : lines.Count;
+            first = writer.ManuscriptPage(manuscript, lines, first, limit, continuePage, drawnOn, anchored, prose, note);
+            continuePage = false;
         }
 
         while (pending.Count > 0)
-            DrawSceneBlock(writer, pending.Dequeue().Scene);
+            pending.Dequeue().Draw();
+    }
+
+    /// <summary>
+    /// A chapter's notes that found no passage of their own (R7): a short list under a muted label,
+    /// each note led by a rule in its severity's colour and dash, so it reads as the same kind of note
+    /// the margin carries, gathered.
+    /// </summary>
+    public static void DrawChapterNotes(PageWriter writer, ChapterNotes chapter)
+    {
+        using var italic = ReportType.BodyItalic();
+        using var small = ReportType.Small();
+
+        writer.Gap(PageGeometry.BlockGap / 2);
+        writer.KeepTogether(italic.Spacing + (small.Spacing * 3));
+        writer.Paragraph("Notes on this chapter", italic, ReportPalette.InkMuted);
+        foreach (var item in chapter.Notes)
+        {
+            var text = string.IsNullOrWhiteSpace(item.Text) ? item.Label : $"{item.Label} — {item.Text}";
+            writer.SeverityItem(text, small, item.Severity);
+        }
+
+        writer.Gap(PageGeometry.BlockGap / 2);
     }
 
     /// <summary>
@@ -225,13 +260,4 @@ internal static class MarkedManuscript
                 break;
         }
     }
-
-    /// <summary>The severity's printed hue — the same four the chart and the plan use.</summary>
-    public static SKColor Hue(ReadinessTier severity) => severity switch
-    {
-        ReadinessTier.Must => ReportPalette.MustFix,
-        ReadinessTier.Should => ReportPalette.Should,
-        ReadinessTier.Consider => ReportPalette.Consider,
-        _ => ReportPalette.Great,
-    };
 }

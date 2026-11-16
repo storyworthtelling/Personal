@@ -163,6 +163,36 @@ internal sealed class PageWriter : IDisposable
         y += PageGeometry.TightGap;
     }
 
+    /// <summary>
+    /// One note in a chapter's list (R7): the text indented as a bullet's, led by an upright rule in
+    /// the severity's colour and dash — the same bracket a margin note wears.
+    /// </summary>
+    public void SeverityItem(string text, SKFont font, ReadinessTier severity)
+    {
+        var lineHeight = font.Size * PageGeometry.LineSpacing;
+        var lines = SkiaText.Wrap(font, text, ContentWidth - PageGeometry.BulletIndent);
+        var cue = SeverityCue.Leader(severity);
+        using var paint = new SKPaint { Color = ReportPalette.InkSoft, IsAntialias = true };
+        using var bracket = new SKPaint
+        {
+            Color = ReportPalette.Severity(severity), IsAntialias = true, Style = SKPaintStyle.Stroke,
+            StrokeWidth = (float)MarkupGeometry.BracketWidth, StrokeCap = SKStrokeCap.Butt,
+            PathEffect = cue.IsSolid ? null : SKPathEffect.CreateDash([.. cue.Dash.Select(length => (float)length)], 0),
+        };
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (y + lineHeight > ContentBottom)
+                NewPage();
+            var x = ContentLeft + ((float)MarkupGeometry.BracketWidth / 2f);
+            canvas.DrawLine(x, y + 1f, x, y + lineHeight - 1f, bracket);
+            canvas.DrawText(lines[i], ContentLeft + PageGeometry.BulletIndent, y + font.Size, font, paint);
+            y += lineHeight;
+        }
+
+        y += PageGeometry.TightGap;
+    }
+
     public void Bullet(string text, SKFont font, SKColor color)
     {
         var lineHeight = font.Size * PageGeometry.LineSpacing;
@@ -470,16 +500,22 @@ internal sealed class PageWriter : IDisposable
         var last = Math.Min(Math.Min(first + perPage, lines.Count), limit);
 
         // What each line's notes come to, in the order the notes will be packed.
+        // Each note keeps its own mark: several notes can share a line, and each is drawn in its own
+        // severity and led to its own phrase (taking the line's first mark for all of them coloured
+        // every later note on that line by the first one's severity).
         var wanted = new List<(int Line, double AnchorY, double Height)>();
         var wrapped = new Dictionary<int, List<string>>();
+        var noteMarks = new List<(Mark Mark, int Stack)>();
         for (var i = first; i < last; i++)
         {
+            var stack = 0;
             foreach (var mark in anchored[i])
             {
                 var text = NoteText(mark);
                 var wraps = SkiaText.Wrap(noteFont, text, noteWidth - 6f);
                 wrapped[wanted.Count] = wraps;
                 wanted.Add((i, (i - first) * lineHeight, (wraps.Count * noteFont.Spacing) + 6f));
+                noteMarks.Add((mark, stack++));
             }
         }
 
@@ -507,9 +543,12 @@ internal sealed class PageWriter : IDisposable
             if (note.AnchorLine >= last)
                 continue;   // its line went to the next page with it
 
+            var line = wanted[n].Line;
+            var anchor = lines[line];
             DrawNote(
-                packed.Notes[n], wanted[n].Line, wrapped[n], anchored[wanted[n].Line].First(),
-                marginLeft, noteWidth, noteFont, lineHeight, prose.Size, origin);
+                packed.Notes[n], wrapped[n], noteMarks[n].Mark, noteMarks[n].Stack,
+                PhraseOn(manuscript, new LineSpan(line, anchor.Start, anchor.End), noteMarks[n].Mark, textLeft, prose),
+                marginLeft, noteFont, origin + ((line - first) * lineHeight) + prose.Size, origin);
         }
 
         // The page draws in absolute coordinates, so the flowing cursor has to be told where the
@@ -530,29 +569,47 @@ internal sealed class PageWriter : IDisposable
         var width = mark.IsPoint ? 0f : prose.MeasureText(manuscript[run.Start..run.End]);
 
         MarkedManuscript.DrawMark(
-            canvas, mark, x, baseline, width, MarkedManuscript.Hue(mark.Severity),
+            canvas, mark, x, baseline, width, ReportPalette.Severity(mark.Severity),
             tail: run.End >= mark.EndOffset);
     }
 
+    /// <summary>Where a mark's phrase starts and ends on its anchor line, in page points.</summary>
+    private static (float Left, float Right) PhraseOn(string manuscript, LineSpan line, Mark mark, float left, SKFont prose)
+    {
+        if (MarkPlacement.RunOn(mark, line) is not { } run)
+            return (left, left);
+
+        var x = left + prose.MeasureText(manuscript[line.StartOffset..run.Start]);
+        return mark.IsPoint ? (x, x) : (x, x + prose.MeasureText(manuscript[run.Start..run.End]));
+    }
+
     /// <summary>
-    /// The note itself: a severity bracket, the reason, and — when the packing pushed it down — a
-    /// leader elbowing back to the line it concerns, so a reader never has to guess which line a
-    /// note two inches lower is about.
+    /// The note itself: a severity bracket, the reason, and a leader back to the phrase it is about
+    /// (R6). The bracket and leader take the severity's colour and its dash (R8) — the dash because on
+    /// the rM2 a Must's rose and a Should's ochre print as the same grey.
     /// </summary>
     private void DrawNote(
-        PlacedNote note, int line, IReadOnlyList<string> wraps, Mark mark,
-        float marginLeft, float noteWidth, SKFont font, float lineHeight, float proseSize, float origin)
+        PlacedNote note, IReadOnlyList<string> wraps, Mark mark, int stack, (float Left, float Right) phrase,
+        float marginLeft, SKFont font, float baseline, float origin)
     {
-        var hue = MarkedManuscript.Hue(mark.Severity);
+        var hue = ReportPalette.Severity(mark.Severity);
+        var cue = SeverityCue.Leader(mark.Severity);
         var top = origin + (float)note.Top;
 
-        using (var bracket = new SKPaint
+        using var stroke = new SKPaint
         {
-            Color = hue, IsAntialias = true, Style = SKPaintStyle.Fill,
-        })
-            canvas.DrawRect(
-                marginLeft - (float)MarkupGeometry.BracketInset - (float)MarkupGeometry.BracketWidth,
-                top, (float)MarkupGeometry.BracketWidth, (float)note.Height - 6f, bracket);
+            Color = hue, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = (float)cue.Width,
+            StrokeCap = SKStrokeCap.Butt, StrokeJoin = SKStrokeJoin.Miter,
+            PathEffect = cue.IsSolid ? null : SKPathEffect.CreateDash([.. cue.Dash.Select(length => (float)length)], 0),
+        };
+
+        // The bracket: an upright beside the note, at the bracket's full width, broken like the leader.
+        using (var bracket = stroke.Clone())
+        {
+            bracket.StrokeWidth = (float)MarkupGeometry.BracketWidth;
+            var x = marginLeft - (float)MarkupGeometry.BracketInset - ((float)MarkupGeometry.BracketWidth / 2f);
+            canvas.DrawLine(x, top, x, top + (float)note.Height - 6f, bracket);
+        }
 
         using (var ink = new SKPaint { Color = ReportPalette.InkSoft, IsAntialias = true })
         {
@@ -564,20 +621,16 @@ internal sealed class PageWriter : IDisposable
             }
         }
 
-        if (!note.NeedsLeader)
-            return;
-
-        // Out of the text, down the gutter, and in to the note — an elbow rather than a diagonal,
-        // because a diagonal across a column of prose reads as a mark on the prose.
-        var anchorY = origin + (float)note.AnchorY + (proseSize / 2f) + 2f;
-        var elbow = ContentLeft + (float)MarkupGeometry.TextWidth + 22f;
-        using var leader = new SKPaint
-        {
-            Color = ReportPalette.Hairline, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 0.6f,
-        };
-        canvas.DrawLine(ContentLeft + (float)MarkupGeometry.TextWidth + 6f, anchorY, elbow, anchorY, leader);
-        canvas.DrawLine(elbow, anchorY, elbow, top + (font.Size / 2f), leader);
-        canvas.DrawLine(elbow, top + (font.Size / 2f), marginLeft - 4f, top + (font.Size / 2f), leader);
+        var route = LeaderRoute.For(
+            phrase.Left, phrase.Right, baseline,
+            ContentLeft + MarkupGeometry.TextWidth + (MarkupGeometry.Gutter / 2),
+            marginLeft - MarkupGeometry.BracketInset - MarkupGeometry.BracketWidth - 2,
+            top + (font.Size / 2f), stack);
+        using var path = new SKPath();
+        path.MoveTo((float)route[0].X, (float)route[0].Y);
+        foreach (var point in route.Skip(1))
+            path.LineTo((float)point.X, (float)point.Y);
+        canvas.DrawPath(path, stroke);
     }
 
     /// <summary>

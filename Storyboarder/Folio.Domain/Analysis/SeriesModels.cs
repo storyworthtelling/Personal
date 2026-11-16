@@ -30,6 +30,13 @@ public sealed record SeriesBreak(string Chapter, string Established, string Cont
     // A verbatim line from THIS book where the clash is, so the contradiction is written on that line
     // rather than listed. Empty when the model gave only a chapter.
     public string Excerpt { get; init; } = string.Empty;
+
+    /// <summary>
+    /// How much this matters — "Must", "Should" or "Consider" — as the model judged it when it wrote
+    /// the finding (R8). Empty on a report stored before findings carried one; the mark then takes the
+    /// revision plan's tier for its chapter.
+    /// </summary>
+    public string Severity { get; init; } = string.Empty;
 }
 
 // A prior-book open thread carried forward, and how this book handles it — "Addressed", "Ignored", or

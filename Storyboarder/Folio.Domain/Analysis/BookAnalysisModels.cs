@@ -71,6 +71,13 @@ public sealed record ReportFinding(string Chapter, string Detail)
     /// report stored before findings carried one, which is why it is init-only with an empty default.
     /// </summary>
     public string Excerpt { get; init; } = string.Empty;
+
+    /// <summary>
+    /// How much this matters — "Must", "Should" or "Consider" — as the model judged it when it wrote
+    /// the finding (R8). Empty on a report stored before findings carried one; the mark then takes the
+    /// revision plan's tier for its chapter.
+    /// </summary>
+    public string Severity { get; init; } = string.Empty;
 }
 
 public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
@@ -78,6 +85,7 @@ public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
     private const string ChapterProperty = "chapter";
     private const string DetailProperty = "detail";
     private const string ExcerptProperty = "excerpt";
+    private const string SeverityProperty = "severity";
 
     public override ReportFinding Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -91,10 +99,11 @@ public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
         var chapter = string.Empty;
         var detail = string.Empty;
         var excerpt = string.Empty;
+        var severity = string.Empty;
         while (reader.Read())
         {
             if (reader.TokenType == JsonTokenType.EndObject)
-                return new ReportFinding(chapter, detail) { Excerpt = excerpt };
+                return new ReportFinding(chapter, detail) { Excerpt = excerpt, Severity = severity };
             if (reader.TokenType != JsonTokenType.PropertyName)
                 continue;
 
@@ -109,6 +118,8 @@ public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
                 detail = value;
             else if (string.Equals(name, ExcerptProperty, StringComparison.OrdinalIgnoreCase))
                 excerpt = value;
+            else if (string.Equals(name, SeverityProperty, StringComparison.OrdinalIgnoreCase))
+                severity = value;
         }
 
         throw new JsonException("A report finding object was not terminated.");
@@ -123,6 +134,8 @@ public sealed class ReportFindingJsonConverter : JsonConverter<ReportFinding>
         // did and nothing stored changes shape.
         if (!string.IsNullOrWhiteSpace(value.Excerpt))
             writer.WriteString(ExcerptProperty, value.Excerpt);
+        if (!string.IsNullOrWhiteSpace(value.Severity))
+            writer.WriteString(SeverityProperty, value.Severity);
         writer.WriteEndObject();
     }
 }
@@ -203,6 +216,13 @@ public sealed record LineEdit(
 {
     // Defaults to Other for a stored report from before this existed, or a reply that omits it.
     public LineEditKind Kind { get; init; } = LineEditKind.Other;
+
+    /// <summary>
+    /// How much this matters — "Must", "Should" or "Consider" — as the model judged it when it wrote
+    /// the finding (R8). Empty on a report stored before findings carried one; the mark then takes the
+    /// revision plan's tier for its chapter.
+    /// </summary>
+    public string Severity { get; init; } = string.Empty;
 }
 
 // A prose-style or voice pattern: repetition, filter words ("she felt", "he saw"), a verbal tic,
@@ -211,7 +231,15 @@ public sealed record ProseNote(
     string Chapter,
     string Pattern,
     string Evidence,
-    string Fix);
+    string Fix)
+{
+    /// <summary>
+    /// How much this matters — "Must", "Should" or "Consider" — as the model judged it when it wrote
+    /// the finding (R8). Empty on a report stored before findings carried one; the mark then takes the
+    /// revision plan's tier for its chapter.
+    /// </summary>
+    public string Severity { get; init; } = string.Empty;
+}
 
 // A dialogue critique: whether the speakers sound distinct, on-the-nose exchanges, and exposition
 // dumped into speech.
@@ -225,6 +253,13 @@ public sealed record DialogueNote(
     // is: "all three sound identical" is an aggregate observation with nothing to point at. Empty
     // means exactly that, and MarkSource produces no mark for it.
     public string Excerpt { get; init; } = string.Empty;
+
+    /// <summary>
+    /// How much this matters — "Must", "Should" or "Consider" — as the model judged it when it wrote
+    /// the finding (R8). Empty on a report stored before findings carried one; the mark then takes the
+    /// revision plan's tier for its chapter.
+    /// </summary>
+    public string Severity { get; init; } = string.Empty;
 }
 
 // Whether a scene, once written, earns its place or does no work for the book.
@@ -434,7 +469,15 @@ public enum ShowTellDirection
 // One show-vs-tell note, both ends of the pendulum. Chapter locates it; Excerpt quotes the prose verbatim so
 // the author can find it; Suggestion is a pointer ("this summary could be a scene" / "this runs long"), never
 // a rewrite.
-public sealed record ShowTellNote(string Chapter, string Excerpt, ShowTellDirection Direction, string Suggestion);
+public sealed record ShowTellNote(string Chapter, string Excerpt, ShowTellDirection Direction, string Suggestion)
+{
+    /// <summary>
+    /// How much this matters — "Must", "Should" or "Consider" — as the model judged it when it wrote
+    /// the finding (R8). Empty on a report stored before findings carried one; the mark then takes the
+    /// revision plan's tier for its chapter.
+    /// </summary>
+    public string Severity { get; init; } = string.Empty;
+}
 
 // The manuscript's length against its genre norm. WordCount is the real count (computed deterministically);
 // TargetLow/TargetHigh are the model's genre-norm range; Note is the plain-language framing (LengthGap).
@@ -483,7 +526,15 @@ public sealed record VoiceConsistency(string DominantVoice, IReadOnlyList<VoiceD
 // One passage that reads as off from the book's established voice. Chapter locates it; Excerpt quotes the
 // divergent prose verbatim so the author can find it; Divergence says how it departs from the dominant
 // voice (register, diction, cadence, tone); Suggestion says how to bring it back into line.
-public sealed record VoiceDivergence(string Chapter, string Excerpt, string Divergence, string Suggestion);
+public sealed record VoiceDivergence(string Chapter, string Excerpt, string Divergence, string Suggestion)
+{
+    /// <summary>
+    /// How much this matters — "Must", "Should" or "Consider" — as the model judged it when it wrote
+    /// the finding (R8). Empty on a report stored before findings carried one; the mark then takes the
+    /// revision plan's tier for its chapter.
+    /// </summary>
+    public string Severity { get; init; } = string.Empty;
+}
 
 // A representative prose sample from one chapter, fed to the voice-consistency read so the model judges
 // the actual writing rather than a summary of it.

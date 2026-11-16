@@ -22,7 +22,15 @@ public enum SceneInconsistencyKind
 /// One place a scene is inconsistent with itself or the book. <see cref="Excerpt"/> is a short verbatim
 /// quote, so the note is also written at its line (R5); empty when the model gave none.
 /// </summary>
-public sealed record SceneInconsistency(SceneInconsistencyKind Kind, string Detail, string Excerpt);
+public sealed record SceneInconsistency(SceneInconsistencyKind Kind, string Detail, string Excerpt)
+{
+    /// <summary>
+    /// How much this matters — "Must", "Should" or "Consider" — as the model judged it when it wrote
+    /// the finding (R8). Empty on a report stored before findings carried one; the mark then takes the
+    /// revision plan's tier for its chapter.
+    /// </summary>
+    public string Severity { get; init; } = string.Empty;
+}
 
 /// <summary>
 /// One detected scene, judged on its own (release A3–A4). Keyed by the scene's own number, never by its

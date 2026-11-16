@@ -51,4 +51,29 @@ public static class SceneBlockPlan
 
         return line;
     }
+
+    /// <summary>
+    /// The index of the line a chapter's list of notes (R7) goes <b>before</b>. After a title it is the
+    /// line following the one the title ends on; otherwise the line holding the chapter's first word.
+    /// </summary>
+    public static int LineBefore(IReadOnlyList<LineSpan> lines, int offset, bool followsTitle)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+
+        var target = followsTitle ? Math.Max(offset - 1, 0) : offset;
+        var line = 0;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (lines[i].StartOffset <= target)
+            {
+                line = i;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return followsTitle ? line + 1 : line;
+    }
 }

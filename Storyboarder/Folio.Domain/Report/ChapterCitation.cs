@@ -90,6 +90,20 @@ public static partial class ChapterCitation
             _ => ReadinessTier.Consider,
         };
 
+    /// <summary>
+    /// A finding's own severity word, or null when there is none or the model sent something other
+    /// than the three it was asked for — the caller then falls back rather than reading an unknown
+    /// word as Consider, which would quietly lower a finding the plan ranks higher.
+    /// </summary>
+    public static ReadinessTier? TierOrNull(string? severity) =>
+        severity?.Trim().ToLowerInvariant() switch
+        {
+            "must" or "must fix" => ReadinessTier.Must,
+            "should" => ReadinessTier.Should,
+            "consider" => ReadinessTier.Consider,
+            _ => null,
+        };
+
     /// <summary>Where a chapter number sits on the curve, matched by the number in its own label.</summary>
     private static int? IndexOf(int chapter, IReadOnlyList<ChapterTension> curve)
     {

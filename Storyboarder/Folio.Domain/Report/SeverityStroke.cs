@@ -35,4 +35,15 @@ public static class SeverityCue
         ReadinessTier.Great => new(1.6, [9, 3, 2, 3]),
         _ => Plain,
     };
+
+    /// <summary>
+    /// A note's leader and bracket on the manuscript (R6, R8): the same dash as the chart's stroke, at
+    /// half its weight, since it runs under prose. The dash is what tells a Must from a Should on the
+    /// rM2, where Problem rose and Caution ochre print as one grey.
+    /// </summary>
+    public static SeverityStroke Leader(ReadinessTier tier)
+    {
+        var stroke = Stroke(tier);
+        return stroke with { Width = stroke.Width / 2 };
+    }
 }

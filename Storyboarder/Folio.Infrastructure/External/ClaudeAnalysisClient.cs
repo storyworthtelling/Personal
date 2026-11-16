@@ -62,14 +62,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "text, the story so far when it begins, the book's dominant voice, and the cast and settings it names. " +
         "Respond with ONLY a JSON object: {\"accomplishes\":string,\"call\":\"Keep|Tighten|Rewrite|Cut\"," +
         "\"tension\":number,\"verdict\":string,\"inconsistencies\":[{\"kind\":\"Voice|Tense|Characterisation|Setting\"," +
-        "\"detail\":string,\"excerpt\":string}]}. accomplishes = what this scene does for the plot and for the " +
+        "\"detail\":string,\"excerpt\":string,\"severity\":\"Must|Should|Consider\"}]}. accomplishes = what this scene does for the plot and for the " +
         "characters, in one or two sentences. call = Keep (it works), Tighten (it works but runs long or repeats), " +
         "Rewrite (it does not yet do its job), or Cut (the book loses nothing without it). tension = how much " +
         "pressure the scene carries, from 0 (calm) to 1 (peak). verdict = one or two sentences on why the call. " +
         "inconsistencies = places where the scene's voice drifts from the book's, its tense slips, a character " +
         "acts or sounds unlike the story so far without cause, or a setting contradicts what was established; " +
         "an empty list when there are none. excerpt = a short verbatim quote (under fifteen words) from THIS " +
-        "scene where the inconsistency is, so the note can be written on that line. You diagnose and point: " +
+        "scene where the inconsistency is, so the note can be written on that line. severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). You diagnose and point: " +
         "never write replacement prose, never rewrite a sentence, never supply the author's words.";
 
     private const string SceneImageInstruction =
@@ -148,13 +148,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         // Every finding has to be findable: an observation the author can't locate in the manuscript
         // costs them a re-read to act on. The chapter is already on the notes, so it only has to be
         // carried through rather than worked out.
-        "FINDING is an object {\"chapter\":string,\"detail\":string,\"excerpt\":string}: copy \"chapter\" from the note the " +
+        "FINDING is an object {\"chapter\":string,\"detail\":string,\"excerpt\":string,\"severity\":\"Must|Should|Consider\"}: copy \"chapter\" from the note the " +
         "observation came from (\"Chapter 7\", \"Chapters 7–8\"), naming the EARLIEST chapter involved " +
         "when an observation spans several, and use \"\" only when the notes carry no chapter at all. " +
         // The excerpt is what lets the finding be written on the page it concerns.
         "\"excerpt\": when the note you drew the finding from quotes a phrase, copy that phrase VERBATIM " +
         "(a short one, under fifteen words) so the finding can be written on that line of the manuscript; " +
-        "use \"\" when the finding is about the book as a whole or no phrase was quoted. " +
+        "use \"\" when the finding is about the book as a whole or no phrase was quoted." +
+        " severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). " +
         "Set \"chapter\" on each revisionPlan item the same way. " +
         "genre: infer the book's genre. wordCountRange: the word-count range publishers expect for that " +
         "genre (e.g. \"90,000–120,000\"). " +
@@ -179,9 +180,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "your three sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
         "book — merge duplicates, drop the trivial, keep the author's own words when quoting. Respond " +
         "with ONLY a JSON object: " +
-        "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string,\"kind\":string}]," +
-        "\"proseNotes\":[{\"chapter\":string,\"pattern\":string,\"evidence\":string,\"fix\":string}]," +
-        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string,\"excerpt\":string}]}. " +
+        "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string,\"kind\":string,\"severity\":\"Must|Should|Consider\"}]," +
+        "\"proseNotes\":[{\"chapter\":string,\"pattern\":string,\"evidence\":string,\"fix\":string,\"severity\":\"Must|Should|Consider\"}]," +
+        "\"dialogueNotes\":[{\"chapter\":string,\"speakers\":string,\"observation\":string,\"fix\":string,\"excerpt\":string,\"severity\":\"Must|Should|Consider\"}]}. " +
         "lineEdits: specific sentences to cut, tighten, or rewrite — \"excerpt\" quoted verbatim from " +
         "the notes so the author can find it, \"suggestion\" the actual replacement or cut, \"reason\" " +
         "one short clause, \"kind\" the ONE word that names what is actually wrong with the sentence: " +
@@ -198,7 +199,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "quote it verbatim from the notes; leave \"\" for an aggregate observation with no single " +
         "exchange to point at (e.g. \"all three sound identical\"). AT MOST 20. " +
         "Every \"chapter\" is copied from the note the item came from; \"\" only when the notes carry " +
-        "none. Use [] when none. No prose outside the JSON.";
+        "none. Every item has a severity: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). Use [] when none. No prose outside the JSON.";
 
     private const string VoiceConsistencyInstruction =
         "You are a developmental editor assessing a manuscript's VOICE CONSISTENCY for an author preparing " +
@@ -211,10 +212,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "chapter, a letter or document embedded in the text) is NOT a defect, so flag only drift that " +
         "reads as unintentional. Respond with ONLY a JSON object: " +
         "{\"dominantVoice\":string,\"divergences\":[{\"chapter\":string,\"excerpt\":string," +
-        "\"divergence\":string,\"suggestion\":string}]}. dominantVoice: two or three sentences " +
+        "\"divergence\":string,\"suggestion\":string,\"severity\":\"Must|Should|Consider\"}]}. dominantVoice: two or three sentences " +
         "characterizing the book's established voice. excerpt: quote the divergent prose VERBATIM from the " +
         "sample so the author can find it. divergence: how it departs from the dominant voice. suggestion: " +
-        "how to bring it into line. Report AT MOST 20 divergences, the clearest ones, and use [] when the " +
+        "how to bring it into line. severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). Report AT MOST 20 divergences, the clearest ones, and use [] when the " +
         "voice is consistent throughout. No prose outside the JSON.";
 
     private const string ReconciliationInstruction =
@@ -238,7 +239,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "scene, never sample lines. Respond with ONLY a JSON object: " +
         "{\"scenesToAdd\":[{\"kind\":string,\"location\":string,\"missing\":string,\"why\":string," +
         "\"priority\":string,\"excerpt\":string}],\"showVsTell\":[{\"chapter\":string,\"excerpt\":string,\"direction\":string," +
-        "\"suggestion\":string}],\"targetLow\":number,\"targetHigh\":number}. " +
+        "\"suggestion\":string,\"severity\":\"Must|Should|Consider\"}],\"targetLow\":number,\"targetHigh\":number}. " +
         "scenesToAdd = the scenes/beats to ADD, ranked most-impactful first. kind is one of " +
         "\"MissingBeat\" (a turn that happens off-page), \"CharacterDeepening\", \"TensionStakes\", or " +
         "\"ThemeDeepening\". location says where it belongs (\"Chapter 4\", \"after Chapter 7\"). missing = " +
@@ -247,7 +248,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "\"Should\", \"Consider\". showVsTell = show-vs-tell notes on BOTH ends: direction \"Dramatize\" for a " +
         "SUMMARIZED passage that could become a shown scene (the main lever for adding words) or \"Tighten\" " +
         "for an OVER-shown passage that runs long; quote the excerpt VERBATIM and give a pointer, not a " +
-        "rewrite. targetLow/targetHigh = the typical published word-count range for this genre (integers; use " +
+        "rewrite; each showVsTell note has a severity: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). targetLow/targetHigh = the typical published word-count range for this genre (integers; use " +
         "0/0 if you can't judge it). Give AT MOST 15 scenesToAdd and 15 showVsTell, the most significant, and " +
         "use [] when there are none. No prose outside the JSON.";
 
@@ -263,10 +264,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "each of the prior book's OPEN THREADS, judge whether this book ADDRESSES it (resolves or meaningfully " +
         "advances it), IGNORES it (never touches it), or CONTRADICTS it. You NUDGE, you never rewrite: point at " +
         "the problem, never draft the fix. Respond with ONLY a JSON object: " +
-        "{\"breaks\":[{\"chapter\":string,\"established\":string,\"contradiction\":string,\"excerpt\":string}]," +
+        "{\"breaks\":[{\"chapter\":string,\"established\":string,\"contradiction\":string,\"excerpt\":string,\"severity\":\"Must|Should|Consider\"}]," +
         "\"carriedThreads\":[{\"established\":string,\"status\":string}]}. breaks: chapter = where in THIS book " +
         "(\"Chapter 4\", \"\" if unknown); established = what the prior book set; contradiction = what this book " +
-        "says instead; excerpt = a short phrase from THIS book's notes, verbatim, where the clash is (\"\" if none). carriedThreads: established = the prior open thread verbatim; status = one of " +
+        "says instead; excerpt = a short phrase from THIS book's notes, verbatim, where the clash is (\"\" if none); severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). carriedThreads: established = the prior open thread verbatim; status = one of " +
         "\"Addressed\", \"Ignored\", \"Contradicted\". Give one carriedThreads entry per open thread provided. " +
         "Use [] when there are no breaks. No prose outside the JSON.";
 
@@ -593,7 +594,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             .Where(item => !string.IsNullOrWhiteSpace(item.Detail))
             .Select(item => (Ok: Enum.TryParse<SceneInconsistencyKind>(item.Kind?.Trim(), ignoreCase: true, out var kind) && Enum.IsDefined(kind), Kind: kind, Item: item))
             .Where(entry => entry.Ok)
-            .Select(entry => new SceneInconsistency(entry.Kind, entry.Item.Detail!, entry.Item.Excerpt ?? string.Empty))
+            .Select(entry => new SceneInconsistency(entry.Kind, entry.Item.Detail!, entry.Item.Excerpt ?? string.Empty)
+            { Severity = entry.Item.Severity ?? string.Empty })
             .ToList();
 
         return new SceneJudgement(
@@ -612,6 +614,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class SceneInconsistencyDto
     {
+        public string? Severity { get; set; }
         public string? Kind { get; set; }
         public string? Detail { get; set; }
         public string? Excerpt { get; set; }
@@ -779,14 +782,15 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             (dto.LineEdits ?? []).Select(e => new LineEdit(
                 e.Chapter ?? string.Empty, e.Excerpt ?? string.Empty,
                 e.Suggestion ?? string.Empty, e.Reason ?? string.Empty)
-                { Kind = ParseLineEditKind(e.Kind) }).ToList(),
+                { Kind = ParseLineEditKind(e.Kind), Severity = e.Severity ?? string.Empty }).ToList(),
             (dto.ProseNotes ?? []).Select(n => new ProseNote(
                 n.Chapter ?? string.Empty, n.Pattern ?? string.Empty,
-                n.Evidence ?? string.Empty, n.Fix ?? string.Empty)).ToList(),
+                n.Evidence ?? string.Empty, n.Fix ?? string.Empty)
+                { Severity = n.Severity ?? string.Empty }).ToList(),
             (dto.DialogueNotes ?? []).Select(n => new DialogueNote(
                 n.Chapter ?? string.Empty, n.Speakers ?? string.Empty,
                 n.Observation ?? string.Empty, n.Fix ?? string.Empty)
-                { Excerpt = n.Excerpt ?? string.Empty }).ToList(),
+                { Excerpt = n.Excerpt ?? string.Empty, Severity = n.Severity ?? string.Empty }).ToList(),
             (dto.SceneBreakdown ?? []).Select(s => new SceneBeat(
                 s.Chapter ?? string.Empty, s.Scene ?? string.Empty,
                 s.Purpose ?? string.Empty, s.Verdict ?? string.Empty)
@@ -816,7 +820,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             (dto.Divergences ?? [])
                 .Where(d => !string.IsNullOrWhiteSpace(d.Excerpt))
                 .Select(d => new VoiceDivergence(
-                    d.Chapter ?? string.Empty, d.Excerpt!, d.Divergence ?? string.Empty, d.Suggestion ?? string.Empty))
+                    d.Chapter ?? string.Empty, d.Excerpt!, d.Divergence ?? string.Empty, d.Suggestion ?? string.Empty)
+                { Severity = d.Severity ?? string.Empty })
                 .ToList());
     }
 
@@ -890,7 +895,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var showTell = (dto.ShowVsTell ?? [])
             .Where(n => !string.IsNullOrWhiteSpace(n.Excerpt))
             .Select(n => new ShowTellNote(
-                n.Chapter ?? string.Empty, n.Excerpt!, ParseShowTellDirection(n.Direction), n.Suggestion ?? string.Empty))
+                n.Chapter ?? string.Empty, n.Excerpt!, ParseShowTellDirection(n.Direction), n.Suggestion ?? string.Empty)
+                { Severity = n.Severity ?? string.Empty })
             .ToList();
 
         // The count is measured, not trusted to the model; the model supplies the genre range and the pure
@@ -930,7 +936,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var breaks = (dto.Breaks ?? [])
             .Where(b => !string.IsNullOrWhiteSpace(b.Contradiction))
             .Select(b => new SeriesBreak(b.Chapter ?? string.Empty, b.Established ?? string.Empty, b.Contradiction!)
-            { Excerpt = b.Excerpt ?? string.Empty })
+            { Excerpt = b.Excerpt ?? string.Empty, Severity = b.Severity ?? string.Empty })
             .ToList();
         var carried = (dto.CarriedThreads ?? [])
             .Where(t => !string.IsNullOrWhiteSpace(t.Established))
@@ -985,7 +991,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "empty string if this book gives you nothing to say\", \"findings\": [{\"chapter\": \"Ch. 12-15\", "
         + "\"detail\": \"what is wrong and why it matters\", \"excerpt\": \"a short phrase (under fifteen "
         + "words) copied verbatim from the manuscript where it happens, or an empty string when it is about "
-        + "the whole book\"}]}. Finding nothing is a legitimate answer: "
+        + "the whole book\", \"severity\": \"Must if the book does not work until it is fixed, Should if it "
+        + "weakens the book, Consider if it is a refinement\"}]}. Finding nothing is a legitimate answer: "
         + "return an empty findings list rather than inventing one.";
 
     private const string ReaderFormat =
@@ -1050,7 +1057,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             dto?.Summary ?? string.Empty,
             (dto?.Findings ?? []).Where(finding => !string.IsNullOrWhiteSpace(finding.Detail))
                 .Select(finding => new ReportFinding(finding.Chapter ?? string.Empty, finding.Detail!)
-                { Excerpt = finding.Excerpt ?? string.Empty })
+                { Excerpt = finding.Excerpt ?? string.Empty, Severity = finding.Severity ?? string.Empty })
                 .ToList());
     }
 
@@ -1522,6 +1529,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class ShowTellDto
     {
+        public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Excerpt { get; set; }
         public string? Direction { get; set; }
@@ -1536,6 +1544,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class SeriesBreakDto
     {
+        public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Established { get; set; }
         public string? Contradiction { get; set; }
@@ -1597,6 +1606,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class LineEditDto
     {
+        public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Excerpt { get; set; }
         public string? Suggestion { get; set; }
@@ -1606,6 +1616,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class ProseNoteDto
     {
+        public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Pattern { get; set; }
         public string? Evidence { get; set; }
@@ -1614,6 +1625,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class DialogueNoteDto
     {
+        public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Speakers { get; set; }
         public string? Observation { get; set; }
@@ -1649,6 +1661,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class SectionFindingDto
     {
+        public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Detail { get; set; }
         public string? Excerpt { get; set; }
@@ -1707,6 +1720,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class VoiceDivergenceDto
     {
+        public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Excerpt { get; set; }
         public string? Divergence { get; set; }
