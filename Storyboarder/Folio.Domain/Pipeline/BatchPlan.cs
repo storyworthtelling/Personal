@@ -64,4 +64,16 @@ public static class BatchKinds
 {
     public const string SceneJudgements = "scene-judgements";
     public const string SceneImagePrompts = "scene-image-prompts";
+
+    /// <summary>The section reads on the standard model, after one direct pass has written the cache.</summary>
+    public const string ReadsStandard = "reads-standard";
+
+    /// <summary>The reader passes on the strong model, after one direct pass has written the cache.</summary>
+    public const string ReadsStrong = "reads-strong";
 }
+
+/// <summary>
+/// One whole-book pass from a finished batch, by persona id: the stored JSON (a SectionRead or a Review,
+/// as a direct pass stores it), or why there is none. A reader's short read is a failure here too.
+/// </summary>
+public sealed record PassBatchItem(string PersonaId, string? Json, string? Failure);

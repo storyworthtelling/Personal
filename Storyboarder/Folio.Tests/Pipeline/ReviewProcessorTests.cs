@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -318,6 +319,40 @@ public class ReviewProcessorTests : IDisposable
         var report = ReportText(id);
         Assert.True(report.IndexOf("At the gate", StringComparison.Ordinal) < report.IndexOf("Batched scene 2 does its job.", StringComparison.Ordinal));
         Assert.True(report.IndexOf("Batched scene 1 does its job.", StringComparison.Ordinal) < report.IndexOf("At the gate", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The reads (R39): for each model, one pass runs on its own to write the manuscript to the cache, then
+    /// the rest of that model's passes go in one batch. A pass the batch did not complete runs one at a time.
+    /// </summary>
+    [Fact]
+    public async Task ReadsWarmTheCacheOnceThenGoInOneBatchPerModel()
+    {
+        var submitted = new List<string[]>();
+        claude.Setup(c => c.SubmitReads(It.IsAny<IReadOnlyList<Persona>>(), It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((IReadOnlyList<Persona> personas, string _, ReadingFrame _, CancellationToken _) =>
+            {
+                submitted.Add([.. personas.Select(persona => persona.Id)]);
+                return $"batch-{submitted.Count}";
+            });
+        claude.Setup(c => c.BatchEnded(It.Is<string>(id => id.StartsWith("batch-")), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        claude.Setup(c => c.ReadResults(It.IsAny<string>(), It.IsAny<IReadOnlyList<Persona>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, IReadOnlyList<Persona> personas, CancellationToken _) =>
+                personas.Select(persona => persona.Id == "harsh-critic"
+                    ? new PassBatchItem(persona.Id, null, "errored: overloaded")
+                    : new PassBatchItem(persona.Id, persona.Kind == PersonaKind.Reader
+                        ? JsonSerializer.Serialize(new Review(persona.Id, "v", "a", ["s"], ["w"], "c") { Score = 6, ScoreReason = "r" })
+                        : JsonSerializer.Serialize(new SectionRead(persona.Id, "s", [])), null)).ToList());
+
+        SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        // One direct pass per model warms the cache, then one batch per model.
+        Assert.Equal([PersonaCatalogue.Sections[0].Id], sectionReads);
+        Assert.Equal([PersonaCatalogue.Readers[0].Id, "harsh-critic"], readerReads);
+        Assert.Equal(2, submitted.Count);
+        Assert.Equal(PersonaCatalogue.Sections.Skip(1).Select(persona => persona.Id), submitted[0]);
+        Assert.Equal(PersonaCatalogue.Readers.Skip(1).Select(persona => persona.Id), submitted[1]);
     }
 
     /// <summary>A scene the batch could not judge goes one at a time afterwards; the batch is never resubmitted.</summary>

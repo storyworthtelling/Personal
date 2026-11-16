@@ -344,14 +344,72 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     public Task<string?> SubmitSceneJudgements(
         IReadOnlyList<SceneToJudge> scenes, DesignBible bible, CancellationToken cancellationToken) =>
         SubmitBatch(
-            scenes.Select(scene => (SceneKey(scene.Number), SceneJudgementInstruction, SceneJudgementContent(scene, bible))).ToList(),
+            scenes.Select(scene => (SceneKey(scene.Number), MessageParams(SceneJudgementInstruction, SceneJudgementContent(scene, bible)))).ToList(),
             nameof(JudgeScene), cancellationToken);
 
     public Task<string?> SubmitSceneImagePrompts(
         IReadOnlyList<SceneImageRequest> scenes, DesignBible bible, string artStyle, CancellationToken cancellationToken) =>
         SubmitBatch(
-            scenes.Select(scene => (SceneKey(scene.Number), SceneImageInstruction, SceneImageContent(scene.Text, bible, artStyle, []))).ToList(),
+            scenes.Select(scene => (SceneKey(scene.Number), MessageParams(SceneImageInstruction, SceneImageContent(scene.Text, bible, artStyle, [])))).ToList(),
             nameof(DescribeSceneImage), cancellationToken);
+
+    public Task<string?> SubmitReads(
+        IReadOnlyList<Persona> personas, string manuscript, ReadingFrame frame, CancellationToken cancellationToken) =>
+        SubmitBatch(
+            personas.Select(persona =>
+            {
+                var pass = PassRequest(persona, manuscript, frame, persona.Kind == PersonaKind.Reader ? ReaderFormat : SectionFormat);
+                return (PassKey(persona.Id), (object)new
+                {
+                    model = pass.Model,
+                    max_tokens = pass.MaxTokens,
+                    output_config = new { effort = options.PassEffort },
+                    system = pass.System,
+                    messages = new[] { new { role = "user", content = pass.User } },
+                });
+            }).ToList(),
+            "ReadPass", cancellationToken);
+
+    public async Task<IReadOnlyList<PassBatchItem>> ReadResults(
+        string batchId, IReadOnlyList<Persona> personas, CancellationToken cancellationToken)
+    {
+        var byKey = personas.ToDictionary(persona => PassKey(persona.Id));
+        var items = new List<PassBatchItem>();
+        foreach (var (key, text, failure) in await BatchTexts(batchId, "ReadPass", cancellationToken))
+        {
+            if (!byKey.TryGetValue(key, out var persona))
+                continue;
+            if (text is null)
+            {
+                items.Add(new PassBatchItem(persona.Id, null, failure));
+                continue;
+            }
+            try
+            {
+                var json = persona.Kind == PersonaKind.Reader
+                    ? JsonSerializer.Serialize(ReadReaderReply(persona, text), JsonResponse.CaseInsensitive)
+                    : JsonSerializer.Serialize(ReadSectionReply(persona, text), JsonResponse.CaseInsensitive);
+                items.Add(new PassBatchItem(persona.Id, json, null));
+            }
+            catch (InvalidOperationException incomplete)
+            {
+                items.Add(new PassBatchItem(persona.Id, null, incomplete.Message));
+            }
+        }
+        return items;
+    }
+
+    private static string PassKey(string personaId) => $"pass-{personaId}";
+
+    // An ordinary request's params: its constant instruction, cached, then the content.
+    private object MessageParams(string instruction, string content) => new
+    {
+        model = options.Model,
+        max_tokens = options.MaxTokens,
+        output_config = new { effort = options.Effort },
+        system = new object[] { new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } } },
+        messages = new[] { new { role = "user", content } },
+    };
 
     public async Task<bool> BatchEnded(string batchId, CancellationToken cancellationToken)
     {
@@ -363,8 +421,10 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         string batchId, IReadOnlyDictionary<int, string> chapters, CancellationToken cancellationToken)
     {
         var items = new List<BatchItem<SceneJudgement>>();
-        foreach (var (number, text, failure) in await BatchTexts(batchId, nameof(JudgeScene), cancellationToken))
+        foreach (var (key, text, failure) in await BatchTexts(batchId, nameof(JudgeScene), cancellationToken))
         {
+            if (SceneNumber(key) is not { } number)
+                continue;
             if (text is null)
             {
                 items.Add(new BatchItem<SceneJudgement>(number, null, failure));
@@ -385,13 +445,17 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     public async Task<IReadOnlyList<BatchItem<string>>> SceneImagePromptResults(string batchId, CancellationToken cancellationToken) =>
         (await BatchTexts(batchId, nameof(DescribeSceneImage), cancellationToken))
-            .Select(item => new BatchItem<string>(item.Number, item.Text?.Trim(), item.Failure))
+            .Where(item => SceneNumber(item.Key) is not null)
+            .Select(item => new BatchItem<string>(SceneNumber(item.Key)!.Value, item.Text?.Trim(), item.Failure))
             .ToList();
+
+    private static int? SceneNumber(string key) =>
+        key.StartsWith("scene-", StringComparison.Ordinal) && int.TryParse(key["scene-".Length..], out var number) ? number : null;
 
     private static string SceneKey(int number) => $"scene-{number}";
 
     private async Task<string?> SubmitBatch(
-        IReadOnlyList<(string CustomId, string Instruction, string Content)> items, string call,
+        IReadOnlyList<(string CustomId, object Params)> items, string call,
         CancellationToken cancellationToken)
     {
         if (items.Count == 0)
@@ -399,18 +463,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
         var payload = new
         {
-            requests = items.Select(item => new
-            {
-                custom_id = item.CustomId,
-                @params = new
-                {
-                    model = options.Model,
-                    max_tokens = options.MaxTokens,
-                    output_config = new { effort = options.Effort },
-                    system = new object[] { new { type = "text", text = item.Instruction, cache_control = new { type = "ephemeral" } } },
-                    messages = new[] { new { role = "user", content = item.Content } },
-                },
-            }).ToList(),
+            requests = items.Select(item => new { custom_id = item.CustomId, @params = item.Params }).ToList(),
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, BatchesUrl);
@@ -449,7 +502,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     // Each result line of a finished batch: the scene it belongs to (by custom id), the reply's text when
     // it succeeded, or why there is none. Every item is logged with its tokens, as a direct call is.
-    private async Task<IReadOnlyList<(int Number, string? Text, string? Failure)>> BatchTexts(
+    private async Task<IReadOnlyList<(string Key, string? Text, string? Failure)>> BatchTexts(
         string batchId, string call, CancellationToken cancellationToken)
     {
         string resultsUrl;
@@ -468,13 +521,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         if (!response.IsSuccessStatusCode)
             throw ToException(response, body);
 
-        var items = new List<(int, string?, string?)>();
+        var items = new List<(string, string?, string?)>();
         foreach (var line in body.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             using var item = JsonDocument.Parse(line);
             var customId = item.RootElement.GetProperty("custom_id").GetString() ?? string.Empty;
-            if (!customId.StartsWith("scene-", StringComparison.Ordinal) || !int.TryParse(customId["scene-".Length..], out var number))
-                continue;
 
             var result = item.RootElement.GetProperty("result");
             var type = result.GetProperty("type").GetString();
@@ -489,7 +540,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                     "Claude batch {BatchId} item {CustomId} ({Call}) succeeded: input={Input} cacheWrite={CacheWrite} cacheRead={CacheRead} output={Output}",
                     batchId, customId, call, Tokens(usage, "input_tokens"), Tokens(usage, "cache_creation_input_tokens"),
                     Tokens(usage, "cache_read_input_tokens"), Tokens(usage, "output_tokens"));
-                items.Add((number, text, null));
+                items.Add((customId, text, null));
             }
             else
             {
@@ -497,7 +548,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                     ? $"errored: {(error.TryGetProperty("message", out var m) ? m.GetString() : error.ToString())}"
                     : type ?? "unknown";
                 logger?.LogWarning("Claude batch {BatchId} item {CustomId} ({Call}) did not succeed: {Why}", batchId, customId, call, why);
-                items.Add((number, null, why));
+                items.Add((customId, null, why));
             }
         }
         return items;
@@ -974,6 +1025,12 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
     {
         var reply = await SendPass(persona, manuscript, frame, SectionFormat, cancellationToken);
+        return ReadSectionReply(persona, reply);
+    }
+
+    // A section's reply, parsed; the one place it is, for the direct pass and the batch.
+    private SectionRead ReadSectionReply(Persona persona, string reply)
+    {
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
         {
@@ -1001,6 +1058,12 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
     {
         var reply = await SendPass(persona, manuscript, frame, ReaderFormat, cancellationToken);
+        return ReadReaderReply(persona, reply);
+    }
+
+    // A reader's reply, parsed and held to the whole-read rule; the one place it is, for both paths.
+    private static Review ReadReaderReply(Persona persona, string reply)
+    {
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException(
                 $"{persona.Name} replied with nothing this could read as a review. A reader's pass is "
@@ -1078,18 +1141,26 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         Persona persona, string manuscript, ReadingFrame frame, string format, CancellationToken cancellationToken,
         [CallerMemberName] string call = "")
     {
+        var pass = PassRequest(persona, manuscript, frame, format);
+        return SendRaw(pass.System, pass.User, pass.MaxTokens, pass.Model, $"{call}[{persona.Id}]", options.PassEffort, cancellationToken);
+    }
+
+    // One whole-book pass's request: the one place it is built, for the direct pass and the batch, so a
+    // batched pass is the same request (same prefix, same cache) as the direct one.
+    private (object[] System, string User, int MaxTokens, string Model) PassRequest(
+        Persona persona, string manuscript, ReadingFrame frame, string format)
+    {
         var system = ReadingPrompt.System(manuscript, persona, frame)
             .Select(block => block.Cached
                 ? (object)new { type = "text", text = block.Text, cache_control = new { type = "ephemeral" } }
                 : new { type = "text", text = block.Text })
             .ToArray();
-
-        var model = persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel;
-        return SendRaw(system, ReadingPrompt.Question(persona, ManuscriptLength.Classify(manuscript)) + "\n\n" + format,
-            persona.Kind == PersonaKind.Reader && ManuscriptLength.Classify(manuscript) == StoryLength.Novel
-                ? options.NovelReaderMaxTokens
-                : options.PassMaxTokens,
-            model, $"{call}[{persona.Id}]", options.PassEffort, cancellationToken);
+        var length = ManuscriptLength.Classify(manuscript);
+        return (
+            system,
+            ReadingPrompt.Question(persona, length) + "\n\n" + format,
+            persona.Kind == PersonaKind.Reader && length == StoryLength.Novel ? options.NovelReaderMaxTokens : options.PassMaxTokens,
+            persona.Tier == ModelTier.Strong ? options.StrongModel : options.StandardModel);
     }
 
     private Task<string> SendMessage(

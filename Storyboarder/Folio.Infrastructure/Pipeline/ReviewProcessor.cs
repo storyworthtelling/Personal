@@ -1177,6 +1177,12 @@ public sealed class ReviewProcessor : IPipelineStep
         // were fine. The ORDER is not cosmetic — sections are grouped before readers so the manuscript
         // is written to the cache once per model rather than once per alternation (F50), and the cheap
         // model goes first so a failing key fails cheaply.
+        // The reads on the batch tier (owner's ruling, R39). For each model, one pass runs directly first to
+        // write the manuscript to that model's cache (each model keeps its own, F50); the rest of that
+        // model's passes then go in one batch. Whatever the batch does not complete runs one at a time below.
+        if (await BatchTheReads(db, novel, analysis, cancellationToken) is { } batched)
+            return batched;
+
         if (await NextUnreadPass(db, novel.Id, cancellationToken) is { } due)
         {
             if (!claudeLimiter.TryAcquire())
@@ -2281,6 +2287,79 @@ public sealed class ReviewProcessor : IPipelineStep
     /// whichever row is unfinished: grouped by model, the manuscript is cached once per model; shuffled,
     /// every change of model pays another cache write.</para>
     /// </summary>
+    /// <summary>
+    /// Batches the next model's whole-book passes once that model's cache is warm. Returns null when the
+    /// next pass should run directly: the first pass of its model, a model whose batch is done, or a
+    /// single pass left.
+    /// </summary>
+    private async Task<ProcessResult?> BatchTheReads(
+        FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
+    {
+        var done = await db.PassReads
+            .Where(pass => pass.NovelId == novel.Id && pass.Json != null)
+            .Select(pass => pass.PassId)
+            .ToListAsync(cancellationToken);
+        var next = ReadingPlan.Passes.FirstOrDefault(pass => !pass.IsSynthesis && !done.Contains(pass.Id));
+        if (next is null)
+            return null;
+
+        var sameModel = ReadingPlan.Passes.Where(pass => !pass.IsSynthesis && pass.Tier == next.Tier).ToList();
+        if (!sameModel.Any(pass => done.Contains(pass.Id)))
+            return null; // the first pass of this model runs directly, to write the cache
+
+        var waiting = sameModel.Where(pass => !done.Contains(pass.Id)).ToList();
+        var kind = next.Tier == ModelTier.Strong ? BatchKinds.ReadsStrong : BatchKinds.ReadsStandard;
+        var batch = await db.ModelBatches.FirstOrDefaultAsync(b => b.NovelId == novel.Id && b.Kind == kind, cancellationToken);
+        var (step, wait) = BatchPlan.Decide(waiting.Count, StateOf(batch), clock.UtcNow);
+        var personas = waiting.Select(pass => pass.Persona!).ToList();
+
+        switch (step)
+        {
+            case BatchStep.Submit:
+                if (!claudeLimiter.TryAcquire())
+                    return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+                var manuscript = await Manuscript(db, novel.Id, cancellationToken);
+                var frame = await Frame(db, novel, analysis, cancellationToken);
+                await SubmitBatch(db, novel, kind, () => claude.SubmitReads(personas, manuscript, frame, cancellationToken), cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+
+            case BatchStep.Poll:
+                if (!await PollBatch(db, batch!, cancellationToken))
+                    return ProcessResult.Waiting(BatchPlan.PollEvery, novel.Id);
+                var results = await claude.ReadResults(batch!.BatchId, personas, cancellationToken);
+                foreach (var result in results.Where(result => result.Json is not null))
+                {
+                    var row = await db.PassReads.FirstOrDefaultAsync(
+                        pass => pass.NovelId == novel.Id && pass.PassId == result.PersonaId, cancellationToken);
+                    if (row is null)
+                    {
+                        row = new PassRead { NovelId = novel.Id, PassId = result.PersonaId };
+                        db.PassReads.Add(row);
+                    }
+                    row.Json = result.Json;
+                    row.CompletedAtUtc = clock.UtcNow;
+                    row.LastError = null;
+                }
+                batch.CompletedAtUtc = clock.UtcNow;
+                logger.LogInformation(
+                    "Read batch {BatchId} ({Kind}) for manuscript {NovelId}: {Done} of {Count} passes; the rest go one at a time",
+                    batch.BatchId, kind, novel.Id, results.Count(result => result.Json is not null), personas.Count);
+                Touch(novel);
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+
+            case BatchStep.Wait:
+                return ProcessResult.Waiting(wait, novel.Id);
+
+            case BatchStep.Abandon:
+                await AbandonBatch(db, novel, batch!, cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+
+            default:
+                return null;
+        }
+    }
+
     private async Task<ReadingPass?> NextUnreadPass(FolioDbContext db, Guid novelId, CancellationToken cancellationToken)
     {
         var done = await db.PassReads

@@ -45,6 +45,17 @@ public interface IClaudeAnalysisClient
     Task<string?> SubmitSceneImagePrompts(
         IReadOnlyList<Scenes.SceneImageRequest> scenes, DesignBible bible, string artStyle, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Submits whole-book passes (sections or readers) as one batch, each built exactly as its direct call,
+    /// keyed by persona id. Returns the batch id.
+    /// </summary>
+    Task<string?> SubmitReads(
+        IReadOnlyList<Reading.Persona> personas, string manuscript, Reading.ReadingFrame frame, CancellationToken cancellationToken);
+
+    /// <summary>A finished batch's passes, parsed as the direct calls parse them, matched by persona id.</summary>
+    Task<IReadOnlyList<Pipeline.PassBatchItem>> ReadResults(
+        string batchId, IReadOnlyList<Reading.Persona> personas, CancellationToken cancellationToken);
+
     /// <summary>Whether the batch has finished processing.</summary>
     Task<bool> BatchEnded(string batchId, CancellationToken cancellationToken);
 

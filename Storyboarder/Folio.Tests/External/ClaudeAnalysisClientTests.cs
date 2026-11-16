@@ -396,6 +396,59 @@ public class ClaudeAnalysisClientTests
         Assert.True(options.NovelReaderMaxTokens > options.PassMaxTokens);
     }
 
+    /// <summary>
+    /// Batched reads (R39) are built exactly as the direct passes are: the same system blocks (manuscript
+    /// first, cached), the same question and format, the model for the persona's tier, the pass effort,
+    /// and the novel ceiling for a reader on a novel. Keyed by persona id.
+    /// </summary>
+    [Fact]
+    public async Task SubmitReads_BuildsEachPassAsTheDirectCallWould()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"id\":\"msgbatch_reads\",\"processing_status\":\"in_progress\"}");
+        const string manuscript = "The tide was out and the wall was down.";
+        var personas = new[] { PersonaCatalogue.ById("agent"), PersonaCatalogue.ById("genre-fan") };
+
+        var id = await client.SubmitReads(personas, manuscript, GenreFrame.Unknown, CancellationToken.None);
+
+        Assert.Equal("msgbatch_reads", id);
+        using var body = JsonDocument.Parse(Assert.Single(handler.RequestBodies));
+        var requests = body.RootElement.GetProperty("requests").EnumerateArray().ToList();
+        Assert.Equal(["pass-agent", "pass-genre-fan"], requests.Select(r => r.GetProperty("custom_id").GetString()));
+        var agent = requests[0].GetProperty("params");
+        Assert.Equal(new ClaudeOptions().StrongModel, agent.GetProperty("model").GetString());
+        Assert.Equal(
+            ReadingPrompt.System(manuscript, personas[0], GenreFrame.Unknown).Select(block => block.Text),
+            agent.GetProperty("system").EnumerateArray().Select(block => block.GetProperty("text").GetString()));
+        Assert.StartsWith(ReadingPrompt.Question(personas[0], StoryLength.ShortStory),
+            agent.GetProperty("messages")[0].GetProperty("content").GetString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>A batched reader's reply is held to the same whole-read rule; a short one is a failure for that pass.</summary>
+    [Fact]
+    public async Task ReadResults_ParseEachPassAndFailAShortRead()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"id\":\"b\",\"processing_status\":\"ended\",\"results_url\":\"https://api.anthropic.com/v1/messages/batches/b/results\"}");
+        var whole = "{\\\"verdict\\\":\\\"v\\\",\\\"assessment\\\":\\\"a\\\",\\\"strengths\\\":[\\\"s\\\"],\\\"weaknesses\\\":[\\\"w\\\"],\\\"condition\\\":\\\"c\\\",\\\"score\\\":6,\\\"scoreReason\\\":\\\"r\\\"}";
+        var shortRead = "{\\\"verdict\\\":\\\"v\\\"}";
+        var section = "{\\\"summary\\\":\\\"s\\\",\\\"findings\\\":[]}";
+        string Line(string id, string text) =>
+            "{\"custom_id\":\"" + id + "\",\"result\":{\"type\":\"succeeded\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"" + text + "\"}]}}}\n";
+        handler.Enqueue(System.Net.HttpStatusCode.OK,
+            Line("pass-agent", whole) + Line("pass-genre-fan", shortRead) + Line("pass-structure", section), "application/binary");
+
+        var results = await client.ReadResults("b",
+            [PersonaCatalogue.ById("agent"), PersonaCatalogue.ById("genre-fan"), PersonaCatalogue.ById("structure")],
+            CancellationToken.None);
+
+        Assert.Contains("\"score\":6", Assert.Single(results, r => r.PersonaId == "agent").Json, StringComparison.OrdinalIgnoreCase);
+        var fan = Assert.Single(results, r => r.PersonaId == "genre-fan");
+        Assert.Null(fan.Json);
+        Assert.NotNull(fan.Failure);
+        Assert.NotNull(Assert.Single(results, r => r.PersonaId == "structure").Json);
+    }
+
     [Fact]
     public async Task AReadingPass_RequestsItsOwnEffortSetting()
     {
