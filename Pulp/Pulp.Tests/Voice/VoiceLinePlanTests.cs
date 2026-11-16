@@ -42,7 +42,7 @@ public class VoiceLinePlanTests
     [Fact]
     public void ChangedFactsComposeAgain()
     {
-        var older = SeatPlan.Remember("0000000000000000", Today, "About older facts.", Now.AddHours(-1));
+        var older = SeatPlan.Remember("an-older-hash", Today, "About older facts.", Now.AddHours(-1));
         Assert.Equal(VoiceLineAction.Compose, VoiceLinePlan.Decide(Playlist, true, older, Now, Today));
     }
 
