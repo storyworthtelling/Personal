@@ -65,7 +65,7 @@ public class SettingsRefreshSourceTests
         var binder = Source("Ledger.Android/Pages/LedgerBinderPage.cs");
         var area = NoDoubleLinkTests.ExtractMethod(binder, "protected override async void OnAreaSelected(int index)");
         var wait = area.IndexOf("await BeforeLeavingAsync();", StringComparison.Ordinal);
-        var pop = area.IndexOf("PopToRootAsync", StringComparison.Ordinal);
+        var pop = area.IndexOf("TurnToAreaAsync", StringComparison.Ordinal);
         Assert.True(wait >= 0 && wait < pop, "The tab turn must await the commit before it pops.");
         Assert.Contains("protected override bool OnBackButtonPressed()", binder, StringComparison.Ordinal);
     }

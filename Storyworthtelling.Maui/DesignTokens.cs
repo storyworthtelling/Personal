@@ -1,7 +1,7 @@
 namespace Storyworthtelling.Maui;
 
 /// <summary>
-/// The dp scales the MAUI kit lays out against — spacing and shape, copied from
+/// The dp scales the MAUI kit lays out against — spacing and shape — and its motion, copied from
 /// <c>Codex.Domain.Design.DesignTokens</c> and kept identical by a parity guard.
 ///
 /// <para>It is a copy rather than a reference because <c>Codex.Domain</c> is FocusPhone's and is
@@ -56,5 +56,13 @@ public static class DesignTokens
         public const int CheckboxDp = 20;
         public const int TouchTargetDp = 48;
         public const int ScreenEdgeDp = Space.X6;
+    }
+
+    /// <summary>DESIGN.md §6's three durations: Quick for a state change, Standard for a page turn or the dog-ear, Ink for a hero moment.</summary>
+    public static class Motion
+    {
+        public const int QuickMs = 150;
+        public const int StandardMs = 200;
+        public const int InkMs = 320;
     }
 }

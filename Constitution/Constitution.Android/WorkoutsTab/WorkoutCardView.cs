@@ -49,7 +49,7 @@ internal sealed class WorkoutCardView
         scrim.AddView(card, layout);
         scrim.Alpha = 0f;
         frame.AddView(scrim, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
-        scrim.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.StandardMs).Start();
+        scrim.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.InkMs).Start();
     }
 
     /// <summary>Closes the card and tells the area, so the pressed clipping lets go.</summary>

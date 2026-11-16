@@ -74,6 +74,40 @@ public abstract class PaperBinderPage : ContentPage, ICardHost
     protected abstract void OnAreaSelected(int index);
 
     /// <summary>
+    /// Turns to an area (DESIGN.md §6, report 04 §24): back to the first page, on to the area's root when it is
+    /// not that page (<paramref name="root"/> null), and the page that is now showing settles into place the way
+    /// the native page turn does, rather than appearing. The stack itself moves without the platform's slide,
+    /// since a pop and a push would otherwise play two transitions for one turn.
+    /// </summary>
+    protected async Task TurnToAreaAsync(Page? root)
+    {
+        await Navigation.PopToRootAsync(animated: false);
+
+        if (root is not null)
+        {
+            await Navigation.PushAsync(root, animated: false);
+        }
+
+        (Navigation.NavigationStack.LastOrDefault() as PaperBinderPage)?.SettleIn();
+    }
+
+    // The incoming page is revealed under the one turned away: a gentle fade and a slight scale from the
+    // spine, as paper_slide_in does on the native heads. A page not yet on screen has nothing to animate.
+    private void SettleIn()
+    {
+        if (well.Handler is null)
+        {
+            return;
+        }
+
+        well.AnchorX = 0;
+        well.Opacity = 0.3;
+        well.Scale = 0.98;
+        _ = well.FadeTo(1, DesignTokens.Motion.StandardMs, Easing.CubicOut);
+        _ = well.ScaleTo(1, DesignTokens.Motion.StandardMs, Easing.CubicOut);
+    }
+
+    /// <summary>
     /// Puts the frame around whatever this page's XAML built. The head calls it from its <c>Wrap</c>, once,
     /// after <c>InitializeComponent</c>.
     /// </summary>

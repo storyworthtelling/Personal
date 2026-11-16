@@ -241,7 +241,7 @@ public static class ActionCard
         scrim.Alpha = 0f;
         host.AddView(scrim, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
-        scrim.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.StandardMs).Start();
+        scrim.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.InkMs).Start();
         return scrim;
     }
 

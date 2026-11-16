@@ -19,11 +19,12 @@ namespace Index.Domain.Design;
 /// </summary>
 public static class DesignTokens
 {
-    /// <summary>Calm functional motion: two durations, decelerate curves, no haptics.</summary>
+    /// <summary>Calm functional motion: three durations, decelerate curves, no haptics.</summary>
     public static class Motion
     {
         public const int QuickMs = 150;
         public const int StandardMs = 200;
+        public const int InkMs = 320;
         public const int UndoWindowMs = Storyworthtelling.Folds.FoldTiming.UndoWindowMs;
     }
 }

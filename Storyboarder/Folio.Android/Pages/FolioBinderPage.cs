@@ -87,12 +87,7 @@ public abstract class FolioBinderPage : PaperBinderPage
     {
         var chosen = (FolioArea)index;
 
-        await Navigation.PopToRootAsync(animated: false);
-
-        if (chosen != FolioArea.Work)
-        {
-            await Navigation.PushAsync(Root(chosen), animated: false);
-        }
+        await TurnToAreaAsync(chosen == FolioArea.Work ? null : Root(chosen));
     }
 
     private static Page Root(FolioArea area) => area switch
