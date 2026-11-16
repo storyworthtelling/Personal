@@ -23,9 +23,9 @@ public sealed record EmptyMailboxDraw(string Line, EmptyMailboxState Next);
 
 /// <summary>
 /// The empty Mailbox — the <b>only</b> seat the owner's voice has in Post. Everything
-/// else, including every error, stays static-neutral: §14 permits voiced error copy but
-/// nothing in the suite has ever exercised it, and now that errors sit behind the fold
-/// a wry line about a dead bridge would arrive as a <i>reward</i> for turning the corner.
+/// else, including every error, stays static-neutral: errors are never voiced (§14), and
+/// now that they sit behind the fold a wry line about a dead bridge would arrive as a
+/// <i>reward</i> for turning the corner.
 ///
 /// A line is drawn from a pool so an empty desk does not always say the same thing;
 /// the voice then rewrites whatever was drawn. The raw baseline IS the fallback when
@@ -43,6 +43,10 @@ public sealed record EmptyMailboxDraw(string Line, EmptyMailboxState Next);
 /// </summary>
 public static class EmptyMailbox
 {
+    /// <summary>What the voice is asked to say for a drawn line, or null for a line shown as it is.</summary>
+    public static Voice.VoiceAsk? Ask(string line) =>
+        Voice.VoiceRewrite.Ask("the Mailbox is empty: everything that arrived has been dealt with", line);
+
     /// <summary>How long a worn-out ladder sits out before coming back reset.</summary>
     public const int RetirementDays = 30;
 

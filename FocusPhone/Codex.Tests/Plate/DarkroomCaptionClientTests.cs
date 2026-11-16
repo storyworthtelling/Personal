@@ -16,14 +16,55 @@ public class DarkroomCaptionClientTests
 {
     private const string Url = "https://api.anthropic.com/v1/messages";
 
+    /// <summary>An invented voice, learned from one book.</summary>
+    private static readonly VoiceProfile Learned = VoiceProfile.Empty with
+    {
+        Register = "fond, exact, faintly amused",
+        Examples = [new VoiceExample("The light did most of the work.", Guid.NewGuid())],
+        DocumentsAnalyzed = 1,
+    };
+
+    private sealed class Voice(VoiceProfile profile) : IVoiceProfileSource
+    {
+        public Task<VoiceProfile> LoadAsync(CancellationToken cancellationToken) => Task.FromResult(profile);
+    }
+
     private static (DarkroomCaptionClient Client, FakeHttpMessageHandler Handler) Build(
-        string apiKey = "test-key")
+        string apiKey = "test-key", VoiceProfile? profile = null)
     {
         var handler = new FakeHttpMessageHandler();
         var client = new DarkroomCaptionClient(
             new HttpClient(handler),
-            Options.Create(new VoiceOptions { ApiKey = apiKey }));
+            Options.Create(new VoiceOptions { ApiKey = apiKey }),
+            new Voice(profile ?? Learned));
         return (client, handler);
+    }
+
+    /// <summary>
+    /// The caption is in the owner's learned voice (audit W10.2): the profile rides in the prompt, and the
+    /// guess it replaced ("dry, warm") is gone.
+    /// </summary>
+    [Fact]
+    public async Task ThePromptCarriesTheOwnersVoice()
+    {
+        var (client, handler) = Build();
+        handler.Respond(Url, Reply("A line."));
+
+        await client.CaptionAsync(OnePicture(), CancellationToken.None);
+
+        var body = Assert.Single(handler.RequestBodies);
+        Assert.Contains("PROFILE (JSON)", body);
+        Assert.Contains("fond, exact, faintly amused", body);
+        Assert.DoesNotContain("dry, warm", body);
+    }
+
+    [Fact]
+    public async Task NoLearnedVoiceMeansNoCall()
+    {
+        var (client, handler) = Build(profile: VoiceProfile.Empty);
+
+        Assert.Null(await client.CaptionAsync(OnePicture(), CancellationToken.None));
+        Assert.Empty(handler.Requests);
     }
 
     private static string Reply(string line) =>
@@ -161,7 +202,9 @@ public class DarkroomCaptionClientTests
         await client.CaptionAsync(OnePicture(), CancellationToken.None);
 
         using var sent = JsonDocument.Parse(handler.RequestBodies[0]!);
-        var system = sent.RootElement.GetProperty("system").GetString()!;
+        // The instruction leads the system blocks; the owner's voice follows it.
+        var system = string.Join("\n", sent.RootElement.GetProperty("system").EnumerateArray()
+            .Select(block => block.GetProperty("text").GetString()));
         Assert.Contains("Do not name or identify any person", system, StringComparison.Ordinal);
     }
 }

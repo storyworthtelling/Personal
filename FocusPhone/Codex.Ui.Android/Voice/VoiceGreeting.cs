@@ -41,7 +41,7 @@ public sealed class VoiceGreeting
         var http = HeadHttp.WithTimeout(TimeSpan.FromMinutes(2));
         var client = new VoiceClient(http, options, HeadCredentialHealth.Store());
         messenger = new VoicedMessenger(
-            DriveVoiceProfileStore.Sealed(name => new DriveTextFile(driveFactory, name, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared), () => VaultPassphraseStore.Passphrase),
+            VoiceProfileAccess.ForHead(accessToken, applicationName),
             client,
             warn: line => HeadLog.Warn("Voice", line));
     }
@@ -82,6 +82,13 @@ public sealed class VoiceGreeting
         }
     }
 
+    /// <summary>
+    /// A baseline written in code, said the owner's way (audit W10.2): "" when it cannot be, so the caller keeps
+    /// showing the baseline it already drew.
+    /// </summary>
+    public Task<string> ComposeAsync(
+        Codex.Domain.Voice.VoiceAsk ask, CancellationToken cancellationToken, bool highVisibility = true) =>
+        ComposeAsync(ask.Purpose, ask.Context, cancellationToken, highVisibility);
 
     private string? Cached(string key)
     {

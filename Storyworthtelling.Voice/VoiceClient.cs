@@ -144,18 +144,9 @@ public sealed class VoiceClient : IVoiceClient
         VoiceProfile profile, MessageRequest request, CancellationToken cancellationToken)
     {
         var options = optionsAccessor.Value;
-        var profileJson = JsonSerializer.Serialize(new
-        {
-            register = profile.Register,
-            traits = profile.Traits,
-            examples = profile.Examples.Select(example => example.Text),
-            avoid = profile.Avoid,
-            cadence = profile.Cadence,
-            punctuation = profile.Punctuation
-        });
         var context = string.IsNullOrWhiteSpace(request.Context) ? "(none)" : request.Context;
         var userContent =
-            $"PROFILE (JSON):\n{profileJson}\n\n" +
+            $"{VoiceProfilePrompt.Block(profile)}\n\n" +
             $"PURPOSE: {request.Purpose}\n" +
             $"CONTEXT: {context}\n" +
             $"WORD LIMIT: {request.MaxWords}";

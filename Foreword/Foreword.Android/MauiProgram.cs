@@ -242,6 +242,8 @@ public static class MauiProgram
             DriveVoiceProfileStore.Sealed(
                 name => new DriveTextFile(VoiceDriveFactory(sp), name, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared),
                 () => CredentialStore.VaultPassphrase));
+        // The prayer line reads the voice through the read half only (audit W10.2): nothing it is handed can write it.
+        builder.Services.AddSingleton<IVoiceProfileSource>(sp => sp.GetRequiredService<IVoiceProfileStore>());
 
         // The cross-app encrypted secrets vault — ONE Drive file holding every app's keys, encrypted with
         // the owner's passphrase (CredentialStore.VaultPassphrase). Foreword publishes its own credentials

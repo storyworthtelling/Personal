@@ -43,8 +43,8 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
 
         if (!room.HasAnything)
         {
-            // The voice gets this seat, exactly as Post's gets the empty Mailbox: Italianno
-            // Script in ink-blue, the one place in the suite that hand appears. Nothing else
+            // The voice gets this seat, exactly as Post's gets the empty Mailbox: the drawn
+            // line, said the owner's way once the voice answers (audit W10.2). Nothing else
             // is on the page, because there is nothing to act on.
             var empty = new LinearLayout(Host) { Orientation = Orientation.Vertical };
             empty.SetGravity(GravityFlags.Center);

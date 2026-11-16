@@ -145,11 +145,59 @@ public class PlateActivity : AppCompatActivity
     public void Kept(DarkroomItem item)
     {
         Room = Room.Add(item);
+        emptyLine = null;
         _ = CaptionSoon();
     }
 
-    /// <summary>The line for an empty room, drawn fresh so it is not always the same one.</summary>
-    public string EmptyLine() => DarkroomVoice.Empty(Random.Shared.Next());
+    private string? emptyLine;
+    private Codex.Ui.Voice.VoiceGreeting? voice;
+
+    /// <summary>
+    /// The line for an empty room: drawn once each time the room empties, so it is not always the same one, and
+    /// then said the owner's way (audit W10.2). The drawn line stays when there is no profile, key or sign-in.
+    /// </summary>
+    public string EmptyLine()
+    {
+        if (emptyLine is null)
+        {
+            emptyLine = DarkroomVoice.Empty(Random.Shared.Next());
+            _ = VoiceEmptyLine(emptyLine);
+        }
+        return emptyLine;
+    }
+
+    private async Task VoiceEmptyLine(string drawn)
+    {
+        if (DarkroomVoice.Ask(drawn) is not { } ask || !VoiceGoogleAccount.IsSignedIn)
+        {
+            return;
+        }
+
+        try
+        {
+            voice ??= new Codex.Ui.Voice.VoiceGreeting(
+                Account.GetAccessToken, "Plate", System.IO.Path.Combine(FilesDir!.AbsolutePath, "voice-lines.json"));
+            var line = await voice.ComposeAsync(ask, CancellationToken.None);
+            if (line.Length == 0)
+            {
+                return;
+            }
+
+            RunOnUiThread(() =>
+            {
+                if (emptyLine != drawn || Room.HasAnything)
+                {
+                    return;
+                }
+                emptyLine = line;
+                RenderContent();
+            });
+        }
+        catch (Exception e)
+        {
+            HeadLog.Quiet("Voice", "Empty Darkroom line not voiced", e);
+        }
+    }
 
     /// <summary>
     /// Sending is where the phase's live bug is finally fixed: the picture is inserted into
@@ -343,7 +391,9 @@ public class PlateActivity : AppCompatActivity
             await voiceOptions.RefreshAsync(CancellationToken.None);
 
             var http = HeadHttp.Shared;
-            var client = new DarkroomCaptionClient(http, voiceOptions, HeadCredentialHealth.Store(), line => HeadLog.Warn("Caption", line));
+            var client = new DarkroomCaptionClient(
+                http, voiceOptions, VoiceProfileAccess.ForHead(Account.GetAccessToken, "Plate"),
+                HeadCredentialHealth.Store(), line => HeadLog.Warn("Caption", line));
             var line = await client.CaptionAsync(jpegs, CancellationToken.None);
             if (string.IsNullOrWhiteSpace(line))
             {

@@ -131,27 +131,28 @@ public class PrayerIsolationTests
     }
 
     /// <summary>
-    /// The pastoral composer does not go through the shared voice stack.
+    /// The pastoral composer <i>reads</i> the owner's voice and can write nothing back (audit W10.2).
     ///
-    /// <para>The voice profile is one file every app in the suite reads. A composer that reached the
-    /// journal <i>through</i> it would be a path from the most private thing the owner writes into
-    /// the most widely shared file they have — and it would look, in code, exactly like reuse.</para>
+    /// <para>The voice profile is one file every app in the suite reads. A composer that could write it
+    /// would be a path from the most private thing the owner writes into the most widely shared file they
+    /// have — and it would look, in code, exactly like reuse. So it is handed the read half only,
+    /// <c>IVoiceProfileSource</c>, and never names the store, the voice client (whose refine is how a
+    /// document reaches the profile), the messenger, or a save.</para>
     /// </summary>
     [Fact]
-    public void ThePastoralComposerDoesNotGoThroughTheSharedVoiceStack()
+    public void ThePastoralComposerReadsTheVoiceAndCannotWriteIt()
     {
         var source = File.ReadAllText(Path.Combine(
             Root(), "Foreword.Infrastructure/Prayer/ClaudePastoralComposer.cs"));
+        var code = string.Join('\n', source.Split('\n')
+            .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
 
-        foreach (Match match in Regex.Matches(
-            source, @"^\s*(?:using|.*\bnew\s+)?.*\b(VoicedMessenger|IVoiceProfileStore|IVoiceClient|VoiceProfile)\b",
-            RegexOptions.Multiline))
+        Assert.Contains("IVoiceProfileSource", code);
+        foreach (var forbidden in new[]
+                 { "IVoiceProfileStore", "IVoiceClient", "VoiceClient", "VoicedMessenger", "SaveAsync", "RefineAsync" })
         {
-            // Its own doc comment names them to say it does not use them, which is the opposite of
-            // a leak — so only real code counts.
-            var line = match.Value.TrimStart();
-            Assert.True(line.StartsWith("///", StringComparison.Ordinal),
-                $"the pastoral composer reaches the shared voice stack: {line}");
+            Assert.False(Regex.IsMatch(code, $@"\b{forbidden}\b"),
+                $"the pastoral composer reaches a way to write the shared voice: {forbidden}");
         }
     }
 
