@@ -127,6 +127,22 @@ public class Novel
     /// </summary>
     public string? PlacementJson { get; set; }
 
+    /// <summary>
+    /// Release R: this draft is being regenerated in the new report form, at the owner's word. Set by
+    /// <c>ProjectService.StartRegenerationAsync</c>, cleared when it completes again. While set, nothing is sent
+    /// to the reMarkable and the voice profile is not touched.
+    /// </summary>
+    public bool Regenerating { get; set; }
+
+    /// <summary>Whether the regeneration's reset (scenes re-detected, reads cleared) has been done.</summary>
+    public bool RegenerationReset { get; set; }
+
+    /// <summary>Its place in its series' story order for the regeneration: it waits for every book ranked before it.</summary>
+    public int RegenerationRank { get; set; }
+
+    /// <summary>When this draft was last regenerated, or null; the diagnostics export lists it.</summary>
+    public DateTimeOffset? RegeneratedAtUtc { get; set; }
+
     // Set once the per-chunk extractions have been merged into canonical DesignRefs, so the merge
     // (which would otherwise reset reference-sheet state) runs exactly once.
     public bool DesignBibleConsolidated { get; set; }

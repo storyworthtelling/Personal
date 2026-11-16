@@ -94,6 +94,37 @@ public partial class SetupPage : FolioBinderPage
     private static ProjectBackupService BackupService() =>
         IPlatformApplication.Current!.Services.GetRequiredService<ProjectBackupService>();
 
+    // Release R: the owner sees which books and roughly what it costs before anything is spent. The card is
+    // the only way in; the healer never starts a regeneration.
+    private async void OnRegenerateClicked(object sender, EventArgs e)
+    {
+        try
+        {
+            using var scope = IPlatformApplication.Current!.Services.CreateScope();
+            var projects = scope.ServiceProvider.GetRequiredService<ProjectService>();
+            var card = Folio.Domain.Pipeline.RegenerationCard.For(await projects.RegenerationCandidatesAsync(CancellationToken.None));
+            if (card.Action is null)
+            {
+                RegenerateStatusLabel.Text = card.Title + ".";
+                return;
+            }
+
+            var answer = await PaperCards.Choose(this, card.Title, card.Subtitle, [card.Action], lead: card.Action);
+            if (answer != card.Action)
+                return;
+
+            var started = await projects.StartRegenerationAsync(CancellationToken.None);
+            PipelineWorker.RunNow(global::Android.App.Application.Context);
+            RegenerateStatusLabel.Text = started == 1
+                ? "One book is being regenerated. Its report in Drive is replaced when it is done."
+                : $"{started} books are being regenerated, a series in story order. Each report in Drive is replaced when it is done.";
+        }
+        catch (Exception ex)
+        {
+            RegenerateStatusLabel.Text = Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Folio");
+        }
+    }
+
     private async void OnBackupClicked(object sender, EventArgs e)
     {
         var activity = Platform.CurrentActivity;

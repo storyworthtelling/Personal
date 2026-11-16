@@ -260,7 +260,8 @@ public class ReviewProcessorTests : IDisposable
 
     private ReviewProcessor NewProcessor(
         ArchiveOptions? archiveOptions = null, IRemarkableClient? remarkable = null,
-        IPaperDriveArchive? driveArchive = null, ILogger<ReviewProcessor>? logger = null, IImageStore? store = null) => new(
+        IPaperDriveArchive? driveArchive = null, ILogger<ReviewProcessor>? logger = null, IImageStore? store = null,
+        Storyworthtelling.Voice.IVoiceClient? voiceClient = null, Storyworthtelling.Voice.IVoiceProfileStore? voiceStore = null) => new(
         database,
         claude.Object,
         gemini.Object,
@@ -277,7 +278,9 @@ public class ReviewProcessorTests : IDisposable
         logger ?? NullLogger<ReviewProcessor>.Instance,
         delivery: remarkable is null && driveArchive is null
             ? null
-            : new PaperDelivery(remarkable, driveArchive));
+            : new PaperDelivery(remarkable, driveArchive),
+        voiceClient: voiceClient,
+        voiceStore: voiceStore);
 
     private Guid SeedManuscript(string? fullText = null)
     {
@@ -544,6 +547,152 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(hostCalls, table.Turns.Count(turn => turn.Speaker == RoundTablePlan.HostId) - 1);
         Assert.Equal(speakCalls - 1, table.Turns.Count(turn => turn.Speaker != RoundTablePlan.HostId));
         Assert.Equal("Second time lucky.", table.Turns.First(turn => turn.Speaker != RoundTablePlan.HostId).Words);
+    }
+
+    // Release R: the books already reviewed are regenerated in place, at the owner's word.
+    private ProjectService Projects() => new(database, new Mock<IGoogleDocsClient>().Object,
+        new FileSystemImageStore(Options.Create(new StorageOptions { OutputRoot = outputRoot })),
+        clock, Options.Create(new RateLimitOptions()));
+
+    /// <summary>
+    /// A finished book's latest draft gets a fresh report in place: the same draft, read again, the round
+    /// table run again, and its Drive copy replaced under the same name.
+    /// </summary>
+    [Fact]
+    public async Task RegeneratingAFinishedBookRewritesItsReportInPlace()
+    {
+        var drive = new Mock<IPaperDriveArchive>();
+        drive.Setup(d => d.FindParentFolder(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("folder-one");
+        drive.Setup(d => d.UploadFile(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("file");
+        var id = SeedManuscript();
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { Enabled = true }, driveArchive: drive.Object));
+        readerReads.Clear();
+        hostCalls = 0;
+
+        Assert.Equal(1, await Projects().StartRegenerationAsync(CancellationToken.None));
+        using (var waiting = database.NewContext())
+            Assert.True(waiting.Novels.Single(n => n.Id == id).Regenerating);
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { Enabled = true }, driveArchive: drive.Object));
+
+        Assert.Equal(PersonaCatalogue.Readers.Select(persona => persona.Id), readerReads);
+        Assert.True(hostCalls > 0);
+        drive.Verify(d => d.UploadFile("folder-one", DeliveredDocument.FileName("Quest", 1), "application/pdf",
+            It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        using var context = database.NewContext();
+        var novel = Assert.Single(context.Novels);
+        Assert.Equal(id, novel.Id);
+        Assert.Equal(1, novel.DraftNumber);
+        Assert.Equal(ProjectStage.Completed, novel.Stage);
+        Assert.False(novel.Regenerating);
+        Assert.NotNull(novel.RegeneratedAtUtc);
+        Assert.True(RoundTableCodec.Read(context.BookAnalyses.Single(a => a.NovelId == id).RoundTableJson).Closed);
+    }
+
+    /// <summary>
+    /// Regeneration sends nothing to the tablet and leaves its delivery mark as it was (owner's ruling), and
+    /// never touches the voice profile: the manuscripts shaped it once already.
+    /// </summary>
+    [Fact]
+    public async Task RegenerationSendsNothingToTheTabletAndLeavesTheVoiceProfileAlone()
+    {
+        var remarkable = new Mock<IRemarkableClient>();
+        SeedManuscript();
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+        remarkable.Invocations.Clear();
+        bool delivered;
+        using (var before = database.NewContext())
+            delivered = before.BookAnalyses.Single().DeliveredToRemarkable;
+
+        var voice = new Mock<Storyworthtelling.Voice.IVoiceClient>();
+        var profiles = new Mock<Storyworthtelling.Voice.IVoiceProfileStore>();
+        await Projects().StartRegenerationAsync(CancellationToken.None);
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object,
+            voiceClient: voice.Object, voiceStore: profiles.Object));
+
+        Assert.Empty(remarkable.Invocations);
+        Assert.Empty(voice.Invocations);
+        Assert.Empty(profiles.Invocations);
+        using var context = database.NewContext();
+        Assert.Equal(delivered, context.BookAnalyses.Single().DeliveredToRemarkable);
+        Assert.Equal(ProjectStage.Completed, context.Novels.Single().Stage);
+    }
+
+    /// <summary>A scene whose text is unchanged keeps its picture: regeneration does not pay for it twice.</summary>
+    [Fact]
+    public async Task RegenerationKeepsThePictureOfEverySceneWhoseTextIsUnchanged()
+    {
+        SeedManuscript("The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+        gemini.Invocations.Clear();
+        judgedScenes.Clear();
+
+        await Projects().StartRegenerationAsync(CancellationToken.None);
+        await DriveToCompletion(NewProcessor());
+
+        gemini.Verify(g => g.GenerateSceneImage(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(), It.IsAny<double?>(), It.IsAny<CancellationToken>()),
+            Times.Never());
+        Assert.Equal([1, 2], judgedScenes.Select(scene => scene.Number).Order());
+        using var context = database.NewContext();
+        Assert.All(context.Scenes.ToList(), scene =>
+        {
+            Assert.Equal(WorkStatus.Completed, scene.ImageStatus);
+            Assert.True(File.Exists(scene.ImagePath));
+        });
+    }
+
+    /// <summary>A series is regenerated in story order, so each book's bible is rebuilt before the next is read.</summary>
+    [Fact]
+    public async Task ASeriesIsRegeneratedInStoryOrder()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        using (var context = database.NewContext())
+        {
+            var sequel = context.Novels.Single(n => n.Id == second);
+            // As the app's own "next book" does, book one joins the series.
+            context.Novels.Single(n => n.Id == first).SeriesId = sequel.SeriesId;
+            sequel.Title = "Quest Before";
+            // Book two is a prequel: it takes place before book one, so it goes first.
+            sequel.PlacementJson = StoryPlacementCodec.Write(StoryPlacement.Before("Quest").Confirm());
+            context.SaveChanges();
+        }
+        await DriveToCompletion(NewProcessor());
+        var order = new List<string>();
+        claude.Setup(c => c.ReadSeriesBible(
+                It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, ReadingFrame _, string title, string _, CancellationToken _) =>
+            {
+                order.Add(title);
+                return Task.FromResult<IReadOnlyList<BibleFact>>([]);
+            });
+
+        Assert.Equal(2, await Projects().StartRegenerationAsync(CancellationToken.None));
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(["Quest Before", "Quest"], order);
+    }
+
+    [Fact]
+    public async Task OnlyEachBooksLatestFinishedDraftIsOffered()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        using (var context = database.NewContext())
+        {
+            var draftTwo = new Novel
+            {
+                Title = "Quest", GoogleDocId = "doc", ProjectId = first, DraftNumber = 2, PreviousDraftId = first,
+                Stage = ProjectStage.Ingesting, CreatedAtUtc = clock.UtcNow, UpdatedAtUtc = clock.UtcNow,
+            };
+            context.Novels.Add(draftTwo);
+            context.SaveChanges();
+        }
+
+        // Draft two is still being read: the book has nothing to regenerate until it finishes.
+        Assert.Empty(await Projects().RegenerationCandidatesAsync(CancellationToken.None));
     }
 
     private async Task DriveToCompletion(ReviewProcessor processor)
