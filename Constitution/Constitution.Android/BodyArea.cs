@@ -10,6 +10,7 @@ using Constitution.Domain.Health;
 using Constitution.Domain.Voice;
 using Constitution.Health;
 using Constitution.Infrastructure.Voice;
+using Storyworthtelling.Materials;
 
 namespace Constitution;
 
@@ -44,7 +45,7 @@ public sealed class BodyArea : ConstitutionAreaBase
     private int loadNumber;
 
     public BodyArea(Activity host)
-        : base(host, "body", Resource.Drawable.areabody)
+        : base(host, "body", TabGlyphs.Figure)
     {
         requester = new ActivityHealthPermissionRequester(host);
     }

@@ -3,6 +3,7 @@ using Codex.Domain.Design;
 using Codex.Domain.Music;
 using Codex.Domain.Voice;
 using Codex.Ui;
+using Storyworthtelling.Materials;
 
 namespace Score;
 
@@ -53,7 +54,7 @@ public sealed class WorkoutArea : ScoreArea
             Path.Combine(host.FilesDir!.AbsolutePath, "voice-lines.json"));
     }
 
-    public override BinderArea Tab => new("Workout", Resource.Drawable.area_workout, PaperTheme.CautionMark, PaperTheme.CautionFill);
+    public override BinderArea Tab => new("Workout", TabGlyphs.Metronome, PaperTheme.CautionMark, PaperTheme.CautionFill);
 
     // The screen already shows what is playing; a bar underneath repeating it is the
     // same information twice.

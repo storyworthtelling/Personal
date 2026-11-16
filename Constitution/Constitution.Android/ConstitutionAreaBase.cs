@@ -15,7 +15,7 @@ namespace Constitution;
 /// What the five areas share: the tab drawn from the domain's tokens, the ground decision, the
 /// Overlay slot, and the loading rule. An area supplies its id and glyph, and builds its page.
 /// </summary>
-public abstract class ConstitutionAreaBase(Activity host, string id, int glyphResourceId) : IConstitutionArea
+public abstract class ConstitutionAreaBase(Activity host, string id, string glyph) : IConstitutionArea
 {
     protected Activity Host { get; } = host;
 
@@ -23,7 +23,7 @@ public abstract class ConstitutionAreaBase(Activity host, string id, int glyphRe
 
     public BinderArea Tab => new(
         Definition.Name,
-        glyphResourceId,
+        glyph,
         Color.ParseColor(Definition.ActiveInk),
         Color.ParseColor(Definition.Cloth));
 

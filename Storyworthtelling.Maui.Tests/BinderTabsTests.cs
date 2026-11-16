@@ -25,7 +25,7 @@ public class BinderTabsTests
         var rebuild = RebuildBody();
 
         Assert.Matches(
-            new Regex(@"strip\.BackgroundColor\s*=.*areas\[activeIndex\]\.Cloth", RegexOptions.Singleline),
+            new Regex(@"gutterCloth\s*=.*areas\[activeIndex\]\.Cloth.*strip\.BackgroundColor\s*=\s*gutterCloth.*new PaperGround\(gutterCloth\)", RegexOptions.Singleline),
             rebuild);
     }
 
@@ -40,7 +40,7 @@ public class BinderTabsTests
         var rebuild = RebuildBody();
 
         Assert.Matches(
-            new Regex(@"strip\.BackgroundColor\s*=.*PaperResources\.Colour\(""Paper""\)", RegexOptions.Singleline),
+            new Regex(@"gutterCloth\s*=.*PaperResources\.Colour\(""Paper""\).*strip\.BackgroundColor\s*=\s*gutterCloth", RegexOptions.Singleline),
             rebuild);
     }
 

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Android half of the materials engine (DESIGN.md §2): Storyworthtelling.Materials' tiles turned into cached
+    Android shaders, once a process, and the painters that draw with them. Referenced by Codex.Ui.Android (the
+    native heads) and Storyworthtelling.Maui (the MAUI heads, which reach the Android canvas under MAUI's), so both
+    kits draw one pencil and one paper. The tiles and their numbers are tested in Storyworthtelling.Materials.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Materials.Android</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Storyworthtelling.Materials\Storyworthtelling.Materials.csproj" />
+  </ItemGroup>
+
+</Project>

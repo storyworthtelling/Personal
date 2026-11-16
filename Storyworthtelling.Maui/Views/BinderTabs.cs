@@ -1,6 +1,9 @@
 using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Layouts;
+using Microsoft.Maui.Graphics.Platform;
+using Storyworthtelling.Materials;
+using Storyworthtelling.Materials.Android;
 using Storyworthtelling.Maui.Layout;
 
 namespace Storyworthtelling.Maui.Views;
@@ -13,8 +16,8 @@ namespace Storyworthtelling.Maui.Views;
 /// cloth an INACTIVE tab is cut from, and <paramref name="Hue"/> is the mark tier the ACTIVE tab
 /// sets its glyph and label in once the tab itself has gone page-coloured.</para>
 ///
-/// <para><paramref name="GlyphPath"/> is SVG path data in a <b>24-unit</b> viewport, the suite's
-/// convention for a glyph. It is path data rather than an image because the same glyph is drawn in
+/// <para><paramref name="GlyphPath"/> is one of <c>Storyworthtelling.Materials.TabGlyphs</c>: SVG path data in a
+/// <b>24-unit</b> viewport, drawn in colored pencil. It is path data rather than an image because the same glyph is drawn in
 /// two inks — ink on the coloured cloth of an inactive tab, the area's hue on the page-coloured
 /// active one — and an <c>ImageSource</c> cannot be re-tinted: MAUI has no equivalent of Android's
 /// <c>SetColorFilter</c>. The alternative was shipping every glyph twice, already inked both ways,
@@ -24,12 +27,13 @@ namespace Storyworthtelling.Maui.Views;
 public sealed record BinderArea(string Label, string GlyphPath, Color Hue, Color Cloth);
 
 /// <summary>
-/// A glyph from 24-unit path data, filled in one colour and fitted to the box it is given.
+/// A tab glyph (<c>Storyworthtelling.Materials.TabGlyphs</c>) in colored pencil (DESIGN.md §2, §10), fitted to the
+/// box it is given: the same painter and tooth as the native strip, reached through the Android canvas under MAUI's.
 /// </summary>
 public sealed class BinderGlyphDrawable : IDrawable
 {
     /// <summary>The viewport glyph path data is written in.</summary>
-    public const float Viewport = 24f;
+    public const float Viewport = TabGlyphs.Viewport;
 
     public string? PathData { get; set; }
 
@@ -42,11 +46,27 @@ public sealed class BinderGlyphDrawable : IDrawable
             return;
         }
 
+        var side = Math.Min(dirtyRect.Width, dirtyRect.Height);
+        if (canvas is PlatformCanvas platform && platform.Canvas is { } native)
+        {
+            // A GraphicsView's canvas is in dp, so one dp is one canvas unit.
+            MaterialPainters.PencilGlyph(
+                native,
+                PathData,
+                new global::Android.Graphics.RectF(dirtyRect.Left, dirtyRect.Top, dirtyRect.Left + side, dirtyRect.Top + side),
+                Ink.AsColor(),
+                1f);
+            return;
+        }
+
         canvas.Antialias = true;
         canvas.SaveState();
-        canvas.Scale(dirtyRect.Width / Viewport, dirtyRect.Height / Viewport);
-        canvas.FillColor = Ink;
-        canvas.FillPath(PathBuilder.Build(PathData), WindingMode.NonZero);
+        canvas.Scale(side / Viewport, side / Viewport);
+        canvas.StrokeColor = Ink;
+        canvas.StrokeSize = TabGlyphs.StrokeWidth;
+        canvas.StrokeLineCap = LineCap.Round;
+        canvas.StrokeLineJoin = LineJoin.Round;
+        canvas.DrawPath(PathBuilder.Build(PathData));
         canvas.RestoreState();
     }
 }
@@ -115,9 +135,15 @@ public class BinderTabs : ContentView
         // instead of reading as the same cloth the tabs around them wear. Set ahead of the early
         // return below so it holds even before the strip has a height to lay tabs out in, and
         // before there are any areas at all.
-        strip.BackgroundColor = activeIndex >= 0 && activeIndex < areas.Count
+        // The cloth carries the paper grain, as the native gutter does (DESIGN.md §2).
+        var gutterCloth = activeIndex >= 0 && activeIndex < areas.Count
             ? areas[activeIndex].Cloth
             : PaperResources.Colour("Paper");
+        strip.BackgroundColor = gutterCloth;
+        var gutter = new PaperGround(gutterCloth);
+        AbsoluteLayout.SetLayoutBounds(gutter, new Rect(0, 0, 1, 1));
+        AbsoluteLayout.SetLayoutFlags(gutter, AbsoluteLayoutFlags.All);
+        strip.Children.Add(gutter);
 
         if (areas.Count == 0)
         {
@@ -190,11 +216,15 @@ public class BinderTabs : ContentView
             Children = { glyph, label },
         };
 
+        // The tab's cloth (or the page, for the active one) carries the paper grain; the Border clips it to the tab.
+        var fill = active ? PaperResources.Colour("Paper") : area.Cloth;
+        var face = new Grid { Children = { new PaperGround(fill), column } };
+
         var corners = BinderTabCorners.Outer(DesignTokens.Shape.RadiusCard);
         var tab = new Border
         {
-            Content = column,
-            BackgroundColor = active ? PaperResources.Colour("Paper") : area.Cloth,
+            Content = face,
+            BackgroundColor = fill,
             Stroke = PaperResources.Colour("Hairline"),
             StrokeThickness = DesignTokens.Shape.HairlineDp,
             StrokeShape = new RoundRectangle

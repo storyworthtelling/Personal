@@ -1,3 +1,4 @@
+using Storyworthtelling.Materials;
 using Storyworthtelling.Maui;
 using Storyworthtelling.Maui.Views;
 using Storyworthtelling.Paper;
@@ -20,34 +21,11 @@ public enum FolioArea
 /// suite, so it never looks like somewhere you are. Three areas, not four — this app does one thing,
 /// and a tab per screen would be a menu wearing a binder's clothes.</para>
 ///
-/// <para>The glyphs are 24-unit <b>fill</b> path data, the kit's convention, because
-/// <c>BinderGlyphDrawable</c> fills them in two different inks — ink on an inactive tab's coloured
-/// cloth, the area's own hue on the page-coloured active one — and an <c>ImageSource</c> cannot be
-/// re-tinted: MAUI has no equivalent of Android's <c>SetColorFilter</c>.</para>
+/// <para>The glyphs are the suite's one set, <c>Storyworthtelling.Materials.TabGlyphs</c>, drawn in colored
+/// pencil by the kit's strip (DESIGN.md §10, W8.8).</para>
 /// </summary>
 public static class FolioAreas
 {
-    // An open book, seen from above: two leaves falling away from a centre gap that is the spine.
-    // The gap is the glyph — two filled quadrilaterals would read as a shape, not a book.
-    private const string WorkGlyph =
-        "M2.6 5.4C5 4.6 8.4 4.4 11 5.2V19.6C8.4 18.8 5 19 2.6 19.8ZM21.4 5.4C19 4.6 15.6 4.4 13 "
-        + "5.2V19.6C15.6 18.8 19 19 21.4 19.8Z";
-
-    // Spines standing on a shelf, two of them leaning — which is what tells it from a bar chart.
-    // The spines are 1.8 units wide rather than 2.5: rendered beside the frame's own, the thicker
-    // version read as a solid block where the drawing reads as books, and at 26dp on a tab that
-    // difference is the whole glyph.
-    private const string ShelfGlyph =
-        "M2.8 19.4h18.4v1.8H2.8zM4.6 4.6h1.8v14.8H4.6zM8.8 4.6h1.8v14.8H8.8zM12.9 19.4 14.65 5.3"
-        + "l1.75.35-1.75 13.75ZM16.2 19.4 18.6 6l1.75.35-2.4 13.05Z";
-
-    // Three sliders, and deliberately not the cog the mockup drew. Foreword settled this for the
-    // suite — the suite's settings are choices, not machinery — and a divider that is one component
-    // across five apps cannot have a different glyph in the sixth.
-    private const string SettingsGlyph =
-        "M3 5.2h8v1.8H3zm11.5 0H21v1.8h-6.5zM12 2.6h1.8v7H12zM3 11.1h4v1.8H3zm7.5 0H21v1.8H10.5zM8 "
-        + "8.5h1.8v7H8zM3 17h10v1.8H3zm12.5 0H21v1.8h-5.5zM13 14.4h1.8v7H13z";
-
     /// <summary>The app's identity hue, as a MAUI colour. The token is the printed page's.</summary>
     public static Color Identity { get; } = Color.FromArgb(AppIdentityTokens.FolioMarkHex);
 
@@ -62,10 +40,10 @@ public static class FolioAreas
 
     public static IReadOnlyList<BinderArea> All { get; } =
     [
-        new("Work", WorkGlyph, Identity, IdentityCloth),
-        new("Shelf", ShelfGlyph,
+        new("Work", TabGlyphs.OpenBook, Identity, IdentityCloth),
+        new("Shelf", TabGlyphs.BookShelf,
             PaperResources.Colour("ReferenceMark"), PaperResources.Colour("ReferenceFill")),
-        new("Settings", SettingsGlyph,
+        new("Settings", TabGlyphs.Settings,
             PaperResources.Colour("ResolvedMark"), PaperResources.Colour("ResolvedFill")),
     ];
 }

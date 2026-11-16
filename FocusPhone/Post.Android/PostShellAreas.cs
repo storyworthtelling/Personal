@@ -1,5 +1,6 @@
 using Codex.Domain.Design;
 using Codex.Ui;
+using Storyworthtelling.Materials;
 
 namespace Post;
 
@@ -21,9 +22,9 @@ internal static class PostShellAreas
 
     public static readonly IReadOnlyList<BinderArea> All =
     [
-        new("Mailbox", Resource.Drawable.area_mailbox, PaperTheme.PostMark, PaperTheme.PostFill),
-        new("Filed", Resource.Drawable.area_filed, PaperTheme.CautionMark, PaperTheme.CautionFill),
-        new("Rolodex", Resource.Drawable.area_rolodex, PaperTheme.PositiveMark, PaperTheme.PositiveFill),
-        new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill),
+        new("Mailbox", TabGlyphs.Mailbox, PaperTheme.PostMark, PaperTheme.PostFill),
+        new("Filed", TabGlyphs.Folder, PaperTheme.CautionMark, PaperTheme.CautionFill),
+        new("Rolodex", TabGlyphs.Rolodex, PaperTheme.PositiveMark, PaperTheme.PositiveFill),
+        new("Settings", TabGlyphs.Settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill),
     ];
 }

@@ -1,6 +1,7 @@
 using Android.Graphics;
 using Codex.Domain.Design;
 using Pulp.Domain.Shell;
+using Storyworthtelling.Materials;
 
 namespace Pulp.Shell;
 
@@ -27,14 +28,14 @@ internal static class AreaPalette
         _ => throw new ArgumentOutOfRangeException(nameof(hue), hue, "Pulp has no tab colour for this hue."),
     };
 
-    public static int Glyph(PulpArea area) => area switch
+    public static string Glyph(PulpArea area) => area switch
     {
-        PulpArea.Watching => Resource.Drawable.tabwatching,
-        PulpArea.Playlists => Resource.Drawable.tabplaylists,
-        PulpArea.Discover => Resource.Drawable.tabdiscover,
-        PulpArea.Sports => Resource.Drawable.tabsports,
-        PulpArea.Calendar => Resource.Drawable.tabcalendar,
-        PulpArea.Settings => Resource.Drawable.tabsettings,
+        PulpArea.Watching => TabGlyphs.Television,
+        PulpArea.Playlists => TabGlyphs.List,
+        PulpArea.Discover => TabGlyphs.CardStack,
+        PulpArea.Sports => TabGlyphs.Baseball,
+        PulpArea.Calendar => TabGlyphs.Calendar,
+        PulpArea.Settings => TabGlyphs.Settings,
         _ => throw new ArgumentOutOfRangeException(nameof(area), area, "Pulp has no glyph for this area."),
     };
 

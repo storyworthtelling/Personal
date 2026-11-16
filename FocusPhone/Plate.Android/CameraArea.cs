@@ -11,6 +11,7 @@ using Codex.Domain.Design;
 using Codex.Domain.Plate;
 using Storyworthtelling.Time;
 using Codex.Ui;
+using Storyworthtelling.Materials;
 
 namespace Plate;
 
@@ -29,7 +30,7 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
     private readonly PlateActivity shell = host;
 
     public override BinderArea Tab =>
-        new("Camera", Resource.Drawable.area_camera, PaperTheme.PlateMark, PaperTheme.PlateFill);
+        new("Camera", TabGlyphs.Camera, PaperTheme.PlateMark, PaperTheme.PlateFill);
 
     private PreviewView? previewView;
     private TextView? statusLine;

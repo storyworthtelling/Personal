@@ -29,7 +29,7 @@ public enum AreaHue
 
 /// <summary>
 /// One binder tab: the short <paramref name="Label"/> under the glyph, the Serif
-/// <paramref name="Title"/> the page opens with, the drawable named by <paramref name="Glyph"/>, the
+/// <paramref name="Title"/> the page opens with, the glyph named by <paramref name="Glyph"/> (one of <c>Storyworthtelling.Materials.TabGlyphs</c>), the
 /// tab's <paramref name="Hue"/>, and the quiet <paramref name="Status"/> sentence the page shows
 /// until its screen is built — a sentence, never a spinner (DESIGN.md §5).
 /// </summary>
@@ -49,17 +49,17 @@ public static class PulpAreas
     public static IReadOnlyList<PulpAreaSpec> All { get; } =
     [
         // "Continue watching" is too long for a 66dp tab, so the tab says Watching (mockup 01).
-        new(PulpArea.Watching, "Watching", "Continue watching", "tabwatching", AreaHue.Identity,
+        new(PulpArea.Watching, "Watching", "Continue watching", "Television", AreaHue.Identity,
             "Shows you are partway through will gather here."),
-        new(PulpArea.Playlists, "Playlists", "Playlists", "tabplaylists", AreaHue.Reference,
+        new(PulpArea.Playlists, "Playlists", "Playlists", "List", AreaHue.Reference,
             "Your playlists will gather here."),
-        new(PulpArea.Discover, "Discover", "Discover", "tabdiscover", AreaHue.Positive,
+        new(PulpArea.Discover, "Discover", "Discover", "CardStack", AreaHue.Positive,
             "The Friday stack will be dealt here."),
-        new(PulpArea.Sports, "Sports", "Sports", "tabsports", AreaHue.Action,
+        new(PulpArea.Sports, "Sports", "Sports", "Baseball", AreaHue.Action,
             "Your leagues will gather here."),
-        new(PulpArea.Calendar, "Calendar", "Calendar", "tabcalendar", AreaHue.Progress,
+        new(PulpArea.Calendar, "Calendar", "Calendar", "Calendar", AreaHue.Progress,
             "The next two weeks will gather here."),
-        new(PulpArea.Settings, "Settings", "Settings", "tabsettings", AreaHue.Resolved,
+        new(PulpArea.Settings, "Settings", "Settings", "Settings", AreaHue.Resolved,
             "Services, household and children will be set here."),
     ];
 

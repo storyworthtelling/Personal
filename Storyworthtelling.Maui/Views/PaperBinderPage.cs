@@ -150,6 +150,12 @@ public abstract class PaperBinderPage : ContentPage, ICardHost
             ],
         };
 
+        // Every screen's ground is paper with its grain (DESIGN.md §2), under the page and its bar.
+        var ground = new PaperGround(PaperResources.Colour("Paper"));
+        page.Children.Add(ground);
+        Grid.SetRowSpan(ground, 2);
+        Grid.SetColumn(ground, 0);
+
         page.Children.Add(column);
         Grid.SetRow(column, 0);
         Grid.SetColumn(column, 0);

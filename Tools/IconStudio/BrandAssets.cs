@@ -14,11 +14,9 @@ public static class BrandAssets
 {
     private static readonly string[] GrainTargets =
     [
+        // The native kit's window background repeats this file. The MAUI heads draw the same tile from the materials
+        // engine (Storyworthtelling.Materials.Android), so they carry no copy of it.
         "FocusPhone/Codex.Ui.Android/Resources/drawable-nodpi/paper_grain.png",
-        // MAUI heads use the plain `Resources/` prefix, not Platforms/Android/Resources — see IconSpecs.
-        "Storyboarder/Folio.Android/Resources/drawable-nodpi/paper_grain.png",
-        "Foreword/Foreword.Android/Resources/drawable-nodpi/paper_grain.png",
-        "Ledger/Ledger.Android/Resources/drawable-nodpi/paper_grain.png",
     ];
 
     private static readonly string[] MedallionTargets =

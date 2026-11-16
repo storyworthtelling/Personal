@@ -83,7 +83,7 @@ public class PulpAreaHueTests
         foreach (var area in PulpAreas.All)
         {
             Assert.False(string.IsNullOrWhiteSpace(area.Title), $"{area.Label} has no header");
-            Assert.Matches("^[a-z][a-z0-9]*$", area.Glyph);
+            Assert.Matches("^[A-Z][A-Za-z]*$", area.Glyph);
             Assert.EndsWith(".", area.Status, StringComparison.Ordinal);
         }
     }
@@ -114,22 +114,17 @@ public class PulpAreaHueTests
     }
 
     [Fact]
-    public void EveryGlyphIsAPulpDrawableWithNoColourOfItsOwn()
+    public void EveryGlyphIsOneOfTheSuitesSet()
     {
-        var drawables = Path.Combine(PulpSource.Root(), "Pulp.Android", "Resources", "drawable");
         Assert.NotEmpty(PulpAreas.All);
 
         foreach (var area in PulpAreas.All)
         {
-            var file = Path.Combine(drawables, area.Glyph + ".xml");
-            Assert.True(File.Exists(file), $"{area.Label}'s glyph {area.Glyph}.xml is missing");
+            // The binder draws the glyph in pencil from the suite's one set (DESIGN.md §10), inked by the tab.
+            Assert.True(Storyworthtelling.Materials.TabGlyphs.All.ContainsKey(area.Glyph), $"{area.Label}'s glyph {area.Glyph} is not in TabGlyphs");
 
-            // The binder tints the glyph (ink on cloth, the area's hue when active); a colour baked
-            // into the vector would be a hex literal outside the token files.
-            Assert.DoesNotMatch("#[0-9A-Fa-f]{3,8}", File.ReadAllText(file));
-
-            // And the head draws the drawable the table names, not a neighbour's.
-            Assert.Contains($"PulpArea.{area.Area} => Resource.Drawable.{area.Glyph},", File.ReadAllText(PalettePath()));
+            // And the head draws the glyph the table names, not a neighbour's.
+            Assert.Contains($"PulpArea.{area.Area} => TabGlyphs.{area.Glyph},", File.ReadAllText(PalettePath()));
         }
     }
 

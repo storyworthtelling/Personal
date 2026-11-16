@@ -5,6 +5,7 @@ using Constitution.MealsTab;
 using Constitution.Domain.Today;
 using Constitution.Today;
 using Constitution.WorkoutsTab;
+using Storyworthtelling.Materials;
 
 namespace Constitution;
 
@@ -15,7 +16,7 @@ namespace Constitution;
 /// whose estimate appears on the meal's card (book p.15).
 /// </summary>
 public sealed class TodayArea(Activity host)
-    : ConstitutionAreaBase(host, "today", Resource.Drawable.areatoday), IUndoableArea
+    : ConstitutionAreaBase(host, "today", TabGlyphs.Page), IUndoableArea
 {
     private readonly WorkoutsLog log = new(host);
     private TodayPlan? plan;

@@ -16,6 +16,7 @@ using Constitution.MealsTab;
 using Constitution.Services;
 using Constitution.Settings;
 using Constitution.WorkoutsTab;
+using Storyworthtelling.Materials;
 
 namespace Constitution;
 
@@ -74,7 +75,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
     private bool sharing;
 
     public MealsArea(Activity host)
-        : base(host, "meals", Resource.Drawable.areameals)
+        : base(host, "meals", TabGlyphs.Bowl)
     {
         photoReader = RecipeReaderServices.ReaderOf(host);
     }

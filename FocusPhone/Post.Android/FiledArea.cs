@@ -11,6 +11,7 @@ using Codex.Infrastructure.Email;
 using Codex.Ui;
 using Storyworthtelling.Voice;
 using Codex.Ui.Voice;
+using Storyworthtelling.Materials;
 
 namespace Post;
 
@@ -59,7 +60,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
     private Microsoft.Extensions.Options.IOptions<VoiceOptions>? voiceOptions;
 
     public override BinderArea Tab =>
-        new("Filed", Resource.Drawable.area_filed, PaperTheme.CautionMark, PaperTheme.CautionFill);
+        new("Filed", TabGlyphs.Folder, PaperTheme.CautionMark, PaperTheme.CautionFill);
 
     public override void Pause() => EndSearch(FiledSearchEnd.Left);
 

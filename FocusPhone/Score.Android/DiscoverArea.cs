@@ -6,6 +6,7 @@ using Codex.Infrastructure.Music;
 using Codex.Infrastructure.Podcasts;
 using Codex.Ui;
 using Codex.Ui.Http;
+using Storyworthtelling.Materials;
 
 namespace Score;
 
@@ -79,7 +80,7 @@ public sealed class DiscoverArea : ScoreArea
         library.Changed += Invalidate;
     }
 
-    public override BinderArea Tab => new("Discover", Resource.Drawable.area_discover, PaperTheme.PositiveMark, PaperTheme.PositiveFill);
+    public override BinderArea Tab => new("Discover", TabGlyphs.Compass, PaperTheme.PositiveMark, PaperTheme.PositiveFill);
 
     public override bool GoBack()
     {

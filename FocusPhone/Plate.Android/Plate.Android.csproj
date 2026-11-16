@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
     <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
     <!-- The Darkroom's caption client lives here with the suite's other Claude clients.
          Flyleaf, Score and Post all reference this already; Plate was the only head that
          did not, because until the Darkroom it had nothing in it. -->
