@@ -302,9 +302,13 @@ form. This is done once, at the end, so no book is paid for twice.
    - Findings keep their thread ids where the new read finds the same issue.
 6. **Batched** (see below). A backfill nobody is waiting on is exactly what the batch tier is for, so the
    whole regeneration runs at the batch discount.
-7. **Delivery.** The new report goes to Drive (replacing the old file) and to the reMarkable.
-   - The tablet's old copy is left in place unless the owner says otherwise (open question 8).
-   - The diagnostics export lists each regenerated book and where it went.
+7. **Delivery: Drive only (owner's ruling).**
+   - The regenerated report **replaces the PDF in Drive** beside the manuscript, under the same name
+     (`DeliveredDocument`).
+   - It is **not sent to the reMarkable**, and the tablet's existing copy is left untouched.
+   - Guard test: a regeneration run makes no `IPaperDelivery` call and leaves
+     `BookAnalysis.DeliveredToRemarkable` as it was.
+   - The diagnostics export lists each regenerated book and its Drive file.
 
 ### Cross-cutting — batching the AI calls (owner's request)
 Folio's pipeline runs unattended: nobody watches a reduction or a scene prompt finish. The Message
@@ -372,8 +376,6 @@ checked, not assumed.
 7. **Batching trades speed for half the cost.** Should every unattended call be batched? A report may
    then take hours (rarely up to a day) instead of about fifteen minutes for the reads. Or should only the
    scene prompts and verdicts be batched, keeping the reads quick?
-8. When a book is regenerated, should the **old report on the reMarkable** be moved to the trash (Folio can
-   trash a document it delivered), or left beside the new one?
 
 ## 5. Order and size
 - **A, Scenes:** medium. A live bug, so it goes first.
