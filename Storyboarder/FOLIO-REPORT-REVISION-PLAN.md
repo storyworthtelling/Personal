@@ -267,6 +267,59 @@ runs a real draft through.
 5. **Status.** `ReadingPlan`, the desk's "read N of M" status and the run estimate are updated for the
    new passes.
 
+### Cross-cutting — batching the AI calls (owner's request)
+Folio's pipeline runs unattended: nobody watches a reduction or a scene prompt finish. The Message
+Batches API takes **50% off every token in a request, including cache reads and writes** (the two
+discounts stack).
+
+The trade-offs:
+- **Latency.** Results come back asynchronously, and the 24-hour window is an expiry, not a promise.
+- **One shot per request.** A request cannot hold a mid-request back-and-forth.
+- **Best-effort caching.** Cache hits between requests in the same batch are not guaranteed.
+
+Batch where the calls are independent and nobody is waiting; keep the rest as they are.
+
+**Batch candidates:**
+
+| Calls | Why they batch | Release |
+|---|---|---|
+| Scene image prompts (`DescribeSceneImage`, one per scene) | Independent of each other; the largest share of input in the first logged book | A |
+| Scene verdicts | Once the craft call takes the detected scene list (A3), the verdicts can be asked per chapter in one batch, keyed by scene id | A |
+| The sections and the seven readers (`ReadSection`, `ReadAsReader`) | Each reads the same manuscript and none depends on another | B |
+| The two synthesis passes (plan and verdict, later the conversation's moderator plan) | Independent of each other | D, H |
+| The conversation's per-reader turns, rebuttals included | Independent once the moderator has planned the splits | H |
+| Updating the series bible from a finished book | Nobody is waiting | G |
+
+**Not batched:**
+- **Chapter notes** (`AnalyzeChapter`). Each carries the story-so-far from the one before, so they run in order.
+- **Anything the owner is waiting on in the app.**
+
+**How it works:**
+1. **Submission.** The worker submits a batch and stores its id on the manuscript, so a restarted phone
+   resumes rather than resubmitting.
+2. **Polling.** It polls on later worker cycles, so no foreground service is needed. The fifteen-minute
+   foreground read exists only to keep the cache warm in one session.
+3. **Results.** Each result is read **by its custom id, never by position**: results arrive in any order,
+   which is the same lesson as the scene-pairing bug.
+4. **Failures.**
+   - A request that errors or expires is retried on its own, through the existing attempt and park rules
+     (`CallGate`).
+   - A refusal or a truncated reply is handled per request, as now.
+5. **Logging.** Every result is logged with its tokens as today, and the batch id is added to the line.
+
+**Caching inside a batch.** The reads share one cached manuscript.
+- Send the first read on its own to write the cache.
+- Then batch the rest.
+- Measure the first batched draft's cache reads and cost against the **$3.38 a draft** baseline before
+  making it the default.
+- If cache hits inside the batch are poor, the 1-hour cache lifetime is the fallback to try.
+
+**What the owner gives up:** a report that arrives in about fifteen minutes. A batched read usually comes
+back well inside the hour, but may take up to a day (open question 7).
+
+**Gemini's image generation** is a separate provider. Whether it has an equivalent batch mode is to be
+checked, not assumed.
+
 ## 4. Open questions for the owner
 1. The **Fellow writer's anchors** for 2, 4, 6, 8 and 10. A first draft will be written for approval in
    release B.
@@ -277,6 +330,9 @@ runs a real draft through.
    **one call per voice** (recommended)?
 6. Should the conversation **section** be called "The conversation" or "The panel"? Its tab replaces
    *Verdict*.
+7. **Batching trades speed for half the cost.** Should every unattended call be batched? A report may
+   then take hours (rarely up to a day) instead of about fifteen minutes for the reads. Or should only the
+   scene prompts and verdicts be batched, keeping the reads quick?
 
 ## 5. Order and size
 - **A, Scenes:** medium. A live bug, so it goes first.
@@ -287,3 +343,8 @@ runs a real draft through.
 - **F, Between drafts:** small. Needs A and D.
 - **G, Series bible:** large. Feeds B5.
 - **H, Conversation:** medium. Best after B, so the Fellow writer takes part.
+- **Batching:** medium, cross-cutting.
+  - It needs a batch submit/poll client beside the existing ones, and the pipeline's stage state to hold
+    a batch id.
+  - It lands with A, for the scene prompts and verdicts (the safest first use), then extends to each
+    later release's calls as they are built.
