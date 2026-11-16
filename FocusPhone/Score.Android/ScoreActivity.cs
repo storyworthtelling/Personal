@@ -118,7 +118,7 @@ public class ScoreActivity : Activity
         ScoreUpdateService.Schedule(this);
 
         greeting = new Codex.Ui.Voice.VoiceGreeting(
-            musicTokens.GetAccessToken, "Score", Path.Combine(FilesDir!.AbsolutePath, "voice-lines.json"));
+            musicTokens.GetAccessToken, "Score", Path.Combine(FilesDir!.AbsolutePath, "voice-seats.json"));
         rescanOutcomeStore = new RescanOutcomeStore(this);
         SetContentView(BuildLayout());
         playback.Connect();
@@ -158,10 +158,12 @@ public class ScoreActivity : Activity
         var isFirstOpenToday = FirstOpenOfDay.IsFirst(today, MusicSettingsStore.LastGreetingLocalDate);
         var outcome = isFirstOpenToday ? rescanOutcomeStore.Completed : null;
 
+        // The part of the day is a fact, so the morning's line is not shown in the evening (audit W10.3).
+        var partOfDay = Codex.Domain.Voice.PartOfDay.Of(DateTime.Now);
         var context = outcome is { IsEmpty: false } found
-            ? "the owner is opening their music and podcasts for the first time today; " +
+            ? $"the owner is opening their music and podcasts for the first time today; it is {partOfDay}; " +
               $"their automatic overnight library rescan found this: {found.Describe()}"
-            : "the owner is opening their music and podcasts";
+            : $"the owner is opening their music and podcasts; it is {partOfDay}";
 
         var message = await greeting.ComposeAsync(
             Storyworthtelling.CallSheet.CallSheet.For("Score", "welcome"), context, CancellationToken.None);

@@ -76,7 +76,7 @@ public sealed class DiscoverArea : ScoreArea
         subscriptionStore = new SubscriptionStore(host);
         voice = new Codex.Ui.Voice.VoiceGreeting(
             new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
-            Path.Combine(host.FilesDir!.AbsolutePath, "voice-lines.json"));
+            Path.Combine(host.FilesDir!.AbsolutePath, "voice-seats.json"));
         library.Changed += Invalidate;
     }
 

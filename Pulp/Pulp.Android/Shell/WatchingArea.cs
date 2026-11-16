@@ -285,8 +285,8 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
         var facts = showing > 0 && viewer is not null
             ? VoiceFactBuilder.Greeting(now, Voice.FirstOpenOfDay(today), showing, arrivedFriday: 0)
             : VoiceFactBuilder.EmptyContinueWatching(arrivedFriday: 0);
-        var remembered = Voice.Remembered(facts.Seat);
-        var action = VoiceLinePlan.Decide(facts, WatchingVoice.Ready, remembered, today);
+        var remembered = Voice.Remembered(facts);
+        var action = VoiceLinePlan.Decide(facts, WatchingVoice.Ready, remembered, DateTimeOffset.Now, today);
 
         Present(facts.Seat, action, action == VoiceLineAction.Reuse ? remembered?.Line : null);
         if (action != VoiceLineAction.Compose)
@@ -297,12 +297,10 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
         var line = await Voice.ComposeAsync(facts, today, cancellationToken);
         if (!cancellationToken.IsCancellationRequested)
         {
-            Host.RunOnUiThread(() => Present(facts.Seat, string.IsNullOrWhiteSpace(line) ? Quiet(facts.Seat) : VoiceLineAction.Reuse, line));
+            Host.RunOnUiThread(() => Present(facts.Seat, string.IsNullOrWhiteSpace(line) ? VoiceLinePlan.Quiet(facts.Seat) : VoiceLineAction.Reuse, line));
         }
     }
 
-    private static VoiceLineAction Quiet(VoiceSeat seat) =>
-        VoicedOccasions.For(seat).Fallback == VoiceFallback.Hide ? VoiceLineAction.Hide : VoiceLineAction.ShowNeutral;
 
     private void Present(VoiceSeat seat, VoiceLineAction action, string? line)
     {

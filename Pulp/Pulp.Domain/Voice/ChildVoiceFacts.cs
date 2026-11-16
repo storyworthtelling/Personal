@@ -20,7 +20,7 @@ public static class ChildVoiceFacts
             lines.Add("This is the first visit today.");
         }
 
-        return new VoiceFacts(VoiceSeat.ChildGreeting, lines, child.Ceiling);
+        return new VoiceFacts(VoiceSeat.ChildGreeting, lines, child.Ceiling) { Subject = child.Child.Value };
     }
 
     /// <summary>
@@ -50,26 +50,26 @@ public static class ChildVoiceFacts
             lines.Add($"One of them is {visible[0].Name}.");
         }
 
-        return new VoiceFacts(VoiceSeat.ChildFavorites, lines, child.Ceiling);
+        return new VoiceFacts(VoiceSeat.ChildFavorites, lines, child.Ceiling) { Subject = child.Child.Value };
     }
 
     public static VoiceFacts EmptyFavorites(ChildRules child)
     {
         ArgumentNullException.ThrowIfNull(child);
-        return new VoiceFacts(VoiceSeat.EmptyChildFavorites, ["There are no favorites yet."], child.Ceiling);
+        return new VoiceFacts(VoiceSeat.EmptyChildFavorites, ["There are no favorites yet."], child.Ceiling) { Subject = child.Child.Value };
     }
 
     /// <summary>A child's Watching page with nothing started (D294): the one fact the empty page holds.</summary>
     public static VoiceFacts EmptyWatching(ChildRules child)
     {
         ArgumentNullException.ThrowIfNull(child);
-        return new VoiceFacts(VoiceSeat.EmptyChildWatching, ["Nothing has been started yet."], child.Ceiling);
+        return new VoiceFacts(VoiceSeat.EmptyChildWatching, ["Nothing has been started yet."], child.Ceiling) { Subject = child.Child.Value };
     }
 
     /// <summary>A child's Playlists page with none on it (D294): the one fact the empty page holds.</summary>
     public static VoiceFacts EmptyPlaylists(ChildRules child)
     {
         ArgumentNullException.ThrowIfNull(child);
-        return new VoiceFacts(VoiceSeat.EmptyChildPlaylists, ["There are no playlists yet."], child.Ceiling);
+        return new VoiceFacts(VoiceSeat.EmptyChildPlaylists, ["There are no playlists yet."], child.Ceiling) { Subject = child.Child.Value };
     }
 }

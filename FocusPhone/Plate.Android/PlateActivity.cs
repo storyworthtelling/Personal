@@ -176,7 +176,7 @@ public class PlateActivity : AppCompatActivity
         try
         {
             voice ??= new Codex.Ui.Voice.VoiceGreeting(
-                Account.GetAccessToken, "Plate", System.IO.Path.Combine(FilesDir!.AbsolutePath, "voice-lines.json"));
+                Account.GetAccessToken, "Plate", System.IO.Path.Combine(FilesDir!.AbsolutePath, "voice-seats.json"));
             var line = await voice.ComposeAsync(ask, CancellationToken.None);
             if (line.Length == 0)
             {

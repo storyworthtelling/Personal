@@ -27,8 +27,8 @@ public sealed class ChildVoice(Activity host, PulpServices services)
         try
         {
             var today = DateOnly.FromDateTime(DateTime.Now);
-            var remembered = voice.Value.Remembered(facts.Seat);
-            var action = VoiceLinePlan.Decide(facts, WatchingVoice.Ready, remembered, today);
+            var remembered = voice.Value.Remembered(facts);
+            var action = VoiceLinePlan.Decide(facts, WatchingVoice.Ready, remembered, DateTimeOffset.Now, today);
             host.RunOnUiThread(() => present(action, action == VoiceLineAction.Reuse ? remembered?.Line : null));
             if (action != VoiceLineAction.Compose)
             {
@@ -38,7 +38,7 @@ public sealed class ChildVoice(Activity host, PulpServices services)
             var line = await voice.Value.ComposeAsync(facts, today, cancellationToken);
             if (!cancellationToken.IsCancellationRequested)
             {
-                host.RunOnUiThread(() => present(string.IsNullOrWhiteSpace(line) ? Quiet(facts.Seat) : VoiceLineAction.Reuse, line));
+                host.RunOnUiThread(() => present(string.IsNullOrWhiteSpace(line) ? VoiceLinePlan.Quiet(facts.Seat) : VoiceLineAction.Reuse, line));
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -55,6 +55,4 @@ public sealed class ChildVoice(Activity host, PulpServices services)
     public static string? Shown(VoiceLineAction action, string? line) =>
         action == VoiceLineAction.Reuse && !string.IsNullOrWhiteSpace(line) ? line.Trim() : null;
 
-    private static VoiceLineAction Quiet(VoiceSeat seat) =>
-        VoicedOccasions.For(seat).Fallback == VoiceFallback.Hide ? VoiceLineAction.Hide : VoiceLineAction.ShowNeutral;
 }

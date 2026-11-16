@@ -51,7 +51,7 @@ public sealed class WorkoutArea : ScoreArea
         this.playback = playback;
         voice = new Codex.Ui.Voice.VoiceGreeting(
             new Score.Google.DeviceAccountTokenProvider().GetAccessToken, "Score",
-            Path.Combine(host.FilesDir!.AbsolutePath, "voice-lines.json"));
+            Path.Combine(host.FilesDir!.AbsolutePath, "voice-seats.json"));
     }
 
     public override BinderArea Tab => new("Workout", TabGlyphs.Metronome, PaperTheme.CautionMark, PaperTheme.CautionFill);

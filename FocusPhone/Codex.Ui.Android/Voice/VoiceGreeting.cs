@@ -7,6 +7,7 @@ using global::Google.Apis.Services;
 using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Secrets;
 using Codex.Ui.Http;
+using Storyworthtelling.CallSheet;
 
 namespace Codex.Ui.Voice;
 
@@ -19,17 +20,13 @@ public sealed class VoiceGreeting
 {
     private readonly DriveVoiceOptions options;
     private readonly VoicedMessenger messenger;
-    private readonly string? cacheFile;
+    private readonly SeatMemoryFile? memory;
 
-    // One lock for every greeting in the process: a head's areas share one cache file.
-    private static readonly object CacheGate = new();
-    private const int CacheEntries = 32;
-
-    /// <param name="cacheFile">Where composed lines are kept for their part of the day (efficiency audit §4); null
-    /// composes every time.</param>
-    public VoiceGreeting(Func<Task<string>> accessToken, string applicationName, string? cacheFile = null)
+    /// <param name="memoryFile">The head's seat memory (the suite's one rule, audit W10.3): a line is written once per
+    /// seat, facts and day and kept across a restart. Null composes every time, for a head that keeps its own.</param>
+    public VoiceGreeting(Func<Task<string>> accessToken, string applicationName, string? memoryFile = null)
     {
-        this.cacheFile = cacheFile;
+        memory = memoryFile is null ? null : new SeatMemoryFile(memoryFile);
         var driveFactory = GoogleDrive.Factory(accessToken, applicationName);
 
         // The shared Claude key now lives in the encrypted secrets vault (the single source of truth, in
@@ -46,49 +43,38 @@ public sealed class VoiceGreeting
             warn: line => HeadLog.Warn("Voice", line));
     }
 
-    // Composes a greeting in the owner's voice for the occasion, or "" when it can't (no profile, no key,
-    // no Drive access, or a call failed). The key is pulled fresh from the shared Drive config first. A
-    // greeting is a screen the owner reads, so it defaults to the strong model (highVisibility).
-    //
-    // A line already composed for this occasion, part of the day and context is reused rather than asked for again
-    // (efficiency audit §4; the strong model stays, by the owner's decision). A screen that stops waiting does not
-    // cancel the call: the line it finishes with is kept for the next time the screen opens.
-    public Task<string> ComposeAsync(
-        string purpose, string context, CancellationToken cancellationToken, bool highVisibility = true) =>
-        ComposeAsync(purpose, context, maxWords: 40, highVisibility, cancellationToken);
-
-    /// <summary>A seat on the suite's voice-line Call Sheet (audit W10.3): its purpose, word limit and tier.</summary>
-    public Task<string> ComposeAsync(
-        Storyworthtelling.CallSheet.VoiceLine line, string context, CancellationToken cancellationToken) =>
-        ComposeAsync(line.Purpose, context, line.MaxWords, line.HighVisibility, cancellationToken);
-
-    private async Task<string> ComposeAsync(
-        string purpose, string context, int maxWords, bool highVisibility, CancellationToken cancellationToken)
+    /// <summary>
+    /// Writes a seat on the suite's voice-line Call Sheet in the owner's voice (its purpose, word limit and tier), or
+    /// returns "" when it cannot (no profile, no key, no Drive access, a failed call). With a memory file, a line
+    /// already written for this seat, subject, context and day is reused, and an empty attempt is believed for
+    /// <see cref="SeatPlan.RetryAfter"/> before it is asked again. A screen that stops waiting does not cancel the
+    /// call: the line it finishes with is kept for the next time the screen opens.
+    /// </summary>
+    public async Task<string> ComposeAsync(
+        VoiceLine line, string context, CancellationToken cancellationToken, string subject = "")
     {
-        var key = Codex.Domain.Voice.GreetingCache.Key(purpose, context, DateTime.Now);
-        if (Cached(key) is { } kept)
+        var now = DateTimeOffset.Now;
+        var today = SeatPlan.Today(now.LocalDateTime);
+        var hash = SeatPlan.Hash(line, [context]);
+        var remembered = memory?.Get(line, subject);
+        switch (SeatPlan.Decide(line, voiceReady: true, hash, hasFacts: true, remembered, now, today))
         {
-            return kept;
+            case SeatAction.Reuse:
+                return remembered!.Line!;
+            case SeatAction.Fallback:
+                return string.Empty;
         }
 
+        var composed = await ComposeNowAsync(line, context, cancellationToken);
         try
         {
-            await options.RefreshAsync(cancellationToken);
-            var line = await messenger.ComposeAsync(
-                new MessageRequest(purpose, context, maxWords, highVisibility),
-                fallback: string.Empty, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(line))
-            {
-                Keep(key, line);
-            }
-            return line;
+            memory?.Put(line, subject, SeatPlan.Remember(hash, today, composed, now));
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (IOException ex)
         {
-            // The key or profile could not be read from Drive; the greeting hides, and the reason is kept (audit 08 §22).
-            HeadLog.Quiet("Voice", "Greeting not composed", ex);
-            return string.Empty;
+            HeadLog.Quiet("Voice", "Line not kept", ex);
         }
+        return composed;
     }
 
     /// <summary>
@@ -98,51 +84,20 @@ public sealed class VoiceGreeting
     public Task<string> ComposeAsync(Codex.Domain.Voice.VoiceAsk ask, CancellationToken cancellationToken) =>
         ComposeAsync(ask.Line, ask.Context, cancellationToken);
 
-    private string? Cached(string key)
+    private async Task<string> ComposeNowAsync(VoiceLine line, string context, CancellationToken cancellationToken)
     {
-        lock (CacheGate)
-        {
-            return Read().TryGetValue(key, out var line) ? line : null;
-        }
-    }
-
-    private void Keep(string key, string line)
-    {
-        if (cacheFile is null)
-        {
-            return;
-        }
-
-        lock (CacheGate)
-        {
-            try
-            {
-                var lines = Read();
-                lines.Remove(key);
-                var kept = lines.TakeLast(CacheEntries - 1).Append(new KeyValuePair<string, string>(key, line));
-                File.WriteAllText(cacheFile, System.Text.Json.JsonSerializer.Serialize(kept.ToDictionary(pair => pair.Key, pair => pair.Value)));
-            }
-            catch (IOException ex)
-            {
-                HeadLog.Quiet("Voice", "Greeting not kept", ex);
-            }
-        }
-    }
-
-    // In insertion order, so the oldest go first when the file is full. A missing or damaged file is no cache.
-    private Dictionary<string, string> Read()
-    {
-        if (cacheFile is null || !File.Exists(cacheFile))
-        {
-            return [];
-        }
         try
         {
-            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(cacheFile)) ?? [];
+            await options.RefreshAsync(cancellationToken);
+            return await messenger.ComposeAsync(
+                new MessageRequest(line.Purpose, context, line.MaxWords, line.HighVisibility),
+                fallback: string.Empty, cancellationToken);
         }
-        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return [];
+            // The key or profile could not be read from Drive; the line hides, and the reason is kept (audit 08 §22).
+            HeadLog.Quiet("Voice", "Line not composed", ex);
+            return string.Empty;
         }
     }
 }

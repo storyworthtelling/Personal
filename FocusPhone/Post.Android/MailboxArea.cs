@@ -609,7 +609,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         try
         {
             voice ??= new VoiceGreeting(
-                MailAccess.Account().GetAccessToken, "Post", Path.Combine(Host.FilesDir!.AbsolutePath, "voice-lines.json"));
+                MailAccess.Account().GetAccessToken, "Post", Path.Combine(Host.FilesDir!.AbsolutePath, "voice-seats.json"));
             var line = await voice.ComposeAsync(ask, CancellationToken.None);
             if (line.Length == 0)
             {

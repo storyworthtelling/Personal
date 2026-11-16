@@ -62,6 +62,10 @@ public static class SeatPlan
         return SeatAction.Compose;
     }
 
+    /// <summary>The day a line belongs to: an evening that runs past midnight is the evening of the day it began,
+    /// so the day turns at five in the morning.</summary>
+    public static DateOnly Today(DateTime local) => DateOnly.FromDateTime(local.Hour < 5 ? local.AddDays(-1) : local);
+
     /// <summary>What to keep after an attempt; a blank line is kept as null.</summary>
     public static SeatMemory Remember(string factsHash, DateOnly today, string? line, DateTimeOffset now) =>
         new(factsHash, today, string.IsNullOrWhiteSpace(line) ? null : line.Trim(), now);

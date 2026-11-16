@@ -69,7 +69,7 @@ public class VoiceFactBuilderTests
             [new PastTitle(Pip, "Pip's Cartoon", Evening.AddDays(-1))]);
 
         Assert.False(facts.HasFacts);
-        Assert.Equal(VoiceLineAction.Hide, VoiceLinePlan.Decide(facts, voiceReady: true, remembered: null, Today));
+        Assert.Equal(VoiceLineAction.Hide, VoiceLinePlan.Decide(facts, voiceReady: true, remembered: null, Evening, Today));
     }
 
     // ---- adult seats speak to adults ----
