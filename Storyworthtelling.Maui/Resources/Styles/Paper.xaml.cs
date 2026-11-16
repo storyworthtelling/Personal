@@ -13,5 +13,8 @@ public partial class PaperKit : ResourceDictionary
     public PaperKit()
     {
         InitializeComponent();
+
+        // The buttons, cards and chips the dictionary styles are drawn in the §2 media (W8.8).
+        PaperMaterials.Install();
     }
 }

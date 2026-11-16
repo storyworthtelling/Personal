@@ -54,11 +54,11 @@ public static class PaperList
             MinimumHeightRequest = DesignTokens.Shape.ListRowMinHeightDp,
             Padding = new Thickness(DesignTokens.Space.X4, DesignTokens.Space.X3),
 
-            // §8 Selected: the highlighter wash, behind full-strength ink. Set both ways rather
-            // than only when picked — a recycled row that is not picked has to actively say so or
-            // it inherits the last one's wash.
-            BackgroundColor = picking && row.Picked ? PaperResources.Colour("ActionWash") : Colors.Transparent,
         };
+
+        // §8 Selected: the highlighter band, behind full-strength ink. Set both ways rather than only when
+        // picked — a recycled row that is not picked has to actively say so or it inherits the last one's band.
+        PaperMaterials.Highlight(content, PaperResources.Colour("ActionMark"), picking && row.Picked);
 
         // Built with the parameterless ctor and Width rather than ColumnDefinitions = [..]: the
         // collection's initializer form is not something to rely on from memory in a project whose

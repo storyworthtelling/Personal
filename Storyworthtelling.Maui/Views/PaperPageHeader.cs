@@ -1,4 +1,7 @@
 using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Graphics.Platform;
+using Microsoft.Maui.Platform;
+using Storyworthtelling.Materials.Android;
 using Storyworthtelling.Maui.Layout;
 
 namespace Storyworthtelling.Maui.Views;
@@ -12,8 +15,33 @@ public sealed class MarkerRuleDrawable : IDrawable
     /// <summary>The ink. An area's identity hue, or the neutral grey on Settings (DESIGN.md §9).</summary>
     public Color Ink { get; set; } = PaperResources.Colour("Ink");
 
+    // §2 Marker: the strokes carry fibre streaks along their length, as the native underline does.
+    private readonly global::Android.Graphics.Paint marker = new();
+
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
+        if (canvas is PlatformCanvas platform && platform.Canvas is { } native)
+        {
+            foreach (var design in MarkerRule.Strokes)
+            {
+                var stroke = MarkerRule.Scale(design, dirtyRect.Width, dirtyRect.Height);
+                var path = new global::Android.Graphics.Path();
+                path.MoveTo(dirtyRect.Left + stroke.StartX, dirtyRect.Top + stroke.StartY);
+                path.CubicTo(
+                    dirtyRect.Left + stroke.Control1X, dirtyRect.Top + stroke.Control1Y,
+                    dirtyRect.Left + stroke.Control2X, dirtyRect.Top + stroke.Control2Y,
+                    dirtyRect.Left + stroke.EndX, dirtyRect.Top + stroke.EndY);
+
+                // The GraphicsView's canvas is in dp, so one dp is one canvas unit.
+                MaterialPainters.Marker(marker, Ink.WithAlpha(stroke.Opacity).ToPlatform(), 1f);
+                marker.SetStyle(global::Android.Graphics.Paint.Style.Stroke);
+                marker.StrokeWidth = stroke.Width;
+                marker.StrokeCap = global::Android.Graphics.Paint.Cap.Round;
+                native.DrawPath(path, marker);
+            }
+            return;
+        }
+
         canvas.Antialias = true;
         canvas.StrokeLineCap = LineCap.Round;
 

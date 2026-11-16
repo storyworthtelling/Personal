@@ -248,27 +248,29 @@ public partial class TaskEditPage : BinderPage
         {
             var isPicked = day == picked;
 
+            var letter = new Label
+            {
+                // One letter, which is all that fits — and enough, because the row is in order.
+                Text = day.ToString()[..1],
+                Style = PaperResources.Token<Style>(isPicked ? "ChipLabelActive" : "ChipLabel"),
+                HorizontalTextAlignment = TextAlignment.Center,
+                VerticalTextAlignment = TextAlignment.Center,
+            };
+
+            // §8 Selected: the highlighter band behind the picked day's letter, inside its circle.
+            PaperMaterials.Highlight(letter, PaperResources.Colour("ActionMark"), isPicked);
+
             var circle = new Border
             {
                 WidthRequest = DesignTokens.Shape.TouchTargetDp,
                 HeightRequest = DesignTokens.Shape.TouchTargetDp,
                 Stroke = PaperResources.Colour("Hairline"),
                 StrokeThickness = DesignTokens.Shape.HairlineDp,
-                BackgroundColor = isPicked
-                    ? PaperResources.Colour("ActionWash")
-                    : Colors.Transparent,
                 StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
                 {
                     CornerRadius = DesignTokens.Shape.TouchTargetDp / 2,
                 },
-                Content = new Label
-                {
-                    // One letter, which is all that fits — and enough, because the row is in order.
-                    Text = day.ToString()[..1],
-                    Style = PaperResources.Token<Style>(isPicked ? "ChipLabelActive" : "ChipLabel"),
-                    HorizontalTextAlignment = TextAlignment.Center,
-                    VerticalTextAlignment = TextAlignment.Center,
-                },
+                Content = letter,
             };
 
             var tap = new TapGestureRecognizer();
