@@ -470,13 +470,79 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
-        // 1) Render one pending/due scene image.
+        // 0b) The image prompts go to the batch tier first (owner's ruling, R39): every fresh scene still
+        // without a prompt in one batch at half the cost. While it runs, scenes whose prompts are back are
+        // rendered; a scene retrying after a refusal (LastError set) always goes one at a time, since it
+        // carries a moment to avoid.
+        var promptless = await db.Scenes
+            .Where(s => s.NovelId == novel.Id && s.ImageStatus == WorkStatus.Pending
+                        && (s.ImagePrompt == null || s.ImagePrompt == "") && s.LastError == null)
+            .OrderBy(s => s.Number)
+            .ToListAsync(cancellationToken);
+        var promptBatch = await db.ModelBatches.FirstOrDefaultAsync(
+            b => b.NovelId == novel.Id && b.Kind == BatchKinds.SceneImagePrompts, cancellationToken);
+        var (promptStep, promptWait) = BatchPlan.Decide(promptless.Count, StateOf(promptBatch), now);
+        var promptsInFlight = false;
+
+        if (promptStep == BatchStep.Submit)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var bible = await LoadBible(db, novel.Id, cancellationToken);
+            var requests = promptless.Select(s =>
+            {
+                var start = Math.Clamp(s.StartOffset, 0, source.Length);
+                return new SceneImageRequest(s.Number, source[start..Math.Clamp(s.EndOffset, start, source.Length)]);
+            }).ToList();
+            await SubmitBatch(db, novel, BatchKinds.SceneImagePrompts,
+                () => claude.SubmitSceneImagePrompts(requests, bible, novel.ArtStyle, cancellationToken), cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        if (promptStep == BatchStep.Poll)
+        {
+            if (await PollBatch(db, promptBatch!, cancellationToken))
+            {
+                var byNumber = promptless.ToDictionary(s => s.Number);
+                var results = await claude.SceneImagePromptResults(promptBatch!.BatchId, cancellationToken);
+                foreach (var result in results)
+                {
+                    if (!string.IsNullOrWhiteSpace(result.Value) && byNumber.TryGetValue(result.SceneNumber, out var prompted))
+                        prompted.ImagePrompt = result.Value;
+                }
+                promptBatch.CompletedAtUtc = now;
+                logger.LogInformation(
+                    "Image prompt batch {BatchId} for manuscript {NovelId}: {Prompted} of {Count} prompts; the rest go one at a time",
+                    promptBatch.BatchId, novel.Id, results.Count(result => !string.IsNullOrWhiteSpace(result.Value)), promptless.Count);
+                Touch(novel);
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+            }
+            promptsInFlight = true;
+            promptWait = BatchPlan.PollEvery;
+        }
+        else if (promptStep == BatchStep.Wait)
+        {
+            promptsInFlight = true;
+        }
+        else if (promptStep == BatchStep.Abandon)
+        {
+            await AbandonBatch(db, novel, promptBatch!, cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 1) Render one pending/due scene image. While a prompt batch is in flight, only a scene whose
+        // prompt is already back is taken; with none, wait for the next poll.
         var scene = await db.Scenes
             .Where(s => s.NovelId == novel.Id &&
                         (s.ImageStatus == WorkStatus.Pending ||
-                         (s.ImageStatus == WorkStatus.NeedsRetry && s.NextAttemptAtUtc <= now)))
+                         (s.ImageStatus == WorkStatus.NeedsRetry && s.NextAttemptAtUtc <= now)) &&
+                        (!promptsInFlight || (s.ImagePrompt != null && s.ImagePrompt != "")))
             .OrderBy(s => s.Number)
             .FirstOrDefaultAsync(cancellationToken);
+        if (scene is null && promptsInFlight)
+            return ProcessResult.Waiting(promptWait, novel.Id);
 
         if (scene is not null)
         {
@@ -1026,30 +1092,81 @@ public sealed class ReviewProcessor : IPipelineStep
         var unjudged = await db.Scenes
             .Where(s => s.NovelId == novel.Id && s.JudgementJson == null)
             .OrderBy(s => s.Number)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (unjudged is not null)
+            .ToListAsync(cancellationToken);
+        if (unjudged.Count > 0)
         {
-            if (!claudeLimiter.TryAcquire())
-                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+            // The batch tier first (owner's ruling, R39): every unjudged scene in one batch at half the
+            // cost. While it runs the reads carry on; the report waits for the last judgement below.
+            var batch = await db.ModelBatches.FirstOrDefaultAsync(
+                b => b.NovelId == novel.Id && b.Kind == BatchKinds.SceneJudgements, cancellationToken);
+            var (step, _) = BatchPlan.Decide(unjudged.Count, StateOf(batch), clock.UtcNow);
 
-            try
+            if (step == BatchStep.Submit)
             {
-                var toJudge = await SceneToJudge(db, novel.Id, analysis, unjudged, cancellationToken);
+                if (!claudeLimiter.TryAcquire())
+                    return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+                var context = await SceneJudgingContext.LoadAsync(db, novel.Id, analysis, cancellationToken);
                 var bible = await LoadBible(db, novel.Id, cancellationToken);
-                var judgement = await claude.JudgeScene(toJudge, bible, cancellationToken);
-                unjudged.JudgementJson = JsonSerializer.Serialize(judgement, JsonResponse.CaseInsensitive);
-                ClearCallFailures(novel);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                unjudged.JudgementAttempts++;
-                await db.SaveChangesAsync(cancellationToken);
-                return await DeferAfterFailedCall(db, novel, ex, $"Judging scene {unjudged.Number}", cancellationToken);
+                await SubmitBatch(db, novel, BatchKinds.SceneJudgements,
+                    () => claude.SubmitSceneJudgements([.. unjudged.Select(context.For)], bible, cancellationToken),
+                    cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
             }
 
-            Touch(novel);
-            await db.SaveChangesAsync(cancellationToken);
-            return ProcessResult.DidWork(novel.Id);
+            if (step == BatchStep.Poll && await PollBatch(db, batch!, cancellationToken))
+            {
+                var chapters = unjudged.ToDictionary(scene => scene.Number, scene => scene.ChapterLabel);
+                var results = await claude.SceneJudgementResults(batch!.BatchId, chapters, cancellationToken);
+                var byNumber = unjudged.ToDictionary(scene => scene.Number);
+                foreach (var result in results)
+                {
+                    // Matched by the scene's own number, never by position (release A3).
+                    if (result.Value is { } judgement && byNumber.TryGetValue(result.SceneNumber, out var judged))
+                        judged.JudgementJson = JsonSerializer.Serialize(judgement, JsonResponse.CaseInsensitive);
+                }
+                batch.CompletedAtUtc = clock.UtcNow;
+                logger.LogInformation(
+                    "Scene judgement batch {BatchId} for manuscript {NovelId}: {Judged} of {Count} judged; the rest go one at a time",
+                    batch.BatchId, novel.Id, results.Count(result => result.Value is not null), unjudged.Count);
+                Touch(novel);
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+            }
+
+            if (step == BatchStep.Abandon)
+            {
+                await AbandonBatch(db, novel, batch!, cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+            }
+
+            if (step == BatchStep.OneByOne)
+            {
+                var scene = unjudged[0];
+                if (!claudeLimiter.TryAcquire())
+                    return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+                try
+                {
+                    var context = await SceneJudgingContext.LoadAsync(db, novel.Id, analysis, cancellationToken);
+                    var bible = await LoadBible(db, novel.Id, cancellationToken);
+                    var judgement = await claude.JudgeScene(context.For(scene), bible, cancellationToken);
+                    scene.JudgementJson = JsonSerializer.Serialize(judgement, JsonResponse.CaseInsensitive);
+                    ClearCallFailures(novel);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    scene.JudgementAttempts++;
+                    await db.SaveChangesAsync(cancellationToken);
+                    return await DeferAfterFailedCall(db, novel, ex, $"Judging scene {scene.Number}", cancellationToken);
+                }
+
+                Touch(novel);
+                await db.SaveChangesAsync(cancellationToken);
+                return ProcessResult.DidWork(novel.Id);
+            }
+
+            // A batch is running (polled and not ended, or polled a moment ago): carry on with the reads.
         }
 
         // 2g) The sixteen passes. Eight whole-book sections on the standard model, then six readers
@@ -1148,6 +1265,10 @@ public sealed class ReviewProcessor : IPipelineStep
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.DidWork(novel.Id);
         }
+
+        // 3a) The report waits for every scene's own judgement; only a running batch can leave one undone here.
+        if (await db.Scenes.AnyAsync(scene => scene.NovelId == novel.Id && scene.JudgementJson == null, cancellationToken))
+            return ProcessResult.Waiting(BatchPlan.PollEvery, novel.Id);
 
         // 3) Render: compose the report PDF from the consolidated report (all parts folded into one).
         if (analysis.PdfStatus != WorkStatus.Completed)
@@ -1916,31 +2037,108 @@ public sealed class ReviewProcessor : IPipelineStep
     }
 
     /// <summary>
-    /// What one scene is judged from: its own text, the story so far when it begins (the running state of
-    /// the last notes block that ended before it) and the book's dominant voice, if the voice read has run.
+    /// What scenes are judged from, loaded once for a draft: the source text, the story so far at the end
+    /// of each notes block, and the book's dominant voice if the voice read has run.
     /// </summary>
-    private static async Task<SceneToJudge> SceneToJudge(
-        FolioDbContext db, Guid novelId, BookAnalysis analysis, Scene scene, CancellationToken cancellationToken)
+    private sealed class SceneJudgingContext
     {
-        var source = await db.SourceTexts.Where(s => s.NovelId == novelId)
-            .Select(s => s.FullText).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
-        var start = Math.Clamp(scene.StartOffset, 0, source.Length);
-        var end = Math.Clamp(scene.EndOffset, start, source.Length);
+        private readonly string source;
+        private readonly IReadOnlyList<TextBlockState> blocks;
+        private readonly string voice;
 
-        var chunks = await db.Chunks.Where(c => c.NovelId == novelId)
-            .Select(c => new { c.Ordinal, c.StartOffset, c.EndOffset }).ToListAsync(cancellationToken);
-        var notes = await db.ChunkAnalyses.Where(a => a.NovelId == novelId && a.NotesJson != null)
-            .Select(a => new { a.Ordinal, a.NotesJson }).ToListAsync(cancellationToken);
-        var blocks = chunks.Join(notes, c => c.Ordinal, n => n.Ordinal, (c, n) => new TextBlockState(
-            c.StartOffset, c.EndOffset,
-            JsonSerializer.Deserialize<ChapterNotes>(n.NotesJson!, JsonResponse.CaseInsensitive)?.RunningState ?? string.Empty));
+        private SceneJudgingContext(string source, IReadOnlyList<TextBlockState> blocks, string voice)
+        {
+            this.source = source;
+            this.blocks = blocks;
+            this.voice = voice;
+        }
 
-        var voice = analysis.VoiceJson is null
-            ? string.Empty
-            : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive)?.DominantVoice ?? string.Empty;
+        public static async Task<SceneJudgingContext> LoadAsync(
+            FolioDbContext db, Guid novelId, BookAnalysis analysis, CancellationToken cancellationToken)
+        {
+            var source = await db.SourceTexts.Where(s => s.NovelId == novelId)
+                .Select(s => s.FullText).FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
+            var chunks = await db.Chunks.Where(c => c.NovelId == novelId)
+                .Select(c => new { c.Ordinal, c.StartOffset, c.EndOffset }).ToListAsync(cancellationToken);
+            var notes = await db.ChunkAnalyses.Where(a => a.NovelId == novelId && a.NotesJson != null)
+                .Select(a => new { a.Ordinal, a.NotesJson }).ToListAsync(cancellationToken);
+            var blocks = chunks.Join(notes, c => c.Ordinal, n => n.Ordinal, (c, n) => new TextBlockState(
+                c.StartOffset, c.EndOffset,
+                JsonSerializer.Deserialize<ChapterNotes>(n.NotesJson!, JsonResponse.CaseInsensitive)?.RunningState ?? string.Empty))
+                .ToList();
+            var voice = analysis.VoiceJson is null
+                ? string.Empty
+                : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive)?.DominantVoice ?? string.Empty;
+            return new SceneJudgingContext(source, blocks, voice);
+        }
 
-        return new SceneToJudge(scene.Number, scene.ChapterLabel, source[start..end],
-            SceneContext.StorySoFar(blocks, scene.StartOffset), voice);
+        public SceneToJudge For(Scene scene)
+        {
+            var start = Math.Clamp(scene.StartOffset, 0, source.Length);
+            var end = Math.Clamp(scene.EndOffset, start, source.Length);
+            return new SceneToJudge(scene.Number, scene.ChapterLabel, source[start..end],
+                SceneContext.StorySoFar(blocks, scene.StartOffset), voice);
+        }
+    }
+
+    // ---- Batches (owner's ruling, R39) ----------------------------------------------------------------
+
+    private static BatchState? StateOf(ModelBatch? batch) =>
+        batch is null ? null : new BatchState(batch.SubmittedAtUtc, batch.LastPolledAtUtc, batch.CompletedAtUtc);
+
+    // Submits one batch and records it. A submit that fails (or returns no id) is recorded as already
+    // completed, so this kind goes one call at a time for the draft rather than resubmitting.
+    private async Task SubmitBatch(
+        FolioDbContext db, Novel novel, string kind, Func<Task<string?>> submit, CancellationToken cancellationToken)
+    {
+        var batch = new ModelBatch { NovelId = novel.Id, Kind = kind, SubmittedAtUtc = clock.UtcNow };
+        try
+        {
+            batch.BatchId = await submit() ?? string.Empty;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                "Could not submit the {Kind} batch for manuscript {NovelId}; going one call at a time: {Error}",
+                kind, novel.Id, ErrorText.Describe(ex));
+        }
+
+        if (batch.BatchId.Length == 0)
+            batch.CompletedAtUtc = clock.UtcNow;
+        db.ModelBatches.Add(batch);
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // Asks whether a batch has ended, and records the poll. A poll that fails is not an error for the
+    // draft: the batch is asked again at the next interval.
+    private async Task<bool> PollBatch(FolioDbContext db, ModelBatch batch, CancellationToken cancellationToken)
+    {
+        bool ended;
+        try
+        {
+            ended = await claude.BatchEnded(batch.BatchId, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning("Could not poll batch {BatchId} ({Kind}); asking again shortly: {Error}",
+                batch.BatchId, batch.Kind, ErrorText.Describe(ex));
+            ended = false;
+        }
+
+        batch.LastPolledAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return ended;
+    }
+
+    private async Task AbandonBatch(FolioDbContext db, Novel novel, ModelBatch batch, CancellationToken cancellationToken)
+    {
+        batch.CompletedAtUtc = clock.UtcNow;
+        logger.LogWarning(
+            "Batch {BatchId} ({Kind}) for manuscript {NovelId} outlived its window; the rest go one call at a time",
+            batch.BatchId, batch.Kind, novel.Id);
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<DesignBible> LoadBible(FolioDbContext db, Guid novelId, CancellationToken cancellationToken)

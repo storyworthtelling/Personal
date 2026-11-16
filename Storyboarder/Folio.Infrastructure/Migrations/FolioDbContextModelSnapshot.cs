@@ -287,6 +287,40 @@ namespace Folio.Infrastructure.Migrations
                     b.ToTable("Findings");
                 });
 
+            modelBuilder.Entity("Folio.Domain.Model.ModelBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BatchId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("CompletedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("LastPolledAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("NovelId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("SubmittedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NovelId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("ModelBatches");
+                });
+
             modelBuilder.Entity("Folio.Domain.Model.Novel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -581,6 +615,15 @@ namespace Folio.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Folio.Domain.Model.ModelBatch", b =>
+                {
+                    b.HasOne("Folio.Domain.Model.Novel", null)
+                        .WithMany("ModelBatches")
+                        .HasForeignKey("NovelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Folio.Domain.Model.PassRead", b =>
                 {
                     b.HasOne("Folio.Domain.Model.Novel", null)
@@ -621,6 +664,8 @@ namespace Folio.Infrastructure.Migrations
                     b.Navigation("DesignRefs");
 
                     b.Navigation("Findings");
+
+                    b.Navigation("ModelBatches");
 
                     b.Navigation("PassReads");
 

@@ -319,17 +319,215 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return dto?.ArtStyle?.Trim() ?? string.Empty;
     }
 
+    // The image-prompt request's content: the one place it is built, for the direct call and the batch.
+    private static string SceneImageContent(
+        string sceneText, DesignBible bible, string artStyle, IReadOnlyList<string> avoidMoments)
+    {
+        // Only the cast and settings this scene names: see DesignBible.ForScene.
+        var bibleJson = JsonSerializer.Serialize(bible.ForScene(sceneText), JsonResponse.CaseInsensitive);
+        var avoid = avoidMoments.Count == 0
+            ? "(none)"
+            : string.Join("\n", avoidMoments.Select(m => $"- {m}"));
+        return
+            $"ART STYLE: {artStyle}\n\n" +
+            $"CAST & SETTINGS (JSON):\n{bibleJson}\n\n" +
+            $"MOMENTS TO AVOID:\n{avoid}\n\n" +
+            $"SCENE:\n{sceneText}";
+    }
+
+    // ---- The batch tier (owner's ruling, R39) ----------------------------------------------------------
+    // The same requests as the direct calls (same instruction, same content, same model and effort), sent
+    // together at half the cost of every token and read back by custom id, never by position.
+
+    private const string BatchesUrl = "https://api.anthropic.com/v1/messages/batches";
+
+    public Task<string?> SubmitSceneJudgements(
+        IReadOnlyList<SceneToJudge> scenes, DesignBible bible, CancellationToken cancellationToken) =>
+        SubmitBatch(
+            scenes.Select(scene => (SceneKey(scene.Number), SceneJudgementInstruction, SceneJudgementContent(scene, bible))).ToList(),
+            nameof(JudgeScene), cancellationToken);
+
+    public Task<string?> SubmitSceneImagePrompts(
+        IReadOnlyList<SceneImageRequest> scenes, DesignBible bible, string artStyle, CancellationToken cancellationToken) =>
+        SubmitBatch(
+            scenes.Select(scene => (SceneKey(scene.Number), SceneImageInstruction, SceneImageContent(scene.Text, bible, artStyle, []))).ToList(),
+            nameof(DescribeSceneImage), cancellationToken);
+
+    public async Task<bool> BatchEnded(string batchId, CancellationToken cancellationToken)
+    {
+        using var batch = await GetBatch(batchId, cancellationToken);
+        return batch.RootElement.TryGetProperty("processing_status", out var status) && status.GetString() == "ended";
+    }
+
+    public async Task<IReadOnlyList<BatchItem<SceneJudgement>>> SceneJudgementResults(
+        string batchId, IReadOnlyDictionary<int, string> chapters, CancellationToken cancellationToken)
+    {
+        var items = new List<BatchItem<SceneJudgement>>();
+        foreach (var (number, text, failure) in await BatchTexts(batchId, nameof(JudgeScene), cancellationToken))
+        {
+            if (text is null)
+            {
+                items.Add(new BatchItem<SceneJudgement>(number, null, failure));
+                continue;
+            }
+            try
+            {
+                items.Add(new BatchItem<SceneJudgement>(
+                    number, ReadSceneJudgement(number, chapters.TryGetValue(number, out var chapter) ? chapter : string.Empty, text), null));
+            }
+            catch (InvalidOperationException unreadable)
+            {
+                items.Add(new BatchItem<SceneJudgement>(number, null, unreadable.Message));
+            }
+        }
+        return items;
+    }
+
+    public async Task<IReadOnlyList<BatchItem<string>>> SceneImagePromptResults(string batchId, CancellationToken cancellationToken) =>
+        (await BatchTexts(batchId, nameof(DescribeSceneImage), cancellationToken))
+            .Select(item => new BatchItem<string>(item.Number, item.Text?.Trim(), item.Failure))
+            .ToList();
+
+    private static string SceneKey(int number) => $"scene-{number}";
+
+    private async Task<string?> SubmitBatch(
+        IReadOnlyList<(string CustomId, string Instruction, string Content)> items, string call,
+        CancellationToken cancellationToken)
+    {
+        if (items.Count == 0)
+            return null;
+
+        var payload = new
+        {
+            requests = items.Select(item => new
+            {
+                custom_id = item.CustomId,
+                @params = new
+                {
+                    model = options.Model,
+                    max_tokens = options.MaxTokens,
+                    output_config = new { effort = options.Effort },
+                    system = new object[] { new { type = "text", text = item.Instruction, cache_control = new { type = "ephemeral" } } },
+                    messages = new[] { new { role = "user", content = item.Content } },
+                },
+            }).ToList(),
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, BatchesUrl);
+        request.Headers.Add("x-api-key", options.ApiKey);
+        request.Headers.Add("anthropic-version", AnthropicVersion);
+        request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, body))
+                healthSink?.MarkFailing(CredentialIds.Claude, $"{(int)response.StatusCode} {response.StatusCode}");
+            logger?.LogWarning("Claude batch for {Call} ({Count} requests) was refused: {Status}", call, items.Count, (int)response.StatusCode);
+            throw ToException(response, body);
+        }
+
+        healthSink?.MarkOk(CredentialIds.Claude);
+        using var created = JsonDocument.Parse(body);
+        var id = created.RootElement.GetProperty("id").GetString();
+        logger?.LogInformation("Claude batch {BatchId} submitted for {Call}: {Count} requests at the batch rate", id, call, items.Count);
+        return id;
+    }
+
+    private async Task<JsonDocument> GetBatch(string batchId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{BatchesUrl}/{Uri.EscapeDataString(batchId)}");
+        request.Headers.Add("x-api-key", options.ApiKey);
+        request.Headers.Add("anthropic-version", AnthropicVersion);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw ToException(response, body);
+        return JsonDocument.Parse(body);
+    }
+
+    // Each result line of a finished batch: the scene it belongs to (by custom id), the reply's text when
+    // it succeeded, or why there is none. Every item is logged with its tokens, as a direct call is.
+    private async Task<IReadOnlyList<(int Number, string? Text, string? Failure)>> BatchTexts(
+        string batchId, string call, CancellationToken cancellationToken)
+    {
+        string resultsUrl;
+        using (var batch = await GetBatch(batchId, cancellationToken))
+        {
+            resultsUrl = batch.RootElement.TryGetProperty("results_url", out var url) && url.GetString() is { Length: > 0 } found
+                ? found
+                : throw new InvalidOperationException($"Batch {batchId} has no results yet.");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, resultsUrl);
+        request.Headers.Add("x-api-key", options.ApiKey);
+        request.Headers.Add("anthropic-version", AnthropicVersion);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw ToException(response, body);
+
+        var items = new List<(int, string?, string?)>();
+        foreach (var line in body.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            using var item = JsonDocument.Parse(line);
+            var customId = item.RootElement.GetProperty("custom_id").GetString() ?? string.Empty;
+            if (!customId.StartsWith("scene-", StringComparison.Ordinal) || !int.TryParse(customId["scene-".Length..], out var number))
+                continue;
+
+            var result = item.RootElement.GetProperty("result");
+            var type = result.GetProperty("type").GetString();
+            if (type == "succeeded")
+            {
+                var message = result.GetProperty("message");
+                var text = string.Concat(message.GetProperty("content").EnumerateArray()
+                    .Where(block => block.TryGetProperty("type", out var kind) && kind.GetString() == "text")
+                    .Select(block => block.GetProperty("text").GetString()));
+                var usage = message.TryGetProperty("usage", out var u) ? u : default;
+                logger?.LogInformation(
+                    "Claude batch {BatchId} item {CustomId} ({Call}) succeeded: input={Input} cacheWrite={CacheWrite} cacheRead={CacheRead} output={Output}",
+                    batchId, customId, call, Tokens(usage, "input_tokens"), Tokens(usage, "cache_creation_input_tokens"),
+                    Tokens(usage, "cache_read_input_tokens"), Tokens(usage, "output_tokens"));
+                items.Add((number, text, null));
+            }
+            else
+            {
+                var why = type == "errored" && result.TryGetProperty("error", out var error)
+                    ? $"errored: {(error.TryGetProperty("message", out var m) ? m.GetString() : error.ToString())}"
+                    : type ?? "unknown";
+                logger?.LogWarning("Claude batch {BatchId} item {CustomId} ({Call}) did not succeed: {Why}", batchId, customId, call, why);
+                items.Add((number, null, why));
+            }
+        }
+        return items;
+    }
+
+    private static int Tokens(JsonElement usage, string name) =>
+        usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty(name, out var value) && value.TryGetInt32(out var tokens) ? tokens : 0;
+
     public async Task<SceneJudgement> JudgeScene(
         SceneToJudge scene, DesignBible bible, CancellationToken cancellationToken)
     {
+        var reply = await SendMessage(SceneJudgementInstruction, SceneJudgementContent(scene, bible), cancellationToken);
+        return ReadSceneJudgement(scene.Number, scene.Chapter, reply);
+    }
+
+    // The scene-judgement request's content: the one place it is built, for the direct call and the batch.
+    private static string SceneJudgementContent(SceneToJudge scene, DesignBible bible)
+    {
         var cast = JsonSerializer.Serialize(bible.ForScene(scene.Text), JsonResponse.CaseInsensitive);
-        var userContent =
+        return
             $"BOOK'S DOMINANT VOICE:\n{(string.IsNullOrWhiteSpace(scene.DominantVoice) ? "(not yet described)" : scene.DominantVoice)}\n\n" +
             $"STORY SO FAR:\n{(string.IsNullOrWhiteSpace(scene.StorySoFar) ? "(this is the opening)" : scene.StorySoFar)}\n\n" +
             $"CAST & SETTINGS THIS SCENE NAMES (JSON):\n{cast}\n\n" +
             $"SCENE {scene.Number} ({scene.Chapter}):\n{scene.Text}";
+    }
 
-        var reply = await SendMessage(SceneJudgementInstruction, userContent, cancellationToken);
+    // A scene judgement read from the model's reply; the one place it is parsed, for both paths.
+    private static SceneJudgement ReadSceneJudgement(int number, string chapter, string reply)
+    {
+        var scene = new { Number = number, Chapter = chapter };
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException(
                 $"Scene {scene.Number}'s judgement came back with nothing readable as JSON; the pass is retried.");
@@ -372,16 +570,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         string sceneText, DesignBible bible, string artStyle, IReadOnlyList<string> avoidMoments,
         CancellationToken cancellationToken)
     {
-        // Only the cast and settings this scene names: see DesignBible.ForScene.
-        var bibleJson = JsonSerializer.Serialize(bible.ForScene(sceneText), JsonResponse.CaseInsensitive);
-        var avoid = avoidMoments.Count == 0
-            ? "(none)"
-            : string.Join("\n", avoidMoments.Select(m => $"- {m}"));
-        var userContent =
-            $"ART STYLE: {artStyle}\n\n" +
-            $"CAST & SETTINGS (JSON):\n{bibleJson}\n\n" +
-            $"MOMENTS TO AVOID:\n{avoid}\n\n" +
-            $"SCENE:\n{sceneText}";
+        var userContent = SceneImageContent(sceneText, bible, artStyle, avoidMoments);
 
         // Best-effort: a wordless prompt is nice to have, so any empty/failed reply yields an empty prompt
         // and the caller leaves the scene without an image rather than blocking the report.

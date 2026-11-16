@@ -15,6 +15,7 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
     public DbSet<Chapter> Chapters => Set<Chapter>();
     public DbSet<DesignRef> DesignRefs => Set<DesignRef>();
     public DbSet<Scene> Scenes => Set<Scene>();
+    public DbSet<ModelBatch> ModelBatches => Set<ModelBatch>();
     public DbSet<ChunkAnalysis> ChunkAnalyses => Set<ChunkAnalysis>();
     public DbSet<BookAnalysis> BookAnalyses => Set<BookAnalysis>();
     public DbSet<Finding> Findings => Set<Finding>();
@@ -82,6 +83,10 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
                 .WithOne()
                 .HasForeignKey(finding => finding.NovelId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(novel => novel.ModelBatches)
+                .WithOne()
+                .HasForeignKey(batch => batch.NovelId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(novel => novel.PassReads)
                 .WithOne()
                 .HasForeignKey(pass => pass.NovelId)
@@ -144,6 +149,15 @@ public sealed class FolioDbContext(DbContextOptions<FolioDbContext> options)
             entity.Property(scene => scene.NextAttemptAtUtc).HasConversion(NullableTicksConverter);
             entity.HasIndex(scene => new { scene.NovelId, scene.Number });
             entity.HasIndex(scene => new { scene.ImageStatus, scene.NextAttemptAtUtc });
+        });
+
+        model.Entity<ModelBatch>(entity =>
+        {
+            entity.HasKey(batch => batch.Id);
+            entity.Property(batch => batch.SubmittedAtUtc).HasConversion(TicksConverter);
+            entity.Property(batch => batch.LastPolledAtUtc).HasConversion(NullableTicksConverter);
+            entity.Property(batch => batch.CompletedAtUtc).HasConversion(NullableTicksConverter);
+            entity.HasIndex(batch => new { batch.NovelId, batch.Kind }).IsUnique();
         });
 
         model.Entity<ChunkAnalysis>(entity =>

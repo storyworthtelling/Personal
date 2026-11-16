@@ -33,6 +33,28 @@ public interface IClaudeAnalysisClient
     /// </summary>
     Task<Scenes.SceneJudgement> JudgeScene(Scenes.SceneToJudge scene, DesignBible bible, CancellationToken cancellationToken);
 
+    // The batch tier (owner's ruling, R39): the same requests as the direct calls, submitted together at
+    // half the cost and read back by key. A submit that cannot be made returns null, and the caller goes
+    // one at a time instead.
+
+    /// <summary>Submits one scene-judgement request per scene, keyed by scene number. Returns the batch id.</summary>
+    Task<string?> SubmitSceneJudgements(
+        IReadOnlyList<Scenes.SceneToJudge> scenes, DesignBible bible, CancellationToken cancellationToken);
+
+    /// <summary>Submits one image-prompt request per scene, keyed by scene number. Returns the batch id.</summary>
+    Task<string?> SubmitSceneImagePrompts(
+        IReadOnlyList<Scenes.SceneImageRequest> scenes, DesignBible bible, string artStyle, CancellationToken cancellationToken);
+
+    /// <summary>Whether the batch has finished processing.</summary>
+    Task<bool> BatchEnded(string batchId, CancellationToken cancellationToken);
+
+    /// <summary>A finished batch's scene judgements, matched to scenes by key; chapters names each scene's chapter.</summary>
+    Task<IReadOnlyList<Pipeline.BatchItem<Scenes.SceneJudgement>>> SceneJudgementResults(
+        string batchId, IReadOnlyDictionary<int, string> chapters, CancellationToken cancellationToken);
+
+    /// <summary>A finished batch's image prompts, matched to scenes by key.</summary>
+    Task<IReadOnlyList<Pipeline.BatchItem<string>>> SceneImagePromptResults(string batchId, CancellationToken cancellationToken);
+
     Task<string> DescribeSceneImage(
         string sceneText,
         DesignBible bible,

@@ -290,6 +290,86 @@ public class ClaudeAnalysisClientTests
         Assert.Contains("never write replacement prose", Assert.Single(handler.RequestBodies), StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The scene judgements go to the batch tier as one request per scene, keyed by the scene's own
+    /// number, built exactly as the direct call is (same instruction, same content), and never streamed.
+    /// </summary>
+    [Fact]
+    public async Task SubmitSceneJudgements_SendsOneRequestPerSceneKeyedByItsNumber()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"id\":\"msgbatch_1\",\"processing_status\":\"in_progress\"}");
+
+        var id = await client.SubmitSceneJudgements(
+            [new SceneToJudge(3, "Chapter 1", "The tide went out.", "", ""), new SceneToJudge(7, "Chapter 2", "The bell rang.", "Before.", "")],
+            new DesignBible([], []), CancellationToken.None);
+
+        Assert.Equal("msgbatch_1", id);
+        Assert.Equal("https://api.anthropic.com/v1/messages/batches", Assert.Single(handler.Requests).RequestUri!.ToString());
+        using var body = JsonDocument.Parse(Assert.Single(handler.RequestBodies));
+        var requests = body.RootElement.GetProperty("requests").EnumerateArray().ToList();
+        Assert.Equal(["scene-3", "scene-7"], requests.Select(r => r.GetProperty("custom_id").GetString()));
+        var first = requests[0].GetProperty("params");
+        Assert.False(first.TryGetProperty("stream", out _));
+        Assert.Contains("The tide went out.", first.GetProperty("messages")[0].GetProperty("content").GetString(), StringComparison.Ordinal);
+        Assert.Contains("never write replacement prose", first.GetProperty("system")[0].GetProperty("text").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BatchEnded_ReadsTheProcessingStatus()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"id\":\"msgbatch_1\",\"processing_status\":\"in_progress\"}");
+        handler.EnqueueOk("{\"id\":\"msgbatch_1\",\"processing_status\":\"ended\",\"results_url\":\"https://api.anthropic.com/v1/messages/batches/msgbatch_1/results\"}");
+
+        Assert.False(await client.BatchEnded("msgbatch_1", CancellationToken.None));
+        Assert.True(await client.BatchEnded("msgbatch_1", CancellationToken.None));
+        Assert.Equal("https://api.anthropic.com/v1/messages/batches/msgbatch_1", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    /// <summary>
+    /// Results come back in any order and are matched by custom id, never by position. A failed or
+    /// unreadable item is reported as a failure for that scene, not dropped and not shifted.
+    /// </summary>
+    [Fact]
+    public async Task SceneJudgementResults_AreMatchedByCustomIdAndFailuresAreKept()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"id\":\"msgbatch_1\",\"processing_status\":\"ended\",\"results_url\":\"https://api.anthropic.com/v1/messages/batches/msgbatch_1/results\"}");
+        var judged = "{\\\"accomplishes\\\":\\\"Sets the grief.\\\",\\\"call\\\":\\\"Cut\\\",\\\"tension\\\":0.1,\\\"verdict\\\":\\\"v\\\",\\\"inconsistencies\\\":[]}";
+        handler.Enqueue(System.Net.HttpStatusCode.OK,
+            "{\"custom_id\":\"scene-7\",\"result\":{\"type\":\"succeeded\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"" + judged + "\"}],\"usage\":{\"input_tokens\":10,\"output_tokens\":5}}}}\n" +
+            "{\"custom_id\":\"scene-3\",\"result\":{\"type\":\"errored\",\"error\":{\"type\":\"api_error\",\"message\":\"overloaded\"}}}\n",
+            "application/binary");
+
+        var results = await client.SceneJudgementResults(
+            "msgbatch_1", new Dictionary<int, string> { [3] = "Chapter 1", [7] = "Chapter 2" }, CancellationToken.None);
+
+        var seven = Assert.Single(results, r => r.SceneNumber == 7);
+        Assert.Equal(SceneCall.Cut, seven.Value!.Call);
+        Assert.Equal("Chapter 2", seven.Value.Chapter);
+        var three = Assert.Single(results, r => r.SceneNumber == 3);
+        Assert.Null(three.Value);
+        Assert.Contains("overloaded", three.Failure, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SubmitSceneImagePrompts_SendsOneRequestPerScene()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"id\":\"msgbatch_2\",\"processing_status\":\"in_progress\"}");
+
+        var id = await client.SubmitSceneImagePrompts(
+            [new SceneImageRequest(1, "A lighthouse at dusk."), new SceneImageRequest(2, "The bell in the fog.")],
+            new DesignBible([], []), "linocut", CancellationToken.None);
+
+        Assert.Equal("msgbatch_2", id);
+        using var body = JsonDocument.Parse(Assert.Single(handler.RequestBodies));
+        var requests = body.RootElement.GetProperty("requests").EnumerateArray().ToList();
+        Assert.Equal(["scene-1", "scene-2"], requests.Select(r => r.GetProperty("custom_id").GetString()));
+        Assert.Contains("ART STYLE: linocut", requests[0].GetProperty("params").GetProperty("messages")[0].GetProperty("content").GetString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task AReadingPass_RequestsItsOwnEffortSetting()
     {

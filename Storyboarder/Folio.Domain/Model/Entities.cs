@@ -165,6 +165,7 @@ public class Novel
     public List<Chapter> Chapters { get; set; } = [];
     public List<DesignRef> DesignRefs { get; set; } = [];
     public List<Scene> Scenes { get; set; } = [];
+    public List<ModelBatch> ModelBatches { get; set; } = [];
     public List<Finding> Findings { get; set; } = [];
     public List<PassRead> PassReads { get; set; } = [];
 
@@ -446,3 +447,22 @@ public class Finding
 
     public DateTimeOffset CreatedAtUtc { get; set; }
 }
+
+// One submitted batch of model calls for one draft (owner's ruling, R39): which kind of call, the batch
+// tier's id, and where it stands. One per kind per draft; once completed (or abandoned), whatever it left
+// undone goes one call at a time. Kind is a wire name from BatchKinds; never rename one.
+public class ModelBatch
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid NovelId { get; set; }
+    public string Kind { get; set; } = string.Empty;
+
+    // Empty when the submit itself failed: the row still records that this kind was tried, so the draft
+    // goes one at a time instead of resubmitting.
+    public string BatchId { get; set; } = string.Empty;
+
+    public DateTimeOffset SubmittedAtUtc { get; set; }
+    public DateTimeOffset? LastPolledAtUtc { get; set; }
+    public DateTimeOffset? CompletedAtUtc { get; set; }
+}
+

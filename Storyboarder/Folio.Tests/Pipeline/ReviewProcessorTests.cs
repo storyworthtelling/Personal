@@ -286,6 +286,80 @@ public class ReviewProcessorTests : IDisposable
         Assert.DoesNotContain("Opens the confrontation.", report, StringComparison.Ordinal);
     }
 
+    // ---- Batches (owner's ruling, R39): the scene calls go to the batch tier at half the cost ---------
+
+    private const string TwoScenes = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+
+    /// <summary>
+    /// The scene judgements go in one batch; while it runs, the pipeline polls and carries on; when it
+    /// ends, each judgement lands on its own scene (by key, never by position), and no scene is judged
+    /// one at a time.
+    /// </summary>
+    [Fact]
+    public async Task SceneJudgementsAreBatchedAndLandOnTheirOwnScenes()
+    {
+        var polls = 0;
+        claude.Setup(c => c.SubmitSceneJudgements(It.IsAny<IReadOnlyList<SceneToJudge>>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("batch-judgements");
+        claude.Setup(c => c.BatchEnded("batch-judgements", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ++polls >= 2);
+        claude.Setup(c => c.SceneJudgementResults("batch-judgements", It.IsAny<IReadOnlyDictionary<int, string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, IReadOnlyDictionary<int, string> chapters, CancellationToken _) =>
+                chapters.Keys.Reverse().Select(number => new BatchItem<SceneJudgement>(number,
+                    new SceneJudgement(number, chapters[number], $"Batched scene {number} does its job.", SceneCall.Keep, 0.5, "v", []), null)).ToList());
+
+        var id = SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Empty(judgedScenes);
+        Assert.True(polls >= 2, "The batch should have been polled until it ended.");
+        var report = ReportText(id);
+        Assert.True(report.IndexOf("At the gate", StringComparison.Ordinal) < report.IndexOf("Batched scene 2 does its job.", StringComparison.Ordinal));
+        Assert.True(report.IndexOf("Batched scene 1 does its job.", StringComparison.Ordinal) < report.IndexOf("At the gate", StringComparison.Ordinal));
+    }
+
+    /// <summary>A scene the batch could not judge goes one at a time afterwards; the batch is never resubmitted.</summary>
+    [Fact]
+    public async Task ASceneTheBatchMissedIsJudgedOneAtATime()
+    {
+        var submits = 0;
+        claude.Setup(c => c.SubmitSceneJudgements(It.IsAny<IReadOnlyList<SceneToJudge>>(), It.IsAny<DesignBible>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => { submits++; return "batch-judgements"; });
+        claude.Setup(c => c.BatchEnded("batch-judgements", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        claude.Setup(c => c.SceneJudgementResults("batch-judgements", It.IsAny<IReadOnlyDictionary<int, string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, IReadOnlyDictionary<int, string> chapters, CancellationToken _) =>
+            [
+                new BatchItem<SceneJudgement>(1, new SceneJudgement(1, chapters[1], "Batched.", SceneCall.Keep, 0.5, "v", []), null),
+                new BatchItem<SceneJudgement>(2, null, "errored: overloaded"),
+            ]);
+
+        SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(1, submits);
+        Assert.Equal([2], judgedScenes.Select(scene => scene.Number));
+    }
+
+    /// <summary>The image prompts go in one batch too; each prompt lands on its own scene and drives its render.</summary>
+    [Fact]
+    public async Task ImagePromptsAreBatchedAndRenderTheirOwnScenes()
+    {
+        claude.Setup(c => c.SubmitSceneImagePrompts(It.IsAny<IReadOnlyList<SceneImageRequest>>(), It.IsAny<DesignBible>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("batch-prompts");
+        claude.Setup(c => c.BatchEnded("batch-prompts", It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        claude.Setup(c => c.SceneImagePromptResults("batch-prompts", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new BatchItem<string>(2, "Prompt for scene two.", null), new BatchItem<string>(1, "Prompt for scene one.", null)]);
+
+        SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        claude.Verify(c => c.DescribeSceneImage(It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
+            It.IsAny<IReadOnlyList<string>>(), It.IsAny<CancellationToken>()), Times.Never());
+        using var context = database.NewContext();
+        var prompts = context.Scenes.OrderBy(scene => scene.Number).Select(scene => scene.ImagePrompt).ToList();
+        Assert.Equal(["Prompt for scene one.", "Prompt for scene two."], prompts);
+    }
+
     [Fact]
     public async Task EverySixteenReadsRunOnceAndTheSynthesisSeesThemAll()
     {

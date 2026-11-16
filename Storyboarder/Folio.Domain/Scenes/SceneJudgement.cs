@@ -84,3 +84,6 @@ public static class SceneWords
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unhandled inconsistency kind."),
     };
 }
+
+/// <summary>A scene whose wordless image prompt is to be derived: its number and its text.</summary>
+public sealed record SceneImageRequest(int Number, string Text);
