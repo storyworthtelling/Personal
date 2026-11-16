@@ -71,13 +71,15 @@ is why release A comes first.
   ("tense shifts a line editor should catch") are allowed, even where the line work is costing the score.
 - R12. At **novel length** each reader gets **its own purpose for writing more**, distinct per reader.
   Short-story reads stay their current length.
-- R13. Scores stay where they are (under the name) and gain a **score history chart** across drafts.
+- R13. Scores stay where they are (under the name) and gain a **score history chart** across drafts
+  (on the phone only: R37).
 - R14. "Would need" stays as it is.
 
 **Plan, notes, chart, frame**
 - R15. Each revision-plan item gets a **link to its mark** in the manuscript and a **checkbox** for the pen.
 - R16. Whole-book notes: **shorter summaries** for a novel; **one page at most** for a short story.
-- R17. The pacing chart: **labelled points**, **chapters on the x-axis**, **novels only**.
+- R17. The pacing chart: **labelled points**, **chapters on the x-axis**, **novels only** (extended to
+  novellas with three or more chapters: R38).
 - R18. Front matter and the frame page stay.
 
 **Between drafts**
@@ -102,9 +104,11 @@ is why release A comes first.
 
 **The readers in conversation**
 - R28. A **second round** after the independent reads; the first-round reviews and scores are unchanged.
-- R29. **The seven readers and a neutral moderator** take part; the sections do not.
+- R29. **The seven readers and a neutral moderator** take part; the sections do not. (The moderator is
+  the podcast host of R40.)
 - R30. It contains a **roundtable**, a **debate on each split**, and **rebuttals** wherever two readers'
-  scores differ by **three or more**: in each such pair, each reader answers the other once.
+  scores differ by **three or more**: in each such pair, each reader answers the other once. (Shaped by
+  R40 into a hosted podcast, in which these back-and-forths happen as the conversation runs.)
 - R31. A reader may **concede a point in words**; its score stays the independent one.
 - R32. It **lays the splits out** and does not rule on them. It **replaces the verdict**.
 - R33. Its length **scales with the manuscript**, and it runs on **every draft**.
@@ -147,7 +151,7 @@ target-age reader (for YA, the genre fan already is one); the line editor back.
 
 ## 3. The plan
 
-Eight releases. A, B and C are the owner's top three (scene breaks, readers, mark anchors), with A first
+Nine releases, A to H and then R, with batching running across them. A, B and C are the owner's top three (scene breaks, readers, mark anchors), with A first
 because it carries a live bug. Every release is test-first, keeps the existing guards green, and
 compiles the Android head before it is called done. None of it is verified on a device until the owner
 runs a real draft through.
@@ -206,7 +210,7 @@ runs a real draft through.
 4. **Score history chart** (R13): each reader's score across drafts.
    - On the phone's book page only, beside the readiness chart (R37).
    - Data: the `PassRead` rows already kept per draft.
-5. **A voice and personality per reader** (R42), drafted below for the owner's approval.
+5. **A voice and personality per reader** (R42), approved by the owner.
    - **Where it goes.** A new `Persona.Voice` field, placed after the cache breakpoint with the rest of the
      persona's instruction, so the cached manuscript prefix is unchanged.
    - **Where it is used.** The reader's first read and every round-table turn. The host gets one too.
@@ -221,7 +225,7 @@ runs a real draft through.
    professor renamed Prof. Craft and the host Tae Boll). The samples are about an invented
    book, a lighthouse keeper's daughter, and show the voice, not the verdict.
 
-   | Reader | Name | Voice and personality (draft) | Sample |
+   | Reader | Name | Voice and personality | Sample |
    |---|---|---|---|
    | Developmental editor | Archie Tecture | Patient and methodical; thinks in load-bearing structure; calm, orderly, numbered points | "Let's look at what each part is holding up. Act two is meant to carry Elin's choice, but nothing in chapters nine to twelve is load-bearing. Take them out and the roof stays where it is." |
    | Agent | Hugo Hook | Brisk, warm, a little impatient; talks in first impressions and moments; short sentences | "Page one, line three: the lamp goes out. That's where I sat up. Then two pages of tide tables, and I'd have put it down." |
@@ -372,7 +376,7 @@ form. This is done once, at the end, so no book is paid for twice.
    | Scene detection | Re-run (release A) | The new rules split scenes differently |
    | Scene images | Reused where the new scene matches an old one (`SceneMatcher`); otherwise generated | |
    | The reads | Re-run | |
-   | Conversation, plan and series checks | Re-run | |
+   | Round table, plan and series checks | Re-run | |
    | Chapter notes and reductions | Re-run only where a release changed their prompt | |
    | Imported source text | Not re-imported | The draft's stored source text is the manuscript |
 
@@ -444,7 +448,7 @@ read usually comes back well inside the hour, but may take up to a day.
 checked, not assumed.
 
 ## 4. Open questions for the owner
-All answered (R34–R41). New questions will come up when release B begins: the craft anchors for the
+All answered (R34–R42). New questions will come up when release B begins: the craft anchors for the
 Agent and the Acquiring editor (R35).
 
 ## 5. Order and size
