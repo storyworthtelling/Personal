@@ -55,7 +55,7 @@ public class ClientLogSinkTests
     {
         var lines = new List<string>();
 
-        await new DarkroomCaptionClient(new HttpClient(RefusingClaude()), Key(), log: lines.Add)
+        await new DarkroomCaptionClient(new HttpClient(RefusingClaude()), Key(), new LearnedVoice(), log: lines.Add)
             .CaptionAsync([[1, 2, 3]], CancellationToken.None);
 
         Assert.Equal(["CLAUDE darkroom-caption failed: KeyRejected 401"], lines);
@@ -73,5 +73,11 @@ public class ClientLogSinkTests
         Assert.Single(lines);
         Assert.StartsWith("PODCAST search failed: ", lines[0], StringComparison.Ordinal);
         Assert.DoesNotContain("garden", lines[0], StringComparison.Ordinal);
+    }
+
+    private sealed class LearnedVoice : IVoiceProfileSource
+    {
+        public Task<VoiceProfile> LoadAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(VoiceProfile.Empty with { Register = "plain", DocumentsAnalyzed = 1 });
     }
 }

@@ -1,3 +1,4 @@
+using Storyworthtelling.Voice;
 using Storyworthtelling.Voice.Health;
 using Storyworthtelling.Voice.Claude;
 using System.Net.Http.Headers;
@@ -14,12 +15,11 @@ namespace Foreword.Infrastructure.Prayer;
 /// <summary>
 /// The prayer page's own line, in the owner's hand at the top of P1.
 ///
-/// <para>One of the four declared <see cref="IPrayerReader"/>s, and the only <i>composer</i> among
-/// them. It has its own system prompt and its own call rather than borrowing the shared voice stack,
-/// and that is the point: the voice profile is a shared file every app reads, so a composer that
-/// went through it would be a path from the journal into something shared. This one touches neither
-/// <c>IVoiceProfileStore</c> nor <c>VoicedMessenger</c>, which a guard asserts by reading this
-/// file.</para>
+/// <para>One of the declared <see cref="IPrayerReader"/>s, and the only <i>composer</i> among
+/// them. It writes in the owner's learned voice (audit W10.2) but has its own system prompt and its own
+/// call rather than borrowing the shared messenger: the voice profile is a shared file every app reads,
+/// so a composer that could write it would be a path from the journal into something shared. It is
+/// handed the read half of the store only, and a guard reads this file for any way to write it back.</para>
 ///
 /// <para>Failure leaves the page with no line, rather than a neutral sentence pretending to be one
 /// — the same rule the rest of the morning's voice follows.</para>
@@ -28,23 +28,26 @@ public sealed class ClaudePastoralComposer : IPastoralComposer, IPrayerReader
 {
     private const string Instruction =
         "You write one short line at the top of a private prayer page, in the voice of the person "
-        + "whose page it is — plain, unsentimental, the way somebody talks to themselves. It "
+        + "whose page it is, described by the PROFILE that follows — the way they talk to themselves. It "
         + "introduces the list below it. Never more than one sentence. Never a prayer, never "
         + "advice, never scripture, never encouragement of the greeting-card kind. Do not name "
         + "anybody on the list. Respond with the line and nothing else.";
 
     private readonly ClaudeMessagesClient claude;
     private readonly AnthropicOptions options;
+    private readonly IVoiceProfileSource voice;
     private readonly ILogger<ClaudePastoralComposer> logger;
 
     public ClaudePastoralComposer(
         HttpClient httpClient,
         IOptions<AnthropicOptions> options,
+        IVoiceProfileSource voice,
         ILogger<ClaudePastoralComposer> logger,
         ICredentialHealthSink? healthSink = null)
     {
         claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, healthSink);
         this.options = options.Value;
+        this.voice = voice;
         this.logger = logger;
     }
 
@@ -57,8 +60,21 @@ public sealed class ClaudePastoralComposer : IPastoralComposer, IPrayerReader
 
         try
         {
+            // No learned voice, no line: the same rule every seat follows.
+            var profile = await voice.LoadAsync(cancellationToken);
+            if (profile.IsEmpty)
+            {
+                return PrayerText.Empty;
+            }
+
+            // The instruction and the voice lead, cached together; the morning's situation follows.
+            var system = new[]
+            {
+                ClaudeBlock.Text(Instruction),
+                ClaudeBlock.Text(VoiceProfilePrompt.Block(profile), cache: true),
+            };
             var reply = await claude.SendAsync(
-                new ClaudeRequest(options.Model, 200, [ClaudeBlock.Text(Instruction, cache: true)], [ClaudeBlock.Text(Situation(brief))]),
+                new ClaudeRequest(options.Model, 200, system, [ClaudeBlock.Text(Situation(brief))]),
                 cancellationToken);
             return FirstLine(reply.Text);
         }

@@ -1,9 +1,9 @@
 namespace Codex.Domain.Plate;
 
 /// <summary>
-/// The owner's voice in Plate, which gets exactly one seat: the empty Darkroom — as Post's
-/// gets the empty Mailbox. Set in Italianno in ink-blue, the one place in the whole
-/// suite that hand appears.
+/// The owner's voice in Plate: the empty Darkroom, as Post's has the empty Mailbox, and the
+/// caption over the pictures waiting. The empty line is drawn from the pool below and then said
+/// the owner's way by the learned voice (audit W10.2); the drawn line is the fallback.
 ///
 /// <para>The lines never nag. The owner was offered auto-send, expiry and a fold that
 /// refuses to flatten, and chose none of them; a line that scolded about what was waiting
@@ -31,6 +31,10 @@ public static class DarkroomVoice
     /// </summary>
     public static string Empty(int roll) =>
         EmptyLines[(int)(((long)roll % EmptyLines.Count + EmptyLines.Count) % EmptyLines.Count)];
+
+    /// <summary>What the voice is asked to say for a drawn empty line.</summary>
+    public static Voice.VoiceAsk? Ask(string line) =>
+        Voice.VoiceRewrite.Ask("the Darkroom is empty: no picture is waiting to be chosen", line);
 
     /// <summary>
     /// What the vision call is asked for. It lives here rather than in the head so its shape

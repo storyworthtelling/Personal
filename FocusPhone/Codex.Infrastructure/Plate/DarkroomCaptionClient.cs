@@ -39,19 +39,22 @@ public sealed class DarkroomCaptionClient
 
     private const string Instruction =
         "You write one short line for a photographer looking at their own unsorted pictures, "
-        + "in their voice: dry, warm, never instructional. Say something true about what is in "
+        + "in their voice, described by the PROFILE that follows; never instructional. Say something true about what is in "
         + "front of them. Do not name or identify any person. Do not tell them what to do with "
         + "the pictures. Reply with the line only — no quotes, no preamble, at most fifteen words.";
 
     private readonly ClaudeMessagesClient claude;
     private readonly IOptions<VoiceOptions> optionsAccessor;
+    private readonly IVoiceProfileSource voice;
 
     private readonly Action<string>? log;
 
     /// <param name="log">One line per failed call (audit 08 §23): the call, the failure kind, status and request id.</param>
     public DarkroomCaptionClient(
-        HttpClient httpClient, IOptions<VoiceOptions> options, ICredentialHealthSink? health = null, Action<string>? log = null)
+        HttpClient httpClient, IOptions<VoiceOptions> options, IVoiceProfileSource voice,
+        ICredentialHealthSink? health = null, Action<string>? log = null)
     {
+        this.voice = voice;
         this.log = log;
         claude = new ClaudeMessagesClient(httpClient, () => options.Value.ApiKey, health);
         optionsAccessor = options;
@@ -75,8 +78,16 @@ public sealed class DarkroomCaptionClient
 
         try
         {
+            // The owner's learned voice, not a guess at it (audit W10.2); with none learned there is no line.
+            var profile = await voice.LoadAsync(cancellationToken);
+            if (profile.IsEmpty)
+            {
+                return null;
+            }
+
+            var system = new[] { ClaudeBlock.Text(Instruction), ClaudeBlock.Text(VoiceProfilePrompt.Block(profile), cache: true) };
             var reply = await claude.SendAsync(
-                new ClaudeRequest(options.FastModel, options.ComposeMaxTokens, [ClaudeBlock.Text(Instruction)], user),
+                new ClaudeRequest(options.FastModel, options.ComposeMaxTokens, system, user),
                 cancellationToken);
             var line = reply.Text.Trim().Trim('"');
             return line.Length > 0 ? line : null;

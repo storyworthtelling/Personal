@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Storyworthtelling.Voice;
 using Foreword.Domain.Prayer;
 using Foreword.Infrastructure.Handwriting;
 using Foreword.Infrastructure.Prayer;
@@ -25,10 +26,25 @@ public class PastoralComposerTests
 
     private static string Read(PrayerText text) => text.ReadBy(new Reader());
 
+    /// <summary>An invented voice, learned from one book.</summary>
+    private static readonly VoiceProfile Learned = VoiceProfile.Empty with
+    {
+        Register = "dry, unhurried, kind",
+        Examples = [new VoiceExample("Well, that is the kettle on.", Guid.NewGuid())],
+        DocumentsAnalyzed = 1,
+    };
+
+    /// <summary>Only the read half: the composer is handed nothing that could write the profile.</summary>
+    private sealed class Voice(VoiceProfile profile) : IVoiceProfileSource
+    {
+        public Task<VoiceProfile> LoadAsync(CancellationToken cancellationToken) => Task.FromResult(profile);
+    }
+
     private static ClaudePastoralComposer Composer(
-        Func<HttpRequestMessage, HttpResponseMessage> respond) =>
+        Func<HttpRequestMessage, HttpResponseMessage> respond, VoiceProfile? profile = null) =>
         new(new HttpClient(new StubHandler(respond)),
             Options.Create(new AnthropicOptions { ApiKey = "key", Model = "m" }),
+            new Voice(profile ?? Learned),
             NullLogger<ClaudePastoralComposer>.Instance);
 
     private static HttpResponseMessage Reply(string text) =>
@@ -77,6 +93,36 @@ public class PastoralComposerTests
         Assert.NotNull(body);
         Assert.Contains("held 6 weeks", body!);
         Assert.Contains("patience", body!);
+    }
+
+    /// <summary>
+    /// The line is in the owner's learned voice (audit W10.2): the profile rides in the prompt, so the
+    /// composer no longer guesses at a voice with words of its own.
+    /// </summary>
+    [Fact]
+    public async Task ThePromptCarriesTheOwnersVoice()
+    {
+        string? body = null;
+        var composer = Composer(request =>
+        {
+            body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return Reply("A line.");
+        });
+
+        await composer.Compose(Brief(), CancellationToken.None);
+
+        Assert.Contains("PROFILE (JSON)", body!);
+        Assert.Contains("dry, unhurried, kind", body!);
+        Assert.DoesNotContain("unsentimental", body!);
+    }
+
+    /// <summary>With no learned voice there is no line, as at every other seat: nothing is asked.</summary>
+    [Fact]
+    public async Task WithNoLearnedVoiceNothingIsAsked()
+    {
+        var composer = Composer(_ => throw new InvalidOperationException("must not call"), VoiceProfile.Empty);
+
+        Assert.True((await composer.Compose(Brief(), CancellationToken.None)).IsEmpty);
     }
 
     /// <summary>

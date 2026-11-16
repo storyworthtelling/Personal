@@ -78,6 +78,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // Mailbox again is what steps the line up.
     private readonly EmptyMailboxStore emptyState = new(host);
     private string emptyLine = string.Empty;
+    private VoiceGreeting? voice;
     private int lastSeenRowCount = -1;
 
     // A prepared list row: identity to open, plus the strings the list renders. Titles are
@@ -592,6 +593,45 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         if (emptyView is not null)
         {
             emptyView.Text = emptyLine;
+        }
+        _ = VoiceEmptyLine(emptyLine);
+    }
+
+    // The drawn line shows at once; the owner's voice then says it their way (audit W10.2), replacing it only
+    // if the Mailbox is still showing that same line. With no profile, key or sign-in the drawn line stays.
+    private async Task VoiceEmptyLine(string drawn)
+    {
+        if (EmptyMailbox.Ask(drawn) is not { } ask || !VoiceGoogleAccount.IsSignedIn)
+        {
+            return;
+        }
+
+        try
+        {
+            voice ??= new VoiceGreeting(
+                MailAccess.Account().GetAccessToken, "Post", Path.Combine(Host.FilesDir!.AbsolutePath, "voice-lines.json"));
+            var line = await voice.ComposeAsync(ask, CancellationToken.None);
+            if (line.Length == 0)
+            {
+                return;
+            }
+
+            Host.RunOnUiThread(() =>
+            {
+                if (emptyLine != drawn)
+                {
+                    return;
+                }
+                emptyLine = line;
+                if (emptyView is not null)
+                {
+                    emptyView.Text = line;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            HeadLog.Quiet("Voice", "Empty Mailbox line not voiced", ex);
         }
     }
 
