@@ -83,6 +83,23 @@ public partial class MaterialsAreOneEngineTests
     public void TheNativeKitDrawsInTheMedia(string file, string call) =>
         Assert.Contains(call, Read(file), StringComparison.Ordinal);
 
+    /// <summary>
+    /// Watercolor is for covers only (owner's ruling, W8.8): no in-app screen is washed. A radial wash is drawn only
+    /// by Flyleaf's painted cover and bookcase, the scoped departure DESIGN.md §1/§5 records.
+    /// </summary>
+    [Fact]
+    public void NoScreenIsWashedInWatercolor()
+    {
+        string[] painted = ["FocusPhone/Flyleaf.Android/CoverView.cs", "FocusPhone/Flyleaf.Android/BookshelfView.cs"];
+        var found = Files(Heads.Append("Storyworthtelling.Materials.Android"), "*.cs")
+            .Concat(Files(Heads, "*.xaml"))
+            .Where(file => !painted.Contains(Relative(file), StringComparer.Ordinal))
+            .Where(file => File.ReadAllText(file).Contains("RadialGradient", StringComparison.Ordinal))
+            .Select(Relative)
+            .ToList();
+        Assert.True(found.Count == 0, "Watercolor stays on the covers:\n" + string.Join("\n", found));
+    }
+
     /// <summary>The MAUI kit's components draw in the same media, through the same drawables (W8.8 PR 2b).</summary>
     [Theory]
     [InlineData("Storyworthtelling.Maui/Materials/PaperMaterials.cs", "new MarkerFillDrawable(")]
