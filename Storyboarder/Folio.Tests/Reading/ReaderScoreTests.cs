@@ -125,7 +125,8 @@ public class ReaderScoreTests
         Assert.Equal(["developmental-editor", "agent"], scores.Select(score => score.PersonaId));
         Assert.Null(scores[0].Previous);
         Assert.Equal(5, scores[1].Previous);
-        Assert.Equal("Agent", scores[1].Name);
+        Assert.Equal("Hugo Hook", scores[1].Name);
+        Assert.Equal("Agent", scores[1].Role);
         Assert.Equal("Could I sell it", scores[1].Question);
     }
 
@@ -135,6 +136,41 @@ public class ReaderScoreTests
         Assert.Equal("7/10 · up from 5 last draft", ReaderScores.Line(7, 5));
         Assert.Equal("7/10", ReaderScores.Line(7, null));
     }
+
+    /// <summary>
+    /// Each reader's scores across drafts, in draft order, for the phone's trend line (R13, R37). A draft
+    /// the reader did not score (read before scores existed) is skipped rather than drawn as zero.
+    /// </summary>
+    [Fact]
+    public void HistoryIsEachReadersScoresInDraftOrder()
+    {
+        var history = ReaderScores.History(
+        [
+            (1, new[] { Whole("agent", 4), Whole("genre-fan", 0) }),
+            (2, new[] { Whole("agent", 6), Whole("genre-fan", 7) }),
+            (3, new[] { Whole("agent", 8) }),
+        ]);
+
+        Assert.Equal([new DraftScore(1, 4), new DraftScore(2, 6), new DraftScore(3, 8)], history["agent"]);
+        Assert.Equal([new DraftScore(2, 7)], history["genre-fan"]);
+    }
+
+    /// <summary>The trend line's points: drafts evenly across, a 10 at the top and a 1 at the foot.</summary>
+    [Fact]
+    public void TheTrendLineSpreadsDraftsAcrossAndScoresUp()
+    {
+        var points = ScoreTrend.Points([new DraftScore(1, 1), new DraftScore(2, 10), new DraftScore(3, 5)], width: 100, height: 20);
+
+        Assert.Equal(3, points.Count);
+        Assert.Equal((0f, 20f), (points[0].X, points[0].Y));
+        Assert.Equal((50f, 0f), (points[1].X, points[1].Y));
+        Assert.Equal(100f, points[2].X);
+        Assert.True(points[2].Y > 0 && points[2].Y < 20);
+    }
+
+    [Fact]
+    public void AReaderWithOneScoredDraftHasNoTrendLine() =>
+        Assert.Empty(ScoreTrend.Points([new DraftScore(1, 6)], width: 100, height: 20));
 
     [Fact]
     public void AScoreIsWrittenOutOfTen() =>

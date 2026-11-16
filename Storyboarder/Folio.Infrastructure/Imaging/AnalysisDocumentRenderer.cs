@@ -480,7 +480,7 @@ public sealed class AnalysisDocumentRenderer
         {
             var review = reviews[i];
             writer.ContentsRow(
-                i + 1, PersonaName(review.PersonaId), Lens(review.PersonaId, length), review.Verdict,
+                i + 1, ReaderLabel(review.PersonaId), Lens(review.PersonaId, length), review.Verdict,
                 readerFolios is { } measured && i < measured.Count ? measured[i] : firstReaderFolio + i);
             if (i < reviews.Count - 1)
                 writer.Hairline();
@@ -510,7 +510,17 @@ public sealed class AnalysisDocumentRenderer
         writer.BeginReader();
         writer.PageLabel($"Reader {index} of {Spell(of)}", Lens(review.PersonaId, length));
 
-        writer.Heading(PersonaName(review.PersonaId), h3, Ink);
+        // The reader's name, then its role (owner's ruling, R42).
+        var reader = PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == review.PersonaId);
+        if (reader?.ReaderName is { } readerName)
+        {
+            writer.Heading(readerName, h3, Ink);
+            writer.Paragraph(reader.Name, body, Muted);
+        }
+        else
+        {
+            writer.Heading(PersonaName(review.PersonaId), h3, Ink);
+        }
 
         // The reader's own score on its own question (the owner's ruling), the sentence that explains
         // it, and on a later draft how it moved. Under the name rather than over it: the read is the
@@ -573,6 +583,12 @@ public sealed class AnalysisDocumentRenderer
             return "Review";
         return PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId)?.Name ?? personaId;
     }
+
+    // "Hugo Hook · Agent": a reader's name and role together, for the readers' contents.
+    private static string ReaderLabel(string personaId) =>
+        PersonaCatalogue.All.FirstOrDefault(persona => persona.Id == personaId) is { ReaderName: { } name } reader
+            ? $"{name} · {reader.Name}"
+            : PersonaName(personaId);
 
     // The impact tiers, in the order the plan and the additive engine both group by.
     private static readonly string[] Tiers = ["Must", "Should", "Consider"];

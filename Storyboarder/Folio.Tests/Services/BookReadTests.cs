@@ -5,6 +5,7 @@ using Folio.Domain.Analysis;
 using Folio.Domain.External;
 using Folio.Domain.Model;
 using Folio.Domain.Readiness;
+using Folio.Domain.Reading;
 using Folio.Infrastructure.Configuration;
 using Folio.Infrastructure.Imaging;
 using Folio.Infrastructure.Services;
@@ -180,6 +181,20 @@ public class BookReadTests : IDisposable
         Assert.Equal((6, (int?)8), (book.ReaderScores[1].Score, book.ReaderScores[1].Previous));
         Assert.Null(book.ReaderScores[2].Previous);
         Assert.Equal(2, book.ScoredDraftNumber);
+    }
+
+    /// <summary>The book carries each reader's score history across its drafts, for the trend line.</summary>
+    [Fact]
+    public async Task TheBookCarriesEachReadersHistoryAcrossDrafts()
+    {
+        var first = Seed(draftNumber: 1, words: 71_000);
+        var second = Seed(draftNumber: 2, words: 88_400, projectId: first);
+        Score(first, "agent", 5);
+        Score(second, "agent", 7);
+
+        var book = await Read(first);
+
+        Assert.Equal([new DraftScore(1, 5), new DraftScore(2, 7)], book!.ReaderScores.Single().History);
     }
 
     [Fact]

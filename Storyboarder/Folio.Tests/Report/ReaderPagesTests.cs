@@ -209,6 +209,33 @@ public class ReaderPagesTests
             Assert.DoesNotContain("last draft", page, StringComparison.Ordinal));
     }
 
+    /// <summary>Each reader's page leads with its name, then its role (owner's ruling).</summary>
+    [Fact]
+    public void EachReadersPageLeadsWithItsNameThenItsRole()
+    {
+        var pages = PagesOf(Render(Reads()));
+
+        foreach (var persona in PersonaCatalogue.Readers)
+        {
+            var page = pages.First(page => page.Contains($"{persona.Name} gives the reason", StringComparison.Ordinal));
+            var name = page.IndexOf(persona.ReaderName!, StringComparison.Ordinal);
+            var role = page.IndexOf(persona.Name, name < 0 ? 0 : name, StringComparison.Ordinal);
+            Assert.True(name >= 0, $"{persona.ReaderName} is not named on their page.");
+            Assert.True(role > name, $"{persona.Name} should follow {persona.ReaderName} on the page.");
+        }
+    }
+
+    [Fact]
+    public void TheContentsNamesEachReaderWithTheirRole()
+    {
+        var pages = PagesOf(Render(Reads()));
+        var contents = pages.First(page => page.Contains("READERS", StringComparison.OrdinalIgnoreCase)
+            && page.Contains(BookLines.Spell(PersonaCatalogue.Readers.Count), StringComparison.OrdinalIgnoreCase));
+
+        foreach (var persona in PersonaCatalogue.Readers)
+            Assert.Contains($"{persona.ReaderName} · {persona.Name}", contents, StringComparison.Ordinal);
+    }
+
     private static byte[] Render(IReadOnlyList<Review> reviews) =>
         new AnalysisDocumentRenderer().Render(
             SampleAnalysis.Of() with { Reviews = reviews }, Cover, Array.Empty<SceneEvidence>());

@@ -15,7 +15,11 @@ namespace Folio.Android.Pages;
 public sealed record DraftRow(Guid Id, int Number, string Date, string Words, bool ReportReady);
 
 /// <summary>One reader's score on the book page: who, on what question, the number and why.</summary>
-public sealed record ScoreRow(string Name, string Question, string Line, string Reason);
+public sealed record ScoreRow(string Name, string Question, string Line, string Reason)
+{
+    /// <summary>This reader's scores across drafts, for its trend line; fewer than two draws nothing.</summary>
+    public IReadOnlyList<DraftScore> History { get; init; } = [];
+}
 
 /// <summary>What the book page needs to draw itself.</summary>
 public sealed record BookPageModel(
@@ -52,7 +56,10 @@ public sealed record BookPageModel(
     {
         ScoresHeading = book.ScoredDraftNumber is { } number ? $"Readers · draft {number}" : null,
         Scores = [.. book.ReaderScores.Select(score => new ScoreRow(
-            score.Name, score.Question, ReaderScores.Line(score.Score, score.Previous), score.Reason))],
+            score.Name, $"{score.Role} · {score.Question}", ReaderScores.Line(score.Score, score.Previous), score.Reason)
+        {
+            History = score.History,
+        })],
     };
 
     private static DraftRow Row(BookDraft draft) => new(
@@ -328,7 +335,12 @@ public class BookPage : FolioBinderPage
     {
         var line = new Grid
         {
-            ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto)],
+            ColumnDefinitions =
+            [
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(GridLength.Auto),
+            ],
             ColumnSpacing = 10,
         };
         var who = new Label { Text = row.Name, FontFamily = "SerifSemibold", FontSize = 17 };
@@ -341,9 +353,25 @@ public class BookPage : FolioBinderPage
             VerticalOptions = LayoutOptions.Center,
         };
         line.Children.Add(who);
-        line.Children.Add(number);
         Grid.SetColumn(who, 0);
-        Grid.SetColumn(number, 1);
+
+        // The reader's scores across drafts (R13, R37), beside today's, once there are two to join.
+        if (row.History.Count >= 2)
+        {
+            var trend = new GraphicsView
+            {
+                Drawable = new ScoreTrendDrawable { History = row.History },
+                WidthRequest = ScoreTrendDrawable.Width,
+                HeightRequest = ScoreTrendDrawable.Height,
+                VerticalOptions = LayoutOptions.Center,
+                InputTransparent = true,
+            };
+            line.Children.Add(trend);
+            Grid.SetColumn(trend, 1);
+        }
+
+        line.Children.Add(number);
+        Grid.SetColumn(number, 2);
 
         var stack = new VerticalStackLayout
         {
