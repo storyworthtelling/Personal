@@ -55,7 +55,7 @@ internal static class SettingsViews
             {
                 var line = PaperUi.Label(context, detail);
                 line.Typeface = PaperTheme.SansRegular(context);
-                line.SetTextColor(PaperTheme.InkMuted);
+                line.SetTextColor(PaperTheme.InkSoft);
                 bottom.AddView(line);
             }
 
@@ -98,6 +98,8 @@ internal static class SettingsViews
         if (!enabled)
         {
             line.Alpha = DesignTokens.Alpha.DisabledOpacity;
+            // Faint is for the eye; Enabled is what TalkBack reads as "disabled" (§17, audit 10 §6).
+            line.Enabled = false;
             return line;
         }
 

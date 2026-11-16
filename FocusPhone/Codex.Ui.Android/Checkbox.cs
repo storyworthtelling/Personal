@@ -2,6 +2,7 @@ using Android.Content;
 using Android.Graphics;
 using Storyworthtelling.Materials.Android;
 using Android.Views;
+using Android.Views.Accessibility;
 using Codex.Domain.Design;
 
 // Android.Graphics.Path, not System.IO.Path — the implicit usings bring both in and
@@ -43,6 +44,30 @@ public sealed class Checkbox : View
         tick.SetStyle(Paint.Style.Stroke);
         tick.StrokeWidth = PaperTheme.Dp(context, 2);
         tick.StrokeCap = Paint.Cap.Round;
+        Describe();
+    }
+
+    // A drawn box says nothing to TalkBack by itself (§17, audit 10 §6): it is a checkable thing with a state, and the
+    // row it sits in reads that state with its own words.
+    public override void OnInitializeAccessibilityNodeInfo(AccessibilityNodeInfo? info)
+    {
+        base.OnInitializeAccessibilityNodeInfo(info);
+        if (info is null)
+        {
+            return;
+        }
+
+        info.ClassName = "android.widget.CheckBox";
+        info.Checkable = true;
+        info.Checked = picked;
+    }
+
+    private void Describe()
+    {
+        if (OperatingSystem.IsAndroidVersionAtLeast(30))
+        {
+            StateDescription = picked ? "Ticked" : "Not ticked";
+        }
     }
 
     public void SetPicked(bool value)
@@ -53,6 +78,7 @@ public sealed class Checkbox : View
         }
 
         picked = value;
+        Describe();
         Invalidate();
     }
 

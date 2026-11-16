@@ -476,7 +476,7 @@ internal sealed class SportsScreen
         line.SetGravity(GravityFlags.CenterVertical);
         line.SetMinimumHeight(PaperTheme.Dp(host, DesignTokens.Shape.TouchTargetDp));
         var rank = PaperUi.Mono(host, row.Rank.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        rank.SetTextColor(PaperTheme.InkMuted);
+        rank.SetTextColor(PaperTheme.InkSoft);
         line.AddView(rank, new LinearLayout.LayoutParams(PaperTheme.Dp(host, DesignTokens.Space.X8), ViewGroup.LayoutParams.WrapContent));
         line.AddView(SportsRows.Badge(host, row.Name, row.BadgeArt, shield: true, letters: 2, LoadBadge));
         var name = PaperUi.Body(host, row.Name);
@@ -727,7 +727,7 @@ internal sealed class SportsScreen
         lines.AddView(PaperUi.Secondary(host, row.LeagueName));
         line.AddView(lines, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         var state = PaperUi.Label(host, row.Following ? "Following" : "Follow");
-        state.SetTextColor(row.Following ? PaperTheme.InkMuted : PaperTheme.ActionText);
+        state.SetTextColor(row.Following ? PaperTheme.InkSoft : PaperTheme.ActionText);
         line.AddView(state);
 
         var team = row.Team;

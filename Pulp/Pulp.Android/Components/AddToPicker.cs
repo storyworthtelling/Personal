@@ -155,6 +155,8 @@ public static class AddToPicker
         {
             // §8 Disabled: dimmed, never removed — the row says why with its badge.
             line.Alpha = DesignTokens.Alpha.DisabledOpacity;
+            // Faint is for the eye; Enabled is what TalkBack reads as "disabled" (§17, audit 10 §6).
+            line.Enabled = false;
             return line;
         }
 

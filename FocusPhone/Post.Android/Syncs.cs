@@ -3,6 +3,7 @@ using Android.Content;
 using Android.OS;
 using Codex.Domain.Design;
 using Codex.Domain.Post;
+using Codex.Ui;
 
 namespace Post;
 
@@ -24,9 +25,6 @@ namespace Post;
 /// </summary>
 internal static class Syncs
 {
-    private static readonly TimeSpan UndoWindow =
-        TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
-
     // One at a time. Several actions in quick succession owe one round trip between them,
     // not one each, and the worker may be running anyway.
     private static int running;
@@ -37,7 +35,7 @@ internal static class Syncs
     /// </summary>
     public static void After(Activity host, PostAction action)
     {
-        var delay = SyncMoment.Delay(action, UndoWindow);
+        var delay = SyncMoment.Delay(action, DogEar.UndoWindow(host));
         if (delay <= TimeSpan.Zero)
         {
             Run(host);

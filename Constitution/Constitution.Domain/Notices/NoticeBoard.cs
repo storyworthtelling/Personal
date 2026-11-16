@@ -26,8 +26,11 @@ public sealed class NoticeBoard
     /// <summary>The role of an open undo: the Action pine (D77).</summary>
     public static FoldRole UndoRole => FoldRole.Action;
 
-    /// <summary>How long an undo holds the corner: 6 s (D50; <c>DesignTokens.Motion.UndoWindowMs</c>).</summary>
-    public static TimeSpan UndoWindow { get; } = TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
+    /// <summary>
+    /// How long an undo holds the corner: 6 s (D50), or longer where the person has asked Android for more time to
+    /// act — the kit adopts that at launch (<c>Storyworthtelling.Folds.FoldTiming</c>, audit 10 §5).
+    /// </summary>
+    public static TimeSpan UndoWindow => Storyworthtelling.Folds.FoldTiming.UndoWindow;
 
     private readonly Dictionary<string, Entry> waiting = [];
     private long next;

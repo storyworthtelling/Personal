@@ -47,14 +47,14 @@ public class FilterField : LinearLayout
         input.SetSingleLine(true);
         input.SetTextSize(Android.Util.ComplexUnitType.Sp, DesignTokens.TypeSp.Body);
         input.SetTextColor(PaperTheme.Ink);
-        input.SetHintTextColor(PaperTheme.InkMuted);
+        input.SetHintTextColor(PaperTheme.InkSoft);
         input.SetTypeface(PaperTheme.SansRegular(context), TypefaceStyle.Normal);
         input.SetBackgroundColor(Color.Transparent);
         input.SetPadding(0, 0, 0, 0);
         AddView(input, new LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
         clear = PaperUi.Body(context, "×");
-        clear.SetTextColor(PaperTheme.InkMuted);
+        clear.SetTextColor(PaperTheme.InkSoft);
         clear.Visibility = ViewStates.Gone;
         var hit = PaperTheme.Dp(context, DesignTokens.Space.X2);
         clear.SetPadding(hit, hit, 0, hit);

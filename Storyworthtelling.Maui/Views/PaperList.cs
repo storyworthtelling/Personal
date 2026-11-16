@@ -82,7 +82,7 @@ public static class PaperList
     {
         if (picking)
         {
-            return new GraphicsView
+            var box = new GraphicsView
             {
                 Drawable = new CheckboxDrawable(PaperResources.Colour) { Picked = row.Picked },
                 WidthRequest = DesignTokens.Shape.CheckboxDp,
@@ -90,6 +90,10 @@ public static class PaperList
                 VerticalOptions = LayoutOptions.Center,
                 InputTransparent = true,
             };
+
+            // A drawn box says nothing to TalkBack by itself (§17, audit 10 §6).
+            SemanticProperties.SetDescription(box, row.Picked ? "Ticked" : "Not ticked");
+            return box;
         }
 
         if (row.ArtworkPath is null)

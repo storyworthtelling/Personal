@@ -109,7 +109,7 @@ public class SettingsRefreshSourceTests
         var remove = tapped[tapped.IndexOf("case \"Remove\":", StringComparison.Ordinal)..];
 
         Assert.Contains("dogEarState.BeginUndo(", remove, StringComparison.Ordinal);
-        Assert.Contains("DesignTokens.Motion.UndoWindowMs", remove, StringComparison.Ordinal);
+        Assert.Contains("DogEar.UndoWindow()", remove, StringComparison.Ordinal);
         Assert.Contains("dogEar.Refresh()", remove, StringComparison.Ordinal);
         Assert.DoesNotContain("UndoBar", remove, StringComparison.Ordinal);
         Assert.DoesNotContain("UndoLabel", remove, StringComparison.Ordinal);

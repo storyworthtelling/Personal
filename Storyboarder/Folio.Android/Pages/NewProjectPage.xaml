@@ -25,7 +25,7 @@
             <Label Grid.Column="1" x:Name="PathLabel" VerticalOptions="Center"
                    Style="{StaticResource MonoLabel}"
                    FontSize="{StaticResource LabelSize}"
-                   TextColor="{StaticResource InkMuted}"
+                   TextColor="{StaticResource InkSoft}"
                    LineBreakMode="TailTruncation" />
         </Grid>
 

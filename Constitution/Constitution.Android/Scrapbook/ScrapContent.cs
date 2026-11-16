@@ -39,7 +39,7 @@ public static class ScrapContent
     /// <summary>A small label in the muted ink, in sentence case (DESIGN.md §14; owner's ruling, W8.5).</summary>
     public static TextView Label(Context context, string text)
     {
-        var view = Text(context, text, PaperTheme.SansSemibold(context), DesignTokens.TypeSp.Label, PaperTheme.InkMuted);
+        var view = Text(context, text, PaperTheme.SansSemibold(context), DesignTokens.TypeSp.Label, PaperTheme.InkSoft);
         return view;
     }
 
@@ -111,7 +111,7 @@ public static class ScrapContent
         row.SetPadding(PaperTheme.Dp(context, DesignTokens.Space.X3), PaperTheme.Dp(context, DesignTokens.Space.X2), PaperTheme.Dp(context, DesignTokens.Space.X3), PaperTheme.Dp(context, DesignTokens.Space.X1));
         foreach (var (field, value) in pairs)
         {
-            var name = Text(context, field, PaperTheme.Mono(context), DesignTokens.TypeSp.Mono * PaperTypeScale.Ratio, PaperTheme.InkMuted);
+            var name = Text(context, field, PaperTheme.Mono(context), DesignTokens.TypeSp.Mono * PaperTypeScale.Ratio, PaperTheme.InkSoft);
             var content = Text(context, value, PaperTheme.Mono(context), DesignTokens.TypeSp.Mono * PaperTypeScale.Ratio, PaperTheme.Ink);
             name.SetPadding(0, 0, PaperTheme.Dp(context, DesignTokens.Space.X1), 0);
             content.SetPadding(0, 0, PaperTheme.Dp(context, DesignTokens.Space.X3), 0);

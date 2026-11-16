@@ -235,7 +235,7 @@ public abstract class PaperBinderPage : ContentPage, ICardHost
     /// <summary>Does the thing, and offers it back (§7): the fold's window is the confirmation.</summary>
     protected void OfferUndo(string hint, Action reverse)
     {
-        folds.BeginUndo(hint, reverse, DateTimeOffset.Now, FoldTiming.UndoWindow);
+        folds.BeginUndo(hint, reverse, DateTimeOffset.Now, DogEar.UndoWindow());
         corner.Refresh();
     }
 
