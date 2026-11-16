@@ -5,8 +5,11 @@ using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
 using Folio.Domain.Scenes;
+using Folio.Domain.Series;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
+using Folio.Infrastructure.Imaging;
+using Folio.Infrastructure.Services;
 using Folio.Domain.Model;
 using Folio.Domain.Pipeline;
 using Storyworthtelling.Voice.Health;
@@ -85,6 +88,8 @@ public sealed class ReviewProcessor : IPipelineStep
     private const int VoiceConsistencySampleChars = 800;
     private readonly DesignBibleMerger merger = new();
 
+    private readonly IOptions<ArchiveOptions> archiveOptions;
+
     public ReviewProcessor(
         IDbContextFactory<FolioDbContext> dbContextFactory,
         IClaudeAnalysisClient claude,
@@ -109,6 +114,7 @@ public sealed class ReviewProcessor : IPipelineStep
         this.voiceClient = voiceClient;
         this.voiceStore = voiceStore;
         this.delivery = delivery;
+        this.archiveOptions = archiveOptions;
 
         rateLimits = rateLimitOptions.Value;
         archive = archiveOptions.Value;
@@ -1055,6 +1061,37 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2e2) Guess where a series book sits in its series' story time (R21), once, when there are other
+        // books to place it against. The owner confirms or changes it on the book's page; a confirmed
+        // placement is carried onto later drafts and never guessed again.
+        if (novel.SeriesId is not null && novel.PlacementJson is null
+            && await EarlierBooks(db, novel, cancellationToken) is { Count: > 0 } others)
+        {
+            if (!claudeLimiter.TryAcquire())
+                return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+            var bible = SeriesBibleCodec.Read(await db.SeriesBibles
+                .Where(record => record.SeriesId == novel.SeriesId)
+                .Select(record => record.Json)
+                .FirstOrDefaultAsync(cancellationToken));
+            try
+            {
+                var placement = await claude.PlaceInSeries(
+                    novel.Title, [.. others.Select(book => book.Title)],
+                    BibleText.For(bible.Without(novel.ProjectId)), novel.ContinuitySummary, cancellationToken);
+                novel.PlacementJson = StoryPlacementCodec.Write(placement with { Confirmed = false });
+                ClearCallFailures(novel);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return await DeferAfterFailedCall(db, novel, ex, "PlaceInSeries", cancellationToken);
+            }
+
+            Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 2f) Cross-book continuity read (Phase 5): only for a book linked to a prior one. Checks this book
         // against the prior book's established canon and tracks its carried-over open threads. Its own resumable
         // step + column, billed once — like the other reduce halves. A standalone book has no PreviousBookId, so
@@ -1066,11 +1103,13 @@ public sealed class ReviewProcessor : IPipelineStep
 
             var canon = await LoadSeriesCanon(db, priorBookId, cancellationToken);
             var notes = await LoadChapterNotes(db, novel.Id, cancellationToken);
+            var (_, bible) = await LoadSeriesBible(db, novel, cancellationToken);
 
             try
             {
                 var continuity = await claude.AssessSeriesContinuity(
-                    novel.Title, canon, notes, novel.ContinuitySummary, cancellationToken);
+                    novel.Title, canon, BibleText.For(bible.Without(novel.ProjectId)),
+                    StoryPlacementCodec.Read(novel.PlacementJson), notes, novel.ContinuitySummary, cancellationToken);
                 analysis.SeriesContinuityJson = JsonSerializer.Serialize(continuity, JsonResponse.CaseInsensitive);
                 ClearCallFailures(novel);
             }
@@ -1241,6 +1280,13 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2g2) Read this book into its series' bible (release G, R20), once per draft, straight after the
+        // reads so the manuscript is still in the cache. A series book only.
+        if (novel.SeriesId is { } seriesId && !analysis.SeriesBibleUpdated)
+        {
+            return await UpdateSeriesBible(db, novel, analysis, seriesId, cancellationToken);
+        }
+
         // 2h) Paint the jacket (a Gemini call), if nothing has painted or set one yet. Its own resumable
         // step, gated on CoverPath/CoverAttempted rather than a column of its own — there is no report field
         // to hold, only a file and a flag. A refusal (ImageContentBlockedException) settles CoverAttempted
@@ -1353,7 +1399,12 @@ public sealed class ReviewProcessor : IPipelineStep
         var reportPending = reportReady && archive.Enabled && delivery is { CanArchiveToDrive: true } && analysis!.ArchivedDriveFileId is null;
 
         if (!reportPending)
+        {
+            // The series bible goes beside the report (R26), once the report has gone wherever it was going.
+            if (reportReady && novel.SeriesId is not null && analysis!.SeriesBibleUpdated && !analysis.SeriesBibleDelivered)
+                return await DeliverSeriesBible(db, novel, analysis, cancellationToken);
             return await FinishArchiving(db, novel, cancellationToken);
+        }
 
         try
         {
@@ -1412,6 +1463,61 @@ public sealed class ReviewProcessor : IPipelineStep
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.Waiting(delay, novel.Id);
         }
+    }
+
+    // Prints the series bible as this draft left it and sends it to the tablet's root and to the Drive folder
+    // the report went to (R26). Best-effort, one try at each target: the bible is a convenience beside the
+    // report, so a target that fails (offline included) is logged and left, never retried into duplicates,
+    // and never holds the review.
+    private async Task<ProcessResult> DeliverSeriesBible(
+        FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
+    {
+        var (readable, bible) = await LoadSeriesBible(db, novel, cancellationToken);
+        var placements = (await db.Novels
+                .Where(other => other.SeriesId == novel.SeriesId && other.PlacementJson != null && other.DeletedAtUtc == null)
+                .Select(other => new { other.ProjectId, other.DraftNumber, other.PlacementJson })
+                .ToListAsync(cancellationToken))
+            .GroupBy(other => other.ProjectId)
+            .Select(book => book.OrderByDescending(draft => draft.DraftNumber).First())
+            .Select(book => (book.ProjectId, Placement: StoryPlacementCodec.Read(book.PlacementJson)))
+            .Where(book => book.Placement is not null)
+            .ToDictionary(book => book.ProjectId, book => book.Placement!);
+        var series = string.IsNullOrWhiteSpace(novel.SeriesName)
+            ? bible.Books.FirstOrDefault()?.Title ?? novel.Title
+            : novel.SeriesName;
+        var pdf = readable ? SeriesBibleDocument.RenderOrNull(series, bible, placements) : null;
+
+        if (pdf is not null)
+        {
+            var name = DeliveredDocument.BibleName(series, novel.Title, novel.DraftNumber);
+            if (archive.DeliverToRemarkable && delivery is { CanDeliverToRemarkable: true } && RemarkableLimits.TooLarge(pdf.Length) is null)
+            {
+                try
+                {
+                    await using var stream = new MemoryStream(pdf, writable: false);
+                    await delivery.DeliverToRemarkableRoot(name, stream, pdf.Length, cancellationToken);
+                    logger.LogInformation("Delivered the series bible of manuscript {NovelId} to the reMarkable root", novel.Id);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    logger.LogWarning(ex, "Manuscript {NovelId}: the series bible did not reach the reMarkable; leaving it", novel.Id);
+                }
+            }
+
+        }
+
+        // Drive keeps the bible as one Google Doc per series, rewritten in place, so its version history
+        // shows what each book changed (owner's request), rather than a PDF per draft.
+        if (readable)
+        {
+            await new SeriesBibleBackup(dbContextFactory, delivery, archiveOptions, clock, logger)
+                .WriteAsync(novel.SeriesId!.Value, $"after {novel.Title}, draft {novel.DraftNumber}", novel.ArchiveFolderId, cancellationToken);
+        }
+
+        analysis.SeriesBibleDelivered = true;
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
     }
 
     // Delivers the finished report to the ROOT of the owner's reMarkable tablet — the same proven path
@@ -1870,6 +1976,113 @@ public sealed class ReviewProcessor : IPipelineStep
                     OpenInPreviousDraft: thread.Any(f => f.NovelId == previousDraftId));
             })
             .ToList();
+    }
+
+    // Merges this draft's read into its series' bible. Earlier books not yet in the bible are seeded from
+    // their stored canon first, at no cost, so a series reviewed before the bible existed is not read again.
+    // A stored bible that will not read is never written over: this draft settles without it, and the
+    // review goes on.
+    private async Task<ProcessResult> UpdateSeriesBible(
+        FolioDbContext db, Novel novel, BookAnalysis analysis, Guid seriesId, CancellationToken cancellationToken)
+    {
+        var record = await db.SeriesBibles.FirstOrDefaultAsync(bible => bible.SeriesId == seriesId, cancellationToken);
+        var (readable, bible) = await LoadSeriesBible(db, novel, cancellationToken);
+        if (!readable)
+        {
+            logger.LogWarning(
+                "The series bible of manuscript {NovelId} could not be read; leaving it as it is and finishing " +
+                "the review without reading this book into it", novel.Id);
+            analysis.SeriesBibleUpdated = true;
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        if (!claudeLimiter.TryAcquire())
+            return ProcessResult.Waiting(claudeLimiter.TimeUntilNext(), novel.Id);
+
+        var manuscript = await Manuscript(db, novel.Id, cancellationToken);
+        IReadOnlyList<BibleFact> facts;
+        try
+        {
+            facts = await claude.ReadSeriesBible(
+                manuscript, await Frame(db, novel, analysis, cancellationToken), novel.Title,
+                BibleText.For(bible.Without(novel.ProjectId)), cancellationToken);
+            ClearCallFailures(novel);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return await DeferAfterFailedCall(db, novel, ex, "ReadSeriesBible", cancellationToken);
+        }
+
+        // Read again after the call, which can take a minute: a correction the owner made meanwhile is kept.
+        record ??= await db.SeriesBibles.FirstOrDefaultAsync(stored => stored.SeriesId == seriesId, cancellationToken);
+        (readable, bible) = await LoadSeriesBible(db, novel, cancellationToken);
+        if (!readable)
+        {
+            analysis.SeriesBibleUpdated = true;
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+        bible = bible.WithBook(
+            new SeriesBook(novel.ProjectId, novel.Title, novel.SeriesSequence), BibleQuotes.Keep(manuscript, facts));
+
+        if (record is null)
+        {
+            record = new SeriesBibleRecord { SeriesId = seriesId };
+            db.SeriesBibles.Add(record);
+        }
+        record.Json = SeriesBibleCodec.Write(bible);
+        record.UpdatedAtUtc = clock.UtcNow;
+        analysis.SeriesBibleUpdated = true;
+        logger.LogInformation(
+            "Read manuscript {NovelId} into its series bible: {Entries} entries across {Books} books",
+            novel.Id, bible.Entries.Count, bible.Books.Count);
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
+    }
+
+    // The series' bible as stored, with every finished earlier book it does not yet hold seeded from that
+    // book's stored canon, at no cost. Readable is false when the stored bible will not read: nothing may
+    // then be written over it, and checks fall back to an empty bible.
+    private async Task<(bool Readable, SeriesBible Bible)> LoadSeriesBible(
+        FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        if (novel.SeriesId is not { } seriesId)
+            return (true, SeriesBible.Empty);
+
+        var json = await db.SeriesBibles.Where(record => record.SeriesId == seriesId)
+            .Select(record => record.Json).FirstOrDefaultAsync(cancellationToken);
+        if (!SeriesBibleCodec.TryRead(json, out var bible))
+            return (false, SeriesBible.Empty);
+
+        foreach (var book in (await EarlierBooks(db, novel, cancellationToken)).Where(book => !bible.Has(book.ProjectId)))
+        {
+            var canon = await LoadSeriesCanon(db, book.DraftId, cancellationToken);
+            bible = bible.WithBook(new SeriesBook(book.ProjectId, book.Title, book.Written), BibleSeed.From(canon));
+        }
+        return (true, bible);
+    }
+
+    private sealed record OtherBook(Guid DraftId, Guid ProjectId, string Title, int Written);
+
+    // The series' other finished books, each as its newest finished draft, in the order they were written.
+    // A series' id is its first book's project id, which is how a first book read before it was linked is found.
+    private static async Task<IReadOnlyList<OtherBook>> EarlierBooks(
+        FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var seriesId = novel.SeriesId;
+        var drafts = await db.Novels
+            .Where(other => (other.SeriesId == seriesId || other.ProjectId == seriesId || other.Id == novel.PreviousBookId)
+                            && other.ProjectId != novel.ProjectId
+                            && other.Stage == ProjectStage.Completed
+                            && other.DeletedAtUtc == null)
+            .Select(other => new { other.Id, other.ProjectId, other.Title, other.SeriesSequence, other.DraftNumber })
+            .ToListAsync(cancellationToken);
+        return [.. drafts.GroupBy(other => other.ProjectId)
+            .Select(book => book.OrderByDescending(draft => draft.DraftNumber).First())
+            .OrderBy(book => book.SeriesSequence)
+            .Select(book => new OtherBook(book.Id, book.ProjectId, book.Title, book.SeriesSequence))];
     }
 
     // Assembles the prior book's canon for the cross-book continuity read (Phase 5): its title, its design-bible
@@ -2430,10 +2643,18 @@ public sealed class ReviewProcessor : IPipelineStep
     /// What every whole-book pass of this draft is told besides the manuscript: the genre, and for a
     /// series book the earlier book's canon (R27). The same for every pass, so the cached prefix holds.
     /// </summary>
-    private async Task<ReadingFrame> Frame(FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken) =>
-        new(Genre(analysis), novel.PreviousBookId is { } prior
+    private async Task<ReadingFrame> Frame(FolioDbContext db, Novel novel, BookAnalysis analysis, CancellationToken cancellationToken)
+    {
+        // The series bible of the other books when there is one (release G), else the earlier book's canon.
+        var (_, bible) = await LoadSeriesBible(db, novel, cancellationToken);
+        var others = bible.Without(novel.ProjectId);
+        if (others.Entries.Count > 0)
+            return new(Genre(analysis), BibleText.For(others));
+
+        return new(Genre(analysis), novel.PreviousBookId is { } prior
             ? ReadingFrame.CanonText(await LoadSeriesCanon(db, prior, cancellationToken))
             : string.Empty);
+    }
 
     private async Task<string> Manuscript(FolioDbContext db, Guid novelId, CancellationToken cancellationToken) =>
         await db.SourceTexts.Where(source => source.NovelId == novelId)

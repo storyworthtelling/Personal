@@ -120,6 +120,13 @@ public class Novel
     public Guid? PreviousBookId { get; set; }
     public int SeriesSequence { get; set; } = 1;
 
+    /// <summary>
+    /// Where this book sits in its series' story time (R21), as a <c>StoryPlacement</c> in JSON: Folio's
+    /// guess until the owner confirms it. Null for a standalone book or a series' first. Carried onto a
+    /// book's later drafts like the series fields above, so a confirmed placement is never guessed again.
+    /// </summary>
+    public string? PlacementJson { get; set; }
+
     // Set once the per-chunk extractions have been merged into canonical DesignRefs, so the merge
     // (which would otherwise reset reference-sheet state) runs exactly once.
     public bool DesignBibleConsolidated { get; set; }
@@ -383,6 +390,14 @@ public class BookAnalysis
     // resumable call and column, folded in at render like the craft/voice/expansion halves. Null until it runs;
     // it runs only for a book with a PreviousBookId — a standalone book leaves it null, so no section renders.
     public string? SeriesContinuityJson { get; set; }
+
+    // Set once this draft's read has been merged into its series' bible (release G, R20). A series book only;
+    // billed once per draft, like the other whole-book calls.
+    public bool SeriesBibleUpdated { get; set; }
+
+    // Set once the series bible, as this draft left it, has been sent to the tablet and Drive (R26), or
+    // given up on. Best-effort: the bible is a convenience beside the report, never a reason to hold it.
+    public bool SeriesBibleDelivered { get; set; }
 }
 
 /// <summary>
@@ -451,6 +466,21 @@ public class Finding
 // One submitted batch of model calls for one draft (owner's ruling, R39): which kind of call, the batch
 // tier's id, and where it stands. One per kind per draft; once completed (or abandoned), whatever it left
 // undone goes one call at a time. Kind is a wire name from BatchKinds; never rename one.
+// One series' bible (release G, R20), stored as a SeriesBible in JSON. One row per series, keyed by the
+// series id. It is derived from the manuscripts, so it stays on the phone (and, sealed, in the owner's Drive),
+// never in the repository. Not cascaded from any draft: deleting a book leaves the series' bible standing.
+public class SeriesBibleRecord
+{
+    public Guid SeriesId { get; set; }
+    public string Json { get; set; } = string.Empty;
+    public DateTimeOffset UpdatedAtUtc { get; set; }
+
+    // The Google Doc in Drive this bible is backed up to (owner's request), rewritten in place so its version
+    // history shows each change; null until the first backup. When it was last written, or null.
+    public string? DriveDocId { get; set; }
+    public DateTimeOffset? BackedUpAtUtc { get; set; }
+}
+
 public class ModelBatch
 {
     public Guid Id { get; set; } = Guid.NewGuid();

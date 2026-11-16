@@ -92,6 +92,45 @@ public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens)
             ?? throw new InvalidOperationException($"Drive accepted the upload of '{name}' but returned no file id.");
     }
 
+    private const string GoogleDocMime = "application/vnd.google-apps.document";
+
+    public async Task<string> WriteGoogleDoc(
+        string? fileId, string folderId, string name, string text, CancellationToken cancellationToken)
+    {
+        using var service = await Service();
+        var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+
+        // Rewritten in place, by id: Drive converts the text into the existing doc, and the doc's version
+        // history keeps the write. A doc that has gone (deleted by hand) is made again rather than failing.
+        if (!string.IsNullOrEmpty(fileId))
+        {
+            try
+            {
+                using var replacement = new MemoryStream(bytes);
+                var update = service.Files.Update(new DriveFile(), fileId, replacement, "text/plain");
+                update.Fields = "id";
+                var updated = await update.UploadAsync(cancellationToken);
+                if (updated.Exception is null)
+                    return fileId;
+                if (updated.Exception is not global::Google.GoogleApiException { HttpStatusCode: System.Net.HttpStatusCode.NotFound })
+                    throw updated.Exception;
+            }
+            catch (global::Google.GoogleApiException missing) when (missing.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+            }
+        }
+
+        using var stream = new MemoryStream(bytes);
+        var create = service.Files.Create(
+            new DriveFile { Name = name, Parents = [folderId], MimeType = GoogleDocMime }, stream, "text/plain");
+        create.Fields = "id";
+        var result = await create.UploadAsync(cancellationToken);
+        if (result.Exception is not null)
+            throw result.Exception;
+        return create.ResponseBody?.Id
+            ?? throw new InvalidOperationException($"Drive accepted the Google Doc '{name}' but returned no file id.");
+    }
+
     private async Task<DriveService> Service()
     {
         var token = await tokens.GetAccessToken();

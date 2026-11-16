@@ -23,4 +23,11 @@ public interface IPaperDriveArchive
     // retried upload overwrites its own partial rather than leaving two copies.
     Task<string> UploadFile(
         string folderId, string name, string mimeType, byte[] content, CancellationToken cancellationToken);
+
+    // Writes plain text as a Google Doc and returns its id. With the id of a doc written before, the doc is
+    // rewritten in place, so Drive keeps each write as a version in the doc's own history; with none, or one
+    // that has gone, a new doc is made in the folder. For a document whose changes the owner wants to see over
+    // time, not for a finished document (those are UploadFile's).
+    Task<string> WriteGoogleDoc(
+        string? fileId, string folderId, string name, string text, CancellationToken cancellationToken);
 }

@@ -7,6 +7,7 @@ using PdfSharp.Pdf.IO;
 using Folio.Domain.Analysis;
 using Folio.Domain.Reading;
 using Folio.Domain.Scenes;
+using Folio.Domain.Series;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
@@ -38,6 +39,8 @@ public class ReviewProcessorTests : IDisposable
     private readonly Mock<IClaudeAnalysisClient> claude = new();
     private readonly Mock<IGeminiImageClient> gemini = new();
     private int chapterAnalysisCalls;
+    private readonly List<string> biblesSeen = [];
+    private readonly List<IReadOnlyList<string>> placementBooks = [];
     private readonly List<string> sectionReads = [];
     private readonly List<string> readerReads = [];
     private readonly List<GenreFrame> readerGenres = [];
@@ -184,10 +187,29 @@ public class ReviewProcessorTests : IDisposable
         // Default cross-book continuity read: nothing to flag (a standalone book never calls this; a sequel with
         // this default folds an empty — and therefore unrendered — series section). Tests that care set their own.
         claude.Setup(c => c.AssessSeriesContinuity(
-                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, SeriesCanon canon, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+            .Returns((string _, SeriesCanon canon, string _, StoryPlacement? _, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
                 Task.FromResult(SeriesContinuity.Empty with { PriorBookTitle = canon.PriorBookTitle }));
+
+        // Default series bible read (release G): the book establishes one character.
+        claude.Setup(c => c.ReadSeriesBible(
+                It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, ReadingFrame _, string _, string soFar, CancellationToken _) =>
+            {
+                biblesSeen.Add(soFar);
+                return Task.FromResult<IReadOnlyList<BibleFact>>(
+                    [new BibleFact(BibleKind.Character, "Hero", [], "", "Now a knight errant.", "The knight's son rode out")]);
+            });
+
+        // Default placement guess (release G, R21): after the latest-written other book.
+        claude.Setup(c => c.PlaceInSeries(
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<string>>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, IReadOnlyList<string> books, string _, string _, CancellationToken _) =>
+            {
+                placementBooks.Add(books);
+                return Task.FromResult(StoryPlacement.After(books[^1]));
+            });
 
         claude.Setup(c => c.DescribeSceneImage(
                 It.IsAny<string>(), It.IsAny<DesignBible>(), It.IsAny<string>(),
@@ -1453,6 +1475,235 @@ public class ReviewProcessorTests : IDisposable
         Assert.All(readerFrames, frame => Assert.Contains("Quest", frame.SeriesCanon, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The series bible (release G): book two's read is merged into its series' bible, which is seeded
+    /// first from book one's stored canon rather than a second read of book one.
+    /// </summary>
+    [Fact]
+    public async Task ASequelIsReadIntoItsSeriesBibleSeededFromTheEarlierBooksCanon()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        Assert.Empty(biblesSeen);
+
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        // Once, shown what book one established.
+        var seen = Assert.Single(biblesSeen);
+        Assert.Contains("\"Quest\"", seen, StringComparison.Ordinal);
+
+        using var context = database.NewContext();
+        Assert.True(context.BookAnalyses.Single(a => a.NovelId == second).SeriesBibleUpdated);
+        var record = Assert.Single(context.SeriesBibles);
+        var bible = SeriesBibleCodec.Read(record.Json);
+        Assert.Equal(2, bible.Books.Count);
+        var hero = Assert.Single(bible.Entries, entry => entry.Kind == BibleKind.Character && entry.Name == "Hero");
+        Assert.Equal(2, hero.States.Count);
+        Assert.Equal("Now a knight errant.", hero.Current);
+        Assert.Equal("The knight's son rode out", hero.States[1].Quote);
+    }
+
+    /// <summary>A sequel's place in the series is guessed once, from the other books, and kept as a guess (R21).</summary>
+    [Fact]
+    public async Task ASequelsPlaceInTheSeriesIsGuessedAndKeptUnconfirmed()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        Assert.Empty(placementBooks);
+
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(["Quest"], Assert.Single(placementBooks));
+        using var context = database.NewContext();
+        var placement = StoryPlacementCodec.Read(context.Novels.Single(n => n.Id == second).PlacementJson);
+        Assert.NotNull(placement);
+        Assert.Equal("after \u201CQuest\u201D", placement!.Where);
+        Assert.False(placement.Confirmed);
+    }
+
+    /// <summary>A placement the owner confirmed, carried onto a later draft, is not guessed again.</summary>
+    [Fact]
+    public async Task AConfirmedPlacementIsNotGuessedAgain()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        using (var context = database.NewContext())
+        {
+            context.Novels.Single(n => n.Id == second).PlacementJson =
+                StoryPlacementCodec.Write(StoryPlacement.Before("Quest").Confirm());
+            context.SaveChanges();
+        }
+
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Empty(placementBooks);
+        using var check = database.NewContext();
+        Assert.True(StoryPlacementCodec.Read(check.Novels.Single(n => n.Id == second).PlacementJson)!.Confirmed);
+    }
+
+    /// <summary>
+    /// A sequel is checked against the series bible (R24), seeded from the earlier book, with its guessed
+    /// place in the series (R21); its readers are given the bible too (R27).
+    /// </summary>
+    [Fact]
+    public async Task ASequelsContinuityReadAndReadersAreGivenTheSeriesBibleAndItsPlacement()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        string? bibleSent = null;
+        StoryPlacement? placementSent = null;
+        claude.Setup(c => c.AssessSeriesContinuity(
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(),
+                It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, SeriesCanon canon, string bible, StoryPlacement? placement, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+            {
+                bibleSent = bible;
+                placementSent = placement;
+                return Task.FromResult(SeriesContinuity.Empty with { PriorBookTitle = canon.PriorBookTitle });
+            });
+
+        readerFrames.Clear();
+        SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor());
+
+        Assert.StartsWith("SERIES BIBLE", bibleSent, StringComparison.Ordinal);
+        Assert.Contains("\"Quest\"", bibleSent, StringComparison.Ordinal);
+        Assert.Equal("after \u201CQuest\u201D", placementSent!.Where);
+        Assert.All(readerFrames, frame => Assert.StartsWith("SERIES BIBLE", frame.SeriesCanon, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The series bible is printed and sent beside the report (R26): to the tablet's root and to the
+    /// Drive folder the report went to, once per draft.
+    /// </summary>
+    [Fact]
+    public async Task ASequelsSeriesBibleIsDeliveredToTheTabletAndDrive()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        using (var context = database.NewContext())
+        {
+            foreach (var novel in context.Novels)
+                novel.SeriesName = "The Gate";
+            context.SaveChanges();
+        }
+        var remarkable = new Mock<IRemarkableClient>();
+        var drive = new Mock<IPaperDriveArchive>();
+        drive.Setup(d => d.FindParentFolder(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("folder-one");
+        drive.Setup(d => d.UploadFile(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("file");
+        string? docText = null;
+        drive.Setup(d => d.WriteGoogleDoc(null, "folder-one", "The Gate — Series bible", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback((string? _, string _, string _, string text, CancellationToken _) => docText = text)
+            .ReturnsAsync("bible-doc");
+
+        await DriveToCompletion(NewProcessor(
+            new ArchiveOptions { DeliverToRemarkable = true, Enabled = true }, remarkable.Object, drive.Object));
+
+        var name = DeliveredDocument.BibleName("The Gate", "Quest", 1);
+        remarkable.Verify(r => r.Upload(name, It.IsAny<Stream>(), It.IsAny<long>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        // Drive keeps one versioned Google Doc for the series rather than a PDF per draft (owner's request).
+        drive.Verify(d => d.UploadFile(It.IsAny<string>(), name + ".pdf", It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("This version: after Quest, draft 1", docText);
+        using var check = database.NewContext();
+        Assert.Equal("bible-doc", check.SeriesBibles.Single().DriveDocId);
+        Assert.True(check.BookAnalyses.Single(a => a.NovelId == second).SeriesBibleDelivered);
+        Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == second).Stage);
+    }
+
+    /// <summary>A bible that fails to send is given up on, and the review still finishes.</summary>
+    [Fact]
+    public async Task ABibleThatWillNotSendIsGivenUpOnAndTheReviewFinishes()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var remarkable = new Mock<IRemarkableClient>();
+        remarkable.Setup(r => r.Upload(It.Is<string>(title => title.Contains("Series bible")), It.IsAny<Stream>(),
+                It.IsAny<long>(), null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("refused"));
+
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { DeliverToRemarkable = true }, remarkable.Object));
+
+        using var check = database.NewContext();
+        Assert.True(check.BookAnalyses.Single(a => a.NovelId == second).SeriesBibleDelivered);
+        Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == second).Stage);
+    }
+
+    /// <summary>A correction the owner makes while the bible read is out is kept, not written over (R26).</summary>
+    [Fact]
+    public async Task ACorrectionMadeDuringTheBibleReadIsKept()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        Guid series;
+        using (var context = database.NewContext())
+            series = context.Novels.Single(n => n.Id == second).SeriesId!.Value;
+
+        claude.Setup(c => c.ReadSeriesBible(
+                It.IsAny<string>(), It.IsAny<ReadingFrame>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                // The owner corrects the castle while the read is out.
+                using var context = database.NewContext();
+                var bible = SeriesBible.Empty
+                    .WithBook(new SeriesBook(first, "Quest", 1), [new BibleFact(BibleKind.Setting, "Castle", [], "", "Grey stone.", "")])
+                    .Correct(BibleKind.Setting, "Castle", "Black basalt.");
+                context.SeriesBibles.Add(new SeriesBibleRecord { SeriesId = series, Json = SeriesBibleCodec.Write(bible), UpdatedAtUtc = clock.UtcNow });
+                context.SaveChanges();
+                return Task.FromResult<IReadOnlyList<BibleFact>>(
+                    [new BibleFact(BibleKind.Setting, "Castle", [], "", "Ruined.", "")]);
+            });
+
+        await DriveToCompletion(NewProcessor());
+
+        using var check = database.NewContext();
+        var castle = Assert.Single(SeriesBibleCodec.Read(check.SeriesBibles.Single().Json).Entries,
+            entry => entry.Kind == BibleKind.Setting && entry.Name == "Castle");
+        Assert.Equal("Black basalt.", castle.Correction);
+        Assert.Contains(castle.States, state => state.Text == "Ruined.");
+    }
+
+    [Fact]
+    public async Task AStandaloneBookHasNoSeriesBible()
+    {
+        SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Empty(biblesSeen);
+        using var context = database.NewContext();
+        Assert.Empty(context.SeriesBibles);
+    }
+
+    /// <summary>A stored bible that will not read is never written over: the review finishes without it.</summary>
+    [Fact]
+    public async Task AnUnreadableBibleIsLeftAloneAndTheReviewStillFinishes()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        Guid series;
+        using (var context = database.NewContext())
+        {
+            series = context.Novels.Single(n => n.Id == second).SeriesId!.Value;
+            context.SeriesBibles.Add(new SeriesBibleRecord { SeriesId = series, Json = "damaged", UpdatedAtUtc = clock.UtcNow });
+            context.SaveChanges();
+        }
+
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Empty(biblesSeen);
+        using var check = database.NewContext();
+        Assert.Equal("damaged", check.SeriesBibles.Single().Json);
+        Assert.Equal(ProjectStage.Completed, check.Novels.Single(n => n.Id == second).Stage);
+    }
+
     [Fact]
     public async Task SecondBook_ReusesReferenceImages_ForReturningEntities()
     {
@@ -1518,7 +1769,7 @@ public class ReviewProcessorTests : IDisposable
         await DriveToCompletion(NewProcessor());
 
         claude.Verify(c => c.AssessSeriesContinuity(
-            It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+            It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
             It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
         using var context = database.NewContext();
@@ -1533,9 +1784,9 @@ public class ReviewProcessorTests : IDisposable
 
         // The sequel finds a contradiction of book one's canon and leaves one of its threads open.
         claude.Setup(c => c.AssessSeriesContinuity(
-                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((string _, SeriesCanon canon, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+            .Returns((string _, SeriesCanon canon, string _, StoryPlacement? _, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
                 Task.FromResult(new SeriesContinuity(
                     canon.PriorBookTitle,
                     [new SeriesBreak("Chapter 1", "The hero's eyes were grey", "Now they are green")],
@@ -1546,7 +1797,7 @@ public class ReviewProcessorTests : IDisposable
 
         claude.Verify(c => c.AssessSeriesContinuity(
             It.IsAny<string>(), It.Is<SeriesCanon>(canon => canon.OpenThreads.Count > 0),
-            It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
 
         using (var context = database.NewContext())
         {
@@ -1574,7 +1825,7 @@ public class ReviewProcessorTests : IDisposable
         await DriveToCompletion(NewProcessor());
 
         claude.Setup(c => c.AssessSeriesContinuity(
-                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(), It.IsAny<IReadOnlyList<ChapterNotes>>(),
                 It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Claude is down"));
 

@@ -305,7 +305,7 @@ public sealed class AnalysisDocumentRenderer
                     AddVoice(blocks, writer, analysis, section, length, body, bodyBold, h3);
                     break;
                 case "series-continuity":
-                    AddSeries(blocks, writer, analysis, section, length, body, bodyBold, h3);
+                    AddSeries(blocks, writer, analysis, section, length, body, bodyBold, bodyItalic, h3);
                     break;
                 default:
                     if (section is { HasContent: true })
@@ -421,7 +421,7 @@ public sealed class AnalysisDocumentRenderer
     // what is left here is the status of the prior book's open threads, which is about the whole book.
     private static void AddSeries(
         List<Action> blocks, PageWriter writer, BookAnalysisResult analysis, SectionRead? section, StoryLength length,
-        SKFont body, SKFont bodyBold, SKFont h3)
+        SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h3)
     {
         var series = analysis.SeriesContinuity;
         if (!series.HasContent)
@@ -435,6 +435,23 @@ public sealed class AnalysisDocumentRenderer
             writer.Heading("Series continuity", h3, Ink);
             if (section is { HasContent: true } && !string.IsNullOrWhiteSpace(section.Summary))
                 writer.Paragraph(WholeBookNotes.Summary(section.Summary, length), body, Ink);
+            if (!string.IsNullOrWhiteSpace(series.Assumption))
+                writer.Paragraph(series.Assumption, body, ReportPalette.InkSoft);
+
+            // The findings against the series bible (R25), here as well as on the text: what kind, where,
+            // what this book says, and the earlier book's own words. A report stored before the bible kept
+            // its breaks on the text only.
+            var checkedBreaks = series.Breaks.Where(brk => !string.IsNullOrWhiteSpace(brk.Kind)).ToList();
+            foreach (var brk in checkedBreaks)
+            {
+                writer.Paragraph(Join(ContinuityKinds.Normalize(brk.Kind), brk.Chapter), bodyBold, Ink);
+                writer.Paragraph(brk.Contradiction, body, Ink);
+                var earlier = string.IsNullOrWhiteSpace(brk.Quote)
+                    ? brk.Established
+                    : $"\u201C{brk.Quote}\u201D";
+                if (!string.IsNullOrWhiteSpace(earlier))
+                    writer.Paragraph(string.IsNullOrWhiteSpace(brk.Book) ? earlier : $"{brk.Book}: {earlier}", bodyItalic, ReportPalette.InkSoft);
+            }
             if (series.CarriedThreads is { Count: > 0 })
             {
                 writer.Paragraph($"Threads carried from {against}:", bodyBold, Ink);

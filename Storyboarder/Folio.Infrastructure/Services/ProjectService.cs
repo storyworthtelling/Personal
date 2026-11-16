@@ -6,6 +6,7 @@ using Folio.Domain.Analysis;
 using Folio.Domain.External;
 using Folio.Domain.Imaging;
 using Folio.Domain.Model;
+using Folio.Domain.Series;
 using Folio.Domain.Pipeline;
 using Folio.Domain.Readiness;
 using Folio.Domain.Reading;
@@ -119,6 +120,7 @@ public sealed class ProjectService
         draft.SeriesId = previous.SeriesId;
         draft.PreviousBookId = previous.PreviousBookId;
         draft.SeriesSequence = previous.SeriesSequence;
+        draft.PlacementJson = previous.PlacementJson;
         draft.Source = new SourceText { NovelId = draft.Id, FullText = text, CharacterCount = text.Length };
         draft.WordCount = Words(text);
 
@@ -592,6 +594,68 @@ public sealed class ProjectService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// The owner's word on where a book sits in its series (R21), written onto every draft of the book so
+    /// it is never guessed again. Any draft of the book names it.
+    /// </summary>
+    public async Task ConfirmPlacementAsync(Guid draftId, StoryPlacement placement, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(placement);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var projectId = await db.Novels.Where(n => n.Id == draftId).Select(n => (Guid?)n.ProjectId).FirstOrDefaultAsync(cancellationToken);
+        if (projectId is null)
+            return;
+
+        var json = StoryPlacementCodec.Write(placement.Confirm());
+        foreach (var draft in await db.Novels.Where(n => n.ProjectId == projectId).ToListAsync(cancellationToken))
+        {
+            draft.PlacementJson = json;
+            draft.UpdatedAtUtc = clock.UtcNow;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The series bible of the series a draft belongs to, for the correction screen (R26), or null when
+    /// the draft is in no series or its series has no bible yet. A stored bible that will not read is
+    /// shown as empty, and is not corrected over.
+    /// </summary>
+    public async Task<SeriesBibleView?> GetSeriesBibleAsync(Guid draftId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var draft = await db.Novels.Where(n => n.Id == draftId)
+            .Select(n => new { n.SeriesId, n.SeriesName }).FirstOrDefaultAsync(cancellationToken);
+        if (draft?.SeriesId is not { } seriesId)
+            return null;
+
+        var json = await db.SeriesBibles.Where(record => record.SeriesId == seriesId)
+            .Select(record => record.Json).FirstOrDefaultAsync(cancellationToken);
+        if (json is null)
+            return null;
+
+        var bible = SeriesBibleCodec.Read(json);
+        var name = string.IsNullOrWhiteSpace(draft.SeriesName) ? bible.Books.FirstOrDefault()?.Title ?? "The series" : draft.SeriesName;
+        return new SeriesBibleView(seriesId, name, bible);
+    }
+
+    /// <summary>
+    /// The owner's correction to one entry of a series bible (R26), which wins over every book; a blank
+    /// one clears it. False when the stored bible will not read: nothing is written over it.
+    /// </summary>
+    public async Task<bool> CorrectSeriesBibleAsync(
+        Guid seriesId, BibleKind kind, string name, string correction, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var record = await db.SeriesBibles.FirstOrDefaultAsync(bible => bible.SeriesId == seriesId, cancellationToken);
+        if (record is null || !SeriesBibleCodec.TryRead(record.Json, out var bible))
+            return false;
+
+        record.Json = SeriesBibleCodec.Write(bible.Correct(kind, name, correction));
+        record.UpdatedAtUtc = clock.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     private sealed record DraftStub(Guid Id, Guid ProjectId, int DraftNumber, DateTimeOffset CreatedAtUtc, DateTimeOffset? ShelvedAtUtc);
 
     /// <summary>
@@ -835,6 +899,19 @@ public sealed class ProjectService
                 .Distinct()
                 .CountAsync(cancellationToken);
 
+        var latestPlacement = await db.Novels.Where(n => n.Id == latest.Id).Select(n => n.PlacementJson).FirstAsync(cancellationToken);
+        var otherBooks = latest.SeriesId is null
+            ? []
+            : (await db.Novels
+                .Where(n => n.SeriesId == latest.SeriesId && n.ProjectId != projectId && n.DeletedAtUtc == null)
+                .Select(n => new { n.ProjectId, n.DraftNumber, n.SeriesSequence, n.Title })
+                .ToListAsync(cancellationToken))
+              .GroupBy(n => n.ProjectId)
+              .Select(other => other.OrderByDescending(n => n.DraftNumber).First())
+              .OrderBy(other => other.SeriesSequence)
+              .Select(other => other.Title)
+              .ToList();
+
         return new BookRecord(
             projectId.Value,
             latest.Id,
@@ -857,6 +934,8 @@ public sealed class ProjectService
         {
             ReaderScores = scores,
             ScoredDraftNumber = scoredDraft,
+            Placement = latest.SeriesId is null ? null : StoryPlacementCodec.Read(latestPlacement),
+            OtherBooks = otherBooks,
         };
     }
 

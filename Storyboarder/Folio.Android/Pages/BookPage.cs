@@ -5,9 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Folio.Domain.Analysis;
 using Folio.Domain.Readiness;
 using Folio.Domain.Reading;
+using Folio.Domain.Series;
 using Folio.Domain.Shelf;
 using Folio.Infrastructure.Services;
 using Storyworthtelling.Maui;
+using Storyworthtelling.Maui.Views;
 
 namespace Folio.Android.Pages;
 
@@ -110,6 +112,14 @@ public class BookPage : FolioBinderPage
     private readonly Button openButton;
     private readonly Dictionary<Guid, Label> marks = [];
 
+    private readonly Label placementLine = new()
+    {
+        FontSize = PaperResources.Token<double>("SecondarySize"),
+        TextColor = PaperResources.Colour("ActionText"),
+        Padding = new Thickness(0, DesignTokens.Space.X3),
+    };
+    private StoryPlacement? placement;
+
     // Which draft's report "Open report" opens. The newest draft is the default; tapping another
     // draft in the list below picks that one instead.
     private Guid selectedDraft;
@@ -121,6 +131,7 @@ public class BookPage : FolioBinderPage
     private BookPage(BookPageModel model, BookRecord book)
     {
         record = book;
+        placement = book.Placement;
         selectedDraft = book.LatestDraftId;
 
         Content = new ScrollView
@@ -189,6 +200,36 @@ public class BookPage : FolioBinderPage
         await Navigation.PushAsync(page);
     }
 
+    // The owner confirms or changes where the book sits (R21). The line changes in place: no toast.
+    private async Task ChoosePlacement()
+    {
+        var options = PlacementCard.Options(placement, record.OtherBooks);
+        var picked = await PaperCards.Choose(
+            this, PlacementCard.Title, PlacementCard.Subtitle(placement),
+            [.. options.Select(option => option.Label)], lead: placement is { Confirmed: false } ? options[0].Label : null);
+        if (picked is null)
+            return;
+
+        var chosen = options.First(option => option.Label == picked).Placement;
+        if (chosen is null)
+        {
+            var era = await PaperCards.AskText(this, PlacementCard.Title, "In the series' own terms",
+                "e.g. a thousand years before the first book", placement is { Kind: PlacementKind.Era } ? placement.Era : null,
+                "Save", text => text.Length == 0 ? "Say when it takes place." : null);
+            if (era is null)
+                return;
+            chosen = StoryPlacement.InEra(era);
+        }
+
+        using (var scope = IPlatformApplication.Current!.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ProjectService>()
+                .ConfirmPlacementAsync(record.LatestDraftId, chosen, CancellationToken.None);
+        }
+        placement = chosen.Confirm();
+        placementLine.Text = placement.Line;
+    }
+
     // A status sentence under the bar, per §8 — not a toast, and never an alert.
     private void Note(string sentence)
     {
@@ -203,6 +244,33 @@ public class BookPage : FolioBinderPage
     private void Show(BookPageModel book)
     {
         body.Add(Hero(book));
+
+        // Where the book sits in its series (R21): Folio's guess until the owner says. A tap opens the card.
+        // The series bible (R26) opens from here too, to be read and corrected.
+        if (record.InSeries)
+        {
+            body.Add(SectionLabel("Series"));
+            if (record.Placement is not null)
+            {
+                placementLine.Text = this.placement!.Line;
+                var change = new TapGestureRecognizer();
+                change.Tapped += (_, _) => _ = ChoosePlacement();
+                placementLine.GestureRecognizers.Add(change);
+                body.Add(placementLine);
+            }
+
+            var bible = new Label
+            {
+                Text = "The series bible",
+                FontSize = PaperResources.Token<double>("SecondarySize"),
+                TextColor = PaperResources.Colour("ActionText"),
+                Padding = new Thickness(0, DesignTokens.Space.X3),
+            };
+            var open = new TapGestureRecognizer();
+            open.Tapped += (_, _) => _ = Navigation.PushAsync(new SeriesBiblePage(record.LatestDraftId));
+            bible.GestureRecognizers.Add(open);
+            body.Add(bible);
+        }
 
         body.Add(SectionLabel("Readiness"));
         body.Add(Chart(book.Readiness));

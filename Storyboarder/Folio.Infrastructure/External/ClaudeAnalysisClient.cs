@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 using Folio.Domain.Analysis;
 using Folio.Domain.Markup;
 using Folio.Domain.Reading;
+using Folio.Domain.Series;
 using Folio.Domain.Scenes;
 using Folio.Domain.External;
 using Folio.Domain.Health;
@@ -273,6 +274,20 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "says instead; excerpt = a short phrase from THIS book's notes, verbatim, where the clash is (\"\" if none); severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). carriedThreads: established = the prior open thread verbatim; status = one of " +
         "\"Addressed\", \"Ignored\", \"Contradicted\". Give one carriedThreads entry per open thread provided. " +
         "Use [] when there are no breaks. No prose outside the JSON.";
+
+    // Appended when the book is checked against the series bible (R22–R24).
+    private const string SeriesBibleCheckInstruction =
+        " You are given the SERIES BIBLE of the books written before this one, in place of the prior book's canon: each " +
+        "entry with the book that established it, the story time it holds as of, and that book's own words. Where this " +
+        "book and the bible disagree, the EARLIER-WRITTEN book is canon and this book is the one to flag, even when this " +
+        "book is set earlier in story time. Read the bible against where this book sits in story time: a character " +
+        "younger, a place not yet built or a thread not yet opened is no clash in a book set before it. Check four things " +
+        "and give each break a kind: \"Contradicted fact\" (a fact this book cannot share with the bible), \"Character " +
+        "drift\" (a character who acts, speaks or is described unlike the bible's without the story earning it), \"Dropped " +
+        "thread\" (an open thread this book should take up and does not, or abandons), \"Timeline error\" (an order, age, " +
+        "date or interval that cannot be true). For each break also give \"book\" (the title of the earlier book it " +
+        "contradicts) and \"quote\" (that book's own words for what it established, copied from the bible's quoted " +
+        "passage, or \"\" when the bible has none).";
 
     private readonly HttpClient httpClient;
     private readonly ClaudeOptions options;
@@ -911,23 +926,114 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         return new ExpansionReport(scenes, showTell, length);
     }
 
-    public async Task<SeriesContinuity> AssessSeriesContinuity(
-        string title, SeriesCanon priorCanon, IReadOnlyList<ChapterNotes> notes, string continuitySummary,
+    public async Task<IReadOnlyList<BibleFact>> ReadSeriesBible(
+        string manuscript, ReadingFrame frame, string title, string bibleSoFar, CancellationToken cancellationToken)
+    {
+        var system = ReadingPrompt.System(manuscript, frame, SeriesBibleInstruction(title))
+            .Select(block => block.Cached
+                ? (object)new { type = "text", text = block.Text, cache_control = new { type = "ephemeral" } }
+                : new { type = "text", text = block.Text })
+            .ToArray();
+        var user = string.IsNullOrWhiteSpace(bibleSoFar)
+            ? $"This is the first book of the series read into its bible: \"{title}\"."
+            : $"WHAT THE EARLIER BOOKS ESTABLISHED (use the same names for the same things):\n{bibleSoFar}";
+        var reply = await SendRaw(system, user, options.PassMaxTokens, options.StandardModel,
+            nameof(ReadSeriesBible), options.PassEffort, cancellationToken);
+
+        var json = JsonResponse.ExtractObject(reply)
+                   ?? throw new InvalidOperationException("The series bible read came back with no JSON.");
+        var dto = JsonResponse.Deserialize<BibleDto>(json)
+                  ?? throw new InvalidOperationException("The series bible read came back unreadable.");
+        return [.. (dto.Entries ?? [])
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Name) && !string.IsNullOrWhiteSpace(entry.Text))
+            .Select(entry => new BibleFact(
+                Enum.TryParse<BibleKind>(entry.Kind, ignoreCase: true, out var kind) ? kind : BibleKind.Event,
+                entry.Name!.Trim(),
+                [.. (entry.Aliases ?? []).Where(alias => !string.IsNullOrWhiteSpace(alias)).Select(alias => alias.Trim())],
+                entry.Era?.Trim() ?? string.Empty,
+                entry.Text!.Trim(),
+                entry.Quote?.Trim() ?? string.Empty))];
+    }
+
+    private static string SeriesBibleInstruction(string title) =>
+        $"You keep the series bible for this book, \"{title}\", a book in a series. List what this book establishes "
+        + "that a later or earlier book in the series must stay consistent with: its characters (who they are, how they "
+        + "look, what they can do, who they are to each other), its settings, the rules of its world, the events of its "
+        + "timeline, and the threads it leaves open. Record only what this book says, as of the point in story time it "
+        + "says it; where the book gives a date, an era or a time relative to an earlier book, say so. Do not judge the "
+        + "book, and do not suggest changes.\n\n"
+        + "Reply with JSON only: {\"entries\": [{\"kind\": \"character, setting, rule, event or thread\", \"name\": "
+        + "\"the name the book uses most\", \"aliases\": [\"other names the book uses for it\"], \"era\": \"the story "
+        + "time this holds as of, in the book's own terms, or an empty string\", \"text\": \"what the book establishes, "
+        + "in one or two sentences\", \"quote\": \"a short passage (under twenty words) copied verbatim from the book "
+        + "that establishes it, or an empty string\"}]}";
+
+    public async Task<StoryPlacement> PlaceInSeries(
+        string title, IReadOnlyList<string> otherBooks, string bibleText, string continuitySummary,
         CancellationToken cancellationToken)
+    {
+        var books = (otherBooks ?? []).Where(book => !string.IsNullOrWhiteSpace(book)).ToList();
+        var plainest = StoryPlacement.After(books.Count == 0 ? string.Empty : books[^1]);
+        var user =
+            $"THIS BOOK: \"{title}\"\n\n"
+            + $"THE OTHER BOOKS, in the order they were written: {string.Join(", ", books.Select(book => $"\"{book}\""))}\n\n"
+            + $"WHERE THIS BOOK'S STORY STANDS:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(not known)" : continuitySummary)}\n\n"
+            + bibleText;
+        var reply = await SendMessage(PlacementInstruction, user, cancellationToken, options.MaxTokens, model: options.StandardModel);
+
+        var json = JsonResponse.ExtractObject(reply);
+        var dto = json is null ? null : JsonResponse.Deserialize<PlacementDto>(json);
+        string? Known(string? name) => books.FirstOrDefault(book => string.Equals(book, name?.Trim(), StringComparison.OrdinalIgnoreCase));
+        return dto?.Kind?.Trim().ToLowerInvariant() switch
+        {
+            "after" when Known(dto.Book) is { } book => StoryPlacement.After(book),
+            "before" when Known(dto.Book) is { } book => StoryPlacement.Before(book),
+            "between" when Known(dto.Book) is { } earlier && Known(dto.OtherBook) is { } later => StoryPlacement.Between(earlier, later),
+            "era" when !string.IsNullOrWhiteSpace(dto.Era) => StoryPlacement.InEra(dto.Era),
+            _ => plainest,
+        };
+    }
+
+    private const string PlacementInstruction =
+        "You place a book in its series' story time. Given the series bible of the books written before it and where "
+        + "this book's story stands, say where it takes place against them: after one book, before one book, between "
+        + "two books, or, when it is set far from all of them, in an era of its own, named in the series' own terms. "
+        + "Use only the book titles given.\n\n"
+        + "Reply with JSON only: {\"kind\": \"after, before, between or era\", \"book\": \"a title (the earlier one, "
+        + "for between)\", \"otherBook\": \"the later title, for between, else an empty string\", \"era\": \"the era, "
+        + "for era, else an empty string\"}";
+
+    public async Task<SeriesContinuity> AssessSeriesContinuity(
+        string title, SeriesCanon priorCanon, string bibleText, StoryPlacement? placement,
+        IReadOnlyList<ChapterNotes> notes, string continuitySummary, CancellationToken cancellationToken)
     {
         var canonJson = JsonSerializer.Serialize(priorCanon, JsonResponse.CaseInsensitive);
         var notesJson = JsonSerializer.Serialize(notes, JsonResponse.CaseInsensitive);
+        // The bible, when the series has one, is what the book is checked against (R24); the prior book's
+        // canon is still sent for its open threads, which the carried-thread verdicts answer one by one.
+        var against = string.IsNullOrWhiteSpace(bibleText)
+            ? $"PRIOR BOOK'S CANON (JSON):\n{canonJson}\n\n"
+            : $"{bibleText}\n\nTHE PRIOR BOOK'S OPEN THREADS (JSON):\n"
+              + JsonSerializer.Serialize(priorCanon.OpenThreads, JsonResponse.CaseInsensitive) + "\n\n";
+        var where = placement is null
+            ? string.Empty
+            : $"WHERE THIS BOOK SITS IN THE SERIES' STORY TIME: {placement.Where}"
+              + (placement.Confirmed ? " (the author's word)" : " (Folio's guess, not yet confirmed by the author)") + "\n\n";
         var userContent =
             $"THIS BOOK'S TITLE: {title}\n\n" +
-            $"PRIOR BOOK'S CANON (JSON):\n{canonJson}\n\n" +
+            where +
+            against +
             $"THIS BOOK'S STORY STATE:\n{(string.IsNullOrWhiteSpace(continuitySummary) ? "(none)" : continuitySummary)}\n\n" +
             $"THIS BOOK'S PER-CHUNK NOTES (JSON array, in reading order):\n{notesJson}";
 
         // Best-effort: a malformed or empty reply yields no breaks/threads (keeping the prior book's title), so
         // the continuity read never blocks the report.
-        var empty = SeriesContinuity.Empty with { PriorBookTitle = priorCanon.PriorBookTitle };
+        var assumption = placement?.Assumption ?? string.Empty;
+        var empty = SeriesContinuity.Empty with { PriorBookTitle = priorCanon.PriorBookTitle, Assumption = assumption };
 
-        var reply = await SendMessage(SeriesContinuityInstruction, userContent, cancellationToken, options.AnalysisMaxTokens);
+        var reply = await SendMessage(
+            SeriesContinuityInstruction + (string.IsNullOrWhiteSpace(bibleText) ? string.Empty : SeriesBibleCheckInstruction),
+            userContent, cancellationToken, options.AnalysisMaxTokens);
         var json = JsonResponse.ExtractObject(reply);
         if (json is null)
             return empty;
@@ -939,14 +1045,21 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var breaks = (dto.Breaks ?? [])
             .Where(b => !string.IsNullOrWhiteSpace(b.Contradiction))
             .Select(b => new SeriesBreak(b.Chapter ?? string.Empty, b.Established ?? string.Empty, b.Contradiction!)
-            { Excerpt = b.Excerpt ?? string.Empty, Severity = b.Severity ?? string.Empty })
+            {
+                Excerpt = b.Excerpt ?? string.Empty,
+                Severity = b.Severity ?? string.Empty,
+                // Only a read against the bible sorts its findings into the four kinds and quotes the earlier book.
+                Kind = string.IsNullOrWhiteSpace(bibleText) ? string.Empty : ContinuityKinds.Normalize(b.Kind),
+                Book = b.Book?.Trim() ?? string.Empty,
+                Quote = b.Quote?.Trim() ?? string.Empty,
+            })
             .ToList();
         var carried = (dto.CarriedThreads ?? [])
             .Where(t => !string.IsNullOrWhiteSpace(t.Established))
             .Select(t => new CarriedThread(t.Established!, NormalizeThreadStatus(t.Status)))
             .ToList();
 
-        return new SeriesContinuity(priorCanon.PriorBookTitle, breaks, carried);
+        return new SeriesContinuity(priorCanon.PriorBookTitle, breaks, carried) { Assumption = assumption };
     }
 
     // Snap a carried-thread status to the three the report speaks; an unrecognized value reads as "Ignored"
@@ -1503,6 +1616,29 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             .Select(e => new EntityMention(e.Name!, e.Description ?? string.Empty, e.Scale ?? string.Empty, e.Aliases ?? []))
             .ToList();
 
+    private sealed class PlacementDto
+    {
+        public string? Kind { get; set; }
+        public string? Book { get; set; }
+        public string? OtherBook { get; set; }
+        public string? Era { get; set; }
+    }
+
+    private sealed class BibleDto
+    {
+        public List<BibleEntryDto>? Entries { get; set; }
+    }
+
+    private sealed class BibleEntryDto
+    {
+        public string? Kind { get; set; }
+        public string? Name { get; set; }
+        public List<string>? Aliases { get; set; }
+        public string? Era { get; set; }
+        public string? Text { get; set; }
+        public string? Quote { get; set; }
+    }
+
     private sealed class FragmentDto
     {
         public List<EntityDto>? Characters { get; set; }
@@ -1588,6 +1724,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class SeriesBreakDto
     {
+        public string? Kind { get; set; }
+        public string? Book { get; set; }
+        public string? Quote { get; set; }
         public string? Severity { get; set; }
         public string? Chapter { get; set; }
         public string? Established { get; set; }

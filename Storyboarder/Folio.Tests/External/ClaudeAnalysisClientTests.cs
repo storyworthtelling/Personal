@@ -288,7 +288,7 @@ public class ClaudeAnalysisClientTests
         var craft = await client.ConsolidateCraft("Title", [ChapterNotes.Empty], CancellationToken.None);
         var voice = await client.AssessVoiceConsistency([new ChapterSample("Chapter 1", "a"), new ChapterSample("Chapter 2", "b")], CancellationToken.None);
         var expansion = await client.ProposeExpansion("Title", [ChapterNotes.Empty], "", 1000, "Mystery", CancellationToken.None);
-        var series = await client.AssessSeriesContinuity("Title", new SeriesCanon("Book One", [], [], "", []), [ChapterNotes.Empty], "", CancellationToken.None);
+        var series = await client.AssessSeriesContinuity("Title", new SeriesCanon("Book One", [], [], "", []), "", null, [ChapterNotes.Empty], "", CancellationToken.None);
         var section = await client.ReadSection(PersonaCatalogue.Sections[0], "the manuscript", GenreFrame.Unknown, CancellationToken.None);
         var scene = await client.JudgeScene(new SceneToJudge(1, "Chapter 1", "t", "", ""), new DesignBible([], []), CancellationToken.None);
 
@@ -790,7 +790,7 @@ public class ClaudeAnalysisClientTests
             [new ReportFinding("Chapter 3", "the gate mechanism")]);
 
         var result = await client.AssessSeriesContinuity(
-            "Book Two", canon, [ChapterNotes.Empty], "the hero rests", CancellationToken.None);
+            "Book Two", canon, "", null, [ChapterNotes.Empty], "the hero rests", CancellationToken.None);
 
         Assert.Equal("Book One", result.PriorBookTitle);
         // The blank-contradiction break is dropped (nothing to report).
@@ -806,6 +806,39 @@ public class ClaudeAnalysisClientTests
         Assert.Contains("the gate mechanism", handler.RequestBodies[0]);
     }
 
+    /// <summary>
+    /// Against the series bible (R22–R24): the bible is sent rather than the bare canon, the earlier-written
+    /// book is named canon, each finding comes back with its kind, the earlier book and its quote, and a
+    /// guessed placement is sent and said back as the read's assumption.
+    /// </summary>
+    [Fact]
+    public async Task AssessSeriesContinuity_ChecksAgainstTheBibleAndCarriesKindBookQuoteAndAssumption()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(
+            "{\"breaks\":[{\"kind\":\"character drift\",\"chapter\":\"Chapter 3\",\"established\":\"scarred left hand\","
+            + "\"contradiction\":\"her right hand is scarred\",\"book\":\"The Salt Road\",\"quote\":\"her scarred left hand\"},"
+            + "{\"kind\":\"nonsense\",\"contradiction\":\"the flood comes early\"}],\"carriedThreads\":[]}"));
+        var placement = Folio.Domain.Series.StoryPlacement.After("The Salt Road");
+
+        var result = await client.AssessSeriesContinuity(
+            "The Tide Ledger", new SeriesCanon("The Salt Road", [], [], "", []),
+            "SERIES BIBLE: Wren Abernay, quoted \"her scarred left hand\"", placement,
+            [ChapterNotes.Empty], "", CancellationToken.None);
+
+        var body = Assert.Single(handler.RequestBodies);
+        Assert.Contains("SERIES BIBLE: Wren Abernay", body);
+        Assert.Contains("canon", body);
+        Assert.Contains("Timeline error", body);
+        Assert.Contains("not yet confirmed by the author", body);
+
+        Assert.Equal(ContinuityKinds.CharacterDrift, result.Breaks[0].Kind);
+        Assert.Equal("The Salt Road", result.Breaks[0].Book);
+        Assert.Equal("her scarred left hand", result.Breaks[0].Quote);
+        Assert.Equal(ContinuityKinds.ContradictedFact, result.Breaks[1].Kind);
+        Assert.Equal(placement.Assumption, result.Assumption);
+    }
+
     [Fact]
     public async Task AssessSeriesContinuity_BlankReply_DegradesToEmpty_KeepingThePriorTitle()
     {
@@ -814,7 +847,7 @@ public class ClaudeAnalysisClientTests
 
         var canon = new SeriesCanon("Book One", [], [], "", []);
         var result = await client.AssessSeriesContinuity(
-            "Book Two", canon, [ChapterNotes.Empty], "", CancellationToken.None);
+            "Book Two", canon, "", null, [ChapterNotes.Empty], "", CancellationToken.None);
 
         Assert.Equal("Book One", result.PriorBookTitle);
         Assert.False(result.HasContent);
@@ -1515,5 +1548,73 @@ public class ClaudeAnalysisClientTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken) =>
             throw new TaskCanceledException("The worker was stopped.");
+    }
+    [Fact]
+    public async Task TheBibleReadSharesTheReadsCachedManuscriptAndAsksForTheBooksEntries()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"entries\":[{\"kind\":\"character\",\"name\":\"Wren Abernay\","
+            + "\"aliases\":[\"the pilot\"],\"era\":\"Year of the flood\",\"text\":\"A ferry pilot.\","
+            + "\"quote\":\"Wren held the tiller\"},{\"kind\":\"oddity\",\"name\":\"Gullhaven\",\"text\":\"On stilts.\"},"
+            + "{\"kind\":\"thread\",\"name\":\"\",\"text\":\"Nameless.\"}]}"));
+        const string manuscript = "Wren held the tiller and did not look back.";
+        var frame = new ReadingFrame(GenreFrame.Unknown, "SERIES BIBLE: earlier.");
+
+        var facts = await client.ReadSeriesBible(manuscript, frame, "The Tide Ledger", "earlier entries", CancellationToken.None);
+
+        using var body = JsonDocument.Parse(Assert.Single(handler.RequestBodies));
+        var system = body.RootElement.GetProperty("system").EnumerateArray().ToList();
+        // The same cached blocks the reads send, so the bible read is a cache hit after them.
+        var reads = ReadingPrompt.System(manuscript, PersonaCatalogue.All[0], frame).TakeWhile(block => block.Cached).ToList();
+        for (var i = 0; i < reads.Count; i++)
+        {
+            Assert.Equal(reads[i].Text, system[i].GetProperty("text").GetString());
+            Assert.True(system[i].TryGetProperty("cache_control", out _));
+        }
+        var user = body.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert.Contains("The Tide Ledger", system[^1].GetProperty("text").GetString() + user);
+        Assert.Contains("earlier entries", user);
+
+        Assert.Equal(2, facts.Count);
+        Assert.Equal(Folio.Domain.Series.BibleKind.Character, facts[0].Kind);
+        Assert.Equal(["the pilot"], facts[0].Aliases);
+        Assert.Equal("Year of the flood", facts[0].Era);
+        Assert.Equal("Wren held the tiller", facts[0].Quote);
+        // A kind it does not know is not thrown away: it is kept as an event.
+        Assert.Equal(Folio.Domain.Series.BibleKind.Event, facts[1].Kind);
+    }
+
+    [Fact]
+    public async Task ABibleReadWithAnUnreadableReplyFailsRatherThanEmptyingTheBooksEntries()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("Sorry, no."));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.ReadSeriesBible("text", GenreFrame.Unknown, "Book", string.Empty, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData("{\"kind\":\"between\",\"book\":\"the salt road\",\"otherBook\":\"The Tide Ledger\"}", "between \u201CThe Salt Road\u201D and \u201CThe Tide Ledger\u201D")]
+    [InlineData("{\"kind\":\"before\",\"book\":\"The Salt Road\"}", "before \u201CThe Salt Road\u201D")]
+    [InlineData("{\"kind\":\"era\",\"era\":\"the age before the flood\"}", "in the age before the flood")]
+    // A book it was not shown, or nothing readable, is the plainest guess: after the latest-written book.
+    [InlineData("{\"kind\":\"after\",\"book\":\"A Book Nobody Wrote\"}", "after \u201CThe Tide Ledger\u201D")]
+    [InlineData("No idea.", "after \u201CThe Tide Ledger\u201D")]
+    public async Task APlacementIsReadAgainstTheBooksItWasShown(string reply, string where)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply(reply));
+
+        var placement = await client.PlaceInSeries(
+            "The Third Tide", ["The Salt Road", "The Tide Ledger"], "SERIES BIBLE ...", "The flood has not come yet.",
+            CancellationToken.None);
+
+        Assert.Equal(where, placement.Where);
+        Assert.False(placement.Confirmed);
+        var user = JsonDocument.Parse(Assert.Single(handler.RequestBodies)).RootElement
+            .GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert.Contains("The flood has not come yet.", user);
+        Assert.Contains("SERIES BIBLE", user);
     }
 }

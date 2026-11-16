@@ -34,10 +34,22 @@ public static class ReadingPrompt
         ArgumentNullException.ThrowIfNull(persona);
         ArgumentNullException.ThrowIfNull(frame);
 
+        return System(manuscript, frame,
+            Instruction(persona, ManuscriptLength.CountWords(manuscript), frame.Genre, frame.HasSeriesCanon));
+    }
+
+    /// <summary>
+    /// The system blocks for any other whole-book call that reads the manuscript (the series bible's
+    /// read, G): the same cached blocks as the passes, so it is a cache hit after them, then its own
+    /// instruction.
+    /// </summary>
+    public static IReadOnlyList<PromptBlock> System(string manuscript, ReadingFrame frame, string instructionText)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+
         // A series book's canon (R27) is the same for every pass of the draft, so it is cached with the
         // manuscript, after it: the prefix stays byte-identical whichever persona is reading.
-        var instruction = new PromptBlock(
-            Instruction(persona, ManuscriptLength.CountWords(manuscript), frame.Genre, frame.HasSeriesCanon), Cached: false);
+        var instruction = new PromptBlock(instructionText, Cached: false);
         return frame.HasSeriesCanon
             ?
             [

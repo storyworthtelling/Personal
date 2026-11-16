@@ -147,9 +147,42 @@ public interface IClaudeAnalysisClient
     // ignored, or contradicted. It NUDGES, never rewrites — pointers only. Best-effort: a blank/partial reply
     // degrades to SeriesContinuity.Empty (keeping the prior book's title) so it never blocks the report. Runs
     // only for a book linked to a prior one; a standalone book never calls it.
+    /// <summary>
+    /// What this book establishes for its series' bible (release G, R20): its characters, settings, world
+    /// rules, timeline events and open threads, each with the story time it holds as of and a short
+    /// passage quoted from the book. Sent with the reads' cached manuscript, so it is a cache hit after
+    /// them. <paramref name="bibleSoFar"/> is what the earlier books established, so names match. Throws
+    /// on an unreadable reply: an empty list would erase the book from the bible.
+    /// </summary>
+    Task<IReadOnlyList<Folio.Domain.Series.BibleFact>> ReadSeriesBible(
+        string manuscript,
+        Folio.Domain.Reading.ReadingFrame frame,
+        string title,
+        string bibleSoFar,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Where this book sits in its series' story time (R21), guessed from what the earlier books
+    /// established and where this book's story stands. Answers only books it was shown; a reply it cannot
+    /// read is the plainest guess, after the latest-written book. Never confirmed: the owner confirms.
+    /// </summary>
+    Task<Folio.Domain.Series.StoryPlacement> PlaceInSeries(
+        string title,
+        IReadOnlyList<string> otherBooks,
+        string bibleText,
+        string continuitySummary,
+        CancellationToken cancellationToken);
+
+    //
+    // Against the series bible (release G, R22–R24) when there is one: bibleText is the earlier books' bible
+    // (each entry with the book that established it and its quoted passage), the earlier-written book is
+    // canon, and each finding is one of ContinuityKinds with the earlier book and its quote. placement is
+    // where this book sits; while it is a guess, the result says what it assumed.
     Task<SeriesContinuity> AssessSeriesContinuity(
         string title,
         SeriesCanon priorCanon,
+        string bibleText,
+        Folio.Domain.Series.StoryPlacement? placement,
         IReadOnlyList<ChapterNotes> notes,
         string continuitySummary,
         CancellationToken cancellationToken);

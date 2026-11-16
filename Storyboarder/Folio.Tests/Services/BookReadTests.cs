@@ -6,6 +6,7 @@ using Folio.Domain.External;
 using Folio.Domain.Model;
 using Folio.Domain.Readiness;
 using Folio.Domain.Reading;
+using Folio.Domain.Series;
 using Folio.Infrastructure.Configuration;
 using Folio.Infrastructure.Imaging;
 using Folio.Infrastructure.Services;
@@ -225,13 +226,104 @@ public class BookReadTests : IDisposable
         context.SaveChanges();
     }
 
+    /// <summary>
+    /// A series book's page knows where the book sits (R21) and the other books it could sit against,
+    /// in the order they were written; confirming writes the owner's answer onto every draft.
+    /// </summary>
+    [Fact]
+    public async Task ASeriesBooksPlacementIsReadAndConfirmedOnEveryDraft()
+    {
+        var series = Guid.NewGuid();
+        var first = Seed(draftNumber: 1, words: 80_000, seriesId: series, sequence: 1);
+        var third = Seed(draftNumber: 1, words: 80_000, seriesId: series, sequence: 3);
+        var second = Seed(draftNumber: 1, words: 80_000, seriesId: series, sequence: 2);
+        var secondAgain = Seed(draftNumber: 2, words: 81_000, projectId: second, seriesId: series, sequence: 2);
+        using (var context = database.NewContext())
+        {
+            context.Novels.Single(n => n.Id == first).Title = "The Salt Road";
+            context.Novels.Single(n => n.Id == third).Title = "The Third Tide";
+            foreach (var draft in context.Novels.Where(n => n.ProjectId == second))
+                draft.PlacementJson = StoryPlacementCodec.Write(StoryPlacement.After("The Salt Road"));
+            context.SaveChanges();
+        }
+
+        var book = await Read(secondAgain);
+        Assert.Equal("after \u201CThe Salt Road\u201D", book!.Placement!.Where);
+        Assert.False(book.Placement.Confirmed);
+        Assert.Equal(["The Salt Road", "The Third Tide"], book.OtherBooks);
+
+        await Service().ConfirmPlacementAsync(secondAgain, StoryPlacement.Between("The Salt Road", "The Third Tide"), CancellationToken.None);
+
+        using var check = database.NewContext();
+        Assert.All(check.Novels.Where(n => n.ProjectId == second).ToList(), draft =>
+        {
+            var placement = StoryPlacementCodec.Read(draft.PlacementJson)!;
+            Assert.True(placement.Confirmed);
+            Assert.Equal(PlacementKind.Between, placement.Kind);
+        });
+        Assert.Null(check.Novels.Single(n => n.Id == first).PlacementJson);
+    }
+
+    /// <summary>The series bible is read for the correction screen, and a correction is kept (R26).</summary>
+    [Fact]
+    public async Task TheSeriesBibleIsReadAndCorrectedFromAnyDraftOfTheSeries()
+    {
+        var series = Guid.NewGuid();
+        var book = Seed(draftNumber: 1, words: 80_000, seriesId: series, sequence: 1);
+        var bible = SeriesBible.Empty.WithBook(new SeriesBook(book, "The Salt Line", 1),
+            [new BibleFact(BibleKind.Setting, "Gullhaven", [], "", "On stilts.", "")]);
+        using (var context = database.NewContext())
+        {
+            context.Novels.Single(n => n.Id == book).SeriesName = "The Tides";
+            context.SeriesBibles.Add(new SeriesBibleRecord { SeriesId = series, Json = SeriesBibleCodec.Write(bible), UpdatedAtUtc = Start });
+            context.SaveChanges();
+        }
+
+        var read = await Service().GetSeriesBibleAsync(book, CancellationToken.None);
+        Assert.Equal("The Tides", read!.Name);
+        Assert.Single(read.Bible.Entries);
+
+        Assert.True(await Service().CorrectSeriesBibleAsync(series, BibleKind.Setting, "Gullhaven", "On piles.", CancellationToken.None));
+
+        using var check = database.NewContext();
+        Assert.Equal("On piles.", SeriesBibleCodec.Read(check.SeriesBibles.Single().Json).Entries[0].Current);
+    }
+
+    /// <summary>A stored bible that will not read is refused rather than written over with a correction.</summary>
+    [Fact]
+    public async Task ACorrectionIsNotWrittenOverABibleThatWillNotRead()
+    {
+        var series = Guid.NewGuid();
+        Seed(draftNumber: 1, words: 80_000, seriesId: series);
+        using (var context = database.NewContext())
+        {
+            context.SeriesBibles.Add(new SeriesBibleRecord { SeriesId = series, Json = "damaged", UpdatedAtUtc = Start });
+            context.SaveChanges();
+        }
+
+        Assert.False(await Service().CorrectSeriesBibleAsync(series, BibleKind.Setting, "Gullhaven", "On piles.", CancellationToken.None));
+
+        using var check = database.NewContext();
+        Assert.Equal("damaged", check.SeriesBibles.Single().Json);
+    }
+
+    [Fact]
+    public async Task AStandaloneBookHasNoPlacement()
+    {
+        var book = await Read(Seed(draftNumber: 1, words: 80_000));
+
+        Assert.Null(book!.Placement);
+        Assert.Empty(book.OtherBooks);
+    }
+
     [Fact]
     public async Task AnUnknownBookReadsAsNothing() =>
         Assert.Null(await Read(Guid.NewGuid()));
 
-    private Task<BookRecord?> Read(Guid draftId) =>
-        new ProjectService(database, docs.Object, imageStore, clock, Options.Create(new RateLimitOptions()))
-            .GetBookAsync(draftId, CancellationToken.None);
+    private Task<BookRecord?> Read(Guid draftId) => Service().GetBookAsync(draftId, CancellationToken.None);
+
+    private ProjectService Service() =>
+        new(database, docs.Object, imageStore, clock, Options.Create(new RateLimitOptions()));
 
     private static BookAnalysisResult Report(int musts, int strengths) =>
         BookAnalysisResult.Empty with

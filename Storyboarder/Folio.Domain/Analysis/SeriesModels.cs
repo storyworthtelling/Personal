@@ -37,6 +37,33 @@ public sealed record SeriesBreak(string Chapter, string Established, string Cont
     /// revision plan's tier for its chapter.
     /// </summary>
     public string Severity { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Which of the four things the continuity read checks (R22), one of <see cref="ContinuityKinds"/>.
+    /// Empty on a report stored before the series bible: it reads as a contradicted fact.
+    /// </summary>
+    public string Kind { get; init; } = string.Empty;
+
+    /// <summary>The earlier book this contradicts (R23, R25), or empty when the read did not say.</summary>
+    public string Book { get; init; } = string.Empty;
+
+    /// <summary>The earlier book's own words for what it established, from the series bible (R24), or empty.</summary>
+    public string Quote { get; init; } = string.Empty;
+}
+
+/// <summary>The four things the continuity read checks against the series bible (R22).</summary>
+public static class ContinuityKinds
+{
+    public const string ContradictedFact = "Contradicted fact";
+    public const string CharacterDrift = "Character drift";
+    public const string DroppedThread = "Dropped thread";
+    public const string TimelineError = "Timeline error";
+
+    public static IReadOnlyList<string> All { get; } = [ContradictedFact, CharacterDrift, DroppedThread, TimelineError];
+
+    /// <summary>One of the four; anything else is a contradicted fact, the plainest of them.</summary>
+    public static string Normalize(string? kind) =>
+        All.FirstOrDefault(known => string.Equals(known, kind?.Trim(), StringComparison.OrdinalIgnoreCase)) ?? ContradictedFact;
 }
 
 // A prior-book open thread carried forward, and how this book handles it — "Addressed", "Ignored", or
@@ -57,4 +84,10 @@ public sealed record SeriesContinuity(
     // True when there is anything worth a section — the renderer stays silent otherwise (a standalone book or a
     // clean sequel shows nothing).
     public bool HasContent => Breaks.Count > 0 || CarriedThreads.Count > 0;
+
+    /// <summary>
+    /// While the book's place in the series is Folio's guess (R21), the sentence saying what the read
+    /// assumed; empty once the owner has confirmed it.
+    /// </summary>
+    public string Assumption { get; init; } = string.Empty;
 }

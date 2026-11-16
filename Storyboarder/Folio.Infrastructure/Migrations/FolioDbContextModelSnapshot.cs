@@ -53,6 +53,12 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<string>("RemarkableNote")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("SeriesBibleDelivered")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("SeriesBibleUpdated")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("SeriesContinuityJson")
                         .HasColumnType("TEXT");
 
@@ -376,6 +382,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<string>("LastError")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PlacementJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<Guid?>("PreviousBookId")
                         .HasColumnType("TEXT");
 
@@ -535,6 +544,30 @@ namespace Folio.Infrastructure.Migrations
                     b.HasIndex("NovelId", "Number");
 
                     b.ToTable("Scenes");
+                });
+
+            modelBuilder.Entity("Folio.Domain.Model.SeriesBibleRecord", b =>
+                {
+                    b.Property<Guid>("SeriesId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("BackedUpAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DriveDocId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Json")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("UpdatedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("SeriesId");
+
+                    b.ToTable("SeriesBibles");
                 });
 
             modelBuilder.Entity("Folio.Domain.Model.SourceText", b =>

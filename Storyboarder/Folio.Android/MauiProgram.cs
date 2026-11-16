@@ -146,6 +146,11 @@ public static class MauiProgram
         // its capability flags and the archive stage skips that target.
         builder.Services.AddSingleton<IPaperDelivery>(sp =>
             new PaperDelivery(sp.GetService<IRemarkableClient>(), sp.GetService<IPaperDriveArchive>()));
+        // The series bible's versioned Google Doc in Drive, written by the pipeline and by the correction screen.
+        builder.Services.AddSingleton(sp => new SeriesBibleBackup(
+            sp.GetRequiredService<IDbContextFactory<FolioDbContext>>(), sp.GetService<IPaperDelivery>(),
+            sp.GetRequiredService<IOptions<ArchiveOptions>>(), sp.GetRequiredService<IClock>(),
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<SeriesBibleBackup>()));
 
         // Owner's-voice Drive files, each ONE JSON file found by name and reached with the device-account
         // token (full `drive` scope, shared across every com.storyworthtelling app) the same way the archive

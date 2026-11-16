@@ -41,6 +41,10 @@ public interface IPaperDelivery
     Task<string> EnsureDriveFolder(string parentFolderId, string name, CancellationToken cancellationToken = default);
     Task<string> UploadDriveFile(
         string folderId, string name, string mimeType, byte[] content, CancellationToken cancellationToken = default);
+
+    // A Google Doc rewritten in place, so its version history keeps every write (see IPaperDriveArchive).
+    Task<string> WriteDriveDoc(
+        string? fileId, string folderId, string name, string text, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -85,6 +89,10 @@ public sealed class PaperDelivery : IPaperDelivery
     public Task<string> UploadDriveFile(
         string folderId, string name, string mimeType, byte[] content, CancellationToken cancellationToken = default) =>
         Require(drive).UploadFile(folderId, name, mimeType, content, cancellationToken);
+
+    public Task<string> WriteDriveDoc(
+        string? fileId, string folderId, string name, string text, CancellationToken cancellationToken = default) =>
+        Require(drive).WriteGoogleDoc(fileId, folderId, name, text, cancellationToken);
 
     private static T Require<T>(T? transport) where T : class =>
         transport ?? throw new InvalidOperationException(
