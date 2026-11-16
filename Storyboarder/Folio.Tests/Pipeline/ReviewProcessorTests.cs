@@ -1908,6 +1908,47 @@ public class ReviewProcessorTests : IDisposable
         Assert.Contains(castle.States, state => state.Text == "Ruined.");
     }
 
+    /// <summary>
+    /// After a reset the phone has the books but no bible: the sequel's review restores it from Drive before
+    /// the continuity read, so the owner's corrections are what the book is checked against.
+    /// </summary>
+    [Fact]
+    public async Task ASequelOnAResetPhoneRestoresTheBibleFromDriveBeforeTheContinuityRead()
+    {
+        var first = SeedManuscript();
+        await DriveToCompletion(NewProcessor());
+        var oldPhone = SeriesBible.Empty
+            .WithBook(new SeriesBook(Guid.NewGuid(), "Quest", 1), [new BibleFact(BibleKind.Setting, "Castle", [], "", "Grey stone.", "")])
+            .Correct(BibleKind.Setting, "Castle", "Black basalt, as the author corrected it.");
+        var drive = new Mock<IPaperDriveArchive>();
+        drive.Setup(d => d.FindParentFolder(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync("folder-one");
+        drive.Setup(d => d.UploadFile(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync("file");
+        drive.Setup(d => d.FindFileByName("Quest — Series bible (data).json", It.IsAny<CancellationToken>())).ReturnsAsync("data-9");
+        drive.Setup(d => d.ReadTextFile("data-9", It.IsAny<CancellationToken>())).ReturnsAsync(SeriesBibleCodec.Write(oldPhone));
+        drive.Setup(d => d.WriteTextFile(It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string? id, string _, string _, string _, string _, CancellationToken _) => Task.FromResult(id ?? "data-new"));
+        string? bibleSent = null;
+        claude.Setup(c => c.AssessSeriesContinuity(
+                It.IsAny<string>(), It.IsAny<SeriesCanon>(), It.IsAny<string>(), It.IsAny<StoryPlacement?>(),
+                It.IsAny<IReadOnlyList<ChapterNotes>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, SeriesCanon canon, string bible, StoryPlacement? _, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
+            {
+                bibleSent = bible;
+                return Task.FromResult(SeriesContinuity.Empty with { PriorBookTitle = canon.PriorBookTitle });
+            });
+
+        SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        await DriveToCompletion(NewProcessor(new ArchiveOptions { Enabled = true }, driveArchive: drive.Object));
+
+        Assert.Contains("Black basalt, as the author corrected it.", bibleSent, StringComparison.Ordinal);
+        // The backup after the review rewrites the restored data file, not a new one.
+        drive.Verify(d => d.WriteTextFile("data-9", It.IsAny<string>(), "Quest — Series bible (data).json", "application/json",
+            It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        using var context = database.NewContext();
+        Assert.Equal("data-9", context.SeriesBibles.Single().DriveDataId);
+    }
+
     [Fact]
     public async Task AStandaloneBookHasNoSeriesBible()
     {

@@ -215,4 +215,33 @@ public class SeriesBibleTests
         Assert.Contains("the author's correction", text);
         Assert.Equal(string.Empty, BibleText.For(SeriesBible.Empty));
     }
+
+    /// <summary>
+    /// A bible restored from Drive onto a new phone names its books by the old phone's ids; it is rebound
+    /// to this phone's books by title, so a book read again replaces its own states rather than adding a
+    /// second copy of itself. A book this phone does not have keeps its states (owner's ruling).
+    /// </summary>
+    [Fact]
+    public void ARestoredBibleIsReboundToThisPhonesBooksByTitle()
+    {
+        var oldOne = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var oldGone = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var restored = SeriesBible.Empty
+            .WithBook(new SeriesBook(oldOne, "The Salt Road", 1), [Fact(BibleKind.Character, "Wren Abernay", "Scarred.")])
+            .WithBook(new SeriesBook(oldGone, "The Lost Book", 2), [Fact(BibleKind.Setting, "Gullhaven", "On stilts.")])
+            .Correct(BibleKind.Character, "Wren Abernay", "Scarred right hand.");
+
+        var rebound = restored.Rebind([new SeriesBook(BookOne, "the salt road", 1)]);
+
+        Assert.True(rebound.Has(BookOne));
+        Assert.False(rebound.Has(oldOne));
+        Assert.True(rebound.Has(oldGone));
+        var wren = Assert.Single(rebound.Entries, entry => entry.Name == "Wren Abernay");
+        Assert.Equal(BookOne, wren.States[0].BookId);
+        Assert.Equal("Scarred right hand.", wren.Correction);
+
+        // Read again on the new phone, the book replaces its own states.
+        var read = rebound.WithBook(new SeriesBook(BookOne, "The Salt Road", 1), [Fact(BibleKind.Character, "Wren Abernay", "Healed.")]);
+        Assert.Equal("Healed.", Assert.Single(Assert.Single(read.Entries, entry => entry.Name == "Wren Abernay").States).Text);
+    }
 }

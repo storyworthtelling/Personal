@@ -411,6 +411,10 @@ public class BookAnalysis
     // billed once per draft, like the other whole-book calls.
     public bool SeriesBibleUpdated { get; set; }
 
+    // Set once this draft has looked for its series' bible in Drive, when the phone had none (a reset). Once
+    // per draft, so an absent copy is not looked for again on every step.
+    public bool SeriesBibleRestoreChecked { get; set; }
+
     // Set once the series bible, as this draft left it, has been sent to the tablet and Drive (R26), or
     // given up on. Best-effort: the bible is a convenience beside the report, never a reason to hold it.
     public bool SeriesBibleDelivered { get; set; }
@@ -500,6 +504,10 @@ public class SeriesBibleRecord
     // history shows each change; null until the first backup. When it was last written, or null.
     public string? DriveDocId { get; set; }
     public DateTimeOffset? BackedUpAtUtc { get; set; }
+
+    // The bible's data as plain JSON in Drive, beside the Doc and rewritten with it: what a new phone restores
+    // from. Null until the first backup, or until a restore finds it.
+    public string? DriveDataId { get; set; }
 }
 
 public class ModelBatch

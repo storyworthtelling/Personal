@@ -45,6 +45,12 @@ public interface IPaperDelivery
     // A Google Doc rewritten in place, so its version history keeps every write (see IPaperDriveArchive).
     Task<string> WriteDriveDoc(
         string? fileId, string folderId, string name, string text, CancellationToken cancellationToken = default);
+
+    // A plain text file kept in Drive to restore from, and finding and reading one (see IPaperDriveArchive).
+    Task<string> WriteDriveText(
+        string? fileId, string folderId, string name, string mimeType, string text, CancellationToken cancellationToken = default);
+    Task<string?> FindDriveFile(string name, CancellationToken cancellationToken = default);
+    Task<string> ReadDriveText(string fileId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -93,6 +99,16 @@ public sealed class PaperDelivery : IPaperDelivery
     public Task<string> WriteDriveDoc(
         string? fileId, string folderId, string name, string text, CancellationToken cancellationToken = default) =>
         Require(drive).WriteGoogleDoc(fileId, folderId, name, text, cancellationToken);
+
+    public Task<string> WriteDriveText(
+        string? fileId, string folderId, string name, string mimeType, string text, CancellationToken cancellationToken = default) =>
+        Require(drive).WriteTextFile(fileId, folderId, name, mimeType, text, cancellationToken);
+
+    public Task<string?> FindDriveFile(string name, CancellationToken cancellationToken = default) =>
+        Require(drive).FindFileByName(name, cancellationToken);
+
+    public Task<string> ReadDriveText(string fileId, CancellationToken cancellationToken = default) =>
+        Require(drive).ReadTextFile(fileId, cancellationToken);
 
     private static T Require<T>(T? transport) where T : class =>
         transport ?? throw new InvalidOperationException(

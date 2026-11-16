@@ -30,4 +30,16 @@ public interface IPaperDriveArchive
     // time, not for a finished document (those are UploadFile's).
     Task<string> WriteGoogleDoc(
         string? fileId, string folderId, string name, string text, CancellationToken cancellationToken);
+
+    // Writes a plain text file (JSON, say) and returns its id: rewritten in place by id, or made in the folder
+    // when there is no id or the file has gone. For data an app keeps in Drive to restore from.
+    Task<string> WriteTextFile(
+        string? fileId, string folderId, string name, string mimeType, string text, CancellationToken cancellationToken);
+
+    // The id of a file this app can see with exactly this name, not trashed, the most recently changed when
+    // there are several; null when there is none. How a new phone finds what an old one left in Drive.
+    Task<string?> FindFileByName(string name, CancellationToken cancellationToken);
+
+    // A file's whole content as text.
+    Task<string> ReadTextFile(string fileId, CancellationToken cancellationToken);
 }

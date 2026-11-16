@@ -1148,6 +1148,20 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 2e1) A phone with no bible for this series (a reset) puts it back from Drive first, so the placement
+        // guess and the continuity read see the owner's corrections. Once per draft; a phone that has its bible
+        // asks Drive nothing. Best-effort: whatever the outcome, the review goes on.
+        if (novel.SeriesId is { } restoreSeries && !analysis.SeriesBibleRestoreChecked)
+        {
+            var restored = await new SeriesBibleBackup(dbContextFactory, delivery, archiveOptions, clock, logger)
+                .RestoreAsync(restoreSeries, cancellationToken);
+            if (restored != BibleRestore.NotNeeded)
+                logger.LogInformation("Series bible restore for manuscript {NovelId}: {Outcome}", novel.Id, restored);
+            analysis.SeriesBibleRestoreChecked = true;
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
         // 2e2) Guess where a series book sits in its series' story time (R21), once, when there are other
         // books to place it against. The owner confirms or changes it on the book's page; a confirmed
         // placement is carried onto later drafts and never guessed again.

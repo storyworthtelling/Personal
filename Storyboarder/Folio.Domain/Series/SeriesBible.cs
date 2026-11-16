@@ -130,6 +130,33 @@ public sealed record SeriesBible(IReadOnlyList<SeriesBook> Books, IReadOnlyList<
         return this with { Entries = entries };
     }
 
+    /// <summary>
+    /// The bible rebound to this phone's books (a restore after a reset): a book of the bible whose title
+    /// matches one of <paramref name="local"/> takes that book's id and written order, in the books list and
+    /// in every state, so a book read again replaces its own states. A book with no match keeps its states.
+    /// </summary>
+    public SeriesBible Rebind(IReadOnlyList<SeriesBook> local)
+    {
+        ArgumentNullException.ThrowIfNull(local);
+        var map = new Dictionary<Guid, SeriesBook>();
+        foreach (var book in Books)
+        {
+            if (local.FirstOrDefault(mine => BibleEntry.Same(mine.Title, book.Title)) is { } mine)
+                map[book.BookId] = mine with { Title = book.Title };
+        }
+        if (map.Count == 0)
+            return this;
+
+        var books = Books.Select(book => map.TryGetValue(book.BookId, out var mine) ? mine : book)
+            .GroupBy(book => book.BookId).Select(group => group.First())
+            .OrderBy(book => book.Written).ThenBy(book => book.Title, StringComparer.Ordinal).ToList();
+        var entries = Entries.Select(entry => entry with
+        {
+            States = [.. entry.States.Select(state => map.TryGetValue(state.BookId, out var mine) ? state with { BookId = mine.BookId } : state)],
+        }).ToList();
+        return new SeriesBible(books, entries);
+    }
+
     /// <summary>The bible as the other books left it: what a book is checked against (R24).</summary>
     public SeriesBible Without(Guid bookId) => new(
         [.. Books.Where(book => book.BookId != bookId)],
