@@ -94,7 +94,7 @@ Terracotta is **retired everywhere** — including documents, where the old "act
 | `InkMuted` | `#8A8578` | Secondary text, metadata (≥14sp) |
 | `InkBlue` | `#2C3E5E` | "The pen": signatures, editorial marks, and the color of the voice |
 
-**Ink-black** reads the body and UI. **Ink-blue** is the pen. The owner's voice is set in a **calligraphy hand** (Pinyon Script, §4) colored ink-blue.
+**Ink-black** reads the body and UI. **Ink-blue** is the pen. The owner's voice is set in a **calligraphy hand** (Italianno, §4) colored ink-blue.
 
 ### Identity hues
 
@@ -193,7 +193,7 @@ Four families, committed as static fonts in `/Fonts` (OFL; see `Fonts/LICENSES.m
 - **Source Serif 4** (Regular, SemiBold, **Black**) — headings, reading text, PDF body, covers. The literary voice. (Black is new: it anchors the reworked display sizes.)
 - **Source Sans 3** (Regular, SemiBold) — UI controls, labels, list rows. The working voice.
 - **Cascadia Code** (Regular) — machine text: keys, SHA-1s, URLs, paths, figures, countdowns.
-- **Pinyon Script** (Regular) — a copperplate **calligraphy** hand, colored ink-blue, used **only** for the owner's voice messages.
+- **Italianno** (Regular) — a slender italic **calligraphy** hand, colored ink-blue, used **only** for the owner's voice messages. It replaced Pinyon Script (owner's choice, W10): elegant without the copperplate flourishes that made Pinyon hard to read, especially for children and at large text. It runs small for its size, so the voice is set at 34 on screen and on its own printed rung (`PaperTypeScale.Voice`, 25.5pt) rather than sharing Title.
 
 **Serif Italic has exactly one role**, and it is the empty state's invitation (§7). It was put to the
 owner a second time when Foreword's prayer page drew its past-entry quotations in it, and the answer
@@ -212,7 +212,7 @@ than decorative wherever a page quotes something.
 | `Secondary` | Sans Regular | 14 | 26 | Supporting text, status lines |
 | `Label` | Sans SemiBold | 13 | 22 | Field labels, buttons, chips, tab labels |
 | `Mono` | Cascadia Regular | 14 | 24 | Technical strings, figures |
-| `Voice` | Pinyon Script | ~26 | — | The owner's voice, in ink-blue |
+| `Voice` | Italianno | 34 | — | The owner's voice, in ink-blue |
 | `Countdown` | Cascadia Regular | 40 | — | Cutover / unlock timer |
 | `CoverTitle` | Serif SemiBold | 72 | — | Book/report covers |
 
@@ -449,7 +449,7 @@ Only these may contain color hex or type-size literals:
 | Shared: MAUI kit | `Storyworthtelling.Maui/Resources/Styles/Paper.xaml` — the role table and component styles for the MAUI heads, the counterpart of `Codex.Ui.Android`'s `PaperUi`/`PaperTheme`. Checked against `PaperColorTokens` **by reflection**, not against a second typed copy |
 | Per-app | `*/Design/DesignTokens.cs` + `Resources/Styles/DesignTokens.xaml` — **thin generated re-exports** of the shared tokens (still leak-guard-scanned). **A MAUI head that has adopted the kit above has no token file at all** and is scanned for hexes everywhere; Ledger and Canonizer still carry their own and adopt the kit at their own phases |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
-| Fonts | `/Fonts` — Source Serif 4 (incl. **Black**), Source Sans 3, Cascadia Code, **Pinyon Script** (all OFL). All eight are embedded in `Storyworthtelling.Paper` for the Skia renderers, held by a guard: a face the printing library cannot load is not an error — Skia substitutes one and says nothing, and the page is already printed by the time anyone looks |
+| Fonts | `/Fonts` — Source Serif 4 (incl. **Black**), Source Sans 3, Cascadia Code, **Italianno** (all OFL). All eight are embedded in `Storyworthtelling.Paper` for the Skia renderers, held by a guard: a face the printing library cannot load is not an error — Skia substitutes one and says nothing, and the page is already printed by the time anyone looks |
 | Branding | `/Branding/owner.png` (owner-supplied) |
 
 **Tests (build-failing):** the **contrast** table (all role×tier×profile ≥ AA vs the worst textured/washed pixel); **screen↔document role parity** (every role resolves in both profiles); **generated↔committed parity** (a fresh generator run equals the committed tokens); the **material-legibility** cap; and C#↔XAML parity. A change to this bible is a change to the source spec and the tests, in the same commit.

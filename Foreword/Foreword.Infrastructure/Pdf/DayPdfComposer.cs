@@ -104,7 +104,7 @@ public class DayPdfComposer : IDayPdfComposer
             return;
         }
 
-        var font = SkiaPageLayout.Script(PaperTypeScale.Title);
+        var font = SkiaPageLayout.Script(PaperTypeScale.Voice);
         layout.Advance(4);
         layout.DrawText(voice, font, SkiaPageLayout.Margin, layout.Y,
             DayPageFurniture.ContentWidth(layout), SkiaPageLayout.LineHeight(font),

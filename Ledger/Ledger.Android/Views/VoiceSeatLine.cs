@@ -4,7 +4,7 @@ namespace Index.Android.Views;
 
 /// <summary>
 /// The line a voice seat is shown in (remediation 3.7, mockups 2, 6, 9, 11): the kit's <c>VoiceLabel</c>
-/// — Pinyon Script, ink-blue, the owner's voice and nothing else's style — created hidden and revealed
+/// — Italianno, ink-blue, the owner's voice and nothing else's style — created hidden and revealed
 /// only with a sentence in it. "Hidden" means hidden: no blank gap is left where a line would have been.
 ///
 /// <para>The style is applied when a sentence arrives rather than at construction, because the page builds

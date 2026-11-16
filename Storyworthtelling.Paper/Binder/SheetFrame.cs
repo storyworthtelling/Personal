@@ -47,7 +47,7 @@ public static class SheetFrame
     public static SKFont Sans(float size, bool bold = false) =>
         Font(bold ? EmbeddedTypefaces.SansSemibold : EmbeddedTypefaces.SansRegular, size);
 
-    /// <summary>Pinyon Script — the owner's hand, and nothing else (DESIGN.md §4).</summary>
+    /// <summary>Italianno — the owner's hand, and nothing else (DESIGN.md §4).</summary>
     public static SKFont Script(float size) => Font(EmbeddedTypefaces.Script, size);
 
     public static float LineHeight(SKFont font)
@@ -97,7 +97,7 @@ public static class SheetFrame
 
         // The app's name in the owner's hand — the one place on a document where the app signs it. A title too long to
         // sit beside it is shortened with an ellipsis rather than run under the signature.
-        var script = Script(PaperTypeScale.Title);
+        var script = Script(PaperTypeScale.Voice);
         var serif = Serif(PaperTypeScale.Title);
         var room = width - script.MeasureText(signature.Name) - 12f;
         Text(canvas, Fit(title, serif, room), serif, box, alignRight: false, Ink);

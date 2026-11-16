@@ -7,7 +7,7 @@ namespace Storyworthtelling.Maui;
 ///
 /// <para>Every MAUI head called <c>AddFont</c> itself, and every one of them registered the same
 /// six of the eight fonts in <c>/Fonts</c>. The other two — Source Serif 4 <b>Black</b> and
-/// <b>Pinyon Script</b> — shipped inside every APK and could not be used by anything, because a
+/// <b>Italianno</b> — shipped inside every APK and could not be used by anything, because a
 /// face with no alias is unreachable from XAML. Nothing failed: MAUI silently substitutes the
 /// system face for an unknown family, so Display quietly drew in whatever the head had asked for
 /// instead, and the owner's voice had nowhere to live at all.</para>
@@ -23,6 +23,6 @@ public static class PaperFonts
         fonts.AddFont("SourceSans3-Semibold.ttf", "SansSemibold");
         fonts.AddFont("SourceSerif4-Black.ttf", "SerifBlack");
         fonts.AddFont("CascadiaCode-Regular.ttf", "Mono");
-        fonts.AddFont("PinyonScript-Regular.ttf", "Script");
+        fonts.AddFont("Italianno-Regular.ttf", "Script");
     }
 }

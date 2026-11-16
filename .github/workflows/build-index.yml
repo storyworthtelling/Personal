@@ -164,7 +164,7 @@ jobs:
         run: |
           set -e
           echo "=== FONT CHECK ==="
-          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSerif4-Black SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular PinyonScript-Regular"
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSerif4-Black SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular Italianno-Regular"
           APK=$(ls -1 Ledger.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
           echo "--- $APK"
           ENTRIES=$(unzip -l "$APK")

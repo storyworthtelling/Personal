@@ -112,7 +112,7 @@ public static class PaperTheme
     public static Typeface Mono(Context context) =>
         mono ??= Load(context, DesignTokens.FontAssets.Mono);
 
-    /// <summary>Pinyon Script — reserved for the owner's voice, always in ink-blue.</summary>
+    /// <summary>Italianno — reserved for the owner's voice, always in ink-blue.</summary>
     public static Typeface Script(Context context) =>
         script ??= Load(context, DesignTokens.FontAssets.Script);
 

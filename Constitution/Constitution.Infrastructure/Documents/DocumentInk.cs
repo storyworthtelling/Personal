@@ -26,8 +26,8 @@ internal sealed class DocumentInk : IDisposable
     /// <summary>Cascadia Code on the Title rung: the recipe's step times, 21 points on the counter.</summary>
     public SKFont Time { get; } = new(EmbeddedTypefaces.Mono, PaperTypeScale.Title);
 
-    /// <summary>The owner's hand (Pinyon Script) on the Title rung: the one place the encouragement seat prints.</summary>
-    public SKFont Voice { get; } = new(EmbeddedTypefaces.Script, PaperTypeScale.Title);
+    /// <summary>The owner's hand (Italianno) on the Title rung: the one place the encouragement seat prints.</summary>
+    public SKFont Voice { get; } = new(EmbeddedTypefaces.Script, PaperTypeScale.Voice);
 
     public SKPaint Ink { get; } = Fill(PaperColorTokens.Ink);
     public SKPaint Soft { get; } = Fill(PaperColorTokens.InkSoft);

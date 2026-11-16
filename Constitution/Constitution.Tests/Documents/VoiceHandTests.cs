@@ -27,7 +27,7 @@ public class VoiceHandTests
     {
         var letters = LettersOf(Page(voiced: true));
 
-        Assert.Contains(letters, letter => letter.FontName.Contains("Pinyon", StringComparison.Ordinal));
+        Assert.Contains(letters, letter => letter.FontName.Contains("Italianno", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public class VoiceHandTests
     {
         var letters = LettersOf(Page(voiced: false));
 
-        Assert.DoesNotContain(letters, letter => letter.FontName.Contains("Pinyon", StringComparison.Ordinal));
+        Assert.DoesNotContain(letters, letter => letter.FontName.Contains("Italianno", StringComparison.Ordinal));
     }
 
     [Fact]

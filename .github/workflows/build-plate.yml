@@ -164,7 +164,7 @@ jobs:
       #
       # This lists all EIGHT, where the other workflows list six. The two they omit are the
       # two most visible fonts in the suite: SourceSerif4-Black, which every screen header
-      # renders in, and PinyonScript-Regular, which is the owner's voice. Codex.Ui.Android
+      # renders in, and Italianno-Regular, which is the owner's voice. Codex.Ui.Android
       # globs Fonts/*.ttf so they do ship — but the whole point of this check is the case
       # where the glob's output is misfiled, and it currently would not notice.
       - name: FONT CHECK
@@ -172,7 +172,7 @@ jobs:
         run: |
           set -e
           echo "=== FONT CHECK ==="
-          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSerif4-Black SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular PinyonScript-Regular"
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSerif4-Black SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular Italianno-Regular"
           APK=$(ls -1 Plate.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
           echo "--- $APK"
           ENTRIES=$(unzip -l "$APK")

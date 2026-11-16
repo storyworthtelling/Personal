@@ -5,7 +5,7 @@ namespace Codex.Tests.Plate;
 
 /// <summary>
 /// The owner's voice gets one seat in Plate, exactly as it gets one in Post: the empty
-/// Darkroom. Set in Pinyon Script in ink-blue, the one place in the whole suite that hand
+/// Darkroom. Set in Italianno in ink-blue, the one place in the whole suite that hand
 /// appears.
 /// </summary>
 public class DarkroomVoiceTests
@@ -58,7 +58,7 @@ public class DarkroomVoiceTests
     [Fact]
     public void EveryLineIsShortEnoughToBeSetInAHand()
     {
-        // Pinyon Script at display size across a phone. Past roughly this length it wraps to
+        // Italianno at display size across a phone. Past roughly this length it wraps to
         // three lines and reads as a paragraph in a calligraphy face, which is unreadable.
         Assert.All(DarkroomVoice.EmptyLines, line => Assert.True(line.Length <= 60, line));
     }

@@ -13,7 +13,7 @@ namespace Storyworthtelling.Paper.Tests;
 /// page has already been printed by the time anyone looks at it.</para>
 ///
 /// <para>The two that were missing are the two that carry meaning rather than text.
-/// <b>Pinyon Script is the owner's voice</b> (DESIGN.md §4 reserves it for exactly that, and every
+/// <b>Italianno is the owner's voice</b> (DESIGN.md §4 reserves it for exactly that, and every
 /// mockup of The Day and The Brief draws the narrator in it), and <b>Cascadia is the Mono role</b>,
 /// which the printed type ladder has a registered size for. Both were sitting in /Fonts, shipped in
 /// every app, and unreachable from the one library that prints.</para>
@@ -67,15 +67,20 @@ public class EmbeddedTypefacesTests
     };
 
     /// <summary>
-    /// The owner's voice is Pinyon Script and nothing else. A substituted face here would print the
+    /// The owner's voice is Italianno (owner's choice, W10; it replaced Italianno) and nothing else. A substituted face here would print the
     /// narrator's sentence in the same hand as the rest of the page, which is precisely the
     /// distinction §4 makes.
     /// </summary>
     [Fact]
-    public void TheVoiceIsPinyonScript()
+    public void TheVoiceIsItalianno()
     {
-        Assert.Contains("Pinyon", EmbeddedTypefaces.Script.FamilyName, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Italianno", EmbeddedTypefaces.Script.FamilyName, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>The voice prints a size larger than the Title rung it shared with Italianno (owner, W10): Italianno runs small.</summary>
+    [Fact]
+    public void TheVoicePrintsAtItsOwnRung() =>
+        Assert.Equal(34f * PaperTypeScale.Ratio, PaperTypeScale.Voice);
 
     private static string FontsFolder()
     {

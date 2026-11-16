@@ -69,7 +69,7 @@ public class KitAdoptionTests
     /// <summary>
     /// The eight fonts ship in every APK regardless; what makes them usable is the alias. An
     /// unregistered family is not an error in MAUI — the platform substitutes the system face and
-    /// reports nothing, which is how Serif Black and Pinyon Script were silently absent before.
+    /// reports nothing, which is how Serif Black and Italianno were silently absent before.
     /// </summary>
     [Fact]
     public void TheHeadRegistersTheKitsFonts()

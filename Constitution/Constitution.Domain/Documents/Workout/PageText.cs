@@ -9,7 +9,7 @@ namespace Constitution.Domain.Documents;
 /// </summary>
 internal static class PageText
 {
-    /// <summary>Pinyon Script on the Title rung runs about 7.1 points a character; 34 fills 241 of the 270 column.</summary>
+    /// <summary>Italianno on the Title rung runs about 7.1 points a character; 34 fills 241 of the 270 column.</summary>
     public const int VoiceLineChars = 34;
 
     /// <summary>Body text in the 270 point column.</summary>

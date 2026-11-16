@@ -62,7 +62,7 @@ public sealed class PrayerPages : IPrayerPdfComposer, IPrayerReader
             return;
         }
 
-        var font = SkiaPageLayout.Script(PaperTypeScale.Title);
+        var font = SkiaPageLayout.Script(PaperTypeScale.Voice);
 
         layout.Advance(LeadGap);
 

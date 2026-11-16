@@ -28,7 +28,7 @@ internal static class ChecklistPage
     {
         if (!string.IsNullOrWhiteSpace(voice))
         {
-            var voiceFont = SkiaPageLayout.Script(PaperTypeScale.Title);
+            var voiceFont = SkiaPageLayout.Script(PaperTypeScale.Voice);
             layout.Advance(4);
             layout.DrawText(voice, voiceFont, SkiaPageLayout.Margin, layout.Y,
                 DayPageFurniture.ContentWidth(layout), SkiaPageLayout.LineHeight(voiceFont),
