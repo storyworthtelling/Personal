@@ -2277,6 +2277,9 @@ public sealed class ReviewProcessor : IPipelineStep
                 synthesis.Verdict);
 
         // What the last draft's plan asked for that no read raises now (R19).
+        var table = RoundTableCodec.Read(analysis.RoundTableJson);
+        if (table.Closed)
+            folded = folded with { RoundTable = table };
         return synthesis.Fixed is { Count: > 0 } ? folded with { FixedSincePrevious = synthesis.Fixed } : folded;
     }
 

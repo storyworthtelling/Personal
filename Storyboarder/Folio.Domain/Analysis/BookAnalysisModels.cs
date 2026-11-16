@@ -400,6 +400,12 @@ public sealed record BookAnalysisResult(
     /// </summary>
     public IReadOnlyList<RevisionItem> FixedSincePrevious { get; init; } = [];
 
+    /// <summary>
+    /// The readers' round table (release H), once it has closed; null on a report from before it, which
+    /// prints its verdict instead. Folded in at render from the draft's stored table.
+    /// </summary>
+    public Folio.Domain.Reading.RoundTable? RoundTable { get; init; }
+
     public BookAnalysisResult WithSceneJudgements(IReadOnlyList<Scenes.SceneJudgement> judgements) =>
         this with { SceneJudgements = judgements };
 

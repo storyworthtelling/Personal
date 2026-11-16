@@ -502,6 +502,11 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal("Goodnight, everyone.", table.Turns[^1].Words);
         Assert.Equal(["Whether it sells"], table.Summary!.StillDiffer);
         Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
+
+        // And the report prints it in the verdict's place.
+        var report = ReportText(id);
+        Assert.Contains("Hugo Hook says the gate scene sold them.", report, StringComparison.Ordinal);
+        Assert.Contains("Where they still differ", report, StringComparison.Ordinal);
     }
 
     /// <summary>A turn that fails is tried again on its own: the show resumes, it does not start over.</summary>

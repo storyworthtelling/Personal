@@ -203,8 +203,12 @@ public sealed class AnalysisDocumentRenderer
         // What to do next: the revision plan, grouped by impact tier.
         RenderRevisionPlan(writer, analysis, marked.Findings, review, body, h2, h3);
 
-        // The candid state of the draft, last.
-        RenderVerdict(writer, analysis.Verdict, cover, body, bodyBold, bodyItalic, h2);
+        // The readers in conversation, last (release H): it replaces the verdict (R32). A report from before
+        // the round table keeps its verdict.
+        if (analysis.RoundTable is { Closed: true, Turns.Count: > 0 } table)
+            RenderRoundTable(writer, table, cover, body, bodyBold, h3);
+        else
+            RenderVerdict(writer, analysis.Verdict, cover, body, bodyBold, bodyItalic, h2);
 
     }
 
@@ -744,6 +748,48 @@ public sealed class AnalysisDocumentRenderer
     /// single action: if the verdict cannot say that in one sentence, the sections above it have not
     /// finished their job.</para>
     /// </summary>
+    /// <summary>
+    /// The round table (R40–R41): the transcript, each line led by its speaker's name and nothing else, then
+    /// where the readers ended up. It lays the splits out and rules on none (R32).
+    /// </summary>
+    private static void RenderRoundTable(
+        PageWriter writer, Folio.Domain.Reading.RoundTable table, ReportCover cover, SKFont body, SKFont bodyBold, SKFont h3)
+    {
+        writer.NewPage();
+        writer.BeginSection(FolioSheet.RoundTable);
+        writer.PageLabel("Round table");
+        writer.Paragraph(
+            $"The readers in conversation, hosted by {Folio.Domain.Reading.RoundTablePlan.HostName}. Each kept the score of "
+            + "their own read; a point given up here is given up in words.", body, ReportPalette.InkSoft);
+        writer.Gap(PageGeometry.TightGap);
+
+        foreach (var turn in table.Turns)
+        {
+            writer.KeepTogether(bodyBold.Size * PageGeometry.LineSpacing * 2);
+            writer.Paragraph(Folio.Domain.Reading.RoundTablePlan.Name(turn.Speaker), bodyBold, Ink);
+            writer.Paragraph(turn.Words, body, Ink);
+        }
+
+        if (table.Summary is { } summary && (summary.Agreed.Count > 0 || summary.StillDiffer.Count > 0))
+        {
+            writer.Gap(PageGeometry.BlockGap);
+            if (summary.Agreed.Count > 0)
+            {
+                writer.Heading("Where they agree", h3, Ink);
+                foreach (var point in summary.Agreed)
+                    writer.Bullet(point, body, Ink);
+            }
+            if (summary.StillDiffer.Count > 0)
+            {
+                writer.Heading("Where they still differ", h3, Ink);
+                foreach (var point in summary.StillDiffer)
+                    writer.Bullet(point, body, Ink);
+            }
+        }
+
+        Colophon(writer, cover);
+    }
+
     private static void RenderVerdict(
         PageWriter writer, Verdict verdict, ReportCover cover,
         SKFont body, SKFont bodyBold, SKFont bodyItalic, SKFont h2)
