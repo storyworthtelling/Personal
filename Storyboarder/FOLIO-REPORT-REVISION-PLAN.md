@@ -50,8 +50,10 @@ is why release A comes first.
 ## 2. Rulings (owner's answers, numbered for reference)
 
 **Scenes**
-- R1. Scene breaks come only from the text: **chapter breaks, divider glyph lines, two or more blank
-  lines, and horizontal rules**. A single blank line is a paragraph break, not a scene break.
+- R1. Scene breaks come only from the text: **chapter breaks, page breaks, divider glyph lines, two or
+  more blank lines, and horizontal rules**. A single blank line is a paragraph break, not a scene break.
+  (Page breaks were in the owner's first answer; the plan had dropped them.) A PDF's page edges are
+  layout, not authorship, so a PDF source breaks on its text alone.
 - R2. A chapter with **no breaks is one scene** (one block, one image). No splitting by length, and no
   Claude fallback.
 - R3. The scene block stays **after** the scene.

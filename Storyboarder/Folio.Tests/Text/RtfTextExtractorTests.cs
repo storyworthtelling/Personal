@@ -50,4 +50,12 @@ public class RtfTextExtractorTests
     {
         Assert.Equal(string.Empty, RtfTextExtractor.Extract(string.Empty));
     }
+
+    [Fact]
+    public void WritesAPageBreak_AsADividerLine()
+    {
+        var text = RtfTextExtractor.Extract(@"{\rtf1\ansi Scene one.\par\page Scene two.\par}");
+
+        Assert.Equal(2, new SceneDetector().Detect(text, []).Count);
+    }
 }

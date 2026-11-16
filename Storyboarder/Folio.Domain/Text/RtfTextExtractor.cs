@@ -135,6 +135,11 @@ public static class RtfTextExtractor
             case "line":
                 emit('\n');
                 break;
+            case "page":
+                // A page break is the author's scene break (R1): a divider line of its own.
+                foreach (var c in "\n" + SceneBreak.Divider + "\n")
+                    emit(c);
+                break;
             case "tab":
                 emit('\t');
                 break;
