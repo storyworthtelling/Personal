@@ -201,7 +201,7 @@ public sealed class AnalysisDocumentRenderer
         RenderReviews(writer, analysis.Reviews, length, review.PreviousReaderScores, body, bodyBold, bodyItalic, h2, h3, readerFolios);
 
         // What to do next: the revision plan, grouped by impact tier.
-        RenderRevisionPlan(writer, analysis.RevisionPlan, body, h2, h3);
+        RenderRevisionPlan(writer, analysis, marked.Findings, review, body, h2, h3);
 
         // The candid state of the draft, last.
         RenderVerdict(writer, analysis.Verdict, cover, body, bodyBold, bodyItalic, h2);
@@ -622,10 +622,18 @@ public sealed class AnalysisDocumentRenderer
     /// through the manuscript, not three.</para>
     /// </summary>
     private static void RenderRevisionPlan(
-        PageWriter writer, IReadOnlyList<RevisionItem> plan, SKFont body, SKFont h2, SKFont h3)
+        PageWriter writer, BookAnalysisResult analysis, IReadOnlyList<FindingEntry> catalogue, DraftReview review,
+        SKFont body, SKFont h2, SKFont h3)
     {
-        if (plan is not { Count: > 0 })
+        var plan = analysis.RevisionPlan ?? [];
+        var fixedItems = analysis.FixedSincePrevious ?? [];
+        if (plan.Count == 0 && fixedItems.Count == 0)
             return;
+
+        // On a later draft each item says where it stands against the last one (R19).
+        var laterDraft = review.DraftNumber > 1;
+        string? Standing(RevisionItem item) =>
+            PlanProgress.Since(item, catalogue, review.Findings, laterDraft) is { } since ? PlanProgress.Words(since) : null;
 
         writer.NewPage();
         writer.BeginSection(FolioSheet.Plan);
@@ -650,7 +658,7 @@ public sealed class AnalysisDocumentRenderer
                 var place = writer.FirstPlace(item.Draws ?? []);
                 writer.CheckItem(
                     Sentences(item.Issue, item.SuggestedFix),
-                    place is { } at ? Join(item.Chapter, $"page {at.Folio}") : item.Chapter,
+                    Join(item.Chapter, place is { } at ? $"page {at.Folio}" : null, Standing(item)),
                     Chip(tier), place?.Destination);
             }
         }
@@ -666,9 +674,20 @@ public sealed class AnalysisDocumentRenderer
                 var place = writer.FirstPlace(item.Draws ?? []);
                 writer.CheckItem(
                     Sentences(item.Issue, item.SuggestedFix),
-                    Join(item.Priority, item.Chapter, place is { } at ? $"page {at.Folio}" : null),
+                    Join(item.Priority, item.Chapter, place is { } at ? $"page {at.Folio}" : null, Standing(item)),
                     Chip("Consider"), place?.Destination);
             }
+        }
+
+        // What the last draft's plan asked for and no read raises now, ticked (R19).
+        if (laterDraft && fixedItems.Count > 0)
+        {
+            writer.Hairline();
+            writer.Heading("Fixed since the last draft", h3, Ink);
+            writer.Continues("Fixed since the last draft");
+            foreach (var item in fixedItems)
+                writer.CheckItem(
+                    Sentences(item.Issue, item.SuggestedFix), item.Chapter, ReportPalette.Great, ticked: true);
         }
 
         writer.Continues(null);

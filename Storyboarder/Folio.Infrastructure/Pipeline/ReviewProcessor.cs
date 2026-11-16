@@ -1211,6 +1211,7 @@ public sealed class ReviewProcessor : IPipelineStep
                                     db, novel, analysis, novel.WordCount,
                                     await SceneJudgements(db, novel.Id, cancellationToken),
                                     SynthesisRead.Empty, cancellationToken)),
+                            due.Id == "verdict" ? [] : await PreviousPlan(db, novel, cancellationToken),
                             cancellationToken),
                         JsonResponse.CaseInsensitive)
                     : due.Persona!.Kind == PersonaKind.Reader
@@ -2002,7 +2003,8 @@ public sealed class ReviewProcessor : IPipelineStep
                 synthesis.RevisionPlan,
                 synthesis.Verdict);
 
-        return folded;
+        // What the last draft's plan asked for that no read raises now (R19).
+        return synthesis.Fixed is { Count: > 0 } ? folded with { FixedSincePrevious = synthesis.Fixed } : folded;
     }
 
     /// <summary>Each judged scene's judgement, in reading order, without loading its picture.</summary>
@@ -2041,8 +2043,8 @@ public sealed class ReviewProcessor : IPipelineStep
             ? []
             : await db.Scenes
                 .Where(s => priorIds.Contains(s.Id))
-                .Select(s => new { s.Id, s.ImagePath })
-                .ToDictionaryAsync(s => s.Id, s => s.ImagePath, cancellationToken);
+                .Select(s => new { s.Id, s.ImagePath, s.JudgementJson })
+                .ToDictionaryAsync(s => s.Id, s => (s.ImagePath, s.JudgementJson), cancellationToken);
 
         var evidence = new List<SceneEvidence>(scenes.Count);
         for (var i = 0; i < scenes.Count; i++)
@@ -2059,10 +2061,15 @@ public sealed class ReviewProcessor : IPipelineStep
                 path is not null && imageStore.Exists(path) ? imageStore.Read(path) : null;
 
             byte[]? previous = null;
+            SceneJudgement? previousJudgement = null;
             if (scene.Changed && scene.PreviousSceneId is { } priorId
-                && priorPaths.TryGetValue(priorId, out var priorPath))
+                && priorPaths.TryGetValue(priorId, out var prior))
             {
-                previous = Read(priorPath);
+                previous = Read(prior.ImagePath);
+                // The last draft's verdict on the scene this one was matched to (R19).
+                previousJudgement = prior.JudgementJson is null
+                    ? null
+                    : JsonSerializer.Deserialize<SceneJudgement>(prior.JudgementJson, JsonResponse.CaseInsensitive);
             }
 
             evidence.Add(new SceneEvidence(
@@ -2072,6 +2079,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 // Where the scene ends, so its block is inserted under its own last line.
                 EndOffset = scene.EndOffset,
                 Judgement = judgement,
+                PreviousJudgement = previousJudgement,
             });
         }
         return evidence;
@@ -2475,6 +2483,7 @@ public sealed class ReviewProcessor : IPipelineStep
             .ToListAsync(cancellationToken);
 
         var plan = new List<RevisionItem>();
+        var fixedItems = new List<RevisionItem>();
         var verdict = Verdict.Empty;
         foreach (var row in rows)
         {
@@ -2484,13 +2493,37 @@ public sealed class ReviewProcessor : IPipelineStep
                 continue;
             }
             plan.AddRange(read.RevisionPlan);
+            fixedItems.AddRange(read.Fixed ?? []);
             if (!string.IsNullOrWhiteSpace(read.Verdict.MostNeeds)
                 || read.Verdict.Strengths is { Count: > 0 } || read.Verdict.Problems is { Count: > 0 })
             {
                 verdict = read.Verdict;
             }
         }
-        return new SynthesisRead(plan, verdict);
+        return new SynthesisRead(plan, verdict) { Fixed = fixedItems };
+    }
+
+    /// <summary>
+    /// The last draft's revision plan, for this draft's plan pass to compare against (R19): its own plan
+    /// pass if it ran one, else the plan its consolidation wrote. Empty on a first draft.
+    /// </summary>
+    private static async Task<IReadOnlyList<RevisionItem>> PreviousPlan(
+        FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        if (novel.PreviousDraftId is not { } previousId)
+            return [];
+
+        var read = await ReadSynthesis(db, previousId, cancellationToken);
+        if (read.RevisionPlan.Count > 0)
+            return read.RevisionPlan;
+
+        var stored = await db.BookAnalyses
+            .Where(analysis => analysis.NovelId == previousId)
+            .Select(analysis => analysis.ConsolidatedJson)
+            .FirstOrDefaultAsync(cancellationToken);
+        return stored is null
+            ? []
+            : JsonSerializer.Deserialize<BookAnalysisResult>(stored, JsonResponse.CaseInsensitive)?.RevisionPlan ?? [];
     }
 
 }

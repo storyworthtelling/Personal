@@ -303,7 +303,15 @@ above it (`ChartLabels`), so a crowded chart takes another lane rather than over
      `ChapterTension`.
    - Labels placed so they do not collide.
 
-### Release F — What changed since the last draft (R19)
+### Release F — What changed since the last draft (R19) — **built**
+
+How it was built: an item resting on findings Folio tracks across drafts takes its mark from their threads
+(regressed outranks still open, which outranks new); the threads cover only the four consolidated lists, so
+an item resting on none takes the plan pass's own word, the pass being shown the last draft's plan and asked
+for "since" per item and the numbers of the last plan's items now fixed (`PlanProgress`). Fixed items print
+in their own list with their boxes ticked. Readers needed nothing new: the score movement and B4's history
+chart were already shipped.
+
 1. **Plan:** each item is marked fixed, still open or regressed against the last draft, from the finding
    threads Folio already tracks (`New`/`Carried`/`Regressed`; fixed is a thread's absence).
 2. **Manuscript:** a changed scene's block shows its previous verdict beside the new one, next to the

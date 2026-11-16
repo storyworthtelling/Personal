@@ -198,6 +198,12 @@ public sealed record RevisionItem(
     /// Empty on a plan written before items carried them.
     /// </summary>
     public IReadOnlyList<string> Draws { get; init; } = [];
+
+    /// <summary>
+    /// The plan pass's own word for how this item stands against the last draft's plan — "new", "open" or
+    /// "regressed" (R19). Read through <see cref="Report.PlanProgress"/>, where tracked threads outrank it.
+    /// </summary>
+    public string Since { get; init; } = string.Empty;
 }
 
 // What is actually wrong with a line edit's sentence — so the manuscript's margin note can say
@@ -387,6 +393,12 @@ public sealed record BookAnalysisResult(
     /// judged one by one.
     /// </summary>
     public IReadOnlyList<Scenes.SceneJudgement> SceneJudgements { get; init; } = [];
+
+    /// <summary>
+    /// The last draft's plan items this draft has fixed (R19), printed under the plan with their boxes
+    /// ticked. Empty on a first draft.
+    /// </summary>
+    public IReadOnlyList<RevisionItem> FixedSincePrevious { get; init; } = [];
 
     public BookAnalysisResult WithSceneJudgements(IReadOnlyList<Scenes.SceneJudgement> judgements) =>
         this with { SceneJudgements = judgements };

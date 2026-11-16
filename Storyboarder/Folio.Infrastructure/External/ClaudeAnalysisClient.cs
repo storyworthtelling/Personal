@@ -1027,6 +1027,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "\"draws\", copy the ids of the findings each item rests on, most telling first — the author follows "
         + "the first one to the page — and leave it empty when no listed finding is behind the item.";
 
+    // Said only on a later draft, after the plan's own instruction (R19).
+    private const string ComparisonInstruction =
+        " You are also given \"previousPlan\": the last draft's plan, numbered. Add to each item \"since\": "
+        + "\"new\" if the last plan had nothing like it, \"open\" if the last plan raised it and it still stands, or "
+        + "\"regressed\" if the last draft had fixed it or made it smaller and it has come back or grown. And add, "
+        + "beside revisionPlan, \"fixed\": the numbers of the last plan's items that no read raises any more.";
+
     private static string VerdictInstruction(StoryLength length) =>
         $"You are given {Spelled(PersonaCatalogue.All.Count)} independent reads of one {ManuscriptLength.Noun(length)}. Write the candid "
         + "state of this draft. "
@@ -1114,6 +1121,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         IReadOnlyList<Review> readers,
         int wordCount,
         IReadOnlyList<FindingEntry> findings,
+        IReadOnlyList<RevisionItem> previousPlan,
         CancellationToken cancellationToken)
     {
         // The synthesis passes read the other fourteen rather than the manuscript, so they carry no
@@ -1123,10 +1131,21 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         {
             id = entry.Key, kind = entry.Label, chapter = entry.Chapter, severity = entry.Severity.ToString(), note = entry.Text,
         });
-        var evidence = JsonSerializer.Serialize(new { sections, readers, findings = listed }, JsonResponse.CaseInsensitive);
+        // On a later draft the plan is also shown the last plan, numbered, to say where each item stands
+        // against it and which of its items are now fixed (R19).
+        IReadOnlyList<RevisionItem> previous = passId == "verdict" ? [] : previousPlan ?? [];
+        var evidence = previous.Count == 0
+            ? JsonSerializer.Serialize(new { sections, readers, findings = listed }, JsonResponse.CaseInsensitive)
+            : JsonSerializer.Serialize(new
+            {
+                sections, readers, findings = listed,
+                previousPlan = previous.Select((item, i) => new { number = i + 1, item.Priority, item.Chapter, item.Issue }),
+            }, JsonResponse.CaseInsensitive);
         var known = (findings ?? []).Select(entry => entry.Key).ToHashSet(StringComparer.Ordinal);
         var length = ManuscriptLength.Classify(wordCount);
-        var instruction = passId == "verdict" ? VerdictInstruction(length) : RevisionPlanInstruction(length);
+        var instruction = passId == "verdict"
+            ? VerdictInstruction(length)
+            : RevisionPlanInstruction(length) + (previous.Count == 0 ? string.Empty : ComparisonInstruction);
         var reply = await SendMessage(
             instruction, evidence, cancellationToken, options.PassMaxTokens, model: options.StrongModel);
 
@@ -1144,6 +1163,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                 {
                     // Only ids it was shown: a made-up one would be a link to nowhere.
                     Draws = [.. (item.Draws ?? []).Where(key => known.Contains(key)).Distinct()],
+                    Since = item.Since?.Trim() ?? string.Empty,
                 }).ToList(),
             dto?.Verdict is { } verdict
                 ? new Verdict(verdict.Strengths ?? [], verdict.Problems ?? [], verdict.MostNeeds ?? string.Empty)
@@ -1151,7 +1171,11 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
                     Standing = verdict.Standing ?? string.Empty,
                     Reading = verdict.Reading ?? string.Empty,
                 }
-                : Verdict.Empty);
+                : Verdict.Empty)
+        {
+            // Only numbers it was shown: a made-up one names nothing.
+            Fixed = [.. (dto?.Fixed ?? []).Distinct().Where(n => n >= 1 && n <= previous.Count).Select(n => previous[n - 1])],
+        };
     }
 
     /// <summary>
@@ -1690,6 +1714,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class SynthesisDto
     {
+        public List<int>? Fixed { get; set; }
         public List<RevisionItemDto>? RevisionPlan { get; set; }
         public VerdictDto? Verdict { get; set; }
     }
@@ -1727,6 +1752,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private sealed class RevisionItemDto
     {
+        public string? Since { get; set; }
         public List<string>? Draws { get; set; }
         public string? Priority { get; set; }
         public string? Chapter { get; set; }

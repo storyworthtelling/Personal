@@ -46,6 +46,7 @@ public class ReviewProcessorTests : IDisposable
     private readonly List<string> synthesisReads = [];
     private int sectionsSeenBySynthesis;
     private IReadOnlyList<Folio.Domain.Markup.FindingEntry> findingsSeenByPlan = [];
+    private IReadOnlyList<RevisionItem> previousPlanSeen = [];
     private int readersSeenBySynthesis;
 
     public ReviewProcessorTests()
@@ -84,13 +85,18 @@ public class ReviewProcessorTests : IDisposable
 
         claude.Setup(c => c.Synthesise(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<SectionRead>>(), It.IsAny<IReadOnlyList<Review>>(),
-                It.IsAny<int>(), It.IsAny<IReadOnlyList<Folio.Domain.Markup.FindingEntry>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<int>(), It.IsAny<IReadOnlyList<Folio.Domain.Markup.FindingEntry>>(),
+                It.IsAny<IReadOnlyList<RevisionItem>>(), It.IsAny<CancellationToken>()))
             .Returns((string passId, IReadOnlyList<SectionRead> sections, IReadOnlyList<Review> readers, int _,
-                IReadOnlyList<Folio.Domain.Markup.FindingEntry> findings, CancellationToken _) =>
+                IReadOnlyList<Folio.Domain.Markup.FindingEntry> findings, IReadOnlyList<RevisionItem> previousPlan,
+                CancellationToken _) =>
             {
                 synthesisReads.Add(passId);
                 if (passId != "verdict")
+                {
                     findingsSeenByPlan = findings;
+                    previousPlanSeen = previousPlan;
+                }
                 sectionsSeenBySynthesis = sections.Count;
                 readersSeenBySynthesis = readers.Count;
                 return Task.FromResult(passId == "verdict"
@@ -1058,6 +1064,40 @@ public class ReviewProcessorTests : IDisposable
         Assert.Single(changed);
         Assert.All(scenes, s => Assert.NotNull(s.PreviousSceneId));   // both matched a prior scene
         Assert.All(scenes, s => Assert.Equal(WorkStatus.Completed, s.ImageStatus));
+    }
+
+    /// <summary>The second draft's plan pass is shown the first draft's plan to compare against (R19).</summary>
+    [Fact]
+    public async Task SecondDraft_ThePlanPassSeesTheLastPlan()
+    {
+        const string text = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        var firstId = SeedManuscript(text);
+        await DriveToCompletion(NewProcessor());
+        Assert.Empty(previousPlanSeen);
+
+        SeedNextDraft(firstId, text);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal("The middle", Assert.Single(previousPlanSeen).Issue);
+    }
+
+    /// <summary>
+    /// A changed scene's block prints the last draft's verdict beside this one's (R19), read off the scene it
+    /// was matched to; an unchanged scene's block does not, since nothing about it moved.
+    /// </summary>
+    [Fact]
+    public async Task SecondDraft_AChangedScenesBlockCarriesItsLastVerdict()
+    {
+        const string first = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked.";
+        const string second = "The knight rode to the castle.\n\n* * *\n\nAt the gate, he knocked loudly and waited in the cold.";
+        var firstId = SeedManuscript(first);
+        await DriveToCompletion(NewProcessor());
+
+        var secondId = SeedNextDraft(firstId, second);
+        await DriveToCompletion(NewProcessor());
+
+        var text = ReportText(secondId);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "Last draft"));
     }
 
     /// <summary>

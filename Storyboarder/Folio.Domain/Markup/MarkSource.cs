@@ -200,7 +200,7 @@ public static partial class MarkSource
             placer.Place(
                 source, MarkKind.Query, label, finding.Excerpt, detail, finding.Chapter,
                 Severity(finding.Severity, finding.Chapter, analysis), fallsBackToChapter: true, unplaced: detail,
-                keyText: finding.Detail);
+                keyText: finding.Detail, category: category);
         }
     }
 
@@ -295,13 +295,17 @@ public static partial class MarkSource
 
         public void Place(
             string source, MarkKind kind, string label, string? excerpt, string? reason, string? chapter,
-            ReadinessTier severity, bool fallsBackToChapter, string? unplaced, string? keyText = null)
+            ReadinessTier severity, bool fallsBackToChapter, string? unplaced, string? keyText = null,
+            FindingCategory? category = null)
         {
             // The key is the finding as it was found — before any draft-status tag is added to the reason,
             // since the plan is written before the report is drawn (R15).
             var said = keyText ?? reason;
             var key = FindingKey.Of(source, label, chapter, excerpt, said);
-            findings.Add(new FindingEntry(key, source, label, chapter ?? string.Empty, Join(Quoted(excerpt), said), severity));
+            findings.Add(new FindingEntry(key, source, label, chapter ?? string.Empty, Join(Quoted(excerpt), said), severity)
+            {
+                Category = category, Said = said ?? string.Empty,
+            });
 
             if (index?.Find(excerpt) is { } span)
             {

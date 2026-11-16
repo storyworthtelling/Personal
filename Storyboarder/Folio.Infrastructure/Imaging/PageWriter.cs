@@ -928,7 +928,7 @@ internal sealed class PageWriter : IDisposable
     /// </summary>
     public void Continues(string? heading) => continuation = heading;
 
-    public void CheckItem(string action, string citation, SKColor chip, string? destination = null)
+    public void CheckItem(string action, string citation, SKColor chip, string? destination = null, bool ticked = false)
     {
         using var body = ReportType.Body();
         using var small = ReportType.Small();
@@ -965,6 +965,22 @@ internal sealed class PageWriter : IDisposable
         canvas.DrawRoundRect(
             new SKRect(ContentLeft, top + 1f, ContentLeft + PageGeometry.PenBox, top + 1f + PageGeometry.PenBox),
             1.4f, 1.4f, boxPaint);
+
+        // A fixed item's box comes already ticked (R19), in the Positive mark.
+        if (ticked)
+        {
+            using var tick = new SKPaint
+            {
+                Color = ReportPalette.Great, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.6f,
+                StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round,
+            };
+            var box = PageGeometry.PenBox;
+            using var path = new SKPath();
+            path.MoveTo(ContentLeft + (box * 0.22f), top + 1f + (box * 0.52f));
+            path.LineTo(ContentLeft + (box * 0.42f), top + 1f + (box * 0.74f));
+            path.LineTo(ContentLeft + (box * 0.80f), top + 1f + (box * 0.26f));
+            canvas.DrawPath(path, tick);
+        }
 
         using var ink = new SKPaint { Color = ReportPalette.Ink, IsAntialias = true };
         using var muted = new SKPaint { Color = ReportPalette.InkMuted, IsAntialias = true };

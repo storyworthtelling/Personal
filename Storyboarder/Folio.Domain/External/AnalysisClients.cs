@@ -179,7 +179,9 @@ public interface IClaudeAnalysisClient
     /// manuscript's own measured length — not re-derived here, since the passes never see the
     /// manuscript itself — so the prompt can call the book what it actually is (short story, novella,
     /// or novel) rather than assuming "novel". <paramref name="findings"/> is every finding written on the
-    /// manuscript, keyed, so each plan item can name the ones it draws on (R15); the verdict is given none.
+    /// manuscript, keyed, so each plan item can name the ones it draws on (R15); <paramref name="previousPlan"/>
+    /// is the last draft's plan, empty on a first draft, so the plan can say what is new, still open, regressed
+    /// or fixed (R19). The verdict is given neither.
     /// </summary>
     Task<SynthesisRead> Synthesise(
         string passId,
@@ -187,6 +189,7 @@ public interface IClaudeAnalysisClient
         IReadOnlyList<Review> readers,
         int wordCount,
         IReadOnlyList<Markup.FindingEntry> findings,
+        IReadOnlyList<RevisionItem> previousPlan,
         CancellationToken cancellationToken);
 }
 
