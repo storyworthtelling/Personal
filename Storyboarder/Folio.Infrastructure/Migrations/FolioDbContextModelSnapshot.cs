@@ -400,6 +400,18 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<long?>("RateLimitedUntilUtc")
                         .HasColumnType("INTEGER");
 
+                    b.Property<long?>("RegeneratedAtUtc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Regenerating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RegenerationRank")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("RegenerationReset")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long?>("RetryNotBeforeUtc")
                         .HasColumnType("INTEGER");
 

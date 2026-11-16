@@ -105,6 +105,23 @@ public class DiagnosticsTests : IDisposable
             "The Salt Line — Draft 3 — Revision report.pdf", await Report(), StringComparison.Ordinal);
     }
 
+    /// <summary>A regenerated book says so in the export, with the Drive file its report replaced (release R).</summary>
+    [Fact]
+    public async Task ARegeneratedBookIsListedWithItsDriveFile()
+    {
+        Seed(new BookAnalysis { PdfStatus = WorkStatus.Completed, PdfPath = "p.pdf", ArchivedDriveFileId = "drive-file-id" });
+        using (var context = database.NewContext())
+        {
+            context.Novels.Single().RegeneratedAtUtc = clock.UtcNow;
+            context.SaveChanges();
+        }
+
+        var report = await Report();
+
+        Assert.Contains("Regenerated:", report, StringComparison.Ordinal);
+        Assert.Contains("drive-file-id", report, StringComparison.Ordinal);
+    }
+
     private Task<string> Report() =>
         new ProjectService(database, docs.Object, imageStore, clock, Options.Create(new RateLimitOptions()))
             .BuildDiagnosticsReportAsync(

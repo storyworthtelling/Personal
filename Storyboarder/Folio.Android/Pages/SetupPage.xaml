@@ -107,6 +107,16 @@
                 </VerticalStackLayout>
             </kit:SettingsGroup>
 
+            <kit:SettingsGroup Title="Reports">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Rewrite the reports of the books already reviewed in the current form: scenes from your own breaks, the seven readers, the round table, the series bible. Each book's latest draft is read again and its report in Drive is replaced; nothing is sent to the reMarkable."
+                           Style="{StaticResource SecondaryLabel}" />
+                    <Button x:Name="RegenerateButton" Text="Regenerate reviewed books"
+                            Clicked="OnRegenerateClicked" Style="{StaticResource SecondaryButton}" />
+                    <Label x:Name="RegenerateStatusLabel" Style="{StaticResource StatusLine}" />
+                </VerticalStackLayout>
+            </kit:SettingsGroup>
+
             <kit:SettingsGroup Title="Progress backup">
                 <VerticalStackLayout Spacing="16">
                     <Label Text="Save your whole library — every conversion and rendered page — to a file you choose. If you reinstall the app or move to a new phone, restore the file to pick up a long conversion where you left off."

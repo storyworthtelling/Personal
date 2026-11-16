@@ -656,6 +656,47 @@ public sealed class ProjectService
         return true;
     }
 
+    /// <summary>
+    /// The books that can be regenerated (release R): each project's latest live draft, when that draft has
+    /// finished and has a report. A book whose latest draft is still being read has nothing to regenerate.
+    /// </summary>
+    public async Task<IReadOnlyList<RegenerationItem>> RegenerationCandidatesAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var latest = (await LatestDraftsAsync(db, cancellationToken)).Select(draft => draft.Id).ToList();
+        var books = await db.Novels
+            .Where(n => latest.Contains(n.Id) && n.Stage == ProjectStage.Completed && !n.Regenerating)
+            .Where(n => db.BookAnalyses.Any(a => a.NovelId == n.Id && a.ConsolidatedJson != null))
+            .Select(n => new { n.Id, n.Title, n.DraftNumber, n.WordCount, n.SeriesId, n.SeriesSequence, n.PlacementJson, n.CreatedAtUtc })
+            .ToListAsync(cancellationToken);
+        return RegenerationPlan.Order([.. books.OrderBy(n => n.CreatedAtUtc).Select(n => new RegenerationCandidate(
+            n.Id, n.Title, n.DraftNumber, n.WordCount, n.SeriesId, n.SeriesSequence, StoryPlacementCodec.Read(n.PlacementJson)))]);
+    }
+
+    /// <summary>
+    /// Starts regenerating every candidate (release R), the owner having seen the list and the estimate. The
+    /// worker resets each draft and reads it again in place; a series waits in story order. Returns how many.
+    /// </summary>
+    public async Task<int> StartRegenerationAsync(CancellationToken cancellationToken)
+    {
+        var books = await RegenerationCandidatesAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        foreach (var item in books)
+        {
+            var novel = await db.Novels.FirstAsync(n => n.Id == item.Book.DraftId, cancellationToken);
+            novel.Regenerating = true;
+            novel.RegenerationReset = false;
+            novel.RegenerationRank = item.Rank;
+            novel.Stage = ProjectStage.RenderingSceneImages;
+            novel.StageAttempts = 0;
+            novel.LastError = null;
+            novel.RetryNotBeforeUtc = null;
+            novel.UpdatedAtUtc = clock.UtcNow;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        return books.Count;
+    }
+
     private sealed record DraftStub(Guid Id, Guid ProjectId, int DraftNumber, DateTimeOffset CreatedAtUtc, DateTimeOffset? ShelvedAtUtc);
 
     /// <summary>
@@ -1261,6 +1302,15 @@ public sealed class ProjectService
             report.AppendLine($"  Stage: {novel.Stage}    Updated: {novel.UpdatedAtUtc:yyyy-MM-dd HH:mm:ss}Z");
             if (!string.IsNullOrEmpty(novel.LastError))
                 report.AppendLine($"  Novel error: {Truncate(novel.LastError)}");
+            // Release R: a regenerated report says when, and which Drive file it replaced.
+            if (novel.Regenerating)
+                report.AppendLine("  Regenerating: waiting its turn or in progress; nothing is sent to the reMarkable");
+            if (novel.RegeneratedAtUtc is { } regenerated)
+            {
+                var driveFile = await db.BookAnalyses.Where(a => a.NovelId == novel.Id)
+                    .Select(a => a.ArchivedDriveFileId).FirstOrDefaultAsync(cancellationToken);
+                report.AppendLine($"  Regenerated: {regenerated:yyyy-MM-dd HH:mm}Z    Drive file: {driveFile ?? "not in Drive"}");
+            }
 
             await AppendPhase(report, "Chunks", db.Chunks.Where(c => c.NovelId == novel.Id),
                 c => c.AnalysisStatus, c => c.LastError, cancellationToken);

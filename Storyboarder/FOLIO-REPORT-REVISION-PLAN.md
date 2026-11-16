@@ -452,7 +452,32 @@ How it was built:
 7. **Status.** `ReadingPlan`, the desk's status (for example "Round table — turn 12 of about 30") and the
    run estimate are updated for the new passes.
 
-### Release R — Regenerate the books already reviewed (owner's request)
+### Release R — Regenerate the books already reviewed (owner's request) — **built**
+
+How it was built:
+- **Starting it.** Settings → Reports → *Regenerate reviewed books* opens a paper card (`RegenerationCard`)
+  before anything is spent.
+  - The card lists each book's latest finished draft and a rough cost (`RegenerationCost`): the measured
+    $3.38 reads per 90,000 words plus an estimate for the rest, at the batch discount. Pictures for changed
+    scenes aren't counted.
+  - Nothing starts unless the owner taps it.
+- **Order.** A series goes in story order (`RegenerationPlan`, `StoryOrder`, from the confirmed or guessed
+  placements). A book waits while any book ranked before it in its series is still regenerating.
+- **The reset** (`ReviewProcessor.ResetForRegeneration`, once per book) works in place: same draft, same
+  draft number.
+  - Scenes are detected again.
+  - A scene whose span is unchanged keeps its picture; on a later draft, the previous draft's pictures carry
+    as usual.
+  - Cleared to run again: the reductions, the reads, the scene judgements, the findings (re-reconciled, so
+    a thread keeps its id where the issue is found again), the series checks, the bible read, the round
+    table and the plan.
+  - Kept: the chapter notes, the design bible, the jacket and the placement.
+  - The ingest step is never re-entered, so the voice profile is untouched.
+- **Delivery: Drive only.** The report replaces the Drive PDF under the same name. The reMarkable is not
+  called, the series bible is not sent to the tablet, and `DeliveredToRemarkable` is left as it was.
+- **Diagnostics.** The export says when a book was regenerated and names its Drive file.
+- **Guard tests:** regeneration makes no reMarkable or voice call; unchanged scenes render no new picture;
+  only each project's latest finished draft is offered.
 When releases A–H have landed, every book Folio has already reviewed gets a fresh report in the new
 form. This is done once, at the end, so no book is paid for twice.
 

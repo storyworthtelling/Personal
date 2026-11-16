@@ -153,7 +153,24 @@ public sealed class ReviewProcessor : IPipelineStep
         return soonestWait ?? ProcessResult.Idle;
     }
 
-    private Task<ProcessResult> Dispatch(FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    private async Task<ProcessResult> Dispatch(FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        // Release R: a book being regenerated waits for every book before it in its series' story order, so
+        // each bible is rebuilt before the next book is read against it; then it is reset, once.
+        if (novel.Regenerating)
+        {
+            if (novel.SeriesId is { } series && await db.Novels.AnyAsync(other =>
+                    other.SeriesId == series && other.Regenerating && other.Id != novel.Id
+                    && other.RegenerationRank < novel.RegenerationRank && other.DeletedAtUtc == null, cancellationToken))
+                return ProcessResult.Idle;
+            if (!novel.RegenerationReset)
+                return await ResetForRegeneration(db, novel, cancellationToken);
+        }
+
+        return await DispatchStage(db, novel, cancellationToken);
+    }
+
+    private Task<ProcessResult> DispatchStage(FolioDbContext db, Novel novel, CancellationToken cancellationToken)
     {
         // A wait stored on the manuscript (an offline phone, a backed-off call) holds every stage that talks
         // to a provider, not just the step that set it, so a book that cannot reach the network is not
@@ -644,6 +661,76 @@ public sealed class ReviewProcessor : IPipelineStep
             novel.Stage, SourceIngested: false, AllChunksAnalyzed: false, BibleConsolidated: false,
             AllReferenceSheetsRendered: false, AllSceneImagesRendered: true)));
         await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
+    }
+
+    // Release R: resets a finished draft for its fresh report, in place. Scenes are detected again under the
+    // current rules; a scene whose span is unchanged keeps its picture (the text is the same manuscript), and
+    // on a later draft the previous draft's pictures are carried as on any new draft. The reads, the round
+    // table, the plan and the series checks are cleared to run again; the chapter notes, the design bible, the
+    // jacket and the placement are kept, and the voice step is never re-entered, so the profile is untouched.
+    private async Task<ProcessResult> ResetForRegeneration(FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var source = await Manuscript(db, novel.Id, cancellationToken);
+        var oldScenes = await db.Scenes.Where(scene => scene.NovelId == novel.Id).ToListAsync(cancellationToken);
+        // The old pictures are read first: the new scenes are saved under the same file names.
+        var kept = new Dictionary<(int Start, int End), (byte[] Image, string? Prompt)>();
+        foreach (var old in oldScenes.Where(scene => scene.ImagePath is { } path && imageStore.Exists(path)))
+            kept.TryAdd((old.StartOffset, old.EndOffset), (imageStore.Read(old.ImagePath!), old.ImagePrompt));
+
+        var chapters = (await db.Chapters.Where(c => c.NovelId == novel.Id).OrderBy(c => c.Number).ToListAsync(cancellationToken))
+            .Select(c => new ChapterSpan(c.Number, c.Label, c.StartOffset, c.EndOffset)).ToList();
+        var scenes = sceneDetector.Detect(source, chapters).Select(span => new Scene
+        {
+            NovelId = novel.Id,
+            Number = span.Number,
+            ChapterNumber = span.ChapterNumber,
+            ChapterLabel = span.ChapterLabel,
+            StartOffset = span.StartOffset,
+            EndOffset = span.EndOffset,
+        }).ToList();
+        db.Scenes.RemoveRange(oldScenes);
+        if (novel.PreviousDraftId is { } previousId)
+            await CarryForwardScenes(db, novel, previousId, source, scenes, cancellationToken);
+
+        var reused = 0;
+        foreach (var scene in scenes.Where(scene => scene.ImageStatus != WorkStatus.Completed))
+        {
+            if (!kept.TryGetValue((scene.StartOffset, scene.EndOffset), out var picture))
+                continue;
+            scene.ImagePath = imageStore.Save($"{novel.Id}/scenes/scene-{scene.Number}.png", picture.Image);
+            scene.ImagePrompt = picture.Prompt;
+            scene.ImageStatus = WorkStatus.Completed;
+            reused++;
+        }
+        db.Scenes.AddRange(scenes);
+
+        db.PassReads.RemoveRange(db.PassReads.Where(pass => pass.NovelId == novel.Id));
+        db.Findings.RemoveRange(db.Findings.Where(finding => finding.NovelId == novel.Id));
+        db.ModelBatches.RemoveRange(db.ModelBatches.Where(batch => batch.NovelId == novel.Id));
+        if (await db.BookAnalyses.FirstOrDefaultAsync(a => a.NovelId == novel.Id, cancellationToken) is { } analysis)
+        {
+            analysis.ConsolidatedJson = null;
+            analysis.CraftJson = null;
+            analysis.VoiceJson = null;
+            analysis.ExpansionJson = null;
+            analysis.FindingsReconciled = false;
+            analysis.SeriesContinuityJson = null;
+            analysis.SeriesBibleUpdated = false;
+            analysis.SeriesBibleDelivered = false;
+            analysis.RoundTableJson = null;
+            analysis.PdfStatus = WorkStatus.Pending;
+            analysis.ArchivedDriveFileId = null;
+        }
+
+        novel.RegenerationReset = true;
+        novel.StageAttempts = 0;
+        novel.LastError = null;
+        SetStage(novel, ProjectStage.RenderingSceneImages);
+        await db.SaveChangesAsync(cancellationToken);
+        logger.LogInformation(
+            "Reset manuscript {NovelId} for regeneration: {Count} scenes, {Reused} pictures kept from the old report",
+            novel.Id, scenes.Count, reused);
         return ProcessResult.DidWork(novel.Id);
     }
 
@@ -1394,7 +1481,8 @@ public sealed class ReviewProcessor : IPipelineStep
 
         // Deliver to the reMarkable tablet FIRST and independently of Drive, so it still runs before the
         // Drive scope is granted (or when Drive is off). One unit of work per cycle, resumable, best-effort.
-        if (reportReady && archive.DeliverToRemarkable && delivery is { CanDeliverToRemarkable: true } && !analysis!.DeliveredToRemarkable)
+        // A regenerated report goes to Drive only (owner's ruling): the tablet keeps the copy it has.
+        if (reportReady && !novel.Regenerating && archive.DeliverToRemarkable && delivery is { CanDeliverToRemarkable: true } && !analysis!.DeliveredToRemarkable)
         {
             var remarkableResult = await DeliverToRemarkable(db, novel, analysis, cancellationToken);
             if (remarkableResult is { } result)
@@ -1496,7 +1584,7 @@ public sealed class ReviewProcessor : IPipelineStep
         if (pdf is not null)
         {
             var name = DeliveredDocument.BibleName(series, novel.Title, novel.DraftNumber);
-            if (archive.DeliverToRemarkable && delivery is { CanDeliverToRemarkable: true } && RemarkableLimits.TooLarge(pdf.Length) is null)
+            if (!novel.Regenerating && archive.DeliverToRemarkable && delivery is { CanDeliverToRemarkable: true } && RemarkableLimits.TooLarge(pdf.Length) is null)
             {
                 try
                 {
@@ -2574,6 +2662,12 @@ public sealed class ReviewProcessor : IPipelineStep
         if (novel.Stage != stage)
             logger.LogInformation("Manuscript {NovelId} ({Title}): {From} -> {To}", novel.Id, novel.Title, novel.Stage, stage);
         novel.Stage = stage;
+        if (stage == ProjectStage.Completed && novel.Regenerating)
+        {
+            novel.Regenerating = false;
+            novel.RegenerationReset = false;
+            novel.RegeneratedAtUtc = clock.UtcNow;
+        }
         Touch(novel);
     }
 
