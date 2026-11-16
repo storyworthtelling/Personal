@@ -169,6 +169,15 @@ internal static class MarkedManuscript
                 writer.Paragraph(judgement.Verdict, italic, ReportPalette.InkMuted);
             foreach (var inconsistency in judgement.Inconsistencies ?? [])
                 writer.Paragraph($"{SceneWords.Kind(inconsistency.Kind)}: {inconsistency.Detail}", body, ReportPalette.InkMuted);
+
+            // What the last draft made of this scene, when it changed (R19): its call, tension and verdict.
+            if (scene.PreviousJudgement is { } before)
+            {
+                var then = $"Last draft: {SceneWords.Call(before.Call)} · {SceneWords.Tension(before.Tension)}";
+                writer.Paragraph(
+                    string.IsNullOrWhiteSpace(before.Verdict) ? then : $"{then} — {before.Verdict}",
+                    italic, ReportPalette.InkSoft);
+            }
         }
         else
         {

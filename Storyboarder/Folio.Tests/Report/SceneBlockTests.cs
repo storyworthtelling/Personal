@@ -57,6 +57,38 @@ public class SceneBlockTests
         Assert.Contains("The spring here is autumn in chapter three.", text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A changed scene shows what the last draft made of it beside what this one does (R19): the old call,
+    /// tension and verdict on a line of their own, under the new.
+    /// </summary>
+    [Fact]
+    public void AChangedScenesBlockCarriesTheLastDraftsVerdict()
+    {
+        var changed = One() with
+        {
+            Judgement = new SceneJudgement(1, "Chapter 1", "Sets up the grief.", SceneCall.Keep, 0.7, "It lands now.", []),
+            PreviousJudgement = new SceneJudgement(1, "Chapter 1", "Sets up the grief.", SceneCall.Tighten, 0.4, "It ran long.", []),
+        };
+
+        var text = TextOf(Render([changed]));
+
+        Assert.Contains("Last draft: Tighten", text, StringComparison.Ordinal);
+        Assert.Contains("It ran long.", text, StringComparison.Ordinal);
+        Assert.True(text.IndexOf("It lands now.", StringComparison.Ordinal) < text.IndexOf("It ran long.", StringComparison.Ordinal),
+            "This draft's verdict comes first; the last draft's follows it.");
+    }
+
+    [Fact]
+    public void AnUnchangedScenesBlockHasNoLastDraftLine()
+    {
+        var unchanged = One() with
+        {
+            Judgement = new SceneJudgement(1, "Chapter 1", "Sets up the grief.", SceneCall.Keep, 0.7, "It lands now.", []),
+        };
+
+        Assert.DoesNotContain("Last draft", TextOf(Render([unchanged])), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void EachScenesBlockSitsUnderThatScenesLastLine()
     {

@@ -48,6 +48,13 @@ public sealed record SceneEvidence(
     /// which prints <see cref="Purpose"/> and <see cref="Verdict"/> as before.
     /// </summary>
     public Scenes.SceneJudgement? Judgement { get; init; }
+
+    /// <summary>
+    /// For a scene that changed since the last draft, the judgement the last draft's matching scene got
+    /// (R19), printed under this one's so the author sees whether the change helped. Null for an unchanged
+    /// scene, a first draft, or a predecessor that was never judged.
+    /// </summary>
+    public Scenes.SceneJudgement? PreviousJudgement { get; init; }
 }
 
 // One finding as it appears in the report, tagged with the cross-draft status the reconciliation gave it, so

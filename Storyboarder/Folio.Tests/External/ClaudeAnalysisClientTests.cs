@@ -329,7 +329,7 @@ public class ClaudeAnalysisClientTests
         IReadOnlyList<Folio.Domain.Markup.FindingEntry> findings =
             [new("f0000beef", "Plot holes", "Plot hole", "Chapter 2", "Nobody reacts.", Folio.Domain.Readiness.ReadinessTier.Must)];
 
-        var read = await client.Synthesise("todo", [], [], 90_000, findings, CancellationToken.None);
+        var read = await client.Synthesise("todo", [], [], 90_000, findings, [], CancellationToken.None);
 
         var body = Assert.Single(handler.RequestBodies);
         Assert.Contains("f0000beef", body, StringComparison.Ordinal);
@@ -365,6 +365,43 @@ public class ClaudeAnalysisClientTests
         await client.ReadSection(PersonaCatalogue.Sections[0], manuscript, GenreFrame.Unknown, CancellationToken.None);
 
         Assert.Contains(asked, Assert.Single(handler.RequestBodies), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// On a later draft the plan pass is shown the last plan, says where each new item stands against it,
+    /// and names the last plan's items that are now fixed (R19). A number it was not shown is dropped.
+    /// </summary>
+    [Fact]
+    public async Task ThePlanIsComparedWithTheLastDraftsPlan()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"revisionPlan\":[{\"priority\":\"Must\",\"chapter\":\"Ch. 2\",\"issue\":\"The middle sags\","
+            + "\"suggestedFix\":\"Cut a subplot.\",\"since\":\"open\"}],\"fixed\":[2, 9]}"));
+        IReadOnlyList<RevisionItem> previous =
+        [
+            new("Must", "Ch. 2", "The middle sags", "Cut a subplot."),
+            new("Should", "Ch. 5", "The ending is rushed", "Give the last scene room."),
+        ];
+
+        var read = await client.Synthesise("todo", [], [], 90_000, [], previous, CancellationToken.None);
+
+        var body = Assert.Single(handler.RequestBodies);
+        Assert.Contains("The ending is rushed", body, StringComparison.Ordinal);
+        Assert.Contains("fixed", body, StringComparison.Ordinal);
+        Assert.Equal("open", Assert.Single(read.RevisionPlan).Since);
+        Assert.Equal("The ending is rushed", Assert.Single(read.Fixed).Issue);
+    }
+
+    /// <summary>A first draft has no last plan, so the pass is not asked to compare.</summary>
+    [Fact]
+    public async Task AFirstDraftsPlanIsNotAskedToCompare()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"revisionPlan\":[]}"));
+
+        await client.Synthesise("todo", [], [], 90_000, [], [], CancellationToken.None);
+
+        Assert.DoesNotContain("previousPlan", Assert.Single(handler.RequestBodies), StringComparison.Ordinal);
     }
 
     /// <summary>A judgement with no call or nothing accomplished is a failed pass, retried, never printed half-made.</summary>

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Folio.Domain.Analysis;
+using Folio.Domain.Model;
 using Folio.Domain.Readiness;
 
 namespace Folio.Domain.Markup;
@@ -25,7 +26,18 @@ public static class FindingKey
 }
 
 /// <summary>One finding as the plan's synthesis is shown it: its key, what it is, where, and what it says.</summary>
-public sealed record FindingEntry(string Key, string Source, string Label, string Chapter, string Text, ReadinessTier Severity);
+public sealed record FindingEntry(string Key, string Source, string Label, string Chapter, string Text, ReadinessTier Severity)
+{
+    /// <summary>
+    /// The tracked list the finding came from, when it is one of the four Folio follows from draft to draft
+    /// (plot holes, inconsistencies, inaccuracies, pacing); null otherwise. With <see cref="Said"/> it is how
+    /// a plan item finds the thread behind it (R19).
+    /// </summary>
+    public FindingCategory? Category { get; init; }
+
+    /// <summary>The finding's own words, before any quote or draft-status tag.</summary>
+    public string Said { get; init; } = string.Empty;
+}
 
 /// <summary>
 /// Every finding the report writes on the manuscript, keyed — the list the revision plan's synthesis

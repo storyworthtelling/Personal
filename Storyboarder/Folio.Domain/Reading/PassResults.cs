@@ -26,4 +26,7 @@ public sealed record SectionRead(string PersonaId, string Summary, IReadOnlyList
 public sealed record SynthesisRead(IReadOnlyList<RevisionItem> RevisionPlan, Verdict Verdict)
 {
     public static SynthesisRead Empty { get; } = new([], Verdict.Empty);
+
+    /// <summary>The last draft's plan items this draft has fixed, as the plan pass named them (R19).</summary>
+    public IReadOnlyList<RevisionItem> Fixed { get; init; } = [];
 }
