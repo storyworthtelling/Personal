@@ -716,6 +716,9 @@ public class HomeActivity : Activity
                 }
                 : PaperTheme.ProgressMark.ToArgb();
 
+        public BookmarkRole? NotificationRole(string packageKey) =>
+            notifications().TryGetValue(packageKey, out var role) ? role : null;
+
         private Drawable? TryLoad(string package)
         {
             try { return packageManager.GetApplicationIcon(package); }
