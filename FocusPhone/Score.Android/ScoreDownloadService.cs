@@ -74,6 +74,6 @@ public class ScoreDownloadService : DownloadService
     {
         var helper = new DownloadNotificationHelper(this, ChannelId);
         return helper.BuildProgressNotification(
-            this, Resource.Drawable.area_music, null, null, downloads ?? [], notMetRequirements)!;
+            this, Resource.Drawable.glyph_note, null, null, downloads ?? [], notMetRequirements)!;
     }
 }

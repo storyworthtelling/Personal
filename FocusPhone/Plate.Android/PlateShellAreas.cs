@@ -1,5 +1,6 @@
 using Codex.Domain.Design;
 using Codex.Ui;
+using Storyworthtelling.Materials;
 
 namespace Plate;
 
@@ -22,9 +23,9 @@ internal static class PlateShellAreas
 
     public static readonly IReadOnlyList<BinderArea> All =
     [
-        new("Camera", Resource.Drawable.area_camera, PaperTheme.PlateMark, PaperTheme.PlateFill),
-        new("Scan", Resource.Drawable.area_scan, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill),
-        new("Darkroom", Resource.Drawable.area_darkroom, PaperTheme.ProgressMark, PaperTheme.ProgressFill),
-        new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill),
+        new("Camera", TabGlyphs.Camera, PaperTheme.PlateMark, PaperTheme.PlateFill),
+        new("Scan", TabGlyphs.ScanFrame, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill),
+        new("Darkroom", TabGlyphs.HangingPrint, PaperTheme.ProgressMark, PaperTheme.ProgressFill),
+        new("Settings", TabGlyphs.Settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill),
     ];
 }

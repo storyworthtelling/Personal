@@ -12,9 +12,10 @@ namespace Codex.Ui;
 /// differently depending on which side of the seam it is on (§9): <paramref name="Cloth"/>
 /// is the area's fill tier, the coloured cloth an INACTIVE tab is cut from, and
 /// <paramref name="Hue"/> is the mark tier the ACTIVE tab sets its glyph and label in
-/// once the tab itself has gone page-coloured.
+/// once the tab itself has gone page-coloured. <paramref name="Glyph"/> is one of
+/// <c>Storyworthtelling.Materials.TabGlyphs</c>, drawn in colored pencil (§10).
 /// </summary>
-public sealed record BinderArea(string Label, int GlyphResourceId, Color Hue, Color Cloth);
+public sealed record BinderArea(string Label, string Glyph, Color Hue, Color Cloth);
 
 /// <summary>
 /// In-app navigation as the right-edge divider tabs of a school notebook
@@ -113,7 +114,7 @@ public class BinderTabs : ViewGroup
         tab.SetGravity(GravityFlags.Center);
 
         var glyph = new ImageView(Context!);
-        glyph.SetImageResource(area.GlyphResourceId);
+        glyph.SetImageDrawable(new PencilGlyphDrawable(Context!, area.Glyph));
         var size = PaperTheme.Dp(Context!, DesignTokens.Shape.TabGlyphDp);
         tab.AddView(glyph, new LinearLayout.LayoutParams(size, size));
 
@@ -150,13 +151,14 @@ public class BinderTabs : ViewGroup
         if (tab is LinearLayout column && column.ChildCount == 2)
         {
             var glyph = (ImageView)column.GetChildAt(0)!;
+            var pencil = (PencilGlyphDrawable)glyph.Drawable!;
             var label = (TextView)column.GetChildAt(1)!;
             // On the page-coloured active tab the hue is the only thing marking the
             // area, so it goes in the ink. On the coloured cloth of an inactive tab
             // the cloth is already saying it, and tinting the glyph too would leave a
             // strip that reads as a row of disabled buttons.
             var tint = active ? area.Hue : PaperTheme.Ink;
-            glyph.SetColorFilter(tint);
+            pencil.Ink = tint;
             label.SetTextColor(tint);
         }
     }

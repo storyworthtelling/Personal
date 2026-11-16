@@ -8,6 +8,7 @@ using Codex.Domain.Music;
 using Codex.Ui;
 using Codex.Ui.Voice;
 using Storyworthtelling.Time;
+using Storyworthtelling.Materials;
 
 namespace Score;
 
@@ -43,7 +44,7 @@ public sealed class SettingsArea : ScoreArea
         library.Changed += Invalidate;
     }
 
-    public override BinderArea Tab => new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
+    public override BinderArea Tab => new("Settings", TabGlyphs.Settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
 
     private SettingsAccordion? accordion;
 

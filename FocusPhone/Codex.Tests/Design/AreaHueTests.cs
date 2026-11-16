@@ -186,7 +186,7 @@ public class AreaHueTests
             foreach (var line in lines)
             {
                 if (line.Contains("BinderArea", StringComparison.Ordinal)
-                    || line.Contains("Resource.Drawable.area_", StringComparison.Ordinal))
+                    || line.Contains("TabGlyphs.", StringComparison.Ordinal))
                 {
                     continue;
                 }

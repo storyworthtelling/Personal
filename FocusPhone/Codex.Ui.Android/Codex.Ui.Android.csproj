@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Google.Android\Storyworthtelling.Google.Android.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Materials.Android\Storyworthtelling.Materials.Android.csproj" />
   </ItemGroup>
 
   <!-- Google Drive read access for the shared voice profile/config. -->

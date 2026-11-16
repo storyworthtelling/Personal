@@ -12,6 +12,7 @@ using Codex.Infrastructure.Email;
 using Codex.Infrastructure.Storage;
 using Codex.Ui;
 using Codex.Ui.Voice;
+using Storyworthtelling.Materials;
 
 namespace Post;
 
@@ -88,7 +89,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         string ContactKey, string Title, string Subtitle, bool HasUnread, IReadOnlyList<TimelineItem> Items);
 
     public override BinderArea Tab =>
-        new("Mailbox", Resource.Drawable.area_mailbox, PaperTheme.PostMark, PaperTheme.PostFill);
+        new("Mailbox", TabGlyphs.Mailbox, PaperTheme.PostMark, PaperTheme.PostFill);
 
     // The correspondence's title while one is open (§7's Serif header, drawn by the shell
     // from Title); the Mailbox's own tab label otherwise.

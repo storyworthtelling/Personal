@@ -18,6 +18,7 @@ using Storyworthtelling.Paper;
 using Xamarin.Google.MLKit.Vision.BarCode;
 using Xamarin.Google.MLKit.Vision.Barcode.Common;
 using Xamarin.Google.MLKit.Vision.Common;
+using Storyworthtelling.Materials;
 
 namespace Plate;
 
@@ -43,7 +44,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     private readonly PlateActivity shell = host;
 
     public override BinderArea Tab =>
-        new("Scan", Resource.Drawable.area_scan, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill);
+        new("Scan", TabGlyphs.ScanFrame, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill);
 
     /// <summary>Which of the area's three faces is showing.</summary>
     private enum Face

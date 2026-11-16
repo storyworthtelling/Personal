@@ -9,6 +9,7 @@ using Codex.Infrastructure.Podcasts;
 using Codex.Ui;
 using Score.Google;
 using Codex.Ui.Http;
+using Storyworthtelling.Materials;
 
 namespace Score;
 
@@ -94,7 +95,7 @@ public sealed class PodcastsArea : ScoreArea
         RestoreLibraryFromDrive();
     }
 
-    public override BinderArea Tab => new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill);
+    public override BinderArea Tab => new("Podcasts", TabGlyphs.Microphone, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill);
 
     public override View BuildView()
     {

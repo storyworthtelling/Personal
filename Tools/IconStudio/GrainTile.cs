@@ -1,44 +1,32 @@
 using SkiaSharp;
+using Storyworthtelling.Materials;
 
 namespace IconStudio;
 
 /// <summary>
-/// The paper-grain tile (DESIGN.md §6): deterministic xorshift-seeded ink
-/// noise. One algorithm, one seed — regeneration is byte-identical, and the
-/// Skia renderers reproduce the identical pattern from the same constants.
+/// The paper-grain tile (DESIGN.md §2) as the PNG every native screen's window background repeats. The tile itself is
+/// the materials engine's (<see cref="PaperGrainTile"/>), the one the MAUI grounds and every document draw too, so
+/// regeneration is byte-identical and the screen and the page are one paper.
 /// </summary>
 public static class GrainTile
 {
-    public const int TileSize = 256;
-    public const byte Alpha = 32;  // of 255 — ~12.5% ink
-    public const int Density = 6;  // ~1 in Density pixels carries grain
-    public const uint Seed = 1913;
+    public const int TileSize = Grain.TileSize;
 
     public static byte[] RenderPng()
     {
-        using var bitmap = new SKBitmap(new SKImageInfo(TileSize, TileSize, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        var tile = PaperGrainTile.Build();
+        using var bitmap = new SKBitmap(new SKImageInfo(tile.Size, tile.Size, SKColorType.Rgba8888, SKAlphaType.Unpremul));
         var ink = SKColor.Parse(Tokens.InkHex);
-        var state = Seed;
-        for (var y = 0; y < TileSize; y++)
+        for (var y = 0; y < tile.Size; y++)
         {
-            for (var x = 0; x < TileSize; x++)
+            for (var x = 0; x < tile.Size; x++)
             {
-                state = XorShift(state);
-                bitmap.SetPixel(x, y, state % Density == 0
-                    ? new SKColor(ink.Red, ink.Green, ink.Blue, Alpha)
-                    : SKColors.Transparent);
+                var alpha = tile.At(x, y);
+                bitmap.SetPixel(x, y, alpha == 0 ? SKColors.Transparent : new SKColor(ink.Red, ink.Green, ink.Blue, alpha));
             }
         }
         using var image = SKImage.FromBitmap(bitmap);
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         return data.ToArray();
-    }
-
-    public static uint XorShift(uint state)
-    {
-        state ^= state << 13;
-        state ^= state >> 17;
-        state ^= state << 5;
-        return state;
     }
 }

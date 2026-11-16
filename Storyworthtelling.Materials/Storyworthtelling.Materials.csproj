@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The drawing media of DESIGN.md §2: the seeded tiles for paper grain, colored pencil, marker and highlighter, their
+    approved strengths, and the one set of tab glyphs as path data (§10). One engine for both kits and the documents.
+    BCL only, so the native heads take it without SkiaSharp and Codex.Domain-style libraries could too; each kit turns
+    these tiles into its own cached shader once (Storyworthtelling.Materials.Android), Paper into a Skia one.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Storyworthtelling.Materials</RootNamespace>
+  </PropertyGroup>
+
+</Project>

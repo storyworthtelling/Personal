@@ -1,5 +1,6 @@
 using Codex.Domain.Design;
 using Codex.Ui;
+using Storyworthtelling.Materials;
 
 namespace Score;
 
@@ -24,11 +25,11 @@ internal static class ScoreShellAreas
 
     public static readonly IReadOnlyList<BinderArea> All =
     [
-        new("Music", Resource.Drawable.area_music, PaperTheme.ScoreMark, PaperTheme.ScoreFill),
-        new("Podcasts", Resource.Drawable.area_podcasts, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill),
-        new("Playing", Resource.Drawable.area_playing, PaperTheme.ProgressMark, PaperTheme.ProgressFill),
-        new("Discover", Resource.Drawable.area_discover, PaperTheme.PositiveMark, PaperTheme.PositiveFill),
-        new("Workout", Resource.Drawable.area_workout, PaperTheme.CautionMark, PaperTheme.CautionFill),
-        new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill),
+        new("Music", TabGlyphs.Note, PaperTheme.ScoreMark, PaperTheme.ScoreFill),
+        new("Podcasts", TabGlyphs.Microphone, PaperTheme.ReferenceMark, PaperTheme.ReferenceFill),
+        new("Playing", TabGlyphs.PlayCircle, PaperTheme.ProgressMark, PaperTheme.ProgressFill),
+        new("Discover", TabGlyphs.Compass, PaperTheme.PositiveMark, PaperTheme.PositiveFill),
+        new("Workout", TabGlyphs.Metronome, PaperTheme.CautionMark, PaperTheme.CautionFill),
+        new("Settings", TabGlyphs.Settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill),
     ];
 }

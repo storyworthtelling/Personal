@@ -43,6 +43,8 @@ public static class Program
         {
             var branded = BrandAssets.Write(repoRoot);
             Console.WriteLine($"branding + grain: wrote {branded.Count} files");
+            var glyphs = GlyphDrawables.Write(repoRoot);
+            Console.WriteLine($"glyph drawables: wrote {glyphs.Count} files");
         }
         return 0;
     }

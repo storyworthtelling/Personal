@@ -6,6 +6,7 @@ using Codex.Domain.Design;
 using Codex.Domain.Plate;
 using Storyworthtelling.Time;
 using Codex.Ui;
+using Storyworthtelling.Materials;
 
 namespace Plate;
 
@@ -29,7 +30,7 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
     private readonly PlateActivity shell = host;
 
     public override BinderArea Tab =>
-        new("Darkroom", Resource.Drawable.area_darkroom,
+        new("Darkroom", TabGlyphs.HangingPrint,
             PaperTheme.ProgressMark, PaperTheme.ProgressFill);
 
     private bool choosing;

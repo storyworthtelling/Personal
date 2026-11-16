@@ -1,4 +1,5 @@
 using SkiaSharp;
+using Storyworthtelling.Materials;
 
 namespace Storyworthtelling.Paper;
 
@@ -59,30 +60,21 @@ public static class PaperGrain
         }
     }
 
+    // The tile is the materials engine's (Storyworthtelling.Materials), the one every native and MAUI ground also
+    // carries, so a document and a screen are one paper.
     private static (SKBitmap, SKShader) Build()
     {
-        var size = PaperColorTokens.Grain.TileSize;
-        var bitmap = new SKBitmap(new SKImageInfo(size, size, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        var tile = PaperGrainTile.Build();
+        var bitmap = new SKBitmap(new SKImageInfo(tile.Size, tile.Size, SKColorType.Rgba8888, SKAlphaType.Unpremul));
         var ink = SKColor.Parse(PaperColorTokens.Ink);
-        var state = PaperColorTokens.Grain.Seed;
-        for (var y = 0; y < size; y++)
+        for (var y = 0; y < tile.Size; y++)
         {
-            for (var x = 0; x < size; x++)
+            for (var x = 0; x < tile.Size; x++)
             {
-                state = XorShift(state);
-                bitmap.SetPixel(x, y, state % PaperColorTokens.Grain.Density == 0
-                    ? new SKColor(ink.Red, ink.Green, ink.Blue, (byte)PaperColorTokens.Grain.Alpha)
-                    : SKColors.Transparent);
+                var alpha = tile.At(x, y);
+                bitmap.SetPixel(x, y, alpha == 0 ? SKColors.Transparent : new SKColor(ink.Red, ink.Green, ink.Blue, alpha));
             }
         }
         return (bitmap, SKShader.CreateBitmap(bitmap, SKShaderTileMode.Repeat, SKShaderTileMode.Repeat));
-    }
-
-    private static uint XorShift(uint state)
-    {
-        state ^= state << 13;
-        state ^= state >> 17;
-        state ^= state << 5;
-        return state;
     }
 }

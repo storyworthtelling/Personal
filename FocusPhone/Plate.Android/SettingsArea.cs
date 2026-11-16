@@ -5,6 +5,7 @@ using Android.Widget;
 using Codex.Domain.Design;
 using Codex.Ui;
 using Codex.Ui.Voice;
+using Storyworthtelling.Materials;
 
 namespace Plate;
 
@@ -29,7 +30,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
     private TextView? status;
 
     public override BinderArea Tab =>
-        new("Settings", Resource.Drawable.area_settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
+        new("Settings", TabGlyphs.Settings, PaperTheme.ResolvedMark, PaperTheme.ResolvedFill);
 
     private SettingsAccordion? accordion;
 
