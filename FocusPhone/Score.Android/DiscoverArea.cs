@@ -459,11 +459,7 @@ public sealed class DiscoverArea : ScoreArea
         // generic. Told explicitly to vary the opening, it has to actually reach for a
         // different one each time rather than defaulting to the shape the reason implies.
         var line = await voice.ComposeAsync(
-            "a one-line note about a record in this week's crate, as the person who picked it out — "
-            + "vary how it opens from one pick to the next (lead with an image, a memory, a detail "
-            + "about the record itself, whatever fits) rather than starting with \"Picked this "
-            + "because\" or any other fixed opening every time",
-            context, CancellationToken.None);
+            Storyworthtelling.CallSheet.CallSheet.For("Score", "crate-note"), context, CancellationToken.None);
         if (string.IsNullOrWhiteSpace(line))
         {
             return;

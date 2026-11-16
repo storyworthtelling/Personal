@@ -53,8 +53,17 @@ public sealed class VoiceGreeting
     // A line already composed for this occasion, part of the day and context is reused rather than asked for again
     // (efficiency audit §4; the strong model stays, by the owner's decision). A screen that stops waiting does not
     // cancel the call: the line it finishes with is kept for the next time the screen opens.
-    public async Task<string> ComposeAsync(
-        string purpose, string context, CancellationToken cancellationToken, bool highVisibility = true)
+    public Task<string> ComposeAsync(
+        string purpose, string context, CancellationToken cancellationToken, bool highVisibility = true) =>
+        ComposeAsync(purpose, context, maxWords: 40, highVisibility, cancellationToken);
+
+    /// <summary>A seat on the suite's voice-line Call Sheet (audit W10.3): its purpose, word limit and tier.</summary>
+    public Task<string> ComposeAsync(
+        Storyworthtelling.CallSheet.VoiceLine line, string context, CancellationToken cancellationToken) =>
+        ComposeAsync(line.Purpose, context, line.MaxWords, line.HighVisibility, cancellationToken);
+
+    private async Task<string> ComposeAsync(
+        string purpose, string context, int maxWords, bool highVisibility, CancellationToken cancellationToken)
     {
         var key = Codex.Domain.Voice.GreetingCache.Key(purpose, context, DateTime.Now);
         if (Cached(key) is { } kept)
@@ -66,7 +75,7 @@ public sealed class VoiceGreeting
         {
             await options.RefreshAsync(cancellationToken);
             var line = await messenger.ComposeAsync(
-                new MessageRequest(purpose, context, HighVisibility: highVisibility),
+                new MessageRequest(purpose, context, maxWords, highVisibility),
                 fallback: string.Empty, cancellationToken);
             if (!string.IsNullOrWhiteSpace(line))
             {
@@ -86,9 +95,8 @@ public sealed class VoiceGreeting
     /// A baseline written in code, said the owner's way (audit W10.2): "" when it cannot be, so the caller keeps
     /// showing the baseline it already drew.
     /// </summary>
-    public Task<string> ComposeAsync(
-        Codex.Domain.Voice.VoiceAsk ask, CancellationToken cancellationToken, bool highVisibility = true) =>
-        ComposeAsync(ask.Purpose, ask.Context, cancellationToken, highVisibility);
+    public Task<string> ComposeAsync(Codex.Domain.Voice.VoiceAsk ask, CancellationToken cancellationToken) =>
+        ComposeAsync(ask.Line, ask.Context, cancellationToken);
 
     private string? Cached(string key)
     {

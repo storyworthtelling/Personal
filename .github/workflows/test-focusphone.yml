@@ -15,6 +15,7 @@ on:
       - 'Storyworthtelling.Voice/**'
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.CallSheet/**'
       - 'Storyworthtelling.Materials/**'
       - 'Storyworthtelling.Materials.Android/**'
       - 'Storyworthtelling.Folds/**'

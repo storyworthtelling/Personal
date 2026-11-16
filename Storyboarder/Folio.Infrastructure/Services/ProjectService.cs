@@ -450,7 +450,8 @@ public sealed class ProjectService
                 new MessageRequest(
                     VoicedOccasions.DeskLine,
                     $"Title: {novel.Title}. Draft {novel.DraftNumber}. {facts}",
-                    MaxWords: 18),
+                    VoicedOccasions.Desk.MaxWords,
+                    VoicedOccasions.Desk.HighVisibility),
                 cancellationToken);
 
             return string.IsNullOrWhiteSpace(message) ? null : message.Trim();

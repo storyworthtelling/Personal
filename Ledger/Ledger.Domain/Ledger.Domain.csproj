@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\Storyworthtelling.Pipeline\Storyworthtelling.Pipeline.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Folds\Storyworthtelling.Folds.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Time\Storyworthtelling.Time.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.CallSheet\Storyworthtelling.CallSheet.csproj" />
   </ItemGroup>
 
 </Project>

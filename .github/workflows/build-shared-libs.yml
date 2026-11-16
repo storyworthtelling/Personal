@@ -26,6 +26,8 @@ on:
       - 'Storyworthtelling.Diagnostics/**'
       - 'Storyworthtelling.Diagnostics.Tests/**'
       - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.CallSheet/**'
+      - 'Storyworthtelling.CallSheet.Tests/**'
       - 'Storyworthtelling.Time.Tests/**'
       - 'Storyworthtelling.Materials/**'
       - 'Storyworthtelling.Materials.Tests/**'
@@ -92,7 +94,8 @@ jobs:
   # Storyworthtelling.Updates.Tests.csproj, Storyworthtelling.Household.Tests.csproj,
   # Storyworthtelling.Handwriting.Tests.csproj, Storyworthtelling.Diagnostics.Tests.csproj,
   # Storyworthtelling.Time.Tests.csproj, Storyworthtelling.Pipeline.Tests.csproj,
-  # Storyworthtelling.Maui.Tests.csproj, Storyworthtelling.Materials.Tests.csproj
+  # Storyworthtelling.Maui.Tests.csproj, Storyworthtelling.Materials.Tests.csproj,
+  # Storyworthtelling.CallSheet.Tests.csproj
   test:
     needs: plan
     if: needs.plan.outputs.projects != '[]'

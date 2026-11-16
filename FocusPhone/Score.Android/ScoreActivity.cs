@@ -163,7 +163,8 @@ public class ScoreActivity : Activity
               $"their automatic overnight library rescan found this: {found.Describe()}"
             : "the owner is opening their music and podcasts";
 
-        var message = await greeting.ComposeAsync("welcome", context, CancellationToken.None);
+        var message = await greeting.ComposeAsync(
+            Storyworthtelling.CallSheet.CallSheet.For("Score", "welcome"), context, CancellationToken.None);
         if (string.IsNullOrWhiteSpace(message))
             return;
 

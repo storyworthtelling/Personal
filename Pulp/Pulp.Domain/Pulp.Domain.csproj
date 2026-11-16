@@ -12,6 +12,7 @@
        its own kinds, edits and sync wording on top of it. -->
   <ItemGroup>
     <ProjectReference Include="..\..\Storyworthtelling.Time\Storyworthtelling.Time.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.CallSheet\Storyworthtelling.CallSheet.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Household\Storyworthtelling.Household.csproj" />
   </ItemGroup>
 

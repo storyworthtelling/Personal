@@ -1,11 +1,18 @@
 namespace Constitution.Domain.Voice;
 
 /// <summary>
-/// One voiced seat: its stored id, what the model is asked to write, and how long it may run.
-/// There is deliberately no "hide" option here — every seat has a plain sentence built from the same
-/// facts, supplied with each request, and it shows whenever the voice is unavailable.
+/// One voiced seat: its stored id, what the model is asked to write, and how long it may run, all read
+/// from the suite's voice-line Call Sheet (audit W10.3).
 /// </summary>
-public sealed record VoicedOccasion(VoiceSeat Seat, string Id, string Purpose, int MaxWords);
+public sealed record VoicedOccasion(VoiceSeat Seat, Storyworthtelling.CallSheet.VoiceLine Line)
+{
+    /// <summary>The stored id: the Call Sheet's seat.</summary>
+    public string Id => Line.Seat;
+
+    public string Purpose => Line.Purpose;
+
+    public int MaxWords => Line.MaxWords;
+}
 
 /// <summary>
 /// Constitution's six voiced seats, each once (book p.18, brief §Voice seats).
@@ -27,19 +34,17 @@ public static class VoicedOccasions
 {
     public static IReadOnlyList<VoicedOccasion> All { get; } =
     [
-        new(VoiceSeat.TodayTopLine, "today-top-line",
-            "one line at the top of Today about the day's workout and tonight's dinner", 25),
-        new(VoiceSeat.RestDayLine, "rest-day-line",
-            "one line at the top of Today on a rest day, about the rest and tonight's dinner", 25),
-        new(VoiceSeat.BodyMonthly, "body-monthly",
-            "one sentence on Body about how the month's signals moved against last month", 35),
-        new(VoiceSeat.SignalSentence, "signal-sentence",
-            "one sentence on a signal's page setting its latest reading against the owner's own past", 30),
-        new(VoiceSeat.WorkoutEncouragement, "workout-encouragement",
-            "one line of encouragement on a workout page, about progress since last time", 20),
-        new(VoiceSeat.MealSheetIntro, "meal-sheet-intro",
-            "one line opening the week's dinner sheet, about the week ahead", 30),
+        new(VoiceSeat.TodayTopLine, Sheet("today-top-line")),
+        new(VoiceSeat.RestDayLine, Sheet("rest-day-line")),
+        new(VoiceSeat.BodyMonthly, Sheet("body-monthly")),
+        new(VoiceSeat.SignalSentence, Sheet("signal-sentence")),
+        new(VoiceSeat.WorkoutEncouragement, Sheet("workout-encouragement")),
+        new(VoiceSeat.MealSheetIntro, Sheet("meal-sheet-intro")),
     ];
+
+    // Each purpose and word limit is the suite's voice-line Call Sheet's (audit W10.3).
+    private static Storyworthtelling.CallSheet.VoiceLine Sheet(string id) =>
+        Storyworthtelling.CallSheet.CallSheet.For("Constitution", id);
 
     private static readonly Dictionary<VoiceSeat, VoicedOccasion> BySeat = All.ToDictionary(occasion => occasion.Seat);
 

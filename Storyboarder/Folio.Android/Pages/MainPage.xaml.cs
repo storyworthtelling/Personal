@@ -157,7 +157,7 @@ public partial class MainPage : FolioBinderPage
                     SettingsStore.EmptyDeskLineAskedAt = now;
                     var messenger = scope.ServiceProvider.GetRequiredService<VoicedMessenger>();
                     var composed = await messenger.ComposeAsync(
-                        new MessageRequest(VoicedOccasions.EmptyDesk, "no manuscripts yet", HighVisibility: true),
+                        new MessageRequest(VoicedOccasions.EmptyDesk, "no manuscripts yet", VoicedOccasions.Empty.MaxWords, VoicedOccasions.Empty.HighVisibility),
                         fallback: string.Empty, CancellationToken.None);
 
                     // No voice yet (no profile or key) stores nothing, so a later paint can still

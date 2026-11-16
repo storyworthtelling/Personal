@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Storyworthtelling.Time\Storyworthtelling.Time.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.CallSheet\Storyworthtelling.CallSheet.csproj" />
   </ItemGroup>
 
 </Project>

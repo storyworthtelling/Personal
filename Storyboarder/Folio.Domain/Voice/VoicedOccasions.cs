@@ -16,13 +16,19 @@ namespace Folio.Domain.Voice;
 public static class VoicedOccasions
 {
     /// <summary>A book's own line on the desk, about how far along it is.</summary>
-    public const string DeskLine = "a one-line note on the desk about how this book is coming along";
+    public static Storyworthtelling.CallSheet.VoiceLine Desk { get; } = Storyworthtelling.CallSheet.CallSheet.For("Folio", "desk-line");
+
+    /// <summary>The desk line's purpose, from the suite's voice-line Call Sheet (audit W10.3).</summary>
+    public static string DeskLine => Desk.Purpose;
 
     /// <summary>
     /// A desk with no manuscripts on it. Not a failure — it is the ordinary first state of a new
     /// install, and the one place in the app with room for the owner to be spoken to at all.
     /// </summary>
-    public const string EmptyDesk = "a line for an empty desk, inviting a first manuscript";
+    public static Storyworthtelling.CallSheet.VoiceLine Empty { get; } = Storyworthtelling.CallSheet.CallSheet.For("Folio", "empty-desk");
+
+    /// <summary>The empty desk's purpose, from the Call Sheet.</summary>
+    public static string EmptyDesk => Empty.Purpose;
 
     public static IReadOnlyList<string> All { get; } = [DeskLine, EmptyDesk];
 }

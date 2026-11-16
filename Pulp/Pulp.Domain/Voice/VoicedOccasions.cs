@@ -1,8 +1,17 @@
 namespace Pulp.Domain.Voice;
 
 /// <summary>One voiced seat: the purpose the composer is given, who hears it, and what shows without a voice.</summary>
-public sealed record VoicedOccasion(
-    VoiceSeat Seat, string Purpose, VoiceAudience Audience, VoiceFallback Fallback, string Decisions);
+public sealed record VoicedOccasion(VoiceSeat Seat, Storyworthtelling.CallSheet.VoiceLine Line, string Decisions)
+{
+    /// <summary>What the composer is given, from the Call Sheet.</summary>
+    public string Purpose => Line.Purpose;
+
+    public VoiceAudience Audience =>
+        Line.Audience == Storyworthtelling.CallSheet.VoiceAudience.Child ? VoiceAudience.Child : VoiceAudience.Adult;
+
+    public VoiceFallback Fallback =>
+        Line.Fallback == Storyworthtelling.CallSheet.VoiceFallback.Hide ? VoiceFallback.Hide : VoiceFallback.NeutralLine;
+}
 
 /// <summary>
 /// Pulp's voiced seats, each once (D38, D39, D112, D118, D232, D233, D264, D294).
@@ -17,44 +26,26 @@ public static class VoicedOccasions
 {
     public static IReadOnlyList<VoicedOccasion> All { get; } =
     [
-        new(VoiceSeat.Greeting,
-            "a greeting under the Continue Watching header", VoiceAudience.Adult, VoiceFallback.Hide, "D38, D118"),
-        new(VoiceSeat.WhyThis,
-            "one line on a title page giving the reason this title was chosen for the viewer",
-            VoiceAudience.Adult, VoiceFallback.Hide, "D36, D38, D41"),
-        new(VoiceSeat.PlaylistLine,
-            "one line about a playlist", VoiceAudience.Adult, VoiceFallback.Hide, "D38"),
-        new(VoiceSeat.ChildGreeting,
-            "a gentle greeting for a child", VoiceAudience.Child, VoiceFallback.Hide, "D39, D233"),
-        new(VoiceSeat.ChildFavorites,
-            "one gentle line above a child's favorites", VoiceAudience.Child, VoiceFallback.Hide, "D232, D233"),
-        new(VoiceSeat.EmptyContinueWatching,
-            "an invitation on a home page with nothing started yet",
-            VoiceAudience.Adult, VoiceFallback.NeutralLine, "D264"),
-        new(VoiceSeat.EmptyPlaylists,
-            "an invitation to make a first playlist", VoiceAudience.Adult, VoiceFallback.NeutralLine, "D264"),
-        new(VoiceSeat.EmptyPlaylist,
-            "an invitation to put something on a new playlist", VoiceAudience.Adult, VoiceFallback.NeutralLine, "D264"),
-        new(VoiceSeat.EmptyRecentlyWatched,
-            "a line for a recently-watched page with nothing on it yet",
-            VoiceAudience.Adult, VoiceFallback.NeutralLine, "D264"),
-        new(VoiceSeat.EmptyChildFavorites,
-            "a gentle line for a child whose favorites page has nothing on it yet",
-            VoiceAudience.Child, VoiceFallback.NeutralLine, "D264, D233"),
-        new(VoiceSeat.EmptyChildWatching,
-            "a gentle line for a child whose watching page has nothing started yet",
-            VoiceAudience.Child, VoiceFallback.NeutralLine, "D294, D233"),
-        new(VoiceSeat.EmptyChildPlaylists,
-            "a gentle line for a child whose playlists page has none on it yet",
-            VoiceAudience.Child, VoiceFallback.NeutralLine, "D294, D233"),
-        new(VoiceSeat.EmptyCalendar,
-            "a line for a calendar with nothing coming up", VoiceAudience.Adult, VoiceFallback.NeutralLine, "D264"),
-        new(VoiceSeat.EmptySports,
-            "an invitation to follow a first team", VoiceAudience.Adult, VoiceFallback.NeutralLine, "D264"),
-        new(VoiceSeat.StackUsedUp,
-            "a line for a week's stack that has all been seen, until the next one on Friday",
-            VoiceAudience.Adult, VoiceFallback.NeutralLine, "D112, D264"),
+        new(VoiceSeat.Greeting, Sheet("greeting"), "D38, D118"),
+        new(VoiceSeat.WhyThis, Sheet("why-this"), "D36, D38, D41"),
+        new(VoiceSeat.PlaylistLine, Sheet("playlist-line"), "D38"),
+        new(VoiceSeat.ChildGreeting, Sheet("child-greeting"), "D39, D233"),
+        new(VoiceSeat.ChildFavorites, Sheet("child-favorites"), "D232, D233"),
+        new(VoiceSeat.EmptyContinueWatching, Sheet("empty-continue-watching"), "D264"),
+        new(VoiceSeat.EmptyPlaylists, Sheet("empty-playlists"), "D264"),
+        new(VoiceSeat.EmptyPlaylist, Sheet("empty-playlist"), "D264"),
+        new(VoiceSeat.EmptyRecentlyWatched, Sheet("empty-recently-watched"), "D264"),
+        new(VoiceSeat.EmptyChildFavorites, Sheet("empty-child-favorites"), "D264, D233"),
+        new(VoiceSeat.EmptyChildWatching, Sheet("empty-child-watching"), "D294, D233"),
+        new(VoiceSeat.EmptyChildPlaylists, Sheet("empty-child-playlists"), "D294, D233"),
+        new(VoiceSeat.EmptyCalendar, Sheet("empty-calendar"), "D264"),
+        new(VoiceSeat.EmptySports, Sheet("empty-sports"), "D264"),
+        new(VoiceSeat.StackUsedUp, Sheet("stack-used-up"), "D112, D264"),
     ];
+
+    // Every purpose, audience, fallback and plain line is the suite's voice-line Call Sheet's (audit W10.3).
+    private static Storyworthtelling.CallSheet.VoiceLine Sheet(string seat) =>
+        Storyworthtelling.CallSheet.CallSheet.For("Pulp", seat);
 
     private static readonly Dictionary<VoiceSeat, VoicedOccasion> BySeat = All.ToDictionary(occasion => occasion.Seat);
 

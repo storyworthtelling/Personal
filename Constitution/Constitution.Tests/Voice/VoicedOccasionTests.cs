@@ -99,10 +99,11 @@ public class VoicedOccasionTests
     {
         var source = File.ReadAllText(DomainVoiceFile("VoicedOccasions.cs"));
 
-        // Each entry is written `new(VoiceSeat.X, "the-id", ...)`: the id is the second argument and a literal.
+        // Each entry is written `new(VoiceSeat.X, Sheet("the-id"))`: the id is a literal, looked up on the
+        // suite's Call Sheet (audit W10.3), whose seat ids are written words too.
         foreach (var id in ExpectedIds)
         {
-            Assert.Matches($@"new\(VoiceSeat\.\w+,\s*""{Regex.Escape(id)}"",", source);
+            Assert.Matches($@"new\(VoiceSeat\.\w+,\s*Sheet\(""{Regex.Escape(id)}""\)\)", source);
         }
 
         Assert.Equal(ExpectedIds.Length, Regex.Matches(source, @"new\(VoiceSeat\.").Count);

@@ -30,18 +30,15 @@ public static class WorkoutVoice
         [Congratulation] = 2,
     };
 
-    /// <summary>What the voice is being asked for. Unknown categories fall back to
-    /// coaching rather than throwing at the one moment nobody can read a stack trace.</summary>
-    public static string Purpose(string category) => category switch
+    /// <summary>The line for a category, from the suite's voice-line Call Sheet (audit W10.3). Unknown categories
+    /// fall back to coaching rather than throwing at the one moment nobody can read a stack trace.</summary>
+    public static Storyworthtelling.CallSheet.VoiceLine Line(string category) => category switch
     {
-        Pun =>
-            "one line about the track now playing, built on its title or its words, delivered flat — " +
-            "a pun the speaker is not going to acknowledge having made",
-        Congratulation =>
-            "one line congratulating the listener out of all proportion to what they have done, " +
-            "then quietly withdrawing the claim",
-        _ =>
-            "one line of encouragement from someone performing the part of a coach and not quite " +
-            "committing to it — it lands on a flat retraction rather than a cheer",
+        Pun => Storyworthtelling.CallSheet.CallSheet.For("Score", "workout-pun"),
+        Congratulation => Storyworthtelling.CallSheet.CallSheet.For("Score", "workout-congratulation"),
+        _ => Storyworthtelling.CallSheet.CallSheet.For("Score", "workout-coaching"),
     };
+
+    /// <summary>What the voice is being asked for.</summary>
+    public static string Purpose(string category) => Line(category).Purpose;
 }

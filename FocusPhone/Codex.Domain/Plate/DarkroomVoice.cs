@@ -34,7 +34,7 @@ public static class DarkroomVoice
 
     /// <summary>What the voice is asked to say for a drawn empty line.</summary>
     public static Voice.VoiceAsk? Ask(string line) =>
-        Voice.VoiceRewrite.Ask("the Darkroom is empty: no picture is waiting to be chosen", line);
+        Voice.VoiceRewrite.Ask(Storyworthtelling.CallSheet.CallSheet.For("Plate", "empty-darkroom"), line);
 
     /// <summary>
     /// What the vision call is asked for. It lives here rather than in the head so its shape

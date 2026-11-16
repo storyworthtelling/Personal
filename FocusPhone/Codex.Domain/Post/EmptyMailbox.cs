@@ -45,7 +45,7 @@ public static class EmptyMailbox
 {
     /// <summary>What the voice is asked to say for a drawn line, or null for a line shown as it is.</summary>
     public static Voice.VoiceAsk? Ask(string line) =>
-        Voice.VoiceRewrite.Ask("the Mailbox is empty: everything that arrived has been dealt with", line);
+        Voice.VoiceRewrite.Ask(Storyworthtelling.CallSheet.CallSheet.For("Post", "empty-mailbox"), line);
 
     /// <summary>How long a worn-out ladder sits out before coming back reset.</summary>
     public const int RetirementDays = 30;

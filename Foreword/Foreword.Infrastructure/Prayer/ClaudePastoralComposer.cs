@@ -26,12 +26,11 @@ namespace Foreword.Infrastructure.Prayer;
 /// </summary>
 public sealed class ClaudePastoralComposer : IPastoralComposer, IPrayerReader
 {
-    private const string Instruction =
-        "You write one short line at the top of a private prayer page, in the voice of the person "
-        + "whose page it is, described by the PROFILE that follows — the way they talk to themselves. It "
-        + "introduces the list below it. Never more than one sentence. Never a prayer, never "
-        + "advice, never scripture, never encouragement of the greeting-card kind. Do not name "
-        + "anybody on the list. Respond with the line and nothing else.";
+    // The instruction is written on the suite's voice-line Call Sheet (audit W10.3).
+    private static readonly Storyworthtelling.CallSheet.VoiceLine Line =
+        Storyworthtelling.CallSheet.CallSheet.For("Foreword", "prayer-line");
+
+    private static readonly string Instruction = Line.Guidance!;
 
     private readonly ClaudeMessagesClient claude;
     private readonly AnthropicOptions options;

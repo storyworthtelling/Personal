@@ -326,10 +326,9 @@ public sealed class WorkoutArea : ScoreArea
 
         lastCategory = category;
         var line = await voice.ComposeAsync(
-            WorkoutVoice.Purpose(category),
+            WorkoutVoice.Line(category),
             $"{playback.CurrentTitle} — running at {tempo} BPM",
-            CancellationToken.None,
-            highVisibility: false);
+            CancellationToken.None);
 
         // The track may have moved on while the line was being written; a note for a
         // song that finished is worse than no note.

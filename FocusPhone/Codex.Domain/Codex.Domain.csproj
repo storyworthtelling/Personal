@@ -10,6 +10,7 @@
          third-party code. DiagnosticLog seals into its LogOutbox instead of discarding a full log. -->
     <ProjectReference Include="..\..\Storyworthtelling.Folds\Storyworthtelling.Folds.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Time\Storyworthtelling.Time.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.CallSheet\Storyworthtelling.CallSheet.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
   </ItemGroup>
 

@@ -181,3 +181,37 @@ public class VoicedOccasionTests
             "These voice a message without naming an occasion from VoicedOccasions:\n  " + string.Join("\n  ", offenders));
     }
 }
+
+/// <summary>Pulp's seats are read from the suite's voice-line Call Sheet (audit W10.3): one list, edited in one place.</summary>
+public class PulpSeatsAreOnTheCallSheetTests
+{
+    [Fact]
+    public void EverySeatIsTheSheetsLine()
+    {
+        foreach (var occasion in VoicedOccasions.All)
+        {
+            var line = Storyworthtelling.CallSheet.CallSheet.For("Pulp", occasion.Line.Seat);
+            Assert.Same(line, occasion.Line);
+            Assert.Equal(line.Purpose, occasion.Purpose);
+            Assert.Equal(line.Audience == Storyworthtelling.CallSheet.VoiceAudience.Child ? VoiceAudience.Child : VoiceAudience.Adult, occasion.Audience);
+            Assert.Equal(line.Fallback == Storyworthtelling.CallSheet.VoiceFallback.Hide ? VoiceFallback.Hide : VoiceFallback.NeutralLine, occasion.Fallback);
+        }
+    }
+
+    [Fact]
+    public void EveryPulpLineOnTheSheetHasASeat()
+    {
+        Assert.Equal(
+            Storyworthtelling.CallSheet.CallSheet.Of("Pulp").Select(line => line.Seat).Order(),
+            VoicedOccasions.All.Select(occasion => occasion.Line.Seat).Order());
+    }
+
+    [Fact]
+    public void AnEmptyPagesPlainLineIsTheSheets()
+    {
+        foreach (var occasion in VoicedOccasions.All.Where(occasion => occasion.Fallback == VoiceFallback.NeutralLine))
+        {
+            Assert.False(string.IsNullOrWhiteSpace(occasion.Line.Neutral));
+        }
+    }
+}

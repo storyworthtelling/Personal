@@ -123,7 +123,8 @@ public class HomeActivity : Activity
     {
         // The part of the day rather than the minute, so the line is kept and reused until the next part (efficiency §4).
         var timeContext = $"the owner just opened Flyleaf; it is {Codex.Domain.Voice.GreetingCache.PartOfDay(DateTime.Now)}";
-        var compose = greeting!.ComposeAsync("welcome", timeContext, CancellationToken.None);
+        var compose = greeting!.ComposeAsync(
+            Storyworthtelling.CallSheet.CallSheet.For("Flyleaf", "welcome"), timeContext, CancellationToken.None);
         var finished = await Task.WhenAny(compose, Task.Delay(DesignTokens.Motion.CoverHelloWaitMs));
         var message = ReferenceEquals(finished, compose) && compose.IsCompletedSuccessfully ? compose.Result : string.Empty;
         if (!string.IsNullOrWhiteSpace(message))
