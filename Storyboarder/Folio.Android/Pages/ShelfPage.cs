@@ -112,7 +112,7 @@ public class ShelfPage : FolioBinderPage
                 HorizontalOptions = LayoutOptions.Fill,
             };
             Press(shelf, row);
-            shelves.Add(shelf);
+            shelves.Add(Readable(shelf, row, drawable.HeightDp));
 
             if (row.SeriesName is not null)
             {
@@ -139,6 +139,40 @@ public class ShelfPage : FolioBinderPage
                 shelves.Add(label);
             }
         }
+    }
+
+    /// <summary>
+    /// The painted shelf with a button laid over each spine, so TalkBack can move book to book and open one
+    /// (DESIGN.md §17, audit W9.3, report 10 §8). The buttons are clear and stand exactly where the painter put each
+    /// spine (<see cref="ShelfRow.Spans"/>), so a finger opens the same book through either; the painting itself is
+    /// hidden from the screen reader, which reads the buttons instead.
+    /// </summary>
+    private View Readable(GraphicsView shelf, ShelfRow row, double height)
+    {
+        AutomationProperties.SetIsInAccessibleTree(shelf, false);
+        var layer = new AbsoluteLayout { HeightRequest = height };
+        AbsoluteLayout.SetLayoutBounds(shelf, new Rect(0, 0, 1, 1));
+        AbsoluteLayout.SetLayoutFlags(shelf, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.All);
+        layer.Children.Add(shelf);
+
+        foreach (var span in row.Spans)
+        {
+            var book = span.Book;
+            var spine = new Button
+            {
+                BackgroundColor = Colors.Transparent,
+                BorderWidth = 0,
+                Padding = 0,
+                Text = string.Empty,
+            };
+            SemanticProperties.SetDescription(spine, $"{book.Title}, {book.WordCount:N0} words");
+            SemanticProperties.SetHint(spine, "Opens the book's actions");
+            spine.Clicked += (_, _) => ShowActions(book);
+            AbsoluteLayout.SetLayoutBounds(spine, new Rect(span.LeftDp, 0, span.WidthDp, height));
+            layer.Children.Add(spine);
+        }
+
+        return layer;
     }
 
     /// <summary>
