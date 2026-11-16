@@ -138,6 +138,9 @@ is why release A comes first.
   - On the page it is a **transcript followed by a summary** of where the readers ended up agreeing and
     still disagreeing.
 - R41. The section and its tab are called **Round table**.
+- R42. **Each reader has a distinct voice and personality** (owner's request), carried into both its own
+  page and the round table. A voice changes *how* a reader talks, never *what* it judges: its question,
+  anchors and score are unchanged by it.
 
 **Not wanted:** a per-piece goal setting; a summary page before the frame; a sensitivity or
 target-age reader (for YA, the genre fan already is one); the line editor back.
@@ -203,7 +206,28 @@ runs a real draft through.
 4. **Score history chart** (R13): each reader's score across drafts.
    - On the phone's book page only, beside the readiness chart (R37).
    - Data: the `PassRead` rows already kept per draft.
-5. **The bible in the readers' prompt** (R27), when the book is in a series.
+5. **A voice and personality per reader** (R42), drafted below for the owner's approval.
+   - **Where it goes.** A new `Persona.Voice` field, placed after the cache breakpoint with the rest of the
+     persona's instruction, so the cached manuscript prefix is unchanged.
+   - **Where it is used.** The reader's first read and every round-table turn. The host gets one too.
+   - **No impersonation.** No voice is modelled on, or named after, a real person.
+   - **Tests.**
+     - Every reader has a voice, and no two share one.
+     - The voice sits after the breakpoint.
+     - A live check on the fixtures confirms the seven read as seven people.
+
+   | Reader | Voice and personality (draft) |
+   |---|---|
+   | Developmental editor | Patient and methodical; thinks in load-bearing structure ("what is this chapter holding up?"); calm, orderly, numbered points; never hurried |
+   | Agent | Brisk, warm, a little impatient; talks in first impressions and moments ("this is where I sat up", "this is where I'd have stopped"); short sentences |
+   | Acquiring editor | Seasoned and dry; protective of the book; speaks in edit-letter cadence ("what I'd ask you for is…"); diplomatic but firm |
+   | Genre fan | Enthusiastic and chatty; wears their heart on their sleeve; reacts to moments; compares to what the genre does at its best; gets disappointed out loud |
+   | Harsh but fair critic | Dry, exacting, wry; precise to the word; never cruel and never effusive; concedes only to evidence |
+   | Literature professor | Curious, generous, digressive; reaches for patterns and context; asks questions back; long, looping sentences |
+   | Fellow writer | Collegial shop-talk; practical and candid; talks about how a move was pulled off and what they'd have tried instead; admits their own struggles |
+   | Round-table host | Warm, neutral and curious; keeps it moving; draws out the quiet voice; sums up without ruling |
+
+6. **The bible in the readers' prompt** (R27), when the book is in a series.
    - It is the same for every pass of a draft, so it goes inside the cached prefix, after the manuscript.
    - `ReadingPromptTests` keeps the prefix byte-identical across personas.
    - The independence guard is updated: the bible is canon, not another reader's notes.
@@ -425,7 +449,7 @@ Agent and the Acquiring editor (R35).
 - **D, Plan links:** small.
 - **E, Notes and chart:** small.
 - **F, Between drafts:** small. Needs A and D.
-- **G, Series bible:** large. Feeds B5.
+- **G, Series bible:** large. Feeds B6.
 - **H, Round table:** medium. Best after B, so the Fellow writer takes part.
 - **R, Regenerate reviewed books:** small to build, and the largest single API spend in the plan.
   - Last, after A–H.
