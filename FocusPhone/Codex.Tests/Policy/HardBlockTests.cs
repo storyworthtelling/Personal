@@ -112,4 +112,47 @@ public class HardBlockTests
 
         Assert.Empty(blocked);
     }
+
+    [Fact]
+    public void Detect_BlocksAppsRatedMatureOrAdultsOnly()
+    {
+        var now = new DateTimeOffset(2026, 11, 16, 12, 0, 0, TimeSpan.Zero);
+        var ratings = Codex.Domain.Apps.RatingBook.Empty
+            .Record("com.example.forum", 1, Rated(Codex.Domain.Apps.ContentRating.Mature), now)
+            .Record("com.example.after", 1, Rated(Codex.Domain.Apps.ContentRating.AdultsOnly), now)
+            .Record("com.example.notes", 1, Rated(Codex.Domain.Apps.ContentRating.Teen), now);
+
+        var blocked = HardBlock.Detect(
+            [("com.example.forum", Undefined), ("com.example.after", Productivity), ("com.example.notes", Productivity),
+             ("com.example.unlooked", Productivity)],
+            ratings);
+
+        Assert.Equal(new HashSet<string> { "com.example.forum", "com.example.after" }, blocked);
+    }
+
+    [Fact]
+    public void Detect_NeverBlocksTheOwnersSuiteForItsRating()
+    {
+        var ratings = Codex.Domain.Apps.RatingBook.Empty.Record("com.storyworthtelling.pulp", 1,
+            Rated(Codex.Domain.Apps.ContentRating.Mature), DateTimeOffset.UnixEpoch);
+
+        Assert.Empty(HardBlock.Detect([("com.storyworthtelling.pulp", Undefined)], ratings));
+    }
+
+    private static Codex.Domain.Apps.PlayLookup Rated(Codex.Domain.Apps.ContentRating rating) =>
+        new(Codex.Domain.Apps.RatingLookupOutcome.Rated, rating);
+
+    [Fact]
+    public void Detect_NeverBlocksPulpsStreamingServicesForTheirRating()
+    {
+        // Pulp hands the viewer to these apps; a rating change must not take its hand-off away.
+        var ratings = Codex.Domain.Apps.RatingBook.Empty;
+        foreach (var package in Codex.Domain.Apps.LockedOpenCatalogue.Packages)
+        {
+            ratings = ratings.Record(package, 1, Rated(Codex.Domain.Apps.ContentRating.Mature), DateTimeOffset.UnixEpoch);
+        }
+
+        Assert.Empty(HardBlock.Detect(
+            Codex.Domain.Apps.LockedOpenCatalogue.Packages.Select(package => (package, Undefined)), ratings));
+    }
 }

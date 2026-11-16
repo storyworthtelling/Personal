@@ -35,6 +35,15 @@ public class PackageWatcher
         launcherApps.RegisterCallback(new InstallCallback(this));
         // Catch anything installed/removed while the launcher was dead.
         Reapply();
+        PlayRatings.RefreshInBackground(context);
+    }
+
+    // A new app is visible until its Play rating is read, so it is looked up straight away; a rating
+    // of M or above re-applies the policy and suspends it.
+    private void Added()
+    {
+        Reapply();
+        PlayRatings.RefreshInBackground(context);
     }
 
     private void Reapply()
@@ -61,7 +70,7 @@ public class PackageWatcher
         // A new install may be a never-visible app to suspend, or an ordinary app to leave running;
         // either way the pure plan decides, so re-apply. A removal can free the never-visible set, so
         // re-apply there too.
-        public override void OnPackageAdded(string? packageName, Android.OS.UserHandle? user) => watcher.Reapply();
+        public override void OnPackageAdded(string? packageName, Android.OS.UserHandle? user) => watcher.Added();
         public override void OnPackageRemoved(string? packageName, Android.OS.UserHandle? user) => watcher.Reapply();
         public override void OnPackageChanged(string? packageName, Android.OS.UserHandle? user) { }
         public override void OnPackagesAvailable(string[]? packageNames, Android.OS.UserHandle? user, bool replacing) { }

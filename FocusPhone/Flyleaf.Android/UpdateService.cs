@@ -319,6 +319,9 @@ public class UpdateWorker : Worker
         try
         {
             var result = UpdateService.CheckAndInstallAsync(ApplicationContext).GetAwaiter().GetResult();
+            // The same six-hourly, network-gated run re-reads due Play ratings (new versions, month-old
+            // reads, earlier failures), so an app re-rated M is caught without its own worker.
+            RefreshRatings();
             // Retry a transient fetch failure so recovery isn't gated on the full 6-hour
             // cadence; a failed install is already left unprocessed and retries next cycle.
             return result.State == UpdateRunState.FetchFailed
@@ -329,6 +332,18 @@ public class UpdateWorker : Worker
         {
             HeadLog.Warn("FocusPhoneUpdate", $"Update check failed; will retry on next period: {e}");
             return Result.InvokeRetry();
+        }
+    }
+
+    private void RefreshRatings()
+    {
+        try
+        {
+            PlayRatings.RefreshAsync(ApplicationContext).GetAwaiter().GetResult();
+        }
+        catch (Exception e)
+        {
+            HeadLog.Warn("FlyleafRatings", "The rating refresh failed; it runs again next period", e);
         }
     }
 }
