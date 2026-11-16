@@ -408,9 +408,10 @@ public static class PolicyManager
         return QueryPackages(context, intent);
     }
 
-    // The never-visible categories (games / social / dating / gambling / short-form): every launchable
-    // app whose declared category or curated id falls in one, hard-suspended by the plan. The pure
-    // HardBlock rule is unit-tested; this only supplies the installed (package, category) facts.
+    // The never-visible categories (games / social / dating / gambling / short-form, and anything rated M
+    // or above on Play): every launchable app whose declared category, curated id or stored Play rating
+    // falls in one, hard-suspended by the plan. The pure HardBlock rule is unit-tested; this only supplies
+    // the installed (package, category) facts and the ratings PlayRatings last read (no network here).
     private static IReadOnlySet<string> QueryNeverVisiblePackages(Context context)
     {
         var launcher = new Intent(Intent.ActionMain);
@@ -420,12 +421,12 @@ public static class PolicyManager
             .Select(r => (r.ActivityInfo!.PackageName!,
                 (int)(r.ActivityInfo.ApplicationInfo?.Category ?? ApplicationCategories.Undefined)))
             .ToList();
-        return HardBlock.Detect(installed);
+        return HardBlock.Detect(installed, PlayRatings.Load(context));
     }
 
     // Every package with a launcher entry — the apps the owner can see. Everything here that the plan
     // does not suspend is actively released (visibility IS runnability).
-    private static IReadOnlyList<string> QueryLaunchablePackages(Context context)
+    internal static IReadOnlyList<string> QueryLaunchablePackages(Context context)
     {
         var launcher = new Intent(Intent.ActionMain);
         launcher.AddCategory(Intent.CategoryLauncher);

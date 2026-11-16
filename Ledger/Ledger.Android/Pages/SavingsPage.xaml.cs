@@ -655,7 +655,7 @@ public partial class SavingsPage : LedgerBinderPage
             $"Removed the goal for {accountName}",
             reverse: () => UndoRemoveGoal(captured),
             DateTimeOffset.Now,
-            TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs));
+            Storyworthtelling.Maui.Views.DogEar.UndoWindow());
         dogEar.Refresh();
     }
 

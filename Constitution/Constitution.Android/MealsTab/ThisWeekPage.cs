@@ -111,8 +111,8 @@ internal sealed class ThisWeekPage : LinearLayout
         var gone = line.IsPast && !line.IsToday;
         if (gone)
         {
-            day.SetTextColor(PaperTheme.InkMuted);
-            dish.SetTextColor(PaperTheme.InkMuted);
+            day.SetTextColor(PaperTheme.InkSoft);
+            dish.SetTextColor(PaperTheme.InkSoft);
         }
         row.AddView(day, new LayoutParams(PaperTheme.Dp(context, DayLabelWidthDp), ViewGroup.LayoutParams.WrapContent));
         row.AddView(dish, new LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
@@ -123,7 +123,7 @@ internal sealed class ThisWeekPage : LinearLayout
             var small = ScrapContent.IndexLine(context, trailing, line.IsToday);
             if (gone)
             {
-                small.SetTextColor(PaperTheme.InkMuted);
+                small.SetTextColor(PaperTheme.InkSoft);
             }
 
             row.AddView(small, new LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));

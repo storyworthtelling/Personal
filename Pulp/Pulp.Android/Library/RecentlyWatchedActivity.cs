@@ -221,7 +221,7 @@ public class RecentlyWatchedActivity : Activity
         if (text.ProgressLine is { } progress)
         {
             var mono = PaperUi.Mono(this, progress);
-            mono.SetTextColor(PaperTheme.InkMuted);
+            mono.SetTextColor(PaperTheme.InkSoft);
             lines.AddView(mono);
         }
 

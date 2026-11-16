@@ -30,7 +30,7 @@ public sealed class RatingChipView : TextView
 
         if (chip.Outlined || chip.Role is null)
         {
-            SetTextColor(PaperTheme.InkMuted);
+            SetTextColor(PaperTheme.InkSoft);
             Background = PaperUi.Chip(context, PaperTheme.InkMuted);
             return;
         }

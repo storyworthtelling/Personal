@@ -64,7 +64,7 @@ public class AccordionPicker : VerticalStackLayout
                 {
                     Text = prefix,
                     Style = PaperResources.Token<Style>("CardRowTitle"),
-                    TextColor = PaperResources.Colour("InkMuted"),
+                    TextColor = PaperResources.Colour("InkSoft"),
                     VerticalOptions = LayoutOptions.Center,
                 },
                 value,

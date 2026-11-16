@@ -108,7 +108,7 @@ public class PaperListAdapter : BaseAdapter
                 TextSize = DesignTokens.TypeSp.Secondary,
                 Typeface = PaperTheme.SansRegular(context),
             };
-            secondary.SetTextColor(PaperTheme.InkMuted);
+            secondary.SetTextColor(PaperTheme.InkSoft);
             lines.AddView(secondary);
         }
 

@@ -37,7 +37,9 @@ public sealed class FoldDrawable : IDrawable
             return;
         }
 
-        float w = dirtyRect.Width, h = dirtyRect.Height;
+        // The fold is drawn at mockup 17's size in the top-right of a larger touch box (DogEar.TargetDp).
+        float w = DogEarGeometry.SizeDp, h = DogEarGeometry.SizeDp;
+        canvas.Translate(dirtyRect.Width - w, 0);
         canvas.Antialias = true;
 
         // The hole: what the fold is carrying, seen through the missing corner.
@@ -119,6 +121,31 @@ public class DogEar : GraphicsView
     /// the crease. It was 72dp, which on Accounts overlapped the status line and the first card.</summary>
     public const int SizeDp = DogEarGeometry.SizeDp;
 
+    /// <summary>The touch box the fold sits in: 48dp (§7, audit 10 §5), the fold drawn in its top-right corner.</summary>
+    public const int TargetDp = DesignTokens.Shape.TouchTargetDp;
+
+    /// <summary>
+    /// How long an undo holds the corner on this phone: the design's six seconds, or longer when the person has asked
+    /// Android for more time to act (Accessibility → Time to take action; WCAG 2.2.1, audit 10 §5). A page that
+    /// commits when the window closes reads this, so the fold and the commit close together.
+    /// </summary>
+    public static TimeSpan UndoWindow()
+    {
+        var recommended = TimeSpan.Zero;
+        if (OperatingSystem.IsAndroidVersionAtLeast(29)
+            && global::Android.App.Application.Context.GetSystemService(global::Android.Content.Context.AccessibilityService)
+                is global::Android.Views.Accessibility.AccessibilityManager manager)
+        {
+            recommended = TimeSpan.FromMilliseconds(manager.GetRecommendedTimeoutMillis(
+                FoldTiming.UndoWindowMs,
+                global::Android.Views.Accessibility.ContentMode.Controls
+                    | global::Android.Views.Accessibility.ContentMode.Text));
+        }
+
+        FoldTiming.Adopt(recommended);
+        return FoldTiming.UndoWindow;
+    }
+
     private readonly FoldDrawable painter;
     private readonly DogEarState state;
     private IDispatcherTimer? window;
@@ -129,8 +156,8 @@ public class DogEar : GraphicsView
         painter = new FoldDrawable(PaperResources.Colour);
         Drawable = painter;
 
-        WidthRequest = SizeDp;
-        HeightRequest = SizeDp;
+        WidthRequest = TargetDp;
+        HeightRequest = TargetDp;
         HorizontalOptions = LayoutOptions.End;
         VerticalOptions = LayoutOptions.Start;
         InputTransparent = false;
@@ -155,10 +182,19 @@ public class DogEar : GraphicsView
     public void Refresh()
     {
         var fold = state.Fold(DateTimeOffset.Now);
+        var said = painter.Fold?.Headline;
         painter.Fold = fold;
         var wasShowing = IsVisible;
         IsVisible = fold is not null;
         Invalidate();
+
+        // The corner says what it carries (§17, audit 10 §2): its headline is its description, and a fold that arrives
+        // or changes is read out once.
+        SemanticProperties.SetDescription(this, fold?.Headline ?? string.Empty);
+        if (fold is not null && fold.Headline != said)
+        {
+            SemanticScreenReader.Announce(fold.Headline);
+        }
 
         if (fold is not null && !wasShowing)
         {

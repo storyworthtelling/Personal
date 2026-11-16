@@ -2,6 +2,7 @@ using Android.Content;
 using Android.Graphics;
 using Android.OS;
 using Android.Views;
+using AccessibilityManager = Android.Views.Accessibility.AccessibilityManager;
 using Android.Widget;
 using Codex.Domain.Design;
 
@@ -178,8 +179,11 @@ public static class DogEar
 
     private static void RepaintNotices(Context context, FrameLayout host)
     {
+        // What the corner said before this repaint, so an unchanged notice is not read out again on every render.
+        string? said = null;
         if (host.FindViewWithTag(NoticeTag) is View existing)
         {
+            said = existing.ContentDescription;
             host.RemoveView(existing);
         }
 
@@ -192,7 +196,7 @@ public static class DogEar
         // One fold, no count (§13): the corner says something waits, not how much. It wears the most
         // serious notice waiting, the newest on a tie (D291); the Waiting page still lists newest first.
         var shown = notices[NoticeSeriousness.MostSerious(notices, notice => Hues.RoleOf(notice.Hue))];
-        var size = PaperTheme.Dp(context, DogEarGeometry.SizeDp);
+        var size = TargetSize(context);
         var fold = new FoldView(context, shown.Headline, timer: null, showsBackArrow: false, hue: shown.Hue)
         {
             Tag = NoticeTag,
@@ -202,6 +206,37 @@ public static class DogEar
         fold.Alpha = 0f;
         host.AddView(fold, new FrameLayout.LayoutParams(size, size, GravityFlags.Top | GravityFlags.End));
         fold.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.StandardMs).Start();
+
+        // A fold arriving is said aloud, once (§17, audit 10 §2): a corner turning down is silent otherwise.
+        if (said != shown.Headline)
+        {
+            fold.AnnounceForAccessibility(shown.Headline);
+        }
+    }
+
+    /// <summary>
+    /// The fold is drawn at mockup 17's 40dp but answers a 48dp touch (§7, audit 10 §5): the box is the touch target
+    /// and the fold sits in its top-right corner.
+    /// </summary>
+    private static int TargetSize(Context context) => PaperTheme.Dp(context, DesignTokens.Shape.TouchTargetDp);
+
+    /// <summary>
+    /// How long an undo holds the corner on this phone: the design's six seconds, or longer when the person has asked
+    /// Android for more time to act (Accessibility → Time to take action; WCAG 2.2.1, audit 10 §5). Whatever commits
+    /// when the window closes (Post's source delete, a removal) reads this too, so the fold and the commit close together.
+    /// </summary>
+    public static TimeSpan UndoWindow(Context context)
+    {
+        var recommended = TimeSpan.Zero;
+        if (OperatingSystem.IsAndroidVersionAtLeast(29)
+            && context.GetSystemService(Context.AccessibilityService) is AccessibilityManager manager)
+        {
+            recommended = TimeSpan.FromMilliseconds(manager.GetRecommendedTimeoutMillis(
+                FoldTiming.UndoWindowMs, Android.Views.Accessibility.ContentMode.Controls | Android.Views.Accessibility.ContentMode.Text));
+        }
+
+        FoldTiming.Adopt(recommended);
+        return FoldTiming.UndoWindow;
     }
 
     // Turning a NOTICE fold no longer opens the ActionCard popup (D162): it turns the page to a
@@ -232,7 +267,8 @@ public static class DogEar
             host.RemoveView(notice);
         }
 
-        var size = PaperTheme.Dp(context, DogEarGeometry.SizeDp);
+        var size = TargetSize(context);
+        var window = UndoWindow(context);
         var handler = new Handler(Looper.MainLooper!);
         var fold = new FoldView(context, undoHint, handler, showsBackArrow: true, hue: PaperTheme.Accent)
         {
@@ -251,6 +287,7 @@ public static class DogEar
         fold.Alpha = 0f;
         host.AddView(fold, layoutParams);
         fold.Animate()!.Alpha(1f).SetDuration(DesignTokens.Motion.StandardMs).Start();
+        fold.AnnounceForAccessibility(undoHint);
 
         handler.PostDelayed(() =>
         {
@@ -261,7 +298,7 @@ public static class DogEar
                     host.RemoveView(current);
                     RepaintNotices(context, host);
                 }))!.Start();
-        }, DesignTokens.Motion.UndoWindowMs);
+        }, (long)window.TotalMilliseconds);
     }
 
     private static void Dismiss(FrameLayout host)
@@ -315,7 +352,10 @@ public static class DogEar
         protected override void OnDraw(Canvas canvas)
         {
             base.OnDraw(canvas);
-            float w = Width, h = Height;
+            // The fold is drawn at its own size in the top-right of a larger touch box (TargetSize).
+            var drawn = DogEarGeometry.SizeDp * density;
+            canvas.Translate(Width - drawn, 0);
+            float w = drawn, h = drawn;
 
             // A dog-ear is TWO triangles, and shipping only the first is what made this
             // read as a coloured corner tag rather than a folded page. The shape is mockup 17's,

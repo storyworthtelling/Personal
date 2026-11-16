@@ -248,7 +248,7 @@ public class BookPage : FolioBinderPage
                 {
                     Text = book.Drafts,
                     FontSize = PaperResources.Token<double>("SecondarySize"),
-                    TextColor = PaperResources.Colour("InkMuted"),
+                    TextColor = PaperResources.Colour("InkSoft"),
                     Margin = new Thickness(0, 4, 0, 0),
                 },
                 new Label
@@ -379,7 +379,7 @@ public class BookPage : FolioBinderPage
             Children =
             {
                 line,
-                new Label { Text = row.Question, FontSize = PaperResources.Token<double>("LabelSize"), TextColor = PaperResources.Colour("InkMuted") },
+                new Label { Text = row.Question, FontSize = PaperResources.Token<double>("LabelSize"), TextColor = PaperResources.Colour("InkSoft") },
                 new Label
                 {
                     Text = row.Reason,
@@ -407,7 +407,7 @@ public class BookPage : FolioBinderPage
         Text = text,
         FontFamily = "SansSemibold",
         FontSize = PaperResources.Token<double>("LabelSize"),
-        TextColor = PaperResources.Colour("InkMuted"),
+        TextColor = PaperResources.Colour("InkSoft"),
         Margin = new Thickness(0, 24, 0, 8),
     };
 
@@ -432,7 +432,7 @@ public class BookPage : FolioBinderPage
         {
             Text = row.Date,
             FontSize = PaperResources.Token<double>("LabelSize"),
-            TextColor = PaperResources.Colour("InkMuted"),
+            TextColor = PaperResources.Colour("InkSoft"),
             VerticalOptions = LayoutOptions.End,
         };
         var words = new Label
@@ -440,7 +440,7 @@ public class BookPage : FolioBinderPage
             Text = row.Words,
             Style = PaperResources.Token<Style>("MonoLabel"),
             FontSize = PaperResources.Token<double>("LabelSize"),
-            TextColor = PaperResources.Colour("InkMuted"),
+            TextColor = PaperResources.Colour("InkSoft"),
             HorizontalOptions = LayoutOptions.End,
             VerticalOptions = LayoutOptions.End,
         };
@@ -448,7 +448,7 @@ public class BookPage : FolioBinderPage
         var mark = new Label
         {
             FontSize = PaperResources.Token<double>("LabelSize"),
-            TextColor = PaperResources.Colour("InkMuted"),
+            TextColor = PaperResources.Colour("InkSoft"),
             VerticalOptions = LayoutOptions.Center,
         };
         marks[row.Id] = mark;

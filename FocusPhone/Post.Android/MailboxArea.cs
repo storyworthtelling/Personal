@@ -1383,7 +1383,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         IReadOnlyList<TimelineItem> items, string message, Action? onUndo, Action[] refresh)
     {
         var now = DateTimeOffset.Now;
-        var window = TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
+        var window = DogEar.UndoWindow(Host);
         foreach (var item in items)
         {
             deleteBuffer.Schedule(item, now, window);
@@ -1416,7 +1416,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                     CommitDelete(item);
                 }
             }
-        }, DesignTokens.Motion.UndoWindowMs);
+        }, (long)window.TotalMilliseconds);
     }
 
     private string OpenThreadTitle(ContactThread? thread)

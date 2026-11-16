@@ -63,7 +63,7 @@ public class AccordionPicker : LinearLayout
         header.Click += (_, _) => Toggle();
 
         var label = PaperUi.Body(context, prefix);
-        label.SetTextColor(PaperTheme.InkMuted);
+        label.SetTextColor(PaperTheme.InkSoft);
         header.AddView(label);
 
         value = PaperUi.Body(context, Current.Label);

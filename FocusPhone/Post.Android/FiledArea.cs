@@ -309,7 +309,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
     // Read on the search's own thread: a few short fields per ghost, never a body in full.
     private IReadOnlyList<FiledEntry> LoadEntries()
     {
-        var window = TimeSpan.FromMilliseconds(DesignTokens.Motion.UndoWindowMs);
+        var window = DogEar.UndoWindow(Host);
         using var database = TimelineDatabase.Open(Host);
         var raw = database.Filing.LoadEntries(settledBy: DateTimeOffset.UtcNow - window);
         var names = ContactNames();

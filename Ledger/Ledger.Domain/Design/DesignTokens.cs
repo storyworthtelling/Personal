@@ -25,6 +25,5 @@ public static class DesignTokens
         public const int QuickMs = 150;
         public const int StandardMs = 200;
         public const int InkMs = 320;
-        public const int UndoWindowMs = Storyworthtelling.Folds.FoldTiming.UndoWindowMs;
     }
 }

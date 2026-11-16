@@ -74,7 +74,7 @@ public static class ContinueRowView
             });
 
             var count = PaperUi.Mono(context, ContinueRowText.Count(mark));
-            count.SetTextColor(PaperTheme.InkMuted);
+            count.SetTextColor(PaperTheme.InkSoft);
             text.AddView(count);
         }
 

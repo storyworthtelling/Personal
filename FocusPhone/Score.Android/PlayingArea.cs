@@ -301,7 +301,7 @@ public sealed class PlayingArea : ScoreArea
             // An empty timed line is a rest — an instrumental — and it keeps its place
             // so the highlight has somewhere to go that is not a lyric.
             var view = PaperUi.Body(Host, line.Text);
-            view.SetTextColor(PaperTheme.InkMuted);
+            view.SetTextColor(PaperTheme.InkSoft);
             lyricViews.Add(view);
             column.AddView(view);
         }
@@ -329,7 +329,7 @@ public sealed class PlayingArea : ScoreArea
 
         if (litLine >= 0 && litLine < lyricViews.Count)
         {
-            lyricViews[litLine].SetTextColor(PaperTheme.InkMuted);
+            lyricViews[litLine].SetTextColor(PaperTheme.InkSoft);
         }
 
         litLine = at;

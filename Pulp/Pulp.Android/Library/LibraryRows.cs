@@ -80,7 +80,7 @@ internal static class LibraryRows
     public static TextView WhereLine(Activity host, string text, bool emphasis)
     {
         var view = PaperUi.Secondary(host, text);
-        view.SetTextColor(emphasis ? PaperTheme.InkSoft : PaperTheme.InkMuted);
+        view.SetTextColor(emphasis ? PaperTheme.InkSoft : PaperTheme.InkSoft);
         return view;
     }
 
@@ -88,7 +88,7 @@ internal static class LibraryRows
     public static void Strike(TextView title)
     {
         title.PaintFlags |= PaintFlags.StrikeThruText;
-        title.SetTextColor(PaperTheme.InkMuted);
+        title.SetTextColor(PaperTheme.InkSoft);
     }
 
     /// <summary>The pencil progress mark across a whole show (mockup 05, D227): the identity's mark on a deep-paper track.</summary>

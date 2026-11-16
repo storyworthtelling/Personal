@@ -686,7 +686,7 @@ public partial class BudgetPage : LedgerBinderPage
             "Moved to a new category",
             reverse: () => _ = UndoRecategorizeAsync(undo),
             DateTimeOffset.Now,
-            TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs));
+            Storyworthtelling.Maui.Views.DogEar.UndoWindow());
         dogEar.Refresh();
     }
 

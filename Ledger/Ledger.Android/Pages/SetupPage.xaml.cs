@@ -471,7 +471,7 @@ public partial class SetupPage : LedgerBinderPage
 
         // Undo-first (DESIGN.md §7, §13): the row goes at once and the dog-ear holds the way back for the
         // suite's one undo window; the bank is released and deleted only when that window closes.
-        var window = TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs);
+        var window = Storyworthtelling.Maui.Views.DogEar.UndoWindow();
         dogEarState.BeginUndo($"Removed {row.Name}", reverse: UndoBankRemoval, DateTimeOffset.Now, window);
         dogEar.Refresh();
 
@@ -609,7 +609,7 @@ public partial class SetupPage : LedgerBinderPage
                     $"Removed {categoryName}",
                     reverse: () => _ = UndoRemoveCategoryAsync(category),
                     DateTimeOffset.Now,
-                    TimeSpan.FromMilliseconds(Index.Domain.Design.DesignTokens.Motion.UndoWindowMs));
+                    Storyworthtelling.Maui.Views.DogEar.UndoWindow());
                 dogEar.Refresh();
                 break;
         }

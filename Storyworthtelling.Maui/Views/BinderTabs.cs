@@ -251,6 +251,10 @@ public class BinderTabs : ContentView
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) => AreaSelected?.Invoke(index);
         tab.GestureRecognizers.Add(tap);
+
+        // TalkBack hears a tab and which one is open (§17, audit 10 §6); the paper fill alone says it only to the eye.
+        SemanticProperties.SetDescription(tab, active ? $"{area.Label} tab, selected" : $"{area.Label} tab");
+        SemanticProperties.SetHint(tab, active ? string.Empty : $"Opens {area.Label}");
         return tab;
     }
 

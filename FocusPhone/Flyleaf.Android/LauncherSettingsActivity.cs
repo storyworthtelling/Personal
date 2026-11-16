@@ -380,7 +380,7 @@ public class LauncherSettingsActivity : Activity
                 undoPackage = null;
                 Render();
             }
-        }, DesignTokens.Motion.UndoWindowMs);
+        }, (long)DogEar.UndoWindow(this).TotalMilliseconds);
     }
 
     private void RenderUndoRow(string package)
@@ -657,7 +657,7 @@ public class LauncherSettingsActivity : Activity
         var row = BeginRow(card);
         newShelfField = new EditText(this) { Hint = "New shelf name" };
         newShelfField.SetTextColor(PaperTheme.Ink);
-        newShelfField.SetHintTextColor(PaperTheme.InkMuted);
+        newShelfField.SetHintTextColor(PaperTheme.InkSoft);
         newShelfField.Typeface = PaperTheme.SerifRegular(this);
         row.AddView(newShelfField, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
         row.AddView(PaperUi.QuietButton(this, "Add", () => AddShelf(newShelfField.Text)));
@@ -828,7 +828,7 @@ public class LauncherSettingsActivity : Activity
     {
         var row = AddCardRow(card, title, desc);
         var chevron = PaperUi.Secondary(this, "›");
-        chevron.SetTextColor(PaperTheme.InkMuted);
+        chevron.SetTextColor(PaperTheme.InkSoft);
         row.AddView(chevron, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent));
         row.Clickable = true;

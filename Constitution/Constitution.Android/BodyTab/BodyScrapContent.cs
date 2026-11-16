@@ -92,7 +92,7 @@ internal static class BodyScrapContent
         else
         {
             left.AddView(Text(context, card.ValueText, PaperTheme.Mono(context), DesignTokens.TypeSp.Body, PaperTheme.Ink));
-            var when = Text(context, card.WhenText, PaperTheme.SansRegular(context), DesignTokens.TypeSp.Label, PaperTheme.InkMuted);
+            var when = Text(context, card.WhenText, PaperTheme.SansRegular(context), DesignTokens.TypeSp.Label, PaperTheme.InkSoft);
             when.SetPadding(PaperTheme.Dp(context, DesignTokens.Space.X1), 0, 0, 0);
             left.AddView(when);
         }

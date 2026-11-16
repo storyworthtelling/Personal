@@ -1,9 +1,12 @@
+using Codex.Domain.Apps;
+
 namespace Codex.Domain.Policy;
 
 /// <summary>
 /// The always-hidden app categories the owner never wants on the phone — Games, Social apps (any
 /// app declaring the social category, except Google's own and the owner's suite), Dating,
-/// Gambling/betting, and Short-form video. Unlike the reversible Admin blocklist, these
+/// Gambling/betting, Short-form video, and any app rated M (Mature 17+) or Adults Only 18+ on Google
+/// Play (<see cref="PlayRating"/>; the owner's suite, the allowlist and Pulp's services are exempt). Unlike the reversible Admin blocklist, these
 /// are hard-suspended by policy and never surfaced, not even in Admin. Detected by BOTH Android's
 /// declared application category AND a curated package list, because many apps mis-declare their
 /// category. (Browsers other than the Flyleaf web view are handled separately, by the existing
@@ -54,13 +57,20 @@ public static class HardBlock
 
     /// <summary>The installed packages that fall in a never-visible category, by declared category
     /// OR the curated list.</summary>
-    public static IReadOnlySet<string> Detect(IEnumerable<(string Package, int AndroidCategory)> installed)
+    public static IReadOnlySet<string> Detect(IEnumerable<(string Package, int AndroidCategory)> installed) =>
+        Detect(installed, RatingBook.Empty);
+
+    /// <summary>As above, plus every installed app the rating book knows to be rated M or above. An app
+    /// whose rating is unknown (not yet looked up, or not on Play) is not blocked for it.</summary>
+    public static IReadOnlySet<string> Detect(
+        IEnumerable<(string Package, int AndroidCategory)> installed, RatingBook ratings)
     {
         var blocked = new HashSet<string>();
         foreach (var (package, androidCategory) in installed)
         {
             var social = IsSocialCategory(androidCategory) && !IsFirstParty(package);
-            if (IsNeverVisibleCategory(androidCategory) || social || CuratedPackages.Contains(package))
+            var mature = PlayRating.IsMature(ratings.RatingOf(package)) && !PlayRating.IsExempt(package);
+            if (IsNeverVisibleCategory(androidCategory) || social || mature || CuratedPackages.Contains(package))
             {
                 blocked.Add(package);
             }
