@@ -64,6 +64,9 @@ public sealed class ClaudeOptions
     // thrown away wholesale, not trimmed — a truncated read costs the whole pass.
     public int PassMaxTokens { get; set; } = 16_000;
 
+    // One turn at the round table (release H): a few sentences, or the host's small JSON move, at medium effort.
+    public int RoundTableMaxTokens { get; set; } = 3_000;
+
     // A reader on a novel writes more (R12: each reader's own novel-length purpose), so its pass gets more
     // room. The reasoning shares the budget, which is how a too-small ceiling truncated a read before.
     public int NovelReaderMaxTokens { get; set; } = 24_000;

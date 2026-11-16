@@ -1617,4 +1617,90 @@ public class ClaudeAnalysisClientTests
         Assert.Contains("The flood has not come yet.", user);
         Assert.Contains("SERIES BIBLE", user);
     }
+
+    private static readonly IReadOnlyList<Review> RoundTablePanel =
+    [
+        new("agent", "I'd take it.", "Strong opening.", ["the hook"], ["the middle"], "a tighter middle") { Score = 8, ScoreReason = "The hook." },
+        new("harsh-critic", "Not yet.", "Sags badly.", ["the prose"], ["the plot"], "a new plot") { Score = 3, ScoreReason = "The plot." },
+    ];
+
+    private static List<(string Text, bool Cached)> SystemOf(string body) =>
+        [.. JsonDocument.Parse(body).RootElement.GetProperty("system").EnumerateArray()
+            .Select(block => (block.GetProperty("text").GetString()!, block.TryGetProperty("cache_control", out _)))];
+
+    private static string UserOf(string body) =>
+        JsonDocument.Parse(body).RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
+
+    /// <summary>
+    /// Every round-table call opens with the same cached block, the panel's reads, so a show's thirty
+    /// calls share one prefix; the speaker's own instruction follows, and the transcript is the message.
+    /// </summary>
+    [Fact]
+    public async Task EveryRoundTableCallOpensWithTheSameCachedPanel()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"says\":\"Welcome.\",\"next\":\"agent\",\"ask\":\"What sold you?\",\"answering\":\"\",\"close\":false}"));
+        handler.EnqueueOk(Reply("Hugo Hook: The opening line sold me."));
+        var table = RoundTable.Empty;
+
+        var move = await client.RoundTableHost(RoundTablePanel, table, [], 15, StoryLength.ShortStory, CancellationToken.None);
+        table = RoundTablePlan.Spoken(RoundTablePlan.Apply(RoundTable.Empty, move, RoundTablePanel) with { }, "x");
+        var said = await client.RoundTableSpeak(PersonaCatalogue.ById("agent"), RoundTablePanel, table,
+            new RoundTableCue("agent", "What sold you?"), CancellationToken.None);
+
+        var host = SystemOf(handler.RequestBodies[0]);
+        var speaker = SystemOf(handler.RequestBodies[1]);
+        Assert.Equal(host[0], speaker[0]);
+        Assert.True(host[0].Cached);
+        Assert.Contains("Hugo Hook", host[0].Text);
+        Assert.Contains("8/10", host[0].Text);
+        Assert.Contains("Tae Boll", host[1].Text);
+        Assert.Contains("You are Hugo Hook", speaker[1].Text);
+        Assert.Contains("score stays", speaker[1].Text);
+        Assert.Contains("Tae Boll: Welcome.", UserOf(handler.RequestBodies[1]));
+        Assert.Contains("What sold you?", UserOf(handler.RequestBodies[1]));
+
+        Assert.Equal(new HostMove("Welcome.", "agent", "What sold you?", "", false), move);
+        // A speaker who labels its own line has the label taken off.
+        Assert.Equal("The opening line sold me.", said);
+    }
+
+    [Fact]
+    public async Task TheHostIsToldTheTurnsLeftAndTheRebuttalsStillOwed()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"says\":\"Nick?\",\"next\":\"harsh-critic\",\"ask\":\"Answer Hugo.\",\"answering\":\"agent\",\"close\":false}"));
+
+        var move = await client.RoundTableHost(RoundTablePanel, RoundTable.Empty,
+            RoundTablePlan.Owed(RoundTable.Empty, RoundTablePanel), 9, StoryLength.ShortStory, CancellationToken.None);
+
+        var user = UserOf(handler.RequestBodies[0]);
+        Assert.Contains("9", user);
+        Assert.Contains("Nick Picker should answer Hugo Hook", user);
+        Assert.Equal("agent", move.Answering);
+    }
+
+    [Fact]
+    public async Task AHostMoveThatWillNotReadFailsSoTheTurnIsTriedAgain()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("Let's begin!"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.RoundTableHost(RoundTablePanel, RoundTable.Empty, [], 15, StoryLength.ShortStory, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TheCloseSaysGoodbyeAndSummarisesWithoutRuling()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"says\":\"Thanks, both.\",\"agreed\":[\"The prose sings\"],\"stillDiffer\":[\"Whether the plot holds\"]}"));
+
+        var closing = await client.RoundTableClose(RoundTablePanel, RoundTable.Empty, CancellationToken.None);
+
+        Assert.Equal("Thanks, both.", closing.Says);
+        Assert.Equal(["The prose sings"], closing.Summary.Agreed);
+        Assert.Equal(["Whether the plot holds"], closing.Summary.StillDiffer);
+        Assert.Contains("never", SystemOf(handler.RequestBodies[0])[1].Text);
+    }
 }

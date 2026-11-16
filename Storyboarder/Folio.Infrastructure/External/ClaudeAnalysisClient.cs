@@ -1003,6 +1003,116 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "for between)\", \"otherBook\": \"the later title, for between, else an empty string\", \"era\": \"the era, "
         + "for era, else an empty string\"}";
 
+    // The round table (release H). Every call opens with the same cached block, the panel's independent
+    // reads, so a show's calls share one prefix; the speaker's own instruction follows it, cached too, since
+    // a reader speaks several times; the transcript, which grows, is the message.
+    public async Task<HostMove> RoundTableHost(
+        IReadOnlyList<Review> reviews, RoundTable table, IReadOnlyList<RoundTableCue> owed, int turnsLeft,
+        StoryLength length, CancellationToken cancellationToken)
+    {
+        var panelIds = string.Join("; ", reviews.Select(review => $"{review.PersonaId} = {RoundTablePlan.Name(review.PersonaId)}"));
+        var user = Transcript(table)
+            + $"\n\nTURNS LEFT: about {turnsLeft}."
+            + (owed.Count == 0
+                ? "\nEvery rebuttal owed has been given; you may close when the conversation has run its course."
+                : "\nREBUTTALS STILL OWED (each must happen before you close): "
+                  + string.Join("; ", owed.Select(cue => $"{RoundTablePlan.Name(cue.Speaker)} should answer {RoundTablePlan.Name(cue.Answering)}")))
+            + $"\nPANEL IDS: {panelIds}.";
+        var reply = await SendRoundTable(reviews, HostInstruction(length), user, nameof(RoundTableHost), cancellationToken);
+
+        var json = JsonResponse.ExtractObject(reply)
+                   ?? throw new InvalidOperationException("The round table host's move came back with no JSON.");
+        var dto = JsonResponse.Deserialize<HostMoveDto>(json)
+                  ?? throw new InvalidOperationException("The round table host's move came back unreadable.");
+        return new HostMove(dto.Says?.Trim() ?? string.Empty, dto.Next?.Trim() ?? string.Empty,
+            dto.Ask?.Trim() ?? string.Empty, dto.Answering?.Trim() ?? string.Empty, dto.Close);
+    }
+
+    public async Task<string> RoundTableSpeak(
+        Persona persona, IReadOnlyList<Review> reviews, RoundTable table, RoundTableCue cue, CancellationToken cancellationToken)
+    {
+        var name = persona.ReaderName ?? persona.Name;
+        var instruction =
+            $"You are {name}, the {persona.Name.ToLowerInvariant()}, on a podcast round table about this manuscript, hosted by "
+            + $"{RoundTablePlan.HostName}. Your voice: {persona.Voice}. The voice shapes how you talk, never what you judge. "
+            + "Your own independent read is in the panel above under your name: it is your memory of the book. The others' reads "
+            + "are there too. Speak one turn of conversation, as yourself: reply to what was just said and to whoever said it, "
+            + "by name; agree, push back, or concede a point in words where you have been persuaded. Your score stays what it "
+            + "was in your read; do not give a new one. Talk about the book as you read it; do not invent passages. Two to five "
+            + "sentences, plain prose: no speaker label, no stage directions.";
+        var user = Transcript(table) + $"\n\n{RoundTablePlan.HostName} has put this to you: {cue.Ask}"
+            + (cue.Answering.Length > 0 ? $"\nAnswer {RoundTablePlan.Name(cue.Answering)} directly." : string.Empty);
+        var reply = (await SendRoundTable(reviews, instruction, user, $"{nameof(RoundTableSpeak)}[{persona.Id}]", cancellationToken)).Trim();
+
+        // A speaker that labels its own line has the label taken off: the page prints the name.
+        foreach (var label in new[] { name, persona.Name })
+            if (reply.StartsWith(label + ":", StringComparison.OrdinalIgnoreCase))
+                reply = reply[(label.Length + 1)..].Trim();
+        return reply.Length > 0 ? reply : throw new InvalidOperationException($"{name} said nothing at the round table.");
+    }
+
+    public async Task<RoundTableClosing> RoundTableClose(
+        IReadOnlyList<Review> reviews, RoundTable table, CancellationToken cancellationToken)
+    {
+        var instruction =
+            $"You are {RoundTablePlan.HostName}, the host of this podcast round table about a manuscript. Your voice: "
+            + $"{RoundTablePlan.HostVoice}. Close the show in two or three sentences, thanking the panel. Then say where the "
+            + "readers ended up: what they came to agree on, and where they still differ. You never say who is right, and "
+            + "never rule on a split; lay it out. Reply with JSON only: {\"says\": \"your closing words\", \"agreed\": "
+            + "[\"one point they agree on, in a sentence\"], \"stillDiffer\": [\"one point they still differ on, naming who "
+            + "stands where\"]}";
+        var reply = await SendRoundTable(reviews, instruction, Transcript(table), nameof(RoundTableClose), cancellationToken);
+        var json = JsonResponse.ExtractObject(reply)
+                   ?? throw new InvalidOperationException("The round table's close came back with no JSON.");
+        var dto = JsonResponse.Deserialize<ClosingDto>(json)
+                  ?? throw new InvalidOperationException("The round table's close came back unreadable.");
+        return new RoundTableClosing(dto.Says?.Trim() ?? string.Empty, new RoundTableSummary(
+            [.. (dto.Agreed ?? []).Where(line => !string.IsNullOrWhiteSpace(line)).Select(line => line.Trim())],
+            [.. (dto.StillDiffer ?? []).Where(line => !string.IsNullOrWhiteSpace(line)).Select(line => line.Trim())]));
+    }
+
+    private static string HostInstruction(StoryLength length) =>
+        $"You are {RoundTablePlan.HostName}, the host of a podcast round table where seven readers talk about a "
+        + $"{ManuscriptLength.Noun(length)} they have each read on their own. Your voice: {RoundTablePlan.HostVoice}. Their "
+        + "independent reads and scores are in the panel above. Steer the conversation as a podcast host would: open by "
+        + "welcoming the panel and naming where they split; then, after each turn, hand the floor to whoever was just named, "
+        + "challenged or disagreed with, and ask the follow-up a listener would want. Make sure every rebuttal still owed "
+        + "happens: hand the reader the floor and say whom to answer. Readers may concede in words; their scores do not "
+        + "change. You never say who is right and never rule on a split. When the splits have been aired and nothing owed "
+        + "remains, you may close early; the turns left are a ceiling, not a target.\n\n"
+        + "Reply with JSON only: {\"says\": \"what you say aloud now, one to three sentences\", \"next\": \"the panel id "
+        + "of who speaks next, or an empty string when closing\", \"ask\": \"what you ask them\", \"answering\": \"the "
+        + "panel id of whom they should answer, or an empty string\", \"close\": false}";
+
+    // The panel's independent reads: the same text for every call of a show, so it is one cached prefix.
+    private static string Panel(IReadOnlyList<Review> reviews) =>
+        "THE PANEL'S INDEPENDENT READS\n\n" + string.Join("\n\n", reviews.Select(review =>
+        {
+            var persona = PersonaCatalogue.Readers.FirstOrDefault(reader => reader.Id == review.PersonaId);
+            var question = persona?.Question ?? string.Empty;
+            return $"{RoundTablePlan.Name(review.PersonaId)} ({persona?.Name ?? review.PersonaId}), asked \"{question}\": "
+                + (review.Score > 0 ? $"{review.Score}/10 — {review.ScoreReason}" : "unscored")
+                + $"\nVerdict: {review.Verdict}\nAssessment: {review.Assessment}"
+                + $"\nStrengths: {string.Join("; ", review.Strengths)}\nWeaknesses: {string.Join("; ", review.Weaknesses)}"
+                + $"\nWould need: {review.Condition}";
+        }));
+
+    private static string Transcript(RoundTable table) =>
+        table.Turns.Count == 0
+            ? "THE CONVERSATION SO FAR: nothing yet; the show is about to begin."
+            : "THE CONVERSATION SO FAR:\n" + string.Join("\n", table.Turns.Select(turn => $"{RoundTablePlan.Name(turn.Speaker)}: {turn.Words}"));
+
+    private Task<string> SendRoundTable(
+        IReadOnlyList<Review> reviews, string instruction, string user, string call, CancellationToken cancellationToken)
+    {
+        object[] system =
+        [
+            new { type = "text", text = Panel(reviews), cache_control = new { type = "ephemeral" } },
+            new { type = "text", text = instruction, cache_control = new { type = "ephemeral" } },
+        ];
+        return SendRaw(system, user, options.RoundTableMaxTokens, options.StrongModel, call, options.Effort, cancellationToken);
+    }
+
     public async Task<SeriesContinuity> AssessSeriesContinuity(
         string title, SeriesCanon priorCanon, string bibleText, StoryPlacement? placement,
         IReadOnlyList<ChapterNotes> notes, string continuitySummary, CancellationToken cancellationToken)
@@ -1615,6 +1725,22 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             .Where(e => !string.IsNullOrWhiteSpace(e.Name))
             .Select(e => new EntityMention(e.Name!, e.Description ?? string.Empty, e.Scale ?? string.Empty, e.Aliases ?? []))
             .ToList();
+
+    private sealed class HostMoveDto
+    {
+        public string? Says { get; set; }
+        public string? Next { get; set; }
+        public string? Ask { get; set; }
+        public string? Answering { get; set; }
+        public bool Close { get; set; }
+    }
+
+    private sealed class ClosingDto
+    {
+        public string? Says { get; set; }
+        public List<string>? Agreed { get; set; }
+        public List<string>? StillDiffer { get; set; }
+    }
 
     private sealed class PlacementDto
     {
