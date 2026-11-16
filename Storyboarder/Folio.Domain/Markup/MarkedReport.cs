@@ -17,7 +17,11 @@ public readonly record struct ChapterSpan(int Number, int StartOffset, int EndOf
 public sealed record UnplacedNote(string Source, string Chapter, string Text);
 
 /// <summary>One note in a chapter's list: its severity, the word naming it, and what it says.</summary>
-public sealed record ChapterNote(ReadinessTier Severity, string Label, string Text, string Source);
+public sealed record ChapterNote(ReadinessTier Severity, string Label, string Text, string Source)
+{
+    /// <summary>The finding's key (<see cref="FindingKey"/>), so the plan can link to the list it is in.</summary>
+    public string FindingKey { get; init; } = string.Empty;
+}
 
 /// <summary>
 /// The notes about one chapter that found no passage of their own (R7), printed as a list —
@@ -28,7 +32,7 @@ public sealed record ChapterNote(ReadinessTier Severity, string Label, string Te
 /// one (<see cref="FollowsTitle"/>), else at its first character, so the list is never printed after
 /// the first line of a paragraph. Notes run most severe first, then in the order they were found.</para>
 /// </summary>
-public sealed record ChapterNotes(int Chapter, int Offset, bool FollowsTitle, IReadOnlyList<ChapterNote> Notes);
+public sealed record ChapterNoteList(int Chapter, int Offset, bool FollowsTitle, IReadOnlyList<ChapterNote> Notes);
 
 /// <summary>What the report's findings come to once they are written on the manuscript.</summary>
 public sealed record MarkedReport(IReadOnlyList<Mark> Marks, IReadOnlyList<UnplacedNote> Unplaced)
@@ -36,5 +40,8 @@ public sealed record MarkedReport(IReadOnlyList<Mark> Marks, IReadOnlyList<Unpla
     public static MarkedReport Empty { get; } = new([], []);
 
     /// <summary>Each chapter's list of notes that could not be tied to a passage, in reading order.</summary>
-    public IReadOnlyList<ChapterNotes> ChapterNotes { get; init; } = [];
+    public IReadOnlyList<ChapterNoteList> ChapterNotes { get; init; } = [];
+
+    /// <summary>Every finding offered to the manuscript, keyed, wherever it ended up (<see cref="FindingCatalogue"/>).</summary>
+    public IReadOnlyList<FindingEntry> Findings { get; init; } = [];
 }

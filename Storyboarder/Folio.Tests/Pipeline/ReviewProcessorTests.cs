@@ -45,6 +45,7 @@ public class ReviewProcessorTests : IDisposable
     private readonly List<SceneToJudge> judgedScenes = [];
     private readonly List<string> synthesisReads = [];
     private int sectionsSeenBySynthesis;
+    private IReadOnlyList<Folio.Domain.Markup.FindingEntry> findingsSeenByPlan = [];
     private int readersSeenBySynthesis;
 
     public ReviewProcessorTests()
@@ -83,10 +84,13 @@ public class ReviewProcessorTests : IDisposable
 
         claude.Setup(c => c.Synthesise(
                 It.IsAny<string>(), It.IsAny<IReadOnlyList<SectionRead>>(), It.IsAny<IReadOnlyList<Review>>(),
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Returns((string passId, IReadOnlyList<SectionRead> sections, IReadOnlyList<Review> readers, int _, CancellationToken _) =>
+                It.IsAny<int>(), It.IsAny<IReadOnlyList<Folio.Domain.Markup.FindingEntry>>(), It.IsAny<CancellationToken>()))
+            .Returns((string passId, IReadOnlyList<SectionRead> sections, IReadOnlyList<Review> readers, int _,
+                IReadOnlyList<Folio.Domain.Markup.FindingEntry> findings, CancellationToken _) =>
             {
                 synthesisReads.Add(passId);
+                if (passId != "verdict")
+                    findingsSeenByPlan = findings;
                 sectionsSeenBySynthesis = sections.Count;
                 readersSeenBySynthesis = readers.Count;
                 return Task.FromResult(passId == "verdict"
@@ -411,6 +415,12 @@ public class ReviewProcessorTests : IDisposable
 
         Assert.Equal(8, sectionsSeenBySynthesis);
         Assert.Equal(7, readersSeenBySynthesis);
+
+        // The plan is shown every finding written on the manuscript, keyed, so each item can name the
+        // findings it draws on and link to them (R15).
+        Assert.Contains(findingsSeenByPlan, entry => entry.Text.Contains("How did the gate open?", StringComparison.Ordinal));
+        Assert.Contains(findingsSeenByPlan, entry => entry.Text.Contains("He felt the cold.", StringComparison.Ordinal));
+        Assert.All(findingsSeenByPlan, entry => Assert.Matches("^f[0-9a-f]{8}$", entry.Key));
 
         // One row per pass, all settled, so a re-run bills nothing again.
         using var context = database.NewContext();

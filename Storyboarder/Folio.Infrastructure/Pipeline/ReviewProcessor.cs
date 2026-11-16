@@ -1205,6 +1205,12 @@ public sealed class ReviewProcessor : IPipelineStep
                             await ReadSections(db, novel.Id, cancellationToken),
                             await ReadReaders(db, novel.Id, cancellationToken),
                             novel.WordCount,
+                            due.Id == "verdict"
+                                ? []
+                                : Folio.Domain.Markup.FindingCatalogue.Of(await FoldReport(
+                                    db, novel, analysis, novel.WordCount,
+                                    await SceneJudgements(db, novel.Id, cancellationToken),
+                                    SynthesisRead.Empty, cancellationToken)),
                             cancellationToken),
                         JsonResponse.CaseInsensitive)
                     : due.Persona!.Kind == PersonaKind.Reader
@@ -1281,45 +1287,13 @@ public sealed class ReviewProcessor : IPipelineStep
         {
             try
             {
-                var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
-                             ?? BookAnalysisResult.Empty;
-                var craft = analysis.CraftJson is null
-                    ? CraftReport.Empty
-                    : JsonSerializer.Deserialize<CraftReport>(analysis.CraftJson, JsonResponse.CaseInsensitive) ?? CraftReport.Empty;
-                var voice = analysis.VoiceJson is null
-                    ? VoiceConsistency.Empty
-                    : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive) ?? VoiceConsistency.Empty;
-                var expansion = analysis.ExpansionJson is null
-                    ? ExpansionReport.Empty
-                    : JsonSerializer.Deserialize<ExpansionReport>(analysis.ExpansionJson, JsonResponse.CaseInsensitive) ?? ExpansionReport.Empty;
-                var seriesContinuity = analysis.SeriesContinuityJson is null
-                    ? SeriesContinuity.Empty
-                    : JsonSerializer.Deserialize<SeriesContinuity>(analysis.SeriesContinuityJson, JsonResponse.CaseInsensitive) ?? SeriesContinuity.Empty;
-
                 var wordCount = await WordCount(db, novel.Id, cancellationToken);
                 var scenes = await GatherSceneEvidence(db, novel.Id, cancellationToken);
                 var review = await BuildDraftReview(db, novel, cancellationToken);
-                // The sixteen passes, folded last so the readers replace the omnibus reduce's reviews
-                // rather than sitting beside them.
-                var sections = await ReadSections(db, novel.Id, cancellationToken);
-                var readers = await ReadReaders(db, novel.Id, cancellationToken);
                 var synthesis = await ReadSynthesis(db, novel.Id, cancellationToken);
-
-                // Each scene's own judgement (release A3). When the scenes have been judged one by one,
-                // the craft reduce's separate scene list is not printed at all: it is the list that used
-                // to be zipped against the real scenes by position.
-                var judgements = scenes.Select(scene => scene.Judgement).OfType<SceneJudgement>().ToList();
-                if (judgements.Count > 0)
-                    craft = craft with { SceneBreakdown = [] };
-
-                var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount)
-                    .WithSceneJudgements(judgements)
-                    .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity)
-                    .WithReads(
-                        readers,
-                        sections.Where(section => section.HasContent).ToList(),
-                        synthesis.RevisionPlan,
-                        synthesis.Verdict);
+                var folded = await FoldReport(
+                    db, novel, analysis, wordCount,
+                    [.. scenes.Select(scene => scene.Judgement).OfType<SceneJudgement>()], synthesis, cancellationToken);
                 // The draft's own text, which the report marks the findings onto (Release G). Read
                 // here rather than carried through the reduce, because it is the largest thing in the
                 // database and every earlier step works from notes about it.
@@ -1982,6 +1956,67 @@ public sealed class ReviewProcessor : IPipelineStep
             .ToDictionary(group => group.Key, group => group.Last().Score);
 
         return new DraftReview(novel.DraftNumber, findings, resolved) { PreviousReaderScores = previousScores };
+    }
+
+    /// <summary>
+    /// The consolidated report with every part folded in: the craft, voice, expansion and continuity
+    /// reductions, each scene's own judgement, the fourteen reads and, when given, the two synthesis passes.
+    /// The render draws it; the plan's synthesis is shown the findings it holds (R15), so both read one fold.
+    /// </summary>
+    private async Task<BookAnalysisResult> FoldReport(
+        FolioDbContext db, Novel novel, BookAnalysis analysis, int wordCount, IReadOnlyList<SceneJudgement> judgements,
+        SynthesisRead synthesis, CancellationToken cancellationToken)
+    {
+        var report = JsonSerializer.Deserialize<BookAnalysisResult>(analysis.ConsolidatedJson, JsonResponse.CaseInsensitive)
+                     ?? BookAnalysisResult.Empty;
+        var craft = analysis.CraftJson is null
+            ? CraftReport.Empty
+            : JsonSerializer.Deserialize<CraftReport>(analysis.CraftJson, JsonResponse.CaseInsensitive) ?? CraftReport.Empty;
+        var voice = analysis.VoiceJson is null
+            ? VoiceConsistency.Empty
+            : JsonSerializer.Deserialize<VoiceConsistency>(analysis.VoiceJson, JsonResponse.CaseInsensitive) ?? VoiceConsistency.Empty;
+        var expansion = analysis.ExpansionJson is null
+            ? ExpansionReport.Empty
+            : JsonSerializer.Deserialize<ExpansionReport>(analysis.ExpansionJson, JsonResponse.CaseInsensitive) ?? ExpansionReport.Empty;
+        var seriesContinuity = analysis.SeriesContinuityJson is null
+            ? SeriesContinuity.Empty
+            : JsonSerializer.Deserialize<SeriesContinuity>(analysis.SeriesContinuityJson, JsonResponse.CaseInsensitive) ?? SeriesContinuity.Empty;
+
+        // The sixteen passes, folded last so the readers replace the omnibus reduce's reviews
+        // rather than sitting beside them.
+        var sections = await ReadSections(db, novel.Id, cancellationToken);
+        var readers = await ReadReaders(db, novel.Id, cancellationToken);
+
+        // Each scene's own judgement (release A3). When the scenes have been judged one by one,
+        // the craft reduce's separate scene list is not printed at all: it is the list that used
+        // to be zipped against the real scenes by position.
+        if (judgements.Count > 0)
+            craft = craft with { SceneBreakdown = [] };
+
+        var folded = report.WithCraft(craft).WithVoiceConsistency(voice).WithWordCount(wordCount)
+            .WithSceneJudgements(judgements)
+            .WithExpansion(expansion).WithSeriesContinuity(seriesContinuity)
+            .WithReads(
+                readers,
+                sections.Where(section => section.HasContent).ToList(),
+                synthesis.RevisionPlan,
+                synthesis.Verdict);
+
+        return folded;
+    }
+
+    /// <summary>Each judged scene's judgement, in reading order, without loading its picture.</summary>
+    private static async Task<IReadOnlyList<SceneJudgement>> SceneJudgements(
+        FolioDbContext db, Guid novelId, CancellationToken cancellationToken)
+    {
+        var stored = await db.Scenes
+            .Where(scene => scene.NovelId == novelId && scene.JudgementJson != null)
+            .OrderBy(scene => scene.Number)
+            .Select(scene => scene.JudgementJson!)
+            .ToListAsync(cancellationToken);
+        return [.. stored
+            .Select(json => JsonSerializer.Deserialize<SceneJudgement>(json, JsonResponse.CaseInsensitive))
+            .OfType<SceneJudgement>()];
     }
 
     // Builds each scene's evidence for the report: the rendered image (if any), cited "Ch. N · Scene M",

@@ -178,13 +178,15 @@ public interface IClaudeAnalysisClient
     /// plan, then the verdict. They run last for that reason. <paramref name="wordCount"/> is the
     /// manuscript's own measured length — not re-derived here, since the passes never see the
     /// manuscript itself — so the prompt can call the book what it actually is (short story, novella,
-    /// or novel) rather than assuming "novel".
+    /// or novel) rather than assuming "novel". <paramref name="findings"/> is every finding written on the
+    /// manuscript, keyed, so each plan item can name the ones it draws on (R15); the verdict is given none.
     /// </summary>
     Task<SynthesisRead> Synthesise(
         string passId,
         IReadOnlyList<SectionRead> sections,
         IReadOnlyList<Review> readers,
         int wordCount,
+        IReadOnlyList<Markup.FindingEntry> findings,
         CancellationToken cancellationToken);
 }
 

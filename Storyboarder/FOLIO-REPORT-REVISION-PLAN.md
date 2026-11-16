@@ -270,7 +270,14 @@ line took the colour of that line's first mark.
    - Colours come from `ReportPalette` only.
    - A contrast test checks the three stay distinguishable in greyscale.
 
-### Release D — Plan links and checkboxes (R15)
+### Release D — Plan links and checkboxes (R15) — **built**
+
+Built with content keys rather than thread ids: the finding rows' thread ids cover only the consolidation's
+four lists, while the manuscript's marks come from a dozen sources. Each finding written on the manuscript is
+keyed by a hash of its own content (`FindingKey`), so the plan pass and a later render name it the same way;
+the synthesis is shown that keyed list and returns the ids per item, and an id it was not shown is dropped.
+Each linked item also prints the page it leads to, because a pen on paper cannot follow a link.
+
 1. The synthesis that writes the plan returns, per item, the finding thread ids it draws on.
 2. Each item gets an internal PDF link to its first mark (or to its chapter's notes list) and a pen
    checkbox drawn on the line.

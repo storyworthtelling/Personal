@@ -26,7 +26,7 @@ public class NudgeNeverWriteTests
             .ToArray();
 
         Assert.Equal(
-            ["EndOffset", "Kind", "Label", "Provenance", "Reason", "Severity", "StartOffset"],
+            ["EndOffset", "FindingKey", "Kind", "Label", "Provenance", "Reason", "Severity", "StartOffset"],
             members);
     }
 

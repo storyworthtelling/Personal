@@ -46,7 +46,7 @@ internal static class MarkedManuscript
     /// </param>
     public static void Render(
         PageWriter writer, string manuscript, IReadOnlyList<Mark> marks, IReadOnlyList<SceneEvidence>? scenes = null,
-        IReadOnlyList<ChapterNotes>? chapterNotes = null)
+        IReadOnlyList<ChapterNoteList>? chapterNotes = null)
     {
         if (string.IsNullOrWhiteSpace(manuscript))
             return;
@@ -115,13 +115,15 @@ internal static class MarkedManuscript
     /// each note led by a rule in its severity's colour and dash, so it reads as the same kind of note
     /// the margin carries, gathered.
     /// </summary>
-    public static void DrawChapterNotes(PageWriter writer, ChapterNotes chapter)
+    public static void DrawChapterNotes(PageWriter writer, ChapterNoteList chapter)
     {
         using var italic = ReportType.BodyItalic();
         using var small = ReportType.Small();
 
         writer.Gap(PageGeometry.BlockGap / 2);
         writer.KeepTogether(italic.Spacing + (small.Spacing * 3));
+        foreach (var item in chapter.Notes)
+            writer.MarkPlace(item.FindingKey, PageGeometry.ContentLeft, writer.Y);
         writer.Paragraph("Notes on this chapter", italic, ReportPalette.InkMuted);
         foreach (var item in chapter.Notes)
         {

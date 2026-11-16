@@ -631,7 +631,14 @@ public sealed class AnalysisDocumentRenderer
             writer.Heading(tier, h3, Ink);
             writer.Continues(tier);
             foreach (var item in items)
-                writer.CheckItem(Sentences(item.Issue, item.SuggestedFix), item.Chapter, Chip(tier));
+            {
+                // The link to the first place its findings are written, and that page named for the pen (R15).
+                var place = writer.FirstPlace(item.Draws ?? []);
+                writer.CheckItem(
+                    Sentences(item.Issue, item.SuggestedFix),
+                    place is { } at ? Join(item.Chapter, $"page {at.Folio}") : item.Chapter,
+                    Chip(tier), place?.Destination);
+            }
         }
 
         var other = plan.Where(item => !Tiers.Any(tier => Matches(item, tier))).ToList();
@@ -641,9 +648,13 @@ public sealed class AnalysisDocumentRenderer
             writer.Heading("Other", h3, Ink);
             writer.Continues("Other");
             foreach (var item in other)
+            {
+                var place = writer.FirstPlace(item.Draws ?? []);
                 writer.CheckItem(
-                    Sentences(item.Issue, item.SuggestedFix), Join(item.Priority, item.Chapter),
-                    Chip("Consider"));
+                    Sentences(item.Issue, item.SuggestedFix),
+                    Join(item.Priority, item.Chapter, place is { } at ? $"page {at.Folio}" : null),
+                    Chip("Consider"), place?.Destination);
+            }
         }
 
         writer.Continues(null);
