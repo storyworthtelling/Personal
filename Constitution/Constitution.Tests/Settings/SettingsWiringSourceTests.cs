@@ -14,7 +14,7 @@ public class SettingsWiringSourceTests
     {
         var file = ConstitutionSource.Files(".cs")
             .SingleOrDefault(candidate => ConstitutionSource.Relative(candidate) == "Constitution.Android/" + relative);
-        Assert.True(file is not null, $"Constitution.Android/{relative} was not found.");
+        Assert.True(file is not null, $"Constitution.Android/{relative} wasn’t found.");
         return File.ReadAllText(file!);
     }
 

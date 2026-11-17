@@ -61,7 +61,7 @@ internal static class ChecklistPage
 
         var hue = PaperPalette.ResolveRole(BandRole(band), ColorTier.Mark, UiColorProfile.DocumentColor);
 
-        layout.DrawText(TaskBands.Heading(band).ToUpperInvariant(), headingFont, x, top,
+        layout.DrawText(TaskBands.Heading(band), headingFont, x, top,
             width, 11, TextAlign.TopLeft, hue);
         layout.DrawRect(x, top + 13, width, 1.6, fill: hue);
 

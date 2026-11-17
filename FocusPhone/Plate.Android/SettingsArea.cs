@@ -53,7 +53,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         PaperUi.CommitsAsTyped(passphrase, text => VaultPassphraseStore.Passphrase = text);
         vault.AddView(passphrase);
         vault.AddView(PaperUi.Secondary(Host,
-            "Shown in the clear on purpose: it is the one secret the vault cannot hold, so it "
+            "Shown in the clear on purpose: it is the one secret the vault can’t hold, so it "
             + "has to be read back and set identically in every app."));
 
         // The Google account, which is here for the vault and nothing else.
@@ -75,8 +75,8 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
             // "Cannot sign in" had no next step — Score and Storyboarder both surface it; Plate
             // never did.
             connections.AddView(PaperUi.Secondary(Host,
-                "If sign-in fails, register this app as an Android OAuth client (Drive API "
-                + $"enabled):\n\nPackage: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
+                "Setup note: if Google sign-in fails, this build isn’t registered with Google yet. Register it in the Google Cloud project with:\n\n"
+                + $"Package: {AppSigningInfo.PackageName}\nSigning fingerprint: {AppSigningInfo.Sha1Fingerprint()}"));
         }
 
         // The tablet: on the screen only while the pairing needs doing (never paired, or the tablet turned it
@@ -119,7 +119,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         ]);
 
         var note = PaperUi.Secondary(Host,
-            "Plate keeps nothing else. Photos go to your camera roll, scans to Documents.");
+            "Nothing leaves Plate until you send it. Until then the Darkroom holds the only copy.");
         note.SetPadding(0, gap, 0, gap);
         column.AddView(note);
 
@@ -155,9 +155,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         }
         catch (Exception e)
         {
-            ShowStatus($"Could not sign in: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google")}. Package: {AppSigningInfo.PackageName}, "
-                + $"SHA-1: {AppSigningInfo.Sha1Fingerprint()} — register these as an OAuth client "
-                + "if they aren't already.");
+            ShowStatus($"Couldn’t sign in: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google")}. If this build is new, see the setup note under Connections.");
         }
     }
 

@@ -103,7 +103,7 @@ public sealed class FileWorkoutOverridesTests : IDisposable
     public void AnUnreadableFileIsSetAside()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(PathOf())!);
-        File.WriteAllText(PathOf(), "{ this is not the file");
+        File.WriteAllText(PathOf(), "{ this isn’t the file");
 
         var store = Make();
 

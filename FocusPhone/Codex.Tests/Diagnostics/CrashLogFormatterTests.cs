@@ -60,4 +60,17 @@ public class CrashLogFormatterTests
     {
         Assert.False(CrashLogFormatter.TryParse("", out _));
     }
+
+    /// <summary>The header carries no codename (audit W11), and a report written under the old one still reads.</summary>
+    [Fact]
+    public void TheHeaderIsPlainAndAnOlderReportStillReads()
+    {
+        var report = new CrashReport(DateTimeOffset.Parse("2026-01-02T03:04:05Z", System.Globalization.CultureInfo.InvariantCulture), "Post", "System.Exception", "boom", "at nowhere");
+        var text = CrashLogFormatter.Format(report);
+
+        Assert.StartsWith("Crash report", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("FocusPhone", text, StringComparison.Ordinal);
+        Assert.True(CrashLogFormatter.TryParse("FocusPhone crash report" + text["Crash report".Length..], out var older));
+        Assert.Equal("boom", older!.Message);
+    }
 }

@@ -39,7 +39,7 @@ public class GroceryPageTests
         var pages = MealSheetGrocerySamples.Pages();
 
         Assert.Equal(["Dinners", "Breakfast and lunch", "Lunchboxes", "Groceries"], pages.Select(p => p.Title));
-        Assert.Contains("WEEKLY MEAL SHEET · 4 OF 5", Rendered(pages[3]));
+        Assert.Contains("Weekly meal sheet · 4 of 5", Rendered(pages[3]));
         Assert.Equal("4 of 5", pages[3].Printed.Single(i => i.Name == "page-number").Text);
         Assert.Contains("Constitution · Meals · week of Nov 15 · both tablets", Rendered(pages[3]));
     }
@@ -54,7 +54,7 @@ public class GroceryPageTests
         var page = MealSheetGrocerySamples.Page();
         var text = Rendered(page);
         var headings = page.Printed.Where(i => i.Name.EndsWith("-aisle", StringComparison.Ordinal)).ToList();
-        var expected = MealSheetGrocerySamples.Groceries().List.Sections.Select(s => Aisles.Label(s.Aisle).ToUpperInvariant()).ToList();
+        var expected = MealSheetGrocerySamples.Groceries().List.Sections.Select(s => Aisles.Label(s.Aisle)).ToList();
 
         Assert.Equal(expected, headings.Select(h => h.Text));
         Assert.Equal(headings.OrderBy(h => h.Bounds.Top), headings);
@@ -101,7 +101,7 @@ public class GroceryPageTests
         var page = MealSheetGrocerySamples.Page(MealSheetGrocerySamples.Model(groceries));
         var text = Rendered(page);
 
-        Assert.Contains("OVER BUDGET", text);
+        Assert.Contains("Over budget", text);
         Assert.Contains("34.50 over this month", text.Replace('\n', ' '));
         Assert.Contains("Say no to a dinner to bring it down.", text.Replace('\n', ' '));
 
@@ -122,7 +122,7 @@ public class GroceryPageTests
         var text = Rendered(page).Replace('\n', ' ');
 
         Assert.DoesNotContain(page.Printed, i => i.Name.StartsWith("budget-flag-", StringComparison.Ordinal));
-        Assert.DoesNotContain("OVER BUDGET", text);
+        Assert.DoesNotContain("Over budget", text);
         Assert.Contains("409.75 would be left of this month", text);
     }
 
@@ -142,10 +142,10 @@ public class GroceryPageTests
         var page = MealSheetGrocerySamples.Page();
         var text = Rendered(page);
 
-        Assert.DoesNotContain("YES", text);
+        Assert.DoesNotContain("Yes", text);
         Assert.DoesNotContain("No, because", text);
         Assert.DoesNotContain(page.Map.Targets, t => t.Kind == InkTargetKind.NoBecause);
-        Assert.Contains("STAPLES · TICK WHAT WE NEED MORE OF", text);
+        Assert.Contains("Staples · check what we need more of", text);
         Assert.Contains("Something we always keep that isn’t listed? Write it on a line.", text.Replace('\n', ' '));
     }
 
@@ -287,7 +287,7 @@ public class GroceryPageTests
         var model = MealSheetGrocerySamples.Model(Long());
         var pages = GroceryPages(model);
 
-        Assert.True(pages.Count >= 2, "the list does not fit one page");
+        Assert.True(pages.Count >= 2, "the list doesn’t fit one page");
         Assert.Equal("Groceries", pages[0].Title);
         Assert.All(pages.Skip(1), p => Assert.Equal("Groceries, continued", p.Title));
         Assert.All(pages, p => Assert.Empty(p.Violations()));
@@ -298,7 +298,7 @@ public class GroceryPageTests
         for (var index = 0; index < all.Count; index++)
         {
             Assert.Equal($"{index + 1} of {total}", all[index].Printed.Single(i => i.Name == "page-number").Text);
-            Assert.Contains($"WEEKLY MEAL SHEET · {index + 1} OF {total}", Rendered(all[index]));
+            Assert.Contains($"Weekly meal sheet · {index + 1} of {total}", Rendered(all[index]));
         }
     }
 
@@ -332,7 +332,7 @@ public class GroceryPageTests
         Assert.All(pages, p => Assert.Empty(p.Violations()));
         Assert.Equal(46, pages.Sum(p => Ticks(p).Count()));
         var text = Rendered(pages.ToArray());
-        Assert.Contains("STAPLES · TICK WHAT WE NEED MORE OF", text);
+        Assert.Contains("Staples · check what we need more of", text);
     }
 
     [Fact]

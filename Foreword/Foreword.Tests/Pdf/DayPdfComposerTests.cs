@@ -76,7 +76,7 @@ public class DayPdfComposerTests
         var line = SkiaPageLayout.LineHeight(font);
         var strip = DayPdfComposer.StripHeight(font);
 
-        Assert.True(strip > line, $"A {strip}pt strip cannot hold a {line}pt line.");
+        Assert.True(strip > line, $"A {strip}pt strip can’t hold a {line}pt line.");
         Assert.True(strip > 11, $"The old fixed height was 11pt and the text now needs {line}pt.");
     }
 
@@ -411,8 +411,8 @@ public class DayPdfComposerTests
         var meeting = words.Single(w => w.Text == "Standup").BoundingBox.Left;
 
         Assert.True(meeting > band,
-            $"The standup starts at {meeting:0.#} and the band's label at {band:0.#} — the meeting "
-            + "is drawn at the band's own edge rather than inside it.");
+            $"The standup starts at {meeting:0.#} and the band’s label at {band:0.#} — the meeting "
+            + "is drawn at the band’s own edge rather than inside it.");
     }
 
     /// <summary>

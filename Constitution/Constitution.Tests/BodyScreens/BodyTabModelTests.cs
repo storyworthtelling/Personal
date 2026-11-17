@@ -100,7 +100,7 @@ public class BodyTabModelTests
         var quarter = ScreenData.CardOf(PageSixteen(BodyWindow.Quarter), BodySignal.Sleep);
 
         Assert.Equal(FormHead.For(BodySignal.Sleep, BodyWindow.Month), month.Head);
-        Assert.Equal(("PERIOD", "QUARTER"), quarter.Head.Fields[2]);
+        Assert.Equal(("Period", "Quarter"), quarter.Head.Fields[2]);
     }
 
     // ---- the order ----
@@ -191,8 +191,8 @@ public class BodyTabModelTests
         var card = ScreenData.CardOf(BodyTabModel.Build(inputs), BodySignal.HeartRateVariability);
 
         Assert.Equal(SignalCardState.AskPermission, card.State);
-        Assert.Equal(("SIGNAL", "HEART RATE VARIABILITY"), card.Head.Fields[0]);
-        Assert.DoesNotContain(card.Head.Fields, field => field.Field == "PERIOD");
+        Assert.Equal(("Signal", "Heart rate variability"), card.Head.Fields[0]);
+        Assert.DoesNotContain(card.Head.Fields, field => field.Field == "Period");
     }
 
     [Fact]
@@ -274,7 +274,7 @@ public class BodyTabModelTests
             .Distinct()
             .ToList();
 
-        Assert.True(names.Count >= 40, $"The guard found only {names.Count} names; it is not reading the real model.");
+        Assert.True(names.Count >= 40, $"The guard found only {names.Count} names; it isn’t reading the real model.");
         var offenders = names.Where(HonestChartTests.IsJudgement).ToList();
         Assert.True(offenders.Count == 0, "Screen names that read as a judgement: " + string.Join(", ", offenders));
     }

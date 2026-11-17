@@ -105,7 +105,7 @@ public class PulpUsageContractTests
     private static string ContractConstant(string name)
     {
         var match = Regex.Match(ContractSource(), $@"public const string {Regex.Escape(name)}\s*=\s*""([^""]*)""\s*;");
-        Assert.True(match.Success, $"Could not find {name}'s literal value in IndexUsageContract.cs.");
+        Assert.True(match.Success, $"Couldn’t find {name}’s literal value in IndexUsageContract.cs.");
         return match.Groups[1].Value;
     }
 

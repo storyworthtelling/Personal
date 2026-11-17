@@ -242,7 +242,7 @@ public static class KeyAssignmentsCodec
         }
         catch (JsonException error)
         {
-            return KeyAssignmentsRead.Unreadable($"The record of issued keys is not valid JSON ({error.Message}).");
+            return KeyAssignmentsRead.Unreadable($"The record of issued keys isn’t valid JSON ({error.Message}).");
         }
     }
 
@@ -250,7 +250,7 @@ public static class KeyAssignmentsCodec
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
-            return KeyAssignmentsRead.Unreadable("The record of issued keys is not a JSON object.");
+            return KeyAssignmentsRead.Unreadable("The record of issued keys isn’t a JSON object.");
         }
 
         if (!root.TryGetProperty("version", out var version)
@@ -258,7 +258,7 @@ public static class KeyAssignmentsCodec
             || !version.TryGetInt32(out var number)
             || number != CurrentVersion)
         {
-            return KeyAssignmentsRead.Unreadable($"The record of issued keys is not version {CurrentVersion}, so it was not read.");
+            return KeyAssignmentsRead.Unreadable($"The record of issued keys isn’t version {CurrentVersion}, so it wasn’t read.");
         }
 
         if (!root.TryGetProperty("issued", out var issued) || issued.ValueKind != JsonValueKind.Array)
@@ -271,7 +271,7 @@ public static class KeyAssignmentsCodec
         {
             if (!TryRead(item, out var issue))
             {
-                return KeyAssignmentsRead.Unreadable("The record of issued keys holds an entry that is not an issue this app wrote.");
+                return KeyAssignmentsRead.Unreadable("The record of issued keys holds an entry that isn’t an issue this app wrote.");
             }
 
             issues.Add(issue!);

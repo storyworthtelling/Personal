@@ -152,7 +152,7 @@ public sealed class WorkoutArea : ScoreArea
         if (pool.IsThin)
         {
             column.AddView(PaperUi.Secondary(Host,
-                "That will loop. Friday's crate will be asked for more at this tempo."));
+                "That will loop. Friday’s crate will be asked for more at this tempo."));
 
             // Offered only when the pool is thin, and only while there is anything left
             // to look up — a button that is usually there and usually does nothing
@@ -161,7 +161,7 @@ public sealed class WorkoutArea : ScoreArea
             if (unmeasured > 0 && !lookingUp)
             {
                 column.AddView(PaperUi.Secondary(Host,
-                    $"{unmeasured} tracks have no tempo yet — most files never carry one."));
+                    (unmeasured == 1 ? "1 track has" : $"{Storyworthtelling.Time.Quantities.Number(unmeasured)} tracks have") + " no tempo yet — most files never carry one."));
                 column.AddView(PaperUi.SecondaryButton(Host, "Look up tempos", () => _ = LookUpTemposAsync()));
             }
         }
@@ -215,12 +215,12 @@ public sealed class WorkoutArea : ScoreArea
             // saying so is better than implying the lookup failed.
             lookupStatus = found == 0
                 ? "No tempos found for those."
-                : $"Found {found}. Rescan isn't needed — they're in the library now.";
+                : $"Found {found}. Rescan isn’t needed — they’re in the library now.";
             library.LoadCatalog();
         }
         catch (Exception e)
         {
-            lookupStatus = "Couldn't reach the tempo catalogue: " + e.Message;
+            lookupStatus = "Couldn’t reach the tempo catalog: " + Storyworthtelling.Diagnostics.PlainError.Describe(e) + " Try again in a moment.";
         }
         finally
         {

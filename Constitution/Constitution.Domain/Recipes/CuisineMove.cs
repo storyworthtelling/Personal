@@ -21,8 +21,8 @@ public sealed record CuisineMoveResult(HouseholdDocument Document, string? Refus
 /// </summary>
 public sealed record CuisineMove(RecipeId Card, Cuisine From, Cuisine To)
 {
-    public const string CardGoneSentence = "That card is not in the box any more.";
-    public const string CardUnreadableSentence = "That card cannot be read on this phone, so it was left where it is.";
+    public const string CardGoneSentence = "That card isn’t in the box any more.";
+    public const string CardUnreadableSentence = "That card can’t be read on this phone, so it was left where it is.";
 
     /// <summary>The move that puts the card back.</summary>
     public CuisineMove Inverse => new(Card, To, From);

@@ -51,7 +51,7 @@ public class UsageReceiver : BroadcastReceiver
         {
             if (!PulpUsageReceipt.TryParse(key => intent.GetStringExtra(key), out var receipt) || receipt is null)
             {
-                Log("received a usage receipt that did not parse; dropped");
+                Log("received a usage receipt that didn’t parse; dropped");
                 return;
             }
 

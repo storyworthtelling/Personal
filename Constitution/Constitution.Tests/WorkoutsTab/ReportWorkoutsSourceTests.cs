@@ -47,22 +47,22 @@ public sealed class ReportWorkoutsSourceTests
     [Fact]
     public void AnUnreadableReportSaysSoInItsOwnSentence()
     {
-        var rig = Make(new WorkoutWeekRecordRead.Unreadable("The saved week could not be read."));
+        var rig = Make(new WorkoutWeekRecordRead.Unreadable("The saved week couldn’t be read."));
 
         var read = Assert.IsType<WorkoutsRead.Unavailable>(rig.Source.Read(Monday));
 
-        Assert.Equal("The saved week could not be read.", read.Reason);
+        Assert.Equal("The saved week couldn’t be read.", read.Reason);
     }
 
     [Fact]
     public void ARecordOfIssuedNumbersThatCannotBeReadIsNotReplacedByAnEmptyOne()
     {
         var rig = Make();
-        rig.Issued.Read = KeyAssignmentsRead.Unreadable("The record of issued numbers could not be read.");
+        rig.Issued.Read = KeyAssignmentsRead.Unreadable("The record of issued numbers couldn’t be read.");
 
         var read = Assert.IsType<WorkoutsRead.Unavailable>(rig.Source.Read(Monday));
 
-        Assert.Equal("The record of issued numbers could not be read.", read.Reason);
+        Assert.Equal("The record of issued numbers couldn’t be read.", read.Reason);
     }
 
     [Fact]
@@ -90,11 +90,11 @@ public sealed class ReportWorkoutsSourceTests
     public void AWeekThatCannotBeSetUpSaysWhy()
     {
         var rig = Make();
-        rig.Requests.Answer = new WeekRequestRead.Unavailable("The household has not been set up yet.");
+        rig.Requests.Answer = new WeekRequestRead.Unavailable("The household hasn’t been set up yet.");
 
         var read = Assert.IsType<WorkoutsRead.Unavailable>(rig.Source.Read(Monday));
 
-        Assert.Equal("The household has not been set up yet.", read.Reason);
+        Assert.Equal("The household hasn’t been set up yet.", read.Reason);
     }
 
     [Fact]

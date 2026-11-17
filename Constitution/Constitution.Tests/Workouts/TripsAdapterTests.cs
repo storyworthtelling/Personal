@@ -202,7 +202,7 @@ public class TripAdapterTests
         {
             Assert.Equal(TravelAction.Paused, change.Action);
             Assert.Null(change.Replacement);
-            Assert.Equal("Paused: family holiday", change.Line);
+            Assert.Equal("Paused: family vacation", change.Line);
         });
     }
 
@@ -217,7 +217,7 @@ public class TripAdapterTests
         Assert.All(result.Notes, note =>
         {
             Assert.Equal(Sam, note.Person);
-            Assert.Equal("Paused: family holiday", note.Line);
+            Assert.Equal("Paused: family vacation", note.Line);
         });
     }
 
@@ -272,7 +272,7 @@ public class TripAdapterTests
 
         var reason = SamOf(result.Plan).NothingBecause;
         Assert.False(string.IsNullOrWhiteSpace(reason));
-        Assert.Contains("holiday", reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("vacation", reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -281,12 +281,12 @@ public class TripAdapterTests
         var unreadable = Request(CalendarsWith(sam: CalendarRead.Unreadable("Not shared yet.")));
         var plan = new HouseholdWorkoutPlan(
             WeekStart,
-            [new WeeklyPlan(Sam, WeekStart, [], "Sam's calendars could not all be read, so no workouts were planned."), new WeeklyPlan(Lee, WeekStart, [], null)],
+            [new WeeklyPlan(Sam, WeekStart, [], "Sam’s calendars couldn’t all be read, so no workouts were planned."), new WeeklyPlan(Lee, WeekStart, [], null)],
             []);
 
         var result = TripAdapter.Apply(unreadable, plan, Away(TripKind.FamilyHoliday, 0, 6));
 
-        Assert.Equal("Sam's calendars could not all be read, so no workouts were planned.", SamOf(result.Plan).NothingBecause);
+        Assert.Equal("Sam’s calendars couldn’t all be read, so no workouts were planned.", SamOf(result.Plan).NothingBecause);
     }
 
     [Fact]

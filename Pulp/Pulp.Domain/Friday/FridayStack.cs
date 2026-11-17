@@ -110,7 +110,7 @@ public sealed class FridayStack
         if (vetoes.Viewer != viewer)
         {
             throw new ArgumentException(
-                $"The vetoes are {vetoes.Viewer}'s, not {viewer}'s; vetoes are per viewer (D111).", nameof(vetoes));
+                $"The vetoes are {vetoes.Viewer}’s, not {viewer}’s; vetoes are per viewer (D111).", nameof(vetoes));
         }
 
         var turnover = FridayTurnover.Current(now, zone);
@@ -148,7 +148,7 @@ public sealed class FridayStack
     {
         if (!films.Contains(title) && !shows.Contains(title))
         {
-            throw new ArgumentException($"{title} is not in this week's stack.", nameof(title));
+            throw new ArgumentException($"{title} is not in this week’s stack.", nameof(title));
         }
 
         return new FridayStack(Viewer, Turnover, Until, films, shows, new HashSet<TitleId>(added) { title });
@@ -175,7 +175,7 @@ public sealed class FridayStack
     {
         if (vetoes.Viewer != Viewer)
         {
-            throw new ArgumentException($"The vetoes are {vetoes.Viewer}'s, not {Viewer}'s.", nameof(vetoes));
+            throw new ArgumentException($"The vetoes are {vetoes.Viewer}’s, not {Viewer}’s.", nameof(vetoes));
         }
 
         if (vetoes.IsVetoed(title))

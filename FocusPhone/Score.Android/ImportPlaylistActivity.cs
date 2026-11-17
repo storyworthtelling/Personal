@@ -93,7 +93,7 @@ public class ImportPlaylistActivity : Activity
         var id = SharedPlaylistLink.Parse(shared);
         if (id is null)
         {
-            Say("That share wasn't a Spotify playlist link.");
+            Say("That share wasn’t a Spotify playlist link.");
             return;
         }
 
@@ -108,13 +108,13 @@ public class ImportPlaylistActivity : Activity
         {
             // The page is read without an account and without anyone's blessing, so
             // it failing is an ordinary outcome and says so in a sentence.
-            Say($"Couldn't reach Spotify: {e.Message}");
+            Say("Couldn’t reach Spotify: " + Storyworthtelling.Diagnostics.PlainError.Describe(e, "Spotify") + " Try again in a moment.");
             return;
         }
 
         if (playlist.IsEmpty)
         {
-            Say("Couldn't read that playlist. It may be private, or Spotify's page may have changed.");
+            Say("Couldn’t read that playlist. It may be private, or Spotify’s page may have changed.");
             return;
         }
 

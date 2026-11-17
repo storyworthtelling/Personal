@@ -68,7 +68,7 @@ public static class CalendarScreenConnection
         HouseholdFileRole.Owner when unshared is { Count: > 0 } =>
             "Calendar connected. Pulp writes the household calendar each night. " + ShareProblem(unshared),
         HouseholdFileRole.Owner => "Calendar connected. Pulp writes the household calendar each night.",
-        HouseholdFileRole.SharedWith => "The household calendar is written from the owner's phone.",
+        HouseholdFileRole.SharedWith => "The household calendar is written from the owner’s phone.",
         _ => "The calendar waits until this phone knows whose it is.",
     };
 
@@ -76,7 +76,7 @@ public static class CalendarScreenConnection
     public static string ShareProblem(IReadOnlyList<string> accounts)
     {
         ArgumentNullException.ThrowIfNull(accounts);
-        return "Couldn't share with " + string.Join(" or ", accounts) + ".";
+        return "Couldn’t share with " + string.Join(" or ", accounts) + ".";
     }
 
     /// <summary>Only the owner's phone writes, so only it needs the consent (D145).</summary>

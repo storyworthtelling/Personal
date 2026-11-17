@@ -19,7 +19,7 @@ public class DesignTokensTests
         Assert.True(DesignTokens.Motion.QuickMs < DesignTokens.Motion.StandardMs,
             "Quick is meant to be the shorter of the two.");
         Assert.True(DesignTokens.Motion.UndoWindowMs >= 5_000,
-            "An undo window shorter than five seconds is not an undo, it is a flicker.");
+            "An undo window shorter than five seconds isn’t an undo, it is a flicker.");
     }
 
     [Fact]
@@ -27,7 +27,7 @@ public class DesignTokensTests
     {
         // DESIGN.md §17: texture is always on, and capped so it never fails contrast.
         Assert.InRange(DesignTokens.Grain.Alpha, 1, 40);
-        Assert.True(DesignTokens.Grain.Density > 1, "Every pixel carrying grain is not grain, it is a tint.");
+        Assert.True(DesignTokens.Grain.Density > 1, "Every pixel carrying grain isn’t grain, it is a tint.");
     }
 
     /// <summary>

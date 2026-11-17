@@ -46,7 +46,7 @@ public static class WorksheetReadBackInstruction
         }
         sb.Append(IndexSheet.Page.PageWidth.ToString("0.0", CultureInfo.InvariantCulture))
             .Append(" by ").Append(IndexSheet.Page.PageHeight.ToString("0.0", CultureInfo.InvariantCulture))
-            .Append(" points, measured in points from the page's top-left corner. Ignore all printed/typed text ")
+            .Append(" points, measured in points from the page’s top-left corner. Ignore all printed/typed text ")
             .Append("except where it names a printed category next to a box. Look ONLY at the hand-written ink ")
             .Append("inside the boxes listed below; every box is a small rounded rectangle drawn in ink, most ")
             .Append("with a printed \"$\" beside the writing area. ");
@@ -66,7 +66,7 @@ public static class WorksheetReadBackInstruction
                 .Append(" — the limit box on the ").Append(Ordinal(i + 1))
                 .Append(pageCount == 1 ? " printed category row from the top" : " printed category row, counting continuously from the top of the first page")
                 .Append(", whatever category name is printed immediately to its left. A whole-dollar figure, ")
-                .Append("or blank if the owner left last month's figure standing.\n");
+                .Append("or blank if the owner left last month’s figure standing.\n");
         }
 
         for (var i = 0; i < layout.SetAside.Count; i++)
@@ -75,7 +75,7 @@ public static class WorksheetReadBackInstruction
             sb.Append("- \"").Append(box.Name).Append("\" at (").Append(Coords(box)).Append(") ").Append(OnPage(box))
                 .Append(" — the box beside the ").Append(Ordinal(i + 1))
                 .Append(" printed line in the \"Set aside\" section, whatever title is printed immediately to ")
-                .Append("its left. A whole-dollar figure, or blank if the owner left last month's figure standing.\n");
+                .Append("its left. A whole-dollar figure, or blank if the owner left last month’s figure standing.\n");
         }
 
         foreach (var (nameBox, limitBox) in layout.NewCategories)
@@ -83,13 +83,13 @@ public static class WorksheetReadBackInstruction
             sb.Append("- \"").Append(nameBox.Name).Append("\" at (").Append(Coords(nameBox)).Append(") ").Append(OnPage(nameBox))
                 .Append(" — a blank write-in category NAME box (text, not a figure), or blank if unused.\n");
             sb.Append("- \"").Append(limitBox.Name).Append("\" at (").Append(Coords(limitBox)).Append(") ").Append(OnPage(limitBox))
-                .Append(" — that write-in category's limit box. A whole-dollar figure, or blank if unused.\n");
+                .Append(" — that write-in category’s limit box. A whole-dollar figure, or blank if unused.\n");
         }
 
         sb.Append(
             "\nRespond with ONLY a JSON array (no prose). One element per box that has ANY hand-written ink in " +
             "it — omit a box entirely if it is blank. Each element: {\"text\": string (the figure with no \"$\" " +
-            "sign, or the written name for a \"new-name:*\" box), \"when\": null, \"column\": the box's exact " +
+            "sign, or the written name for a \"new-name:*\" box), \"when\": null, \"column\": the box’s exact " +
             "name as given above, \"isTask\": false, \"confidence\": number 0..1 for how confident you are in " +
             "the transcription}. Use a low confidence rather than omitting the element when the writing is hard " +
             "to read — a box you attempted but could not make out should still be reported, at low confidence, " +

@@ -294,8 +294,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             return;
         }
         DogEar.SetNotice(Host, Overlay, NoticeKeys.MmsSend, new DogEar.Notice(
-            "A group text did not go out.",
-            "Post holds the texting role but the last group send failed. It will need to be sent again.",
+            "A group text didn’t go out.",
+            "Open the conversation and send it again.",
             PaperTheme.ProblemMark));
     }
 
@@ -741,7 +741,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             }
             catch (Exception e)
             {
-                RolodexWriteFailed(e, $"Could not save {name} to the Rolodex.");
+                RolodexWriteFailed(e, $"Couldn’t save {name} to the Rolodex.");
                 return null;
             }
             ReloadThreads();
@@ -768,7 +768,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 }
                 catch (Exception e)
                 {
-                    RolodexWriteFailed(e, $"Could not add them to {chosen.Name}.");
+                    RolodexWriteFailed(e, $"Couldn’t add them to {chosen.Name}.");
                     return;
                 }
                 ReloadThreads();
@@ -783,7 +783,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         var detail = cause switch
         {
             null => string.Empty,
-            Java.Lang.SecurityException => " Post does not have permission to write contacts yet.",
+            Java.Lang.SecurityException => " Post doesn’t have permission to write contacts yet.",
             _ => " Diagnostics has the details.",
         };
         if (cause is not null)
@@ -791,7 +791,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             PostDiagnostics.LogWarning("Rolodex", reason, cause);
         }
         DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
-            "The Rolodex did not change.",
+            "The Rolodex didn’t change.",
             reason + detail,
             PaperTheme.ProblemMark));
     }
@@ -887,7 +887,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             }
             catch (Exception e)
             {
-                failure = e.Message;
+                failure = Storyworthtelling.Diagnostics.PlainError.Describe(e);
                 Android.Util.Log.Warn("Post", $"Sync failed: {e}");
                 PostDiagnostics.LogWarning("Sync", "Sync failed", e);
             }
@@ -898,8 +898,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 DogEar.SetNotice(Host, Overlay, NoticeKeys.Sync, failure is null
                     ? null
                     : new DogEar.Notice(
-                        "Your mail did not come through.",
-                        "Post could not reach the account. What is already here is still here; it will "
+                        "Your mail didn’t come through.",
+                        "Post couldn’t reach the account. What is already here is still here; it will "
                         + "try again shortly. Diagnostics has the details.",
                         PaperTheme.ProblemMark,
                         "What happened →",
@@ -1642,8 +1642,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             Android.Util.Log.Warn("Post", $"Could not block {LogSafe.Number(number)}: {e.GetType().Name}");
             PostDiagnostics.LogWarning("Block", $"Could not block {LogSafe.Number(number)}", e);
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Block, new DogEar.Notice(
-                "That number was not blocked.",
-                "The phone would not accept it. Blocking is the system's list, not Post's, and it "
+                "That number wasn’t blocked.",
+                "The phone wouldn’t accept it. Blocking is the system’s list, not Post’s, and it "
                 + "refused — so calls from this number will still come through.",
                 PaperTheme.ProblemMark));
             return;
@@ -1749,14 +1749,14 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
 
         var when = offer.Event.StartsAt is { } time
-            ? $"{offer.Event.StartsOn:ddd d MMM} at {time:h:mm tt}"
-            : $"{offer.Event.StartsOn:ddd d MMM}, all day";
+            ? $"{offer.Event.StartsOn.ToString("ddd, MMM d", System.Globalization.CultureInfo.InvariantCulture)} at {TimeFormats.Clock12(offer.Event.StartsOn.ToDateTime(time))}"
+            : $"{offer.Event.StartsOn.ToString("ddd, MMM d", System.Globalization.CultureInfo.InvariantCulture)}, all day";
 
         var detail = offer.Clashed switch
         {
             true => $"{when}. Something else is already in that day.",
             false => $"{when}. The day is clear.",
-            null => $"{when}. Post could not read your calendar, so the day has not been checked.",
+            null => $"{when}. Post couldn’t read your calendar, so the day hasn’t been checked.",
         };
 
         DogEar.SetNotice(Host, Overlay, NoticeKeys.ProposedDate, new DogEar.Notice(
@@ -1792,8 +1792,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         // Reported rather than swallowed. Believing something is in the calendar when it is
         // not is the one outcome worse than never having been offered it.
         DogEar.SetNotice(Host, Overlay, NoticeKeys.ProposedDate, new DogEar.Notice(
-            "That did not reach your calendar.",
-            "Post could not write to it — there may be no calendar it is allowed to add to. "
+            "That didn’t reach your calendar.",
+            "Post couldn’t write to it — there may be no calendar it is allowed to add to. "
             + "The date is still here; nothing was lost.",
             PaperTheme.ProblemMark));
         FieldNotesStore.Record(Host, notes => notes.WithCalendarWrite(written: false));
@@ -1992,7 +1992,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         {
             sending.Failed($"{e.GetType().Name}: {e.Message}");
             PostDiagnostics.LogWarning("Sms", "Sending a text failed", e);
-            NotSent("Google Messages could not be reached and the phone refused the plain text too.");
+            NotSent("Google Messages couldn’t be reached, and the phone couldn’t send it as a plain text either. Try again in a moment.");
         }
     }
 
@@ -2005,7 +2005,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     }
 
     private void NotSent(string detail) =>
-        DogEar.ShowNotices(Host, Overlay, [new DogEar.Notice("That text did not go out.", detail, PaperTheme.ProblemMark)]);
+        DogEar.ShowNotices(Host, Overlay, [new DogEar.Notice("That text didn’t go out.", detail, PaperTheme.ProblemMark)]);
 
     // One picker for both photos and videos rather than two buttons beside Send.
     private void PickMedia(IReadOnlyList<string> recipients, string? conversationId)
@@ -2050,8 +2050,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             PostDiagnostics.LogWarning("Mms", "Sending a group text failed", e);
             DogEar.ShowNotices(Host, Overlay,
             [
-                new DogEar.Notice("That text did not go out.",
-                    "The send failed before it could even start.",
+                new DogEar.Notice("That text didn’t go out.",
+                    "It stopped before it went anywhere. Try again.",
                     PaperTheme.ProblemMark),
             ]);
         }

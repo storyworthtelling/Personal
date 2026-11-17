@@ -150,7 +150,7 @@ public class PulpUsageTests
     {
         var ledger = PulpUsageLedger.Empty.Apply(Receipt("streamly", "2026-09", 1, "2026-09-02", "Streamly"));
 
-        Assert.Equal("Opened 1 time in Pulp", PulpUsageLine.For(ledger, "Streamly", "2026-09", Today));
+        Assert.Equal("Opened once in Pulp", PulpUsageLine.For(ledger, "Streamly", "2026-09", Today));
     }
 
     [Fact]

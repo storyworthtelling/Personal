@@ -39,7 +39,7 @@ public sealed record MoodViewer
         if (children.Count == 0 || children.Any(child => child is null))
         {
             throw new ArgumentException(
-                "A sitting with children needs each child's rules; with none, use Adult and say so.", nameof(children));
+                "A sitting with children needs each child’s rules; with none, use Adult and say so.", nameof(children));
         }
 
         return new MoodViewer(viewer, children.ToList());

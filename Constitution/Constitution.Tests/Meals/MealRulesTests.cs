@@ -169,7 +169,7 @@ public class MealRulesTests
     {
         var request = Request();
         var planned = MealPlanner.Plan(request);
-        var week = Replace(Replace(Replace(planned, 0, DinnerChoice.Leftovers(Sunday, "Last night's.")), 1, DinnerChoice.EatOut(Sunday.AddDays(1), "Out.")), 2, DinnerChoice.NothingPlanned(Sunday.AddDays(2), "Free."));
+        var week = Replace(Replace(Replace(planned, 0, DinnerChoice.Leftovers(Sunday, "Last night’s.")), 1, DinnerChoice.EatOut(Sunday.AddDays(1), "Out.")), 2, DinnerChoice.NothingPlanned(Sunday.AddDays(2), "Free."));
 
         Assert.Empty(Check(request, week));
     }

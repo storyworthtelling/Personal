@@ -80,7 +80,7 @@ public partial class ContractPermissionsTests
     [MemberData(nameof(Rows))]
     public void EachEndNamesTheSameString(string head, string constant, string value)
     {
-        Assert.True(Resolve(constant) == value, $"{head} names {constant}, which is not {value}.");
+        Assert.True(Resolve(constant) == value, $"{head} names {constant}, which isn’t {value}.");
     }
 
     [Theory]
@@ -98,7 +98,7 @@ public partial class ContractPermissionsTests
         }
 
         var declared = DeclaredCustom().Matches(source).Count;
-        Assert.True(declared == Contracts.Count(row => row.Head == head), $"{head}'s ContractPermissions.cs declares a permission the table does not list.");
+        Assert.True(declared == Contracts.Count(row => row.Head == head), $"{head}’s ContractPermissions.cs declares a permission the table doesn’t list.");
     }
 
     [Theory]
@@ -136,7 +136,7 @@ public partial class ContractPermissionsTests
             .ToList();
 
         var unheld = named.Where(constant => !held.Contains(constant)).Distinct().ToList();
-        Assert.True(unheld.Count == 0, $"{head} sends under or is guarded by a permission it does not hold: {string.Join(", ", unheld)}");
+        Assert.True(unheld.Count == 0, $"{head} sends under or is guarded by a permission it doesn’t hold: {string.Join(", ", unheld)}");
     }
 
     /// <summary>
@@ -155,7 +155,7 @@ public partial class ContractPermissionsTests
             Assert.True(text.Contains("ContractBroadcast.Before(", StringComparison.Ordinal) || text.Contains("ContractCourier.Before(", StringComparison.Ordinal),
                 $"{name} sends without checking the receiver first.");
             Assert.True(text.Contains("ContractBroadcast.VersionExtra, ContractBroadcast.Version", StringComparison.Ordinal), $"{name} sends without a version.");
-            Assert.True(text.Contains("ContractBroadcast.SendLine(", StringComparison.Ordinal), $"{name} does not log how the send went.");
+            Assert.True(text.Contains("ContractBroadcast.SendLine(", StringComparison.Ordinal), $"{name} doesn’t log how the send went.");
         }
     }
 
@@ -171,9 +171,9 @@ public partial class ContractPermissionsTests
         {
             var text = File.ReadAllText(file);
             var name = Path.GetFileName(file);
-            Assert.True(text.Contains("ContractBroadcast.ReadVersion(", StringComparison.Ordinal), $"{name} does not read the version.");
+            Assert.True(text.Contains("ContractBroadcast.ReadVersion(", StringComparison.Ordinal), $"{name} doesn’t read the version.");
             Assert.True(text.Contains("ContractBroadcast.Accepts(", StringComparison.Ordinal), $"{name} would read a newer version as its own.");
-            Assert.True(text.Contains("ContractBroadcast.ReceiptLine(", StringComparison.Ordinal), $"{name} does not log what arrived.");
+            Assert.True(text.Contains("ContractBroadcast.ReceiptLine(", StringComparison.Ordinal), $"{name} doesn’t log what arrived.");
         }
     }
 
@@ -205,7 +205,7 @@ public partial class ContractPermissionsTests
             .Where(head => Sources(head).Any(file => SentUnder().IsMatch(File.ReadAllText(file))))
             .ToList();
 
-        Assert.True(missing.Count == 0, "A head sends under a permission and is not in the contract table: " + string.Join(", ", missing));
+        Assert.True(missing.Count == 0, "A head sends under a permission and isn’t in the contract table: " + string.Join(", ", missing));
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public partial class ContractPermissionsTests
             var manifests = Directory.EnumerateFiles(Root(head), "AndroidManifest.xml", SearchOption.AllDirectories).Where(Kept).Select(File.ReadAllText);
             var seesAll = sources.Any(text => text.Contains("Manifest.Permission.QueryAllPackages", StringComparison.Ordinal));
             var queries = manifests.Any(text => text.Contains($"<package android:name=\"{package}\" />", StringComparison.Ordinal));
-            Assert.True(seesAll || queries, $"{head} asks whether {package} is installed but cannot see it (no <queries> entry).");
+            Assert.True(seesAll || queries, $"{head} asks whether {package} is installed but can’t see it (no <queries> entry).");
         }
     }
 
@@ -244,7 +244,7 @@ public partial class ContractPermissionsTests
     // A const string is a literal, another const, or a sum of them; that is every shape the contracts use.
     private static string Evaluate(string type, string member, int depth)
     {
-        Assert.True(depth < 8, $"{type}.{member} does not resolve.");
+        Assert.True(depth < 8, $"{type}.{member} doesn’t resolve.");
         var definition = new Regex(@"const string " + Regex.Escape(member) + @"\s*=\s*(?<expr>[^;]+);");
         var expression = AllSources()
             .Select(File.ReadAllText)

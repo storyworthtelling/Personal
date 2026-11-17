@@ -10,20 +10,20 @@ public sealed record FormHead(string Signal, string Units, string? Period)
     /// <summary>The field name and the value beside it, in the order they are printed across the head.</summary>
     public IReadOnlyList<(string Field, string Value)> Fields =>
         Period is null
-            ? [("SIGNAL", Signal), ("UNITS", Units)]
-            : [("SIGNAL", Signal), ("UNITS", Units), ("PERIOD", Period)];
+            ? [("Signal", Signal), ("Units", Units)]
+            : [("Signal", Signal), ("Units", Units), ("Period", Period)];
 
     /// <summary>The head for one signal over one window; null for a chart that has no window yet.</summary>
     public static FormHead For(BodySignal signal, BodyWindow? window) => new(
-        BodySignals.Name(signal).ToUpperInvariant(),
-        BodySignals.Units(signal).ToUpperInvariant(),
+        BodySignals.Name(signal),
+        BodySignals.Units(signal),
         window is null ? null : PeriodWord(window.Value));
 
     private static string PeriodWord(BodyWindow window) => window switch
     {
-        BodyWindow.Month => "MONTH",
-        BodyWindow.Quarter => "QUARTER",
-        BodyWindow.Year => "YEAR",
-        _ => throw new ArgumentOutOfRangeException(nameof(window), window, "That is not one of Body's windows."),
+        BodyWindow.Month => "Month",
+        BodyWindow.Quarter => "Quarter",
+        BodyWindow.Year => "Year",
+        _ => throw new ArgumentOutOfRangeException(nameof(window), window, "That is not one of Body’s windows."),
     };
 }

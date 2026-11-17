@@ -37,7 +37,7 @@ public static class ChangeWords
         BodySignal.ActiveMinutes => $"{gap.ToString("0", Invariant)} minutes a day",
         BodySignal.Strength => $"{gap.ToString("0", Invariant)} lb",
         BodySignal.Calories => $"about {Rounded(gap, 10).ToString("N0", Invariant)} kcal a day",
-        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body's signals."),
+        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body’s signals."),
     };
 
     /// <summary>Sleep is held in hours but said in minutes, to the nearest five, until it is two hours or more.</summary>

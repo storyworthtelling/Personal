@@ -32,7 +32,7 @@ public static class PulpLogLines
         { } code => string.Create(CultureInfo.InvariantCulture, $"LOCKED OPEN refused by Flyleaf (answer {code}); opened plainly"),
     };
 
-    public static string LockedOpenNotSent(string why) => $"LOCKED OPEN could not be asked ({why}); opened plainly";
+    public static string LockedOpenNotSent(string why) => $"LOCKED OPEN couldn’t be asked ({why}); opened plainly";
 
     public static string Calendar(CalendarNightlyOutcome outcome)
     {

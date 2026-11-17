@@ -174,7 +174,7 @@ public class SeatFactsTests
     {
         var facts = SeatFacts.BodyMonthly(SleepSlipped("watch")).Facts;
 
-        Assert.Equal(["No watch readings yesterday.", "Today's line has a gap because of that."], facts);
+        Assert.Equal(["No watch readings yesterday.", "Today’s line has a gap because of that."], facts);
     }
 
     [Fact]

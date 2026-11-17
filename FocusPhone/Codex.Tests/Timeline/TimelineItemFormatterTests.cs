@@ -33,8 +33,8 @@ public class TimelineItemFormatterTests
     [Fact]
     public void Describe_Voicemail_PrefixesTranscription()
     {
-        Assert.Equal("Voicemail: Hi, it's mom",
-            TimelineItemFormatter.Describe(Item(TimelineItemKind.Voicemail, "Hi, it's mom")));
+        Assert.Equal("Voicemail: Hi, it’s mom",
+            TimelineItemFormatter.Describe(Item(TimelineItemKind.Voicemail, "Hi, it’s mom")));
     }
 
     [Theory]

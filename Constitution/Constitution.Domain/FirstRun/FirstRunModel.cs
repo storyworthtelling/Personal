@@ -38,7 +38,7 @@ public static class FirstRunModel
     [
         "Sign in with Google so Constitution can reach your calendar and Drive.",
         "Choose the vault passphrase. It unlocks the saved connections.",
-        "Tick what you have. The plan only uses these.",
+        "Check what you have. The plan only uses these.",
     ];
 
     private static readonly string[] Labels = ["Sign in with Google", "Save passphrase", "Done"];

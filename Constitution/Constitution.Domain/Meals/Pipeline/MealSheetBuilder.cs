@@ -66,7 +66,7 @@ public static class MealSheetBuilder
         {
             var id = dinner.Recipe!.Value;
             var card = request.Cards.FirstOrDefault(item => item.Id == id)
-                ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}'s dinner names a card that is not in the box, so the sheet cannot name it.", nameof(request));
+                ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}’s dinner names a card that is not in the box, so the sheet cannot name it.", nameof(request));
             var kids = dinner.ChildrenEatDifferently && request.KidsMeals.TryGetValue(dinner.Day, out var facts) ? facts.Meal.Title : null;
             var marker = request.SlowCookerCards.Contains(id)
                 ? MealMarker.SlowCooker

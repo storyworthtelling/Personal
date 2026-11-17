@@ -32,9 +32,9 @@ public class EmptyStateNeutralLineTests
     public void TheDrawnLinesAreTheDrawnLines()
     {
         // Mockup 13 draws these two word for word.
-        Assert.Equal("Nothing started yet. Discover has this week's stack.",
+        Assert.Equal("Nothing started yet. Discover has this week’s stack.",
             VoicedOccasions.For(VoiceSeat.EmptyContinueWatching).Line.Neutral);
-        Assert.Equal("That's the week. More on Friday.", VoicedOccasions.For(VoiceSeat.StackUsedUp).Line.Neutral);
+        Assert.Equal("That’s the week. More on Friday.", VoicedOccasions.For(VoiceSeat.StackUsedUp).Line.Neutral);
     }
 
     [Fact]

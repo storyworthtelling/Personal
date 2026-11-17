@@ -106,7 +106,7 @@ public class MainActivity : Activity
         }
         catch (Java.Lang.SecurityException e)
         {
-            SpikeLog.Note(this, $"Could not read Play Store's hidden state: {e.GetType().Name}.");
+            SpikeLog.Note(this, $"Couldn’t read Play Store’s hidden state: {e.GetType().Name}.");
             return false;
         }
     }
@@ -138,7 +138,7 @@ public class MainActivity : Activity
         {
             var sms = GetSystemService(Java.Lang.Class.FromType(typeof(SmsManager))) as SmsManager;
             sms!.SendTextMessage(to, null, "Test reply from the watch spike.", null, null);
-            SpikeLog.Note(this, "A test reply was handed to the watch's SMS service.");
+            SpikeLog.Note(this, "A test reply was handed to the watch’s SMS service.");
         }
         catch (Exception e)
         {
@@ -153,7 +153,7 @@ public class MainActivity : Activity
         var admin = new ComponentName(this, Java.Lang.Class.FromType(typeof(SpikeAdmin)));
         if (dpm is null || !dpm.IsDeviceOwnerApp(PackageName!))
         {
-            SpikeLog.Note(this, "Not device owner, so Play Store cannot be hidden.");
+            SpikeLog.Note(this, "Not device owner, so Play Store can’t be hidden.");
             Refresh();
             return;
         }
@@ -191,7 +191,7 @@ public class MainActivity : Activity
         }
         catch (Exception e)
         {
-            SpikeLog.Note(this, $"Reinstall could not start: {e.GetType().Name}.");
+            SpikeLog.Note(this, $"Reinstall couldn’t start: {e.GetType().Name}.");
         }
         Refresh();
     }

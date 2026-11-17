@@ -123,7 +123,7 @@ public sealed class LocalInstallStore
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or ArgumentException)
         {
             // Never silently replaced: a new id here would make this phone a second writer.
-            throw new HouseholdFormatException($"{FileName} is damaged and this install's writer id cannot be read: {exception.Message}", exception);
+            throw new HouseholdFormatException($"{FileName} is damaged and this install’s writer id cannot be read: {exception.Message}", exception);
         }
     }
 

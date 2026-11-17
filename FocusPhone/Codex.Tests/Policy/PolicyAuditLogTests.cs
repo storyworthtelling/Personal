@@ -53,15 +53,15 @@ public class PolicyAuditLogTests
     public void Record_CollapsesConsecutiveDuplicates_SoARecurringFailureIsLoggedOnce()
     {
         var log = PolicyAuditLog.Empty
-            .Record(Event(1, PolicyEventKind.SuspendFailed, "Could not suspend com.x"))
-            .Record(Event(2, PolicyEventKind.SuspendFailed, "Could not suspend com.x"))  // same pass, dup
-            .Record(Event(3, PolicyEventKind.SuspendFailed, "Could not suspend com.x")); // next pass, dup
+            .Record(Event(1, PolicyEventKind.SuspendFailed, "Couldn’t suspend com.x"))
+            .Record(Event(2, PolicyEventKind.SuspendFailed, "Couldn’t suspend com.x"))  // same pass, dup
+            .Record(Event(3, PolicyEventKind.SuspendFailed, "Couldn’t suspend com.x")); // next pass, dup
 
         Assert.Single(log.Events);
 
         // A different summary (or the same one after an intervening event) records again.
         log = log.Record(Event(4, PolicyEventKind.AppBlocked, "Blocked com.y"))
-                 .Record(Event(5, PolicyEventKind.SuspendFailed, "Could not suspend com.x"));
+                 .Record(Event(5, PolicyEventKind.SuspendFailed, "Couldn’t suspend com.x"));
         Assert.Equal(3, log.Events.Count);
     }
 

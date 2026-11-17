@@ -88,17 +88,17 @@ public class ContinueRowTextTests
 
     [Fact]
     public void AFilmSaysHowLongIsLeft() =>
-        Assert.Equal("Film · 1h 12m left", ContinueRowText.NextUp(FilmRow(new ProgressMark(46, 118, ProgressUnit.Minute)), null));
+        Assert.Equal("Film · 1 hr 12 min left", ContinueRowText.NextUp(FilmRow(new ProgressMark(46, 118, ProgressUnit.Minute)), null));
 
     [Fact]
     public void AFilmWithNoMarkIsJustAFilm() =>
         Assert.Equal("Film", ContinueRowText.NextUp(FilmRow(null), null));
 
     [Theory]
-    [InlineData(72, "1h 12m left")]
-    [InlineData(45, "45m left")]
-    [InlineData(120, "2h left")]
-    [InlineData(61, "1h 1m left")]
+    [InlineData(72, "1 hr 12 min left")]
+    [InlineData(45, "45 min left")]
+    [InlineData(120, "2 hr left")]
+    [InlineData(61, "1 hr 1 min left")]
     [InlineData(0, "Under a minute left")]
     public void TimeLeftReadsInHoursAndMinutes(int minutes, string expected) =>
         Assert.Equal(expected, ContinueRowText.Left(minutes));

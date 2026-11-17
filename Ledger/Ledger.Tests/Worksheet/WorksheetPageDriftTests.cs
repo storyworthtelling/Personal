@@ -54,10 +54,10 @@ public class WorksheetPageDriftTests
         using var document = Open(MockupPlan());
         var text = document.GetPage(1).Text;
 
-        Assert.Contains("keeps September's figure", text, StringComparison.Ordinal);
-        Assert.Contains("September's spending", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("Last month's spending", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("last month's figure", text, StringComparison.Ordinal);
+        Assert.Contains("keeps September’s figure", text, StringComparison.Ordinal);
+        Assert.Contains("September’s spending", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Last month’s spending", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("last month’s figure", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -66,9 +66,9 @@ public class WorksheetPageDriftTests
         using var document = Open(MockupPlan("2027-01"));
         var text = document.GetPage(1).Text;
 
-        Assert.Contains("December's figure", text, StringComparison.Ordinal);
-        Assert.Contains("December's spending", text, StringComparison.Ordinal);
-        Assert.Contains("DECEMBER", text, StringComparison.Ordinal);
+        Assert.Contains("December’s figure", text, StringComparison.Ordinal);
+        Assert.Contains("December’s spending", text, StringComparison.Ordinal);
+        Assert.Contains("December", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -77,9 +77,9 @@ public class WorksheetPageDriftTests
         using var document = Open(MockupPlan());
         var text = document.GetPage(1).Text;
 
-        Assert.Contains("SEPTEMBER", text, StringComparison.Ordinal);
-        Assert.Contains("OCTOBER LIMIT", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("LAST MONTH", text, StringComparison.Ordinal);
+        Assert.Contains("September", text, StringComparison.Ordinal);
+        Assert.Contains("October limit", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Last month", text, StringComparison.Ordinal);
     }
 
     // ---- the last-month column sits where the grid puts it ----
@@ -100,7 +100,7 @@ public class WorksheetPageDriftTests
         var figure = Single(page, "$548");
         Assert.Equal(WorksheetRegions.LastMonthColumnRight, PdfProbe.BoardX((float)figure.BoundingBox.Right), Tolerance);
 
-        var header = Single(page, "SEPTEMBER");
+        var header = Single(page, "September");
         Assert.Equal(WorksheetRegions.LastMonthColumnRight, PdfProbe.BoardX((float)header.BoundingBox.Right), Tolerance);
     }
 

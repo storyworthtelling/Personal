@@ -74,8 +74,8 @@ public class HonestChartTests
     {
         var types = BodyTypes();
         var names = types.SelectMany(NamesOf).Distinct().ToList();
-        Assert.True(types.Count >= 9, $"The guard found only {types.Count} Body types; it is not reading the real model.");
-        Assert.True(names.Count >= 60, $"The guard found only {names.Count} Body names; it is not reading the real model.");
+        Assert.True(types.Count >= 9, $"The guard found only {types.Count} Body types; it isn’t reading the real model.");
+        Assert.True(names.Count >= 60, $"The guard found only {names.Count} Body names; it isn’t reading the real model.");
 
         var offenders = names.Where(IsJudgement).ToList();
         Assert.True(offenders.Count == 0, "Body names that read as a judgement: " + string.Join(", ", offenders));
@@ -106,7 +106,7 @@ public class HonestChartTests
     {
         var shapeTypes = new[] { typeof(ChartGeometry), typeof(ChartPoint), typeof(ChartBridge) };
         var names = shapeTypes.SelectMany(NamesOf).Distinct().ToList();
-        Assert.True(names.Count >= 15, "The guard found too few names on the geometry; it is not reading it.");
+        Assert.True(names.Count >= 15, "The guard found too few names on the geometry; it isn’t reading it.");
 
         var offenders = names.Where(IsColour).ToList();
         Assert.True(offenders.Count == 0, "Geometry names that read as a colour or a verdict: " + string.Join(", ", offenders));
@@ -130,7 +130,7 @@ public class HonestChartTests
         Assert.True(properties.Count >= 9);
         var strays = properties.Where(property => !allowed.Contains(property.PropertyType))
             .Select(property => $"{property.DeclaringType!.Name}.{property.Name}: {property.PropertyType.Name}").ToList();
-        Assert.True(strays.Count == 0, "Geometry properties that are not a place or a reading: " + string.Join(", ", strays));
+        Assert.True(strays.Count == 0, "Geometry properties that aren’t a place or a reading: " + string.Join(", ", strays));
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public class HonestChartTests
         {
             if (!NeutralTokens.Contains(match.Groups["name"].Value))
             {
-                yield return new Finding(GuardScan.LineOf(code, match.Index), "a design token that is not neutral (" + match.Groups["name"].Value + ")");
+                yield return new Finding(GuardScan.LineOf(code, match.Index), "a design token that isn’t neutral (" + match.Groups["name"].Value + ")");
             }
         }
 
@@ -265,7 +265,7 @@ public class HonestChartTests
             ["a colour literal"] = $"var ink = Color.ParseColor(\"{hex}\");",
             ["a raw colour"] = "paint.Color = Color.Red;",
             ["a role colour"] = "paint.Color = PaperTheme.ProblemMark;",
-            ["a design token that is not neutral"] = "var c = DesignTokens.PositiveMark;",
+            ["a design token that isn’t neutral"] = "var c = DesignTokens.PositiveMark;",
             ["a name that reads as a judgement"] = "var targetLine = 3;",
         };
 

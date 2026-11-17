@@ -47,7 +47,7 @@ public static class MorningVoiceFacts
     }
 
     public static IReadOnlyList<string> Checklist(int tasks) =>
-        tasks <= 0 ? [] : [$"{Sentence(Count(tasks))} {(tasks == 1 ? "task is" : "tasks are")} on today's list."];
+        tasks <= 0 ? [] : [$"{Sentence(Count(tasks))} {(tasks == 1 ? "task is" : "tasks are")} on today’s list."];
 
     private static readonly string[] Words =
         ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];

@@ -74,7 +74,7 @@ public partial class DiagnosticsKeepNoViewingTests
     [Fact]
     public void TheHeadLogsThroughDiagnosticsAndTheGuardFindsIt()
     {
-        Assert.True(Calls().Count() > 20, "Expected the head's many Diagnostics.Warn calls; the guard has nothing to check.");
+        Assert.True(Calls().Count() > 20, "Expected the head’s many Diagnostics.Warn calls; the guard has nothing to check.");
     }
 
     [Fact]

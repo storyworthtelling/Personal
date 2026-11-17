@@ -36,13 +36,13 @@ public static class NoticeNotifications
 
     private static readonly NoticeNotification[] Table =
     [
-        new(NoticeKind.ReMarkableDelivery, 4101, ProblemRole, "Pages did not reach the tablet", "Open Constitution to see what to do."),
-        new(NoticeKind.HealthConnectRevoked, 4102, ProblemRole, "Health Connect was turned off", "The charts have stopped. Open Constitution to turn it back on."),
-        new(NoticeKind.BedOffline, 4103, ProblemRole, "The bed cannot be reached", "Open Constitution to see what to do."),
-        new(NoticeKind.ScanToCheck, 4104, ReferenceRole, "A scanned page is waiting", "It needs a quick look before it is kept."),
-        new(NoticeKind.BoxUnderTen, 4105, ReferenceRole, "The budget box is running low", "Worth knowing. Nothing to do."),
-        new(NoticeKind.WeekNotPlanned, 4106, ProblemRole, "The week could not be planned", "Open Constitution to see what to do."),
-        new(NoticeKind.HouseholdFileUnreadable, 4107, ProblemRole, "The household file will not open", "Open Constitution to see what to do."),
+        new(NoticeKind.ReMarkableDelivery, 4101, ProblemRole, "Pages didn’t reach the reMarkable", "Pair the reMarkable again and Constitution sends them."),
+        new(NoticeKind.HealthConnectRevoked, 4102, ProblemRole, "Health Connect was switched off", "The charts have stopped. Open Constitution to switch it back on."),
+        new(NoticeKind.BedOffline, 4103, ProblemRole, "The bed couldn’t be reached", "Sign in to the bed again and the sleep line picks back up."),
+        new(NoticeKind.ScanToCheck, 4104, ReferenceRole, "A scanned card is waiting to be checked", "Some words were hard to read. Check it before it is kept."),
+        new(NoticeKind.BoxUnderTen, 4105, ReferenceRole, "The recipe box needs more cards", "Scan a card; weekly meal sheets start once there are enough."),
+        new(NoticeKind.WeekNotPlanned, 4106, ProblemRole, "This week couldn’t be planned", "A calendar or record couldn’t be read. Constitution looks again at the next run."),
+        new(NoticeKind.HouseholdFileUnreadable, 4107, ProblemRole, "The household file won’t open", "Check the vault passphrase in Settings."),
     ];
 
     /// <summary>The kinds that post, in table order.</summary>

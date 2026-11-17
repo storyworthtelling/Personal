@@ -96,7 +96,7 @@ public class MealWeekRunPublishTests
     public async Task AFailedPublishIsReportedAndTheRunStillPlanned()
     {
         var (rig, publisher) = Rigs();
-        publisher.Answer = new WeekPlanPublication.NotPublished(WeekPlanNotPublishedBecause.FileUnreadable, "The household file cannot be opened.");
+        publisher.Answer = new WeekPlanPublication.NotPublished(WeekPlanNotPublishedBecause.FileUnreadable, "The household file can’t be opened.");
 
         var outcome = await RunAsync(rig, publisher);
 
@@ -155,7 +155,7 @@ public class MealWeekRunPublishTests
     public async Task AStopNeverPublishes()
     {
         var (rig, publisher) = Rigs();
-        rig.Box.Answer = new Constitution.Domain.Recipes.Screens.RecipeBoxRead.Unavailable("The box cannot be read.");
+        rig.Box.Answer = new Constitution.Domain.Recipes.Screens.RecipeBoxRead.Unavailable("The box can’t be read.");
 
         await RunAsync(rig, publisher);
 

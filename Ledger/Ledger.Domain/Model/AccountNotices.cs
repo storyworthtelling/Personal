@@ -133,8 +133,8 @@ public static class AccountNotices
         // "Its figures are from then": the last good refresh is both the date the connection was lost
         // (as near as Index can know it) and the date the figures are from.
         var detail = institution.LastRefreshedUtc is { } refreshed
-            ? $"Plaid lost the connection on {ShortDate(refreshed, now)}, so its figures are from then. Reconnecting needs Admin mode."
-            : "Plaid lost the connection before it ever refreshed, so there are no figures yet. Reconnecting needs Admin mode.";
+            ? $"Plaid lost the connection on {ShortDate(refreshed, now)}, so its figures are from then. Reconnecting needs admin mode."
+            : "Plaid lost the connection before it ever refreshed, so there are no figures yet. Reconnecting needs admin mode.";
 
         return new AccountNotice(
             $"{institution.Name} needs signing in",

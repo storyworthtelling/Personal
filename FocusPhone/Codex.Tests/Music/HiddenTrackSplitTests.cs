@@ -53,7 +53,7 @@ public class HiddenTrackSplitTests
     {
         var result = HiddenTrackSplit.Apply(Original, Segments, hiddenTitle: null);
 
-        Assert.Equal("Hidden Track", result[1].Title);
+        Assert.Equal("Hidden track", result[1].Title);
     }
 
     [Theory]
@@ -63,7 +63,7 @@ public class HiddenTrackSplitTests
     {
         var result = HiddenTrackSplit.Apply(Original, Segments, blank);
 
-        Assert.Equal("Hidden Track", result[1].Title);
+        Assert.Equal("Hidden track", result[1].Title);
     }
 
     // Everything about the source that is not specific to timing carries forward

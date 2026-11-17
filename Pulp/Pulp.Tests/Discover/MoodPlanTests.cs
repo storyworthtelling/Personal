@@ -141,13 +141,13 @@ public class MoodPlanTests
 
         var result = MoodPlan.Resolve(ChildQuery(), everything, KnownTitles, MoodViewer.Child(WrenRules), FranchisesOf);
 
-        Assert.True(hiddenNamed.Count >= 3, "The fixture must name titles Wren's filter hides, or this guard checks nothing.");
+        Assert.True(hiddenNamed.Count >= 3, "The fixture must name titles Wren’s filter hides, or this guard checks nothing.");
         Assert.Contains(Nightwater.Id, hiddenNamed);
         Assert.Contains(Unrated.Id, hiddenNamed);
         Assert.Contains(Lantern.Id, hiddenNamed);
         Assert.NotEmpty(result.Titles);
         Assert.DoesNotContain(result.Titles, title => hiddenNamed.Contains(title.Id));
-        Assert.True(result.Hidden >= 3, $"Only {result.Hidden} titles were hidden; the filter was not asked.");
+        Assert.True(result.Hidden >= 3, $"Only {result.Hidden} titles were hidden; the filter wasn’t asked.");
     }
 
     [Fact]

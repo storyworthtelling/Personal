@@ -64,7 +64,7 @@ public class MealSheetPageTests
         var text = Rendered(page);
 
         Assert.Equal("Dinners", page.Title);
-        Assert.Contains("WEEKLY MEAL SHEET · 1 OF 5", text);
+        Assert.Contains("Weekly meal sheet · 1 of 5", text);
         Assert.Contains("Constitution · Meals · week of Nov 15 · both tablets", text);
         Assert.Equal("1 of 5", page.Printed.Single(i => i.Name == "page-number").Text);
     }
@@ -76,15 +76,15 @@ public class MealSheetPageTests
 
         foreach (var day in Week)
         {
-            var yes = page.Printed.Single(i => i.OwnerId == MealSheetIds.DinnerYes(day) && i.Text == "YES");
+            var yes = page.Printed.Single(i => i.OwnerId == MealSheetIds.DinnerYes(day) && i.Text == "Yes");
             var no = page.Printed.Single(i => i.OwnerId == MealSheetIds.DinnerReason(day) && i.Text == "No, because");
 
             Assert.True(yes.Bounds.Top > page.Map.ById(MealSheetIds.DinnerYes(day)).Bounds.Bottom, "YES is under its box");
-            Assert.True(no.Bounds.Right <= page.Map.ById(MealSheetIds.DinnerReason(day)).Bounds.Left, "No, because stands at the field's left");
+            Assert.True(no.Bounds.Right <= page.Map.ById(MealSheetIds.DinnerReason(day)).Bounds.Left, "No, because stands at the field’s left");
         }
 
         var text = Rendered(page);
-        Assert.Equal(7 + 1, text.Split("YES").Length - 1); // seven rows, and the tick line's own YES
+        Assert.Equal(7 + 1, text.Split("Yes").Length - 1); // seven rows, and the tick line's own YES
         Assert.Equal(7, text.Split("No, because").Length - 1);
     }
 
@@ -94,10 +94,10 @@ public class MealSheetPageTests
         var page = MealSheetSamples.Page();
         var words = Texts(page, PrintedRole.Label).ToList();
 
-        Assert.Contains("SLOW COOKER", words);
-        Assert.Contains("NEW RECIPE", words);
-        Assert.Contains("EATING OUT", words);
-        Assert.Equal(3, words.Count(w => w is "SLOW COOKER" or "NEW RECIPE" or "EATING OUT"));
+        Assert.Contains("Slow cooker", words);
+        Assert.Contains("New recipe", words);
+        Assert.Contains("Eating out", words);
+        Assert.Equal(3, words.Count(w => w is "Slow cooker" or "New recipe" or "Eating out"));
 
         using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.RenderContent([page]));
         var header = PdfReadBack.Rgb(AppIdentityTokens.ConstitutionDocument);
@@ -155,7 +155,7 @@ public class MealSheetPageTests
         var page = MealSheetSamples.Page();
 
         Assert.Contains("Anything untouched is approved Sunday morning.", Rendered(page));
-        Assert.Contains("Tick YES to approve, or write after NO, BECAUSE.", Rendered(page));
+        Assert.Contains("Check Yes to approve, or write after it why not.", Rendered(page));
 
         var evening = MealSheetSamples.Page(MealSheetSamples.Model(deadline: new DateTimeOffset(2026, 11, 22, 19, 0, 0, TimeSpan.FromHours(-5))));
         Assert.Contains("Anything untouched is approved Sunday evening.", Rendered(evening));
@@ -174,7 +174,7 @@ public class MealSheetPageTests
     public void LeftoversAndNothingPlannedRows()
     {
         var dinners = MealSheetSamples.Dinners().ToList();
-        dinners[5] = DinnerChoice.Leftovers(MealSheetSamples.Sunday.AddDays(5), "Thursday's pan makes enough.");
+        dinners[5] = DinnerChoice.Leftovers(MealSheetSamples.Sunday.AddDays(5), "Thursday’s pan makes enough.");
         dinners[6] = DinnerChoice.NothingPlanned(MealSheetSamples.Sunday.AddDays(6), "Company comes.");
         var page = MealSheetSamples.Page(MealSheetSamples.Model(dinners));
         var text = Rendered(page);

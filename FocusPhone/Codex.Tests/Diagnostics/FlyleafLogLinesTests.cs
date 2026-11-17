@@ -16,10 +16,10 @@ public class FlyleafLogLinesTests
     [Fact]
     public void OnlyEventsTheAuditActuallyRecordsAreNewSoARepeatedFailureIsOneLine()
     {
-        var log = PolicyAuditLog.Empty.Record([Event(PolicyEventKind.SuspendFailed, "Could not suspend: com.example.game")]);
+        var log = PolicyAuditLog.Empty.Record([Event(PolicyEventKind.SuspendFailed, "Couldn’t suspend: com.example.game")]);
 
         var fresh = log.NewlyRecorded([
-            Event(PolicyEventKind.SuspendFailed, "Could not suspend: com.example.game", 5),
+            Event(PolicyEventKind.SuspendFailed, "Couldn’t suspend: com.example.game", 5),
             Event(PolicyEventKind.Applied, "12 restrictions · 3 suspended · 40 released · 6 grants · admin off", 5),
         ]);
 
@@ -31,8 +31,8 @@ public class FlyleafLogLinesTests
     public void ARepeatInsideOneBatchCollapsesToo()
     {
         var fresh = PolicyAuditLog.Empty.NewlyRecorded([
-            Event(PolicyEventKind.GrantFailed, "Could not grant X"),
-            Event(PolicyEventKind.GrantFailed, "Could not grant X"),
+            Event(PolicyEventKind.GrantFailed, "Couldn’t grant X"),
+            Event(PolicyEventKind.GrantFailed, "Couldn’t grant X"),
         ]);
 
         Assert.Single(fresh);
@@ -57,8 +57,8 @@ public class FlyleafLogLinesTests
     [Fact]
     public void APolicyLineNamesTheKind()
     {
-        Assert.Equal("POLICY SuspendFailed: Could not suspend: com.example.game",
-            PolicyLogLines.Line(Event(PolicyEventKind.SuspendFailed, "Could not suspend: com.example.game")));
+        Assert.Equal("POLICY SuspendFailed: Couldn’t suspend: com.example.game",
+            PolicyLogLines.Line(Event(PolicyEventKind.SuspendFailed, "Couldn’t suspend: com.example.game")));
     }
 
     [Theory]
@@ -73,6 +73,6 @@ public class FlyleafLogLinesTests
     [Fact]
     public void ACallScreenThatWouldNotOpenSaysSo()
     {
-        Assert.Equal("CALL Incoming: the call screen did not open", CallNotice.Line(CallNoticeKind.Incoming, surfaced: true, opened: false));
+        Assert.Equal("CALL Incoming: the call screen didn’t open", CallNotice.Line(CallNoticeKind.Incoming, surfaced: true, opened: false));
     }
 }

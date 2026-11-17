@@ -220,7 +220,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             // The read itself failed (not "no such package"). Claiming Admin mode is open would send the
             // owner to a browser that may be blocked, so the cautious answer is the one that names the
             // way out; the failure is in the log for whoever diagnoses it.
-            logger.LogWarning(ex, "Connect: could not read Chrome's state; treating Admin mode as needed.");
+            logger.LogWarning(ex, "Connect: could not read Chrome’s state; treating Admin mode as needed.");
             return AdminModeState.Needed;
         }
     }
@@ -410,7 +410,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             {
                 logger.LogWarning("Connect: Plaid returned no hosted_link_url; cannot open Link.");
                 Trail(t => t.LinkTokenFailed(DateTimeOffset.Now, "no hosted_link_url"));
-                ShowProblem("Couldn’t open Plaid Link. Check your credentials and environment in Settings.");
+                ShowProblem("Couldn’t open Plaid. Check the Plaid client id and secret in Settings.");
                 return false;
             }
 
@@ -422,7 +422,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
         {
             logger.LogError(ex, "Connect: failed to start Plaid Link.");
             Trail(t => t.LinkTokenFailed(DateTimeOffset.Now, ex.GetType().Name));
-            ShowProblem($"Couldn’t start Plaid Link: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Plaid")}");
+            ShowProblem($"Couldn’t open Plaid: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Plaid")}");
             return false;
         }
     }
@@ -539,7 +539,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             // (audit W8.2b: it was an alert in front of a connection that had already worked).
             if (backup.NeedsAttention)
                 CarriedNotices.Shared.Carry("vault-backup", new DogEarNotice(
-                    "The new bank’s backup did not finish.", backup.Message, DogEarHue.Problem));
+                    "The new bank’s backup didn’t finish.", backup.Message, DogEarHue.Problem));
 
             // Kick an immediate refresh so balances appear without waiting for the daily cycle, then
             // turn to Accounts, where the new bank's cards appear (no toast: the cards are the news).

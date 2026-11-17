@@ -169,6 +169,6 @@ public static class QrScan
     };
 
     private static string WepUnsupportedText(WifiNetwork network) =>
-        $"Wi-Fi network \"{network.Ssid}\" (WEP). WEP can't be joined directly from here — "
-        + "connect to it from the phone's Wi-Fi settings instead.";
+        $"Wi-Fi network \"{network.Ssid}\" (WEP). WEP can’t be joined directly from here — "
+        + "connect to it from the phone’s Wi-Fi settings instead.";
 }

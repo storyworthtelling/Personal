@@ -73,7 +73,7 @@ public static class SmsRoleAccess
         var intent = host.PackageManager?.GetLaunchIntentForPackage(SmsRole.GoogleMessagesPackage);
         if (intent is null)
         {
-            action.Failed("Google Messages is not installed");
+            action.Failed("Google Messages isn’t installed");
             return;
         }
         try
@@ -83,7 +83,7 @@ public static class SmsRoleAccess
         }
         catch (Exception e)
         {
-            action.Failed($"Google Messages would not open: {e.GetType().Name}");
+            action.Failed($"Google Messages wouldn’t open: {e.GetType().Name}");
             PostDiagnostics.LogWarning("SmsRole", "Google Messages would not open", e);
         }
     }

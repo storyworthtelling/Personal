@@ -67,9 +67,9 @@ public class MusicCatalogTests
     {
         var catalog = new MusicCatalog([Tr("1", "T1", "", "", genre: "")]);
 
-        Assert.Equal("Unknown Artist", Assert.Single(catalog.Artists()).Name);
-        Assert.Equal("Unknown Album", Assert.Single(catalog.Albums()).Name);
-        Assert.Equal("Unknown Genre", Assert.Single(catalog.Genres()));
+        Assert.Equal("Unknown artist", Assert.Single(catalog.Artists()).Name);
+        Assert.Equal("Unknown album", Assert.Single(catalog.Albums()).Name);
+        Assert.Equal("Unknown genre", Assert.Single(catalog.Genres()));
     }
 
     [Fact]

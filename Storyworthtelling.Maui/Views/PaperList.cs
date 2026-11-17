@@ -92,7 +92,7 @@ public static class PaperList
             };
 
             // A drawn box says nothing to TalkBack by itself (§17, audit 10 §6).
-            SemanticProperties.SetDescription(box, row.Picked ? "Ticked" : "Not ticked");
+            SemanticProperties.SetDescription(box, row.Picked ? "Checked" : "Not checked");
             return box;
         }
 

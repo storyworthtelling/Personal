@@ -26,7 +26,7 @@ public class ContractReceiptAtInformationTests
             source,
             @"private static void " + Regex.Escape(helper) + @"\([^)]*\)\s*(=>[^;]*;|\{(?:[^{}]|\{[^{}]*\})*\})",
             RegexOptions.Singleline);
-        Assert.True(body.Success, $"{file}: could not find the body of {helper}.");
+        Assert.True(body.Success, $"{file}: couldn’t find the body of {helper}.");
         Assert.Contains("LogInformation(", body.Value, StringComparison.Ordinal);
         Assert.DoesNotContain("LogWarning(", body.Value, StringComparison.Ordinal);
     }

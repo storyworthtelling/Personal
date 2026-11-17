@@ -32,7 +32,7 @@ public sealed class InkPageRead
 
     /// <summary>The page was not read: the call failed, the document had no annotations rendered, anything.</summary>
     public static InkPageRead NotRead(string why) =>
-        new(false, string.IsNullOrWhiteSpace(why) ? "The page was not read." : why.Trim(), []);
+        new(false, string.IsNullOrWhiteSpace(why) ? "The page wasn’t read." : why.Trim(), []);
 
     /// <summary>The page was read and these are the targets it reported; the rest were not read.</summary>
     public static InkPageRead Read(IEnumerable<InkTargetRead> targetReads)
@@ -43,7 +43,7 @@ public sealed class InkPageRead
             if (!byId.TryAdd(read.TargetId, read))
             {
                 throw new ArgumentException(
-                    $"The target '{read.TargetId}' was read twice; two answers for one box cannot both be the owner's.",
+                    $"The target '{read.TargetId}' was read twice; two answers for one box can’t both be the owner’s.",
                     nameof(targetReads));
             }
         }

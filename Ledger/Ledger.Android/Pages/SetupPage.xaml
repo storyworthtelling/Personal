@@ -91,14 +91,14 @@
                                             <Label Text="{Binding Name}" Style="{StaticResource HeadingLabel}" />
                                             <Label Text="{Binding Summary}" Style="{StaticResource SecondaryLabel}" />
                                         </VerticalStackLayout>
-                                        <Button Grid.Column="1" Text="Remove" Style="{StaticResource SecondaryButton}"
+                                        <Button Grid.Column="1" Text="Disconnect" Style="{StaticResource SecondaryButton}"
                                                 Clicked="OnRemoveClicked" />
                                     </Grid>
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
                         </VerticalStackLayout>
 
-                        <Button x:Name="ConnectButton" Text="Connect an account"
+                        <Button x:Name="ConnectButton" Text="Connect a bank"
                                 Clicked="OnConnectClicked" Style="{StaticResource SecondaryButton}" Margin="0,4,0,0" />
                         <Label x:Name="ConnectStatusLabel" Style="{StaticResource StatusLine}" />
                     </VerticalStackLayout>

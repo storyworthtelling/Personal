@@ -277,7 +277,7 @@ public class LockedOpenContractTests
     public void TheCatalogueEqualsPulpsServiceCataloguePackageForPackage()
     {
         var path = Path.Combine(RepoRoot(), "Pulp", "Pulp.Domain", "Services", "ServiceCatalogue.cs");
-        Assert.True(File.Exists(path), $"Pulp's ServiceCatalogue.cs was not found at {path}.");
+        Assert.True(File.Exists(path), $"Pulp’s ServiceCatalogue.cs wasn’t found at {path}.");
         var source = File.ReadAllText(path);
         var start = source.IndexOf("Public { get; } = new(", StringComparison.Ordinal);
         var block = source[start..source.IndexOf("]);", start, StringComparison.Ordinal)];

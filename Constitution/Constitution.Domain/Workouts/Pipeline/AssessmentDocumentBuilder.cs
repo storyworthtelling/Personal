@@ -66,7 +66,7 @@ public static class AssessmentDocumentBuilder
         AssessmentCatalogue.SitToStandId =>
             "Sit on a sturdy chair, then stand all the way up and sit down again, as many times as you can in 30 seconds. Count each full stand.",
         AssessmentCatalogue.WallPushUpsId =>
-            "Stand an arm's length from a wall with your hands on it at chest height. Lean in and push back, as many times as you can in 30 seconds.",
+            "Stand an arm’s length from a wall with your hands on it at chest height. Lean in and push back, as many times as you can in 30 seconds.",
         AssessmentCatalogue.TimedWalkId =>
             "Walk, or jog if you like, for 10 minutes at a pace you could keep up. When the time is up, note how far you went.",
         AssessmentCatalogue.ToeReachId =>

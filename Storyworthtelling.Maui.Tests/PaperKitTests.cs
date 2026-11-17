@@ -72,7 +72,7 @@ public class PaperKitTests
         }
 
         Assert.True(wrong.Count == 0,
-            "The kit's palette has drifted from the generated tokens:\n" + string.Join("\n", wrong));
+            "The kit’s palette has drifted from the generated tokens:\n" + string.Join("\n", wrong));
     }
 
     /// <summary>
@@ -102,7 +102,7 @@ public class PaperKitTests
         }
 
         Assert.True(wrong.Count == 0,
-            "The kit's type ladder has drifted from the native one:\n" + string.Join("\n", wrong));
+            "The kit’s type ladder has drifted from the native one:\n" + string.Join("\n", wrong));
     }
 
     /// <summary>
@@ -235,7 +235,7 @@ public class PaperKitTests
         }
 
         Assert.True(offenders.Count == 0,
-            "Colour hex outside the kit's registered token file:\n" + string.Join("\n", offenders));
+            "Colour hex outside the kit’s registered token file:\n" + string.Join("\n", offenders));
     }
 
     // ---- reading the kit ----

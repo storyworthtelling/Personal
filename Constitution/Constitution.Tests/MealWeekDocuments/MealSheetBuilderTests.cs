@@ -140,7 +140,7 @@ public class MealSheetBuilderTests
         var model = MealSheetBuilder.Build(Request(budgets: MonthBudget(100m, 130m)));
 
         Assert.Equal(GroceryBudgetState.Over, model.Groceries!.Budget.State);
-        Assert.Contains("OVER BUDGET", TextOf(MealSheetDocument.Build(model)), StringComparison.Ordinal);
+        Assert.Contains("Over budget", TextOf(MealSheetDocument.Build(model)), StringComparison.Ordinal);
     }
 
     [Fact]

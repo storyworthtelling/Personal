@@ -66,7 +66,7 @@ public sealed class GroceryList
             foreach (var dinner in week.Dinners.Where(item => item.Kind == DinnerKind.Cooked))
             {
                 var card = recipes.FirstOrDefault(item => item.Id == dinner.Recipe)
-                    ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}'s dinner names a card that is not in the box, so its groceries could not be listed.", nameof(recipes));
+                    ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}’s dinner names a card that is not in the box, so its groceries could not be listed.", nameof(recipes));
                 foreach (var ingredient in card.Ingredients)
                 {
                     Add(wanted, ingredient, card.Servings, headcount);

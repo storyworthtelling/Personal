@@ -98,7 +98,7 @@ public class MessagesNotificationListener : NotificationListenerService
             }
             catch (Exception e)
             {
-                PostDiagnostics.LogWarning("Notifications", "Could not record a group's name", e);
+                PostDiagnostics.LogWarning("Notifications", "Could not record a group’s name", e);
             }
         }
         return true;

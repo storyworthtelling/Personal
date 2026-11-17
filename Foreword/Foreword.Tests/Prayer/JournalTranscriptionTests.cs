@@ -116,14 +116,14 @@ public class JournalTranscriptionTests
     {
         var transcriber = Transcriber(_ => Reply("""
             Here is what I could read:
-            {"journalling":"Still turning it over.","adding":["Sam's trip"]}
+            {"journalling":"Still turning it over.","adding":["Sam’s trip"]}
             Let me know if you need more.
             """));
 
         var read = await transcriber.Read(Page, Day);
 
         Assert.Equal("Still turning it over.", Read(read.Journalled));
-        Assert.Equal(["Sam's trip"], read.Added.Select(Read));
+        Assert.Equal(["Sam’s trip"], read.Added.Select(Read));
     }
 
     /// <summary>
@@ -157,7 +157,7 @@ public class JournalTranscriptionTests
     [Fact]
     public async Task AReplyWithNoObjectInItReadsNothing()
     {
-        var transcriber = Transcriber(_ => Reply("I could not make out the handwriting."));
+        var transcriber = Transcriber(_ => Reply("I couldn’t make out the handwriting."));
 
         var read = await transcriber.Read(Page, Day);
 

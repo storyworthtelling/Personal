@@ -176,7 +176,7 @@ public class HouseholdActivity : Activity
             catch (Exception exception)
             {
                 services.Diagnostics.Warn("household", "The Household page could not read the household.", exception);
-                RunOnUiThread(() => ShowStatus("The household couldn't be read just now."));
+                RunOnUiThread(() => ShowStatus("The household couldn’t be read just now."));
             }
         }, token);
     }
@@ -324,7 +324,7 @@ public class HouseholdActivity : Activity
             }
 
             drafts.Clear(draftKey);
-            Enqueue($"record {viewer.Id}'s Google account", token =>
+            Enqueue($"record {viewer.Id}’s Google account", token =>
                 services.PutAsync(HouseholdMaps.AdultAccount, new AdultAccountEntry(viewer.Id, typed), token));
         }), SettingsViews.Spaced(this, DesignTokens.Space.X2));
         return form;
@@ -333,9 +333,9 @@ public class HouseholdActivity : Activity
     private void ClearAccount(HouseholdViewer viewer, string name, string address)
     {
         var entry = new AdultAccountEntry(viewer.Id, address);
-        Enqueue($"clear {viewer.Id}'s Google account", token => services.RemoveAsync(HouseholdMaps.AdultAccount, entry, token));
+        Enqueue($"clear {viewer.Id}’s Google account", token => services.RemoveAsync(HouseholdMaps.AdultAccount, entry, token));
         DogEar.Show(this, overlay, HouseholdText.Undo("clear account", name), () =>
-            Enqueue($"put {viewer.Id}'s Google account back", token => services.PutAsync(HouseholdMaps.AdultAccount, entry, token)));
+            Enqueue($"put {viewer.Id}’s Google account back", token => services.PutAsync(HouseholdMaps.AdultAccount, entry, token)));
     }
 
     private View AddPerson()
@@ -446,7 +446,7 @@ public class HouseholdActivity : Activity
             }
             catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, lifetime.Token))
             {
-                services.Diagnostics.Warn("household", "This phone could not be recorded as a viewer's.", exception);
+                services.Diagnostics.Warn("household", "This phone could not be recorded as a viewer’s.", exception);
             }
 
             RunOnUiThread(() => Reload(ReloadCause.OwnWrites));
@@ -458,7 +458,7 @@ public class HouseholdActivity : Activity
     private View ChildSection(HouseholdView household, string name, ChildRules childRules)
     {
         var section = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        section.AddView(SettingsViews.Subheading(this, $"{name}'s rules"));
+        section.AddView(SettingsViews.Subheading(this, $"{name}’s rules"));
 
         // The ceiling (D127): one age band, read against both rating systems.
         var bands = Enum.GetValues<AgeBand>();
@@ -467,7 +467,7 @@ public class HouseholdActivity : Activity
             "Age band",
             bands.Select(band => new PickerOption(ChildRuleEdits.BandLabel(band), ChildRuleEdits.BandDetail(band))),
             Array.IndexOf(bands, childRules.Ceiling));
-        picker.Chosen += index => Edit(childRules.Child, $"set {childRules.Child}'s band", current => ChildRuleEdits.Ceiling(current, bands[index]));
+        picker.Chosen += index => Edit(childRules.Child, $"set {childRules.Child}’s band", current => ChildRuleEdits.Ceiling(current, bands[index]));
         section.AddView(picker);
 
         // Whole services (D129). A blocked service hides a title only when it is the title's only home (D282).
@@ -518,7 +518,7 @@ public class HouseholdActivity : Activity
         section.AddView(Muted("Leagues"), SettingsViews.Spaced(this, DesignTokens.Space.X3));
         if (phone.Viewer is not { } parent)
         {
-            section.AddView(PaperUi.Secondary(this, "Say whose phone this is above to choose " + name + "'s leagues."));
+            section.AddView(PaperUi.Secondary(this, "Say whose phone this is above to choose " + name + "’s leagues."));
             return;
         }
 
@@ -537,7 +537,7 @@ public class HouseholdActivity : Activity
                     leaguesAllowed[child].Remove(row.League);
                 }
 
-                Enqueue($"{(ticked ? "allow" : "stop allowing")} {row.League} for {child}", token => ticked
+                Enqueue($"{(ticked ? "allow" : "stop allowing")} {row.League} for {child}", token => ticked  // not copy: the word matched is the variable ticked
                     ? services.PutAsync(HouseholdMaps.ChildLeague, allowance, token)
                     : services.RemoveAsync(HouseholdMaps.ChildLeague, allowance, token));
             }));
@@ -559,11 +559,11 @@ public class HouseholdActivity : Activity
             var hint = allowList ? "Tap to take off the allow-list" : "Tap to unblock";
             section.AddView(SettingsViews.Row(this, label, hint, onTap: () =>
             {
-                Edit(child, $"take {title} off {child}'s {(allowList ? "allow" : "block")}-list", current => allowList
+                Edit(child, $"take {title} off {child}’s {(allowList ? "allow" : "block")}-list", current => allowList
                     ? ChildRuleEdits.Unallow(current, title)
                     : ChildRuleEdits.Unblock(current, title));
                 DogEar.Show(this, overlay, HouseholdText.Undo(allowList ? "remove" : "unblock", label), () =>
-                    Edit(child, $"put {title} back on {child}'s list", current => allowList
+                    Edit(child, $"put {title} back on {child}’s list", current => allowList
                         ? ChildRuleEdits.Allow(current, title)
                         : ChildRuleEdits.Block(current, title)));
             }));
@@ -627,9 +627,9 @@ public class HouseholdActivity : Activity
             }
             catch (CatalogueLookupException exception)
             {
-                services.Diagnostics.Warn("household", $"A title search for a child's rules failed ({exception.Failure}).", exception);
+                services.Diagnostics.Warn("household", $"A title search for a child’s rules failed ({exception.Failure}).", exception);
                 found = [];
-                status = "The search couldn't be reached just now.";
+                status = "The search couldn’t be reached just now.";
             }
             catch (System.OperationCanceledException)
             {

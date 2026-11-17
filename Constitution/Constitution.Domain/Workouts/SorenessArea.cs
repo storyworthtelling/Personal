@@ -168,7 +168,7 @@ public static class ExerciseLoads
 
         // mobility
         ["Cat and cow"] = [SoreArea.UpperBack, SoreArea.LowerBack, SoreArea.Neck],
-        ["Child's pose"] = [SoreArea.Knee, SoreArea.Hip, SoreArea.LowerBack, SoreArea.Shoulder],
+        ["Child’s pose"] = [SoreArea.Knee, SoreArea.Hip, SoreArea.LowerBack, SoreArea.Shoulder],
         ["Hip flexor stretch"] = [SoreArea.Hip, SoreArea.Knee],
         ["Seated hamstring stretch"] = [SoreArea.Thigh, SoreArea.LowerBack],
         ["Lying spine twist"] = [SoreArea.LowerBack, SoreArea.UpperBack],

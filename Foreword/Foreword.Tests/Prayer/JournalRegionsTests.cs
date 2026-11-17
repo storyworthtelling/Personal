@@ -56,7 +56,7 @@ public class JournalRegionsTests
 
         Assert.True(regions[1].Top > Height / 2);
         Assert.True(regions[0].Height > regions[1].Height,
-            "journalling should be the larger of the two — it is the page's purpose");
+            "journalling should be the larger of the two — it is the page’s purpose");
     }
 
     [Fact]

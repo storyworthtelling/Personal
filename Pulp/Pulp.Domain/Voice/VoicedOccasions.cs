@@ -53,5 +53,5 @@ public static class VoicedOccasions
         BySeat.TryGetValue(seat, out var occasion)
             ? occasion
             : throw new ArgumentOutOfRangeException(nameof(seat), seat,
-                "This seat has no occasion on Pulp's closed list (D38); a voiced seat is a decision, not a diff.");
+                "This seat has no occasion on Pulp’s closed list (D38); a voiced seat is a decision, not a diff.");
 }

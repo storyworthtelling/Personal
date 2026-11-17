@@ -56,7 +56,7 @@ public class EmptyBoxTests
     {
         var state = EmptyBox.For(3);
 
-        Assert.Equal("Ten family favourites, and the planning can begin.", state.Invitation);
+        Assert.Equal("Ten family favorites, and the planning can begin.", state.Invitation);
         Assert.Equal("Weekly meal sheets start on the Thursday after the tenth card.", state.Footnote);
         Assert.Equal("Scan a recipe card", state.PrimaryAction);
     }

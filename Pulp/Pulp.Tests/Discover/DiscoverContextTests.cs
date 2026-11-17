@@ -117,7 +117,7 @@ public class DiscoverContextTests
             }
         }
 
-        Assert.True(checkedMembers >= 10, $"Only {checkedMembers} members were checked; the guard is not reading the sent types.");
+        Assert.True(checkedMembers >= 10, $"Only {checkedMembers} members were checked; the guard isn’t reading the sent types.");
         Assert.True(offenders.Count == 0, "A sent type can carry a private value: " + string.Join(", ", offenders));
     }
 

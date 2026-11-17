@@ -46,7 +46,7 @@ public static class KeyConsoleLink
             MauiLog.Current?.Write(
                 "KeyConsole",
                 Microsoft.Extensions.Logging.LogLevel.Warning,
-                $"The {console.CredentialId} console did not open.",
+                $"The {console.CredentialId} console didn’t open.",
                 exception);
         }
     }

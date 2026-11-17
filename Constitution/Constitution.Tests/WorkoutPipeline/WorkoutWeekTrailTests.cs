@@ -38,7 +38,7 @@ public class WorkoutWeekTrailTests
         foreach (var verdict in Enum.GetValues<DocumentVerdict>())
         {
             var failure = verdict is DocumentVerdict.NotBuilt or DocumentVerdict.NotDelivered
-                ? new HttpRequestException("The tablet said no to Sam's page at 18:00.")
+                ? new HttpRequestException("The tablet said no to Sam’s page at 18:00.")
                 : null;
             data.Add(new DocumentOutcome(Title, Sam, day, verdict, failure));
         }
@@ -51,7 +51,7 @@ public class WorkoutWeekTrailTests
         var data = new TheoryData<WorkoutWeekOutcome>();
         foreach (var because in Enum.GetValues<NotPlannedBecause>())
         {
-            data.Add(new WorkoutWeekOutcome.NotPlanned(because, [new UnreadableCalendar(CalendarSource.Own, "Lee has not shared a calendar.")], "Lee has not shared a calendar."));
+            data.Add(new WorkoutWeekOutcome.NotPlanned(because, [new UnreadableCalendar(CalendarSource.Own, "Lee hasn’t shared a calendar.")], "Lee hasn’t shared a calendar."));
         }
 
         data.Add(Planned());

@@ -148,8 +148,8 @@ public class UnlockActivity : Activity
         {
             case UnlockState.Locked:
                 AddHeader("Locked");
-                AddBody($"Admin access requires a {UnlockDelayText.Format(machine.UnlockDelay)} delay. The countdown is visible and can be cancelled at any time.");
-                PinActions(PaperUi.PrimaryButton(this, "Request admin unlock", () => KeyActs.Run(
+                AddBody($"Admin mode needs a {UnlockDelayText.Format(machine.UnlockDelay)} delay. The countdown is visible and can be canceled at any time.");
+                PinActions(PaperUi.PrimaryButton(this, "Ask for admin mode", () => KeyActs.Run(
                     TapWatch.Action(FlyleafKeyActions.AdminUnlock, KeyActs.Local), () => Transition(machine.RequestUnlock))));
                 break;
 
@@ -267,7 +267,7 @@ public class UnlockActivity : Activity
         entry.AddView(PaperUi.SecondaryButton(this, "Set", () => SaveDelay($"{amountInput.Text} {units[unitSpinner.SelectedItemPosition]}")));
 
         var row = new LinearLayout(this) { Orientation = Orientation.Vertical };
-        row.AddView(PaperUi.Secondary(this, "Admin unlock delay"));
+        row.AddView(PaperUi.Secondary(this, "Admin mode delay"));
         row.AddView(entry, MatchWrap());
         return row;
     }
@@ -291,7 +291,7 @@ public class UnlockActivity : Activity
             return;
         }
         store!.Save(machine);
-        inlineStatus = $"Admin unlock delay set to {UnlockDelayText.Format(delay)}. It applies to the next request.";
+        inlineStatus = $"Admin mode delay set to {UnlockDelayText.Format(delay)}. It applies to the next request.";
         Render();
     }
 
@@ -410,8 +410,8 @@ public class UnlockActivity : Activity
             using var input = ContentResolver!.OpenInputStream(uri);
             if (input is null)
             {
-                pendingApkInstall?.Failed("the selected file could not be read");
-                inlineStatus = "Could not read the selected file.";
+                pendingApkInstall?.Failed("the selected file couldn’t be read");
+                inlineStatus = "Couldn’t read the selected file.";
                 Render();
                 return;
             }
@@ -422,7 +422,7 @@ public class UnlockActivity : Activity
         {
             pendingApkInstall?.Failed($"{e.GetType().Name}: {e.Message}");
             HeadLog.Warn("Install", "Installing an APK from Downloads failed", e);
-            inlineStatus = $"Install failed: {e.Message}";
+            inlineStatus = "That app didn’t install: " + Storyworthtelling.Diagnostics.PlainError.Describe(e) + " Pick the file again to retry.";
             Render();
         }
     }
@@ -449,7 +449,7 @@ public class UnlockActivity : Activity
         // that backs up the update token (and every app's keys) so a factory reset can restore them.
         // Shown in the clear (not a password field) so it can be read back and copied — it's the one secret
         // that isn't kept in the vault, so being able to see it is what lets the owner set the same one everywhere.
-        var passphrase = PaperUi.MonoField(this, "Secrets vault passphrase");
+        var passphrase = PaperUi.MonoField(this, "Vault passphrase");
         passphrase.Text = VaultPassphraseStore.Passphrase;
 
         var fields = new LinearLayout(this) { Orientation = Orientation.Vertical };
@@ -496,7 +496,7 @@ public class UnlockActivity : Activity
         {
             // Best-effort: the vault picks the token up on the next successful save.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet(LogSources.Vault, "Update token backup did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Update token backup didn’t complete", e);
         }
     }
 

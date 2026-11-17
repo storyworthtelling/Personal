@@ -22,7 +22,7 @@ public class PaperWebViewPlayerGuardTests
 
         Assert.NotNull(directory);
         var file = Path.Combine(directory!.FullName, "FocusPhone", "Codex.Ui.Android", "PaperWebView.cs");
-        Assert.True(File.Exists(file), "PaperWebView.cs was not found at " + file);
+        Assert.True(File.Exists(file), "PaperWebView.cs wasn’t found at " + file);
         return File.ReadAllText(file);
     }
 
@@ -30,9 +30,9 @@ public class PaperWebViewPlayerGuardTests
     private static string Member(string source, string signature)
     {
         var start = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.True(start >= 0, $"Could not find '{signature}' in PaperWebView.cs.");
+        Assert.True(start >= 0, $"Couldn’t find '{signature}' in PaperWebView.cs.");
         var next = Regex.Match(source[(start + signature.Length)..], @"\n    (public|private|internal) ");
-        Assert.True(next.Success, $"Could not find the end of '{signature}'.");
+        Assert.True(next.Success, $"Couldn’t find the end of '{signature}'.");
         return source.Substring(start, signature.Length + next.Index);
     }
 

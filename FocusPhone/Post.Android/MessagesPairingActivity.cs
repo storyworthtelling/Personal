@@ -149,7 +149,7 @@ public class MessagesPairingActivity : Activity
         {
             // Names only: the values are the account's sign-in.
             PostDiagnostics.LogWarning("Bridge", "Messages sign-in came back without " + string.Join(", ", cookies.Missing));
-            pairing?.Failed("the sign-in did not leave the pairing cookies");
+            pairing?.Failed("the sign-in didn’t leave the pairing cookies");
             Show(Step.Failed, MessagesPairing.SignInIncomplete(cookies.Missing));
             return;
         }
@@ -266,7 +266,7 @@ public class MessagesPairingActivity : Activity
         if (intent is null)
         {
             Show(Step.PickEmoji, MessagesPairing.PickEmoji(emoji ?? string.Empty)
-                + " Google Messages is not installed on this phone.");
+                + " Google Messages isn’t installed on this phone.");
             return;
         }
         StartActivity(intent);

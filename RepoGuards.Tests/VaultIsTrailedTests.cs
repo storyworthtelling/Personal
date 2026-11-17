@@ -31,6 +31,6 @@ public class VaultIsTrailedTests
             .Select(file => file.relative)
             .ToList();
 
-        Assert.True(found.Count == 0, "Pass the head's log as the vault's trail (HeadLog.Trail / MauiLog.Trail):\n" + string.Join("\n", found));
+        Assert.True(found.Count == 0, "Pass the head’s log as the vault’s trail (HeadLog.Trail / MauiLog.Trail):\n" + string.Join("\n", found));
     }
 }

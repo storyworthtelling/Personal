@@ -29,7 +29,7 @@ namespace Flyleaf;
 /// </summary>
 public static class UpdateService
 {
-    private const string Tag = "FocusPhoneUpdate";
+    private const string Tag = "FocusPhoneUpdate";  // not copy: a stage, id or wire word
     private const string WorkName = "focusphone-update-check";
     public const string Repo = "storyworthtelling/Personal";
     private static readonly UpdateRunGate RunGate = new();

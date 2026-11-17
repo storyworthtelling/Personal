@@ -177,7 +177,7 @@ public class ReaderScoreTests
         Assert.Equal("7/10", ReaderScores.OutOfTen(7));
 
     private static Review Whole(string persona = "agent", int score = 7) => new(
-        persona, "A verdict.", "A review.", ["works"], ["does not"], "a condition")
+        persona, "A verdict.", "A review.", ["works"], ["doesn’t"], "a condition")
     {
         Score = score,
         ScoreReason = "Why this number.",

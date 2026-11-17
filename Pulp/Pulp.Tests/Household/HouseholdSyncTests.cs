@@ -44,7 +44,7 @@ public class HouseholdSyncTests
     [Fact]
     public void AWrongPassphraseRaisesTheUnreadableNotice()
     {
-        var status = HouseholdSyncStatus.Unreadable(HouseholdUnreadableReason.WrongPassphrase, "The passphrase does not open it.", Opened);
+        var status = HouseholdSyncStatus.Unreadable(HouseholdUnreadableReason.WrongPassphrase, "The passphrase doesn’t open it.", Opened);
 
         Assert.Equal(WaitingNotices.HouseholdUnreadable(Opened), status.Notice(Opened));
     }

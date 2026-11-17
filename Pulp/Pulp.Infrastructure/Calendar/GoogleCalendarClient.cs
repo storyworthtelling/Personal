@@ -120,7 +120,7 @@ public sealed class GoogleCalendarClient : IPulpCalendar
                 + "&timeMin=" + Uri.EscapeDataString(Midnight(from))
                 + "&timeMax=" + Uri.EscapeDataString(Midnight(to))
                 + (page is null ? string.Empty : "&pageToken=" + Uri.EscapeDataString(page));
-            using var response = await Send(HttpMethod.Get, url, null, "reading the calendar's events", cancellationToken);
+            using var response = await Send(HttpMethod.Get, url, null, "reading the calendar’s events", cancellationToken);
             foreach (var item in Items(response))
             {
                 var read = ReadEvent(item, zone);

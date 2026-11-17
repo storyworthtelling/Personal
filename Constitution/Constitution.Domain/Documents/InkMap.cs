@@ -14,7 +14,7 @@ public sealed class InkMap
             if (!byId.TryAdd(target.Id, target))
             {
                 throw new ArgumentException(
-                    $"Two targets on one page are both called '{target.Id}'; the reader would not know which box was meant.",
+                    $"Two targets on one page are both called '{target.Id}'; the reader wouldn’t know which box was meant.",
                     nameof(targets));
             }
         }

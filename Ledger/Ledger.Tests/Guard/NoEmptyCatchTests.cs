@@ -71,7 +71,7 @@ public class NoEmptyCatchTests
         const string reintroducedBug = "catch (Exception) { }";
         Assert.Matches(EmptyCatch, reintroducedBug);
 
-        const string documentedBestEffort = "catch { /* Drive being unreachable just means can't tell right now */ }";
+        const string documentedBestEffort = "catch { /* Drive being unreachable just means can’t tell right now */ }";
         Assert.DoesNotMatch(EmptyCatch, documentedBestEffort);
     }
 

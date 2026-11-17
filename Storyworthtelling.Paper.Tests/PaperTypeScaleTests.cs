@@ -84,7 +84,7 @@ public class PaperTypeScaleTests
             .ToArray();
 
         Assert.Equal(new[] { "Dose" }, printedOnly);
-        Assert.True(screen.Count >= 7, "The screen ladder was not read; the guard is looking at nothing.");
+        Assert.True(screen.Count >= 7, "The screen ladder wasn’t read; the guard is looking at nothing.");
     }
 
     private static Dictionary<string, float> ScreenLadder()
@@ -92,7 +92,7 @@ public class PaperTypeScaleTests
         var native = File.ReadAllText(RepoFile("FocusPhone/Codex.Domain/Design/DesignTokens.cs"));
         var block = Regex.Match(native, @"public static class TypeSp\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline);
 
-        Assert.True(block.Success, "Could not find TypeSp in the native design tokens.");
+        Assert.True(block.Success, "Couldn’t find TypeSp in the native design tokens.");
 
         return Regex.Matches(block.Groups["body"].Value, @"public const float (?<name>\w+) = (?<value>[\d.]+)f;")
             .ToDictionary(m => m.Groups["name"].Value, m => float.Parse(m.Groups["value"].Value));

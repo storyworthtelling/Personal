@@ -171,12 +171,12 @@ public static class WorkoutWeekReportCodec
             using var document = JsonDocument.Parse(json);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                return Unreadable("The saved week is not a record.");
+                return Unreadable("The saved week isn’t a record.");
             }
 
             if (!document.RootElement.TryGetProperty(VersionName, out var version) || version.ValueKind != JsonValueKind.Number || version.GetInt32() != Version)
             {
-                return Unreadable("The saved week is not a version this app reads.");
+                return Unreadable("The saved week isn’t a version this app reads.");
             }
 
             var week = document.RootElement.Deserialize<StoredWorkoutWeek>(Options);
@@ -184,7 +184,7 @@ public static class WorkoutWeekReportCodec
         }
         catch (Exception failure) when (failure is JsonException or InvalidOperationException or FormatException)
         {
-            return Unreadable("The saved week could not be read.");
+            return Unreadable("The saved week couldn’t be read.");
         }
     }
 
@@ -225,7 +225,7 @@ public interface IWorkoutWeekReports
 /// <summary>The report in one small file in the app's private storage, read and replaced whole (atomically).</summary>
 public sealed class FileWorkoutWeekReports : IWorkoutWeekReports
 {
-    public const string UnopenableReason = "The saved week could not be opened.";
+    public const string UnopenableReason = "The saved week couldn’t be opened.";
 
     private static readonly object FileLock = new();
 

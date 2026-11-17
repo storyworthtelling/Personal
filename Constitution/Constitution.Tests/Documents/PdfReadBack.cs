@@ -76,7 +76,7 @@ internal static class PdfReadBack
                     break;
                 case "K" or "k" or "SC" or "SCN" or "sc" or "scn" or "CS" or "cs":
                     throw new NotSupportedException(
-                        $"The page uses the colour operator '{op}', which this read-back does not decode. "
+                        $"The page uses the colour operator '{op}', which this read-back doesn’t decode. "
                         + "A document drawn for the tablets paints in plain RGB or grey only.");
             }
 

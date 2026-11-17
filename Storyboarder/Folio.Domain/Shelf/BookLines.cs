@@ -26,7 +26,7 @@ public static class BookLines
         return stage switch
         {
             "Completed" => "Reviewed",
-            "Failed" or "Cancelled" => "Stopped",
+            "Failed" or "Cancelled" => "Stopped",  // not copy: a stage, id or wire word
             _ => "Being read",
         };
     }

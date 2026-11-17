@@ -83,7 +83,7 @@ public class ShoppingTripTests
     [Fact]
     public void AnUnreadableCalendarIsNotFreeTime()
     {
-        var calendars = CalendarsWith(sam: CalendarRead.Unreadable("Sam's calendar did not answer."));
+        var calendars = CalendarsWith(sam: CalendarRead.Unreadable("Sam’s calendar didn’t answer."));
 
         var trip = Trip(calendars, SaturdayMorning);
 

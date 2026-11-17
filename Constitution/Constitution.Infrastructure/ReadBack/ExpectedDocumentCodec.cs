@@ -210,7 +210,7 @@ internal static class ExpectedDocumentCodec
 
         if (rows.ValueKind != JsonValueKind.Array)
         {
-            throw new FormatException("The manifest's rating rows are not a list.");
+            throw new FormatException("The manifest’s rating rows are not a list.");
         }
 
         return rows.EnumerateArray()

@@ -35,7 +35,7 @@ public sealed record InkTarget(
         if (string.IsNullOrWhiteSpace(meaning))
         {
             throw new ArgumentException(
-                $"The {what} '{id}' needs a few words for what a mark there means; a box with no words cannot be read.",
+                $"The {what} '{id}' needs a few words for what a mark there means; a box with no words can’t be read.",
                 nameof(meaning));
         }
     }

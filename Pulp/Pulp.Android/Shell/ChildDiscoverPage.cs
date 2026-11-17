@@ -128,7 +128,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
                 Search(DiscoverPageText.Asking(step.Text), (audience, view, token) => AskMoodAsync(step.Text, audience, view, token));
                 break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(submitted), step.Action, "A field decision the child's page does not act on.");
+                throw new ArgumentOutOfRangeException(nameof(submitted), step.Action, "A field decision the child’s page does not act on.");
         }
     }
 
@@ -168,7 +168,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
             }
             catch (Exception exception)
             {
-                Services.Diagnostics.Warn("child", "A child's search failed: " + exception.Message, exception);
+                Services.Diagnostics.Warn("child", "A child’s search failed: " + exception.Message, exception);
                 Land(asked, () => ShowStatus(DiscoverPageText.SearchUnreachable));
             }
         }, token);
@@ -182,7 +182,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
         }
         catch (CatalogueLookupException exception)
         {
-            Services.Diagnostics.Warn("child", $"A child's title search failed ({exception.Failure}).", exception);
+            Services.Diagnostics.Warn("child", $"A child’s title search failed ({exception.Failure}).", exception);
             return [];
         }
     }
@@ -201,7 +201,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
         var answer = await Services.Mood.AskMoodAsync(query, token);
         if (answer.Outcome != MoodOutcome.Answered)
         {
-            Services.Diagnostics.Warn("child", $"A child's mood search had no idea ({answer.Outcome}): {answer.Detail}");
+            Services.Diagnostics.Warn("child", $"A child’s mood search had no idea ({answer.Outcome}): {answer.Detail}");
             return [];
         }
 
@@ -214,7 +214,7 @@ public sealed class ChildDiscoverPage(Activity host, Func<FrameLayout> overlay, 
             }
             catch (CatalogueLookupException exception)
             {
-                Services.Diagnostics.Warn("child", $"A mood candidate's lookup failed ({exception.Failure}); it is dropped.", exception);
+                Services.Diagnostics.Warn("child", $"A mood candidate’s lookup failed ({exception.Failure}); it is dropped.", exception);
             }
         }
 

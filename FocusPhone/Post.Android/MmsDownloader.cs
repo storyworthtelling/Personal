@@ -180,7 +180,7 @@ public class MmsDownloadReceiver : BroadcastReceiver
             {
                 MmsStubSweep.RecordAttempt(context, stub);
                 PostDiagnostics.LogWarning("Mms", message is null
-                    ? "A downloaded MMS could not be read."
+                    ? "A downloaded MMS couldn’t be read."
                     : $"The carrier refused an MMS download (status {message.RetrieveStatus}).");
                 PostDiagnostics.LogText("Mms", "MMS download could not be read; will retry");
                 return;

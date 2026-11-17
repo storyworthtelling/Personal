@@ -26,10 +26,10 @@ public class BodyScreensSourceTests
     {
         var files = TabFiles();
 
-        Assert.True(files.Count >= 8, $"The guard found only {files.Count} tab files; it is not reading the real folder.");
+        Assert.True(files.Count >= 8, $"The guard found only {files.Count} tab files; it isn’t reading the real folder.");
         var strays = files.Where(path => !HonestChartTests.IsBodyFile(path)).ToList();
         Assert.True(strays.Count == 0,
-            "Tab files the honest-chart guard does not read (name them Body* or Signal*): " + string.Join(", ", strays));
+            "Tab files the honest-chart guard doesn’t read (name them Body* or Signal*): " + string.Join(", ", strays));
     }
 
     // ---- no reading in a log line ----
@@ -61,10 +61,10 @@ public class BodyScreensSourceTests
     {
         var files = TabFiles();
         var calls = files.Sum(path => TrailCall.Matches(Read(path)).Count);
-        Assert.True(calls >= 3, $"The guard found only {calls} trail lines on the tab; it is not reading them.");
+        Assert.True(calls >= 3, $"The guard found only {calls} trail lines on the tab; it isn’t reading them.");
 
         var loose = files.SelectMany(path => LoosePieces(Read(path)).Select(piece => path + ": {" + piece + "}")).ToList();
-        Assert.True(loose.Count == 0, "A trail line on the tab holds something other than a failure's type or a seat id:\n" + string.Join("\n", loose));
+        Assert.True(loose.Count == 0, "A trail line on the tab holds something other than a failure’s type or a seat id:\n" + string.Join("\n", loose));
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class BodyScreensSourceTests
     {
         var source = Read("Constitution.Android/Health/ActivityHealthPermissionRequester.cs");
         var start = source.IndexOf("public bool OpenHealthConnectSettings(", StringComparison.Ordinal);
-        Assert.True(start >= 0, "OpenHealthConnectSettings is gone; this guard is not reading it.");
+        Assert.True(start >= 0, "OpenHealthConnectSettings is gone; this guard isn’t reading it.");
         var method = source[start..];
 
         Assert.Contains("catch (Java.Lang.SecurityException", method, StringComparison.Ordinal);

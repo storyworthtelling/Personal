@@ -7,21 +7,21 @@ public class UpdateRunResultTests
     [Fact]
     public void NoToken_SaysSo()
     {
-        Assert.Equal("No update token is set, so updates can't be checked.",
+        Assert.Equal("No update token is set, so updates can’t be checked.",
             UpdateRunResult.NoToken().Summarize());
     }
 
     [Fact]
     public void NotDeviceOwner_SaysSo()
     {
-        Assert.Equal("Not the device owner, so updates can't install.",
+        Assert.Equal("Not the device owner, so updates can’t install.",
             UpdateRunResult.NotDeviceOwner().Summarize());
     }
 
     [Fact]
     public void FetchFailed_CarriesTheReason()
     {
-        Assert.Equal("Couldn't reach GitHub (401 Unauthorized).",
+        Assert.Equal("Couldn’t reach GitHub (401 Unauthorized).",
             UpdateRunResult.FetchFailed("401 Unauthorized").Summarize());
     }
 
@@ -69,10 +69,10 @@ public class UpdateRunResultTests
         var result = UpdateRunResult.Ran(
         [
             new AppInstallResult("com.storyworthtelling.focusphone.launcher", 128, InstallOutcome.Failed,
-                "Install failed (status 4): signatures do not match"),
+                "Install failed (status 4): signatures don’t match"),
         ]);
 
-        Assert.Equal("1 couldn't install (Install failed (status 4): signatures do not match).",
+        Assert.Equal("1 couldn’t install (Install failed (status 4): signatures don’t match).",
             result.Summarize());
         Assert.True(result.AnyFailed);
     }
@@ -84,10 +84,10 @@ public class UpdateRunResultTests
         [
             new AppInstallResult("com.storyworthtelling.focusphone.audio", 128, InstallOutcome.Installed),
             new AppInstallResult("com.storyworthtelling.focusphone.launcher", 128, InstallOutcome.Failed,
-                "signatures do not match"),
+                "signatures don’t match"),
         ]);
 
-        Assert.Equal("Installed 1 update. 1 couldn't install (signatures do not match).",
+        Assert.Equal("Installed 1 update. 1 couldn’t install (signatures don’t match).",
             result.Summarize());
     }
 

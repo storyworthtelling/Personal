@@ -9,7 +9,7 @@ public class CalendarScreenHeadGuardTests
     private static string Head(string relative)
     {
         var path = Path.Combine(PulpSource.Root(), relative);
-        Assert.True(File.Exists(path), relative + " does not exist, so nothing it should contain can be checked.");
+        Assert.True(File.Exists(path), relative + " doesn’t exist, so nothing it should contain can be checked.");
         var text = File.ReadAllText(path);
         Assert.False(string.IsNullOrWhiteSpace(text));
         return text;
@@ -81,7 +81,7 @@ public class CalendarScreenHeadGuardTests
     {
         var text = Head("Pulp.Android/App/PulpServices.cs");
         var start = text.IndexOf("public async Task FollowTeamAsync(", StringComparison.Ordinal);
-        Assert.True(start >= 0, "FollowTeamAsync is missing or no longer async, so it cannot read the roster.");
+        Assert.True(start >= 0, "FollowTeamAsync is missing or no longer async, so it can’t read the roster.");
         var body = text[start..Math.Min(text.Length, start + 900)];
 
         Assert.Contains("CalendarFollows.RefusesFollow(", body, StringComparison.Ordinal);

@@ -8,14 +8,14 @@ using Pulp.Domain.Household;
 namespace Pulp.Settings;
 
 /// <summary>
-/// The household page's sync line with its quiet "Sync now" button (S5): the line says where the household
+/// The household page's sync line with its quiet "Refresh now" button (S5): the line says where the household
 /// stands against Drive (<see cref="HouseholdSyncText"/>), the button asks for a pass at once — which also
 /// releases a file that was refused until someone asked — and the line is the state change when it lands.
 /// The page adds one call to <see cref="Build"/>; it owns nothing of the sync.
 /// </summary>
 public static class SyncLine
 {
-    public const string ButtonLabel = "Sync now";
+    public const string ButtonLabel = "Refresh now";
 
     /// <summary>
     /// The line and its button as one view. <paramref name="lifetime"/> is the page's token, so a pass the

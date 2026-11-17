@@ -91,8 +91,8 @@ public class MealPlacementPropertyTests
                 if (made.Title.StartsWith("Cook: ", StringComparison.Ordinal))
                 {
                     var choice = week.Dinners.Single(item => item.Day == day);
-                    Assert.True(made.End == dinner.Start, $"A block does not end at dinner: {where}");
-                    Assert.True(made.Start == choice.CookStart && made.End == choice.CookEnd, $"A block is not the planned one: {where}");
+                    Assert.True(made.End == dinner.Start, $"A block doesn’t end at dinner: {where}");
+                    Assert.True(made.Start == choice.CookStart && made.End == choice.CookEnd, $"A block isn’t the planned one: {where}");
                     Assert.True(string.Equals(made.Person, choice.Cook, StringComparison.OrdinalIgnoreCase), $"A block is on the wrong calendar: {where}");
                 }
                 else

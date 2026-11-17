@@ -475,7 +475,7 @@ public class FirstRunActivity : Activity
         }
         catch (Exception exception)
         {
-            services.Diagnostics.Warn("first-run", "This phone could not be recorded as a person's.", exception);
+            services.Diagnostics.Warn("first-run", "This phone could not be recorded as a person’s.", exception);
             PulpNotices.Raise(this, overlay, FirstRunNotices.PhoneNotSaved(DateTimeOffset.UtcNow), NoticeButtons());
         }
         finally

@@ -100,7 +100,7 @@ internal static class DocumentResultCodec
         }
         catch (Exception e) when (e is JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException)
         {
-            throw new FormatException("The result file could not be read as a document's result.", e);
+            throw new FormatException("The result file could not be read as a document’s result.", e);
         }
     }
 

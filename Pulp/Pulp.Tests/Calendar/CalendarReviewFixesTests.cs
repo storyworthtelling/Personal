@@ -184,8 +184,8 @@ public class CalendarReviewFixesTests
     }
 
     [Theory]
-    [InlineData(new[] { "a@example.com" }, "Couldn't share with a@example.com.")]
-    [InlineData(new[] { "a@example.com", "b@example.com" }, "Couldn't share with a@example.com or b@example.com.")]
+    [InlineData(new[] { "a@example.com" }, "Couldn’t share with a@example.com.")]
+    [InlineData(new[] { "a@example.com", "b@example.com" }, "Couldn’t share with a@example.com or b@example.com.")]
     public void TheStatusNamesWhoTheCalendarCouldNotBeSharedWith(string[] accounts, string sentence)
     {
         Assert.Equal(sentence, CalendarScreenConnection.ShareProblem(accounts));

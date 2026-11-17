@@ -115,14 +115,14 @@ public class JsonBodyStoreTests : IDisposable
     public void AGarbledFileIsSetAsideNotOverwritten()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, "{ this is not json");
+        File.WriteAllText(FilePath, "{ this isn’t json");
 
         var store = new JsonBodyStore(FilePath);
         Assert.True(store.IsEmpty);
         store.Upsert([Weight(0, 180)]);
 
         // What could not be read is kept for a person to look at; the store carries on with a clean file.
-        Assert.Equal("{ this is not json", File.ReadAllText(FilePath + ".unreadable"));
+        Assert.Equal("{ this isn’t json", File.ReadAllText(FilePath + ".unreadable"));
         Assert.Single(new JsonBodyStore(FilePath).All());
     }
 

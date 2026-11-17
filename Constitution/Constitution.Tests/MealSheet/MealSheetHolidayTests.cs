@@ -108,7 +108,7 @@ public class MealSheetHolidayTests
         var page = MealSheetGrocerySamples.Pages(MealSheetGrocerySamples.Model(ask: Ask()))[4];
         var text = Rendered(page);
 
-        Assert.Contains("WEEKLY MEAL SHEET · 5 OF 5 · ONLY THE WEEK BEFORE A HOLIDAY", text);
+        Assert.Contains("Weekly meal sheet · 5 of 5 · only the week before a vacation", text);
         Assert.Contains("Thursday, Nov 26 · at the Okafors’ · dinner 3:00 pm", text);
         Assert.Contains("What are we bringing?", text);
         Assert.Contains("Constitution · Meals · week of Nov 15 · both tablets", text);

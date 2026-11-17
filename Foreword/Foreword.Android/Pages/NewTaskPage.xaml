@@ -30,7 +30,7 @@
                     <Editor x:Name="SentenceEditor"
                             AutoSize="TextChanges"
                             MinimumHeightRequest="120"
-                            Placeholder="mow the lawn once this weekend, saturday if it's dry, needs about three dry hours, april to october" />
+                            Placeholder="mow the lawn once this weekend, saturday if it’s dry, needs about three dry hours, april to october" />
                 </Border>
 
                 <Label Text="It reads this back before anything is saved."

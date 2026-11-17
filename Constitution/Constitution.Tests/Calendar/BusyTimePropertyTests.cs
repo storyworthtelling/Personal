@@ -37,7 +37,7 @@ public class BusyTimePropertyTests
         new("Juniper swimming", []),
         new("Samba class", []),
         new("Parent-teacher night: Sam and Lee", [Sam, Lee]),
-        new("Sam's turn to take Robin", [Sam]),
+        new("Sam’s turn to take Robin", [Sam]),
         new("Robin at the Leeds museum", []),
     ];
 

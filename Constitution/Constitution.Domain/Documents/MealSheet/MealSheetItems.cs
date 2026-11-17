@@ -33,10 +33,10 @@ internal static class MealSheetItems
         Require(daily.WeekendLunch, "The weekend lunch");
         return
         [
-            new("WEEKDAY BREAKFAST · MON–FRI", Weekday("breakfast", daily.WeekdayBreakfasts, MealSheetIds.BreakfastYes, MealSheetIds.BreakfastReason)),
-            new("WEEKDAY LUNCH · MON–FRI", Weekday("lunch", daily.WeekdayLunches, MealSheetIds.LunchYes, MealSheetIds.LunchReason)),
+            new("Weekday breakfast · Mon–Fri", Weekday("breakfast", daily.WeekdayBreakfasts, MealSheetIds.BreakfastYes, MealSheetIds.BreakfastReason)),
+            new("Weekday lunch · Mon–Fri", Weekday("lunch", daily.WeekdayLunches, MealSheetIds.LunchYes, MealSheetIds.LunchReason)),
             new(
-                "WEEKEND · SAT–SUN",
+                "Weekend · Sat–Sun",
                 [
                     Item("weekend-breakfast", "Breakfast", daily.WeekendBreakfast, MealSheetIds.WeekendBreakfastYes, MealSheetIds.WeekendBreakfastReason, "Weekend breakfast"),
                     Item("weekend-lunch", "Lunch", daily.WeekendLunch, MealSheetIds.WeekendLunchYes, MealSheetIds.WeekendLunchReason, "Weekend lunch"),
@@ -51,14 +51,14 @@ internal static class MealSheetItems
         return
         [
             new(
-                "IN THE BOX",
+                "In the box",
                 [
                     Item("box-sandwich", "Sandwich", box.Sandwich, MealSheetIds.BoxSandwichYes, MealSheetIds.BoxSandwichReason, "Lunchbox sandwich"),
                     Item("box-fruit", "Fruit", box.Fruit, MealSheetIds.BoxFruitYes, MealSheetIds.BoxFruitReason, "Lunchbox fruit"),
                     Item("box-snack", "Snack", box.Snack, MealSheetIds.BoxSnackYes, MealSheetIds.BoxSnackReason, "Lunchbox snack"),
                 ]),
             new(
-                "SEPARATE SNACK",
+                "Separate snack",
                 [
                     Item("snack-fruit", "Fruit or veg", box.SeparateFruitOrVeg, MealSheetIds.SnackFruitYes, MealSheetIds.SnackFruitReason, "Lunchbox separate fruit or veg"),
                     Item("snack-bar", "Bar", box.SeparateBar, MealSheetIds.SnackBarYes, MealSheetIds.SnackBarReason, "Lunchbox separate bar"),
@@ -97,7 +97,7 @@ internal static class MealSheetItems
         var items = new List<MealSheetItem>();
         for (var index = 0; index < lines.Count; index++)
         {
-            Require(lines[index].Label, $"A weekday {kind} line's person");
+            Require(lines[index].Label, $"A weekday {kind} line’s person");
             items.Add(Item($"{kind}-{index + 1}", lines[index].Label.Trim(), lines[index].Text, yes(index + 1), reason(index + 1), $"Weekday {kind}, {lines[index].Label.Trim()}"));
         }
 

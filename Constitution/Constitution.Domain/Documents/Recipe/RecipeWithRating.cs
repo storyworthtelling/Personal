@@ -22,7 +22,7 @@ public static class RecipeWithRating
 
         if (!string.Equals(model.Cook.Trim(), rating.Cook?.Trim(), StringComparison.OrdinalIgnoreCase) || model.Day.Date != rating.Day.Date)
         {
-            throw new ArgumentException($"The rating page is for {rating.Cook} on {rating.Day:d}, not for {model.Cook}'s '{model.Title}' on {model.Day:d}.", nameof(rating));
+            throw new ArgumentException($"The rating page is for {rating.Cook} on {rating.Day:d}, not for {model.Cook}’s '{model.Title}' on {model.Day:d}.", nameof(rating));
         }
 
         var pages = RecipeDocument.Build(model).ToList();

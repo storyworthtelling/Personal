@@ -89,7 +89,7 @@ public sealed class FileDeliveredMealDocumentsTests : IDisposable
     public void AFileThatCannotBeReadIsSetAsideAndTheStoreCarriesOn()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(PathOf())!);
-        File.WriteAllText(PathOf(), "this is not the record");
+        File.WriteAllText(PathOf(), "this isn’t the record");
 
         Assert.Null(Make().Find(Entry().Name));
 

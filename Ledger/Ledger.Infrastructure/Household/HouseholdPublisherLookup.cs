@@ -39,7 +39,7 @@ public sealed class HouseholdPublisherLookup : IHouseholdPublisherLookup
                 HouseholdFilePublisher.PublishedBy(result.NewerFilePublisherEmail),
             HouseholdSnapshotStatus.NewerVersion => HouseholdFilePublisher.Unreadable("The household file is from a newer version of Index."),
             HouseholdSnapshotStatus.Empty => HouseholdFilePublisher.Absent,
-            HouseholdSnapshotStatus.WrongPassphrase => HouseholdFilePublisher.Unreadable("The passphrase does not open the household file."),
+            HouseholdSnapshotStatus.WrongPassphrase => HouseholdFilePublisher.Unreadable("The passphrase doesn’t open the household file."),
             _ => HouseholdFilePublisher.Unreadable("The household file is damaged."),
         };
     }

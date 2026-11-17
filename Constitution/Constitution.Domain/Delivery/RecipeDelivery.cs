@@ -68,7 +68,7 @@ public static class RecipeDelivery
         ArgumentNullException.ThrowIfNull(zone);
         if (string.IsNullOrWhiteSpace(cook))
         {
-            throw new ArgumentException("A recipe goes to the cook's tablet; there is no cook named.", nameof(cook));
+            throw new ArgumentException("A recipe goes to the cook’s tablet; there is no cook named.", nameof(cook));
         }
 
         var tablet = adults.FirstOrDefault(adult => string.Equals(adult?.Trim(), cook.Trim(), StringComparison.OrdinalIgnoreCase))

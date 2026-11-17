@@ -34,7 +34,7 @@ public static class StackSizeChoice
         if (!CanStep(sizes, kind, delta))
         {
             throw new ArgumentOutOfRangeException(
-                nameof(delta), delta, $"A {kind} pile of {sizes.For(kind)} cannot step by {delta}: each pile holds 0 to {Most} and the stack keeps one card.");
+                nameof(delta), delta, $"A {kind} pile of {sizes.For(kind)} can’t step by {delta}: each pile holds 0 to {Most} and the stack keeps one card.");
         }
 
         return kind == TitleKind.Film

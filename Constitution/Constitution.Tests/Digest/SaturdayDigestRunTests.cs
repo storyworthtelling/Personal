@@ -89,9 +89,9 @@ public class SaturdayDigestRunTests
     public async Task AStoreThatCannotAnswerSendsNothingAndStampsNothing()
     {
         var rig = new Rig();
-        rig.Sources.Unavailable = "The skip ledger could not be read.";
+        rig.Sources.Unavailable = "The skip ledger couldn’t be read.";
         var outcome = await rig.Run().RunAsync(SaturdayMorning, Zone, "Sam", CancellationToken.None);
-        Assert.Equal("The skip ledger could not be read.", Assert.IsType<DigestOutcome.NotReady>(outcome).Reason);
+        Assert.Equal("The skip ledger couldn’t be read.", Assert.IsType<DigestOutcome.NotReady>(outcome).Reason);
         Assert.Equal(0, rig.Tablet.Uploads);
         Assert.False(rig.Stamps.Has("Sam", DigestFixture.Saturday));
         Assert.Empty(rig.Expected.Recorded);

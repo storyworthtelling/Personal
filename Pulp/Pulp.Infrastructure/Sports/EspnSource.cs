@@ -192,7 +192,7 @@ public sealed class EspnSource : ISportsSource
     private EspnLeague Served(LeagueId requested) =>
         leagues.TryGetValue(requested, out var league)
             ? league
-            : throw new ArgumentException($"ESPN's source was not given the league '{requested}'.", nameof(requested));
+            : throw new ArgumentException($"ESPN’s source was not given the league '{requested}'.", nameof(requested));
 
     private static IEnumerable<JsonElement> Groups(JsonElement node)
     {

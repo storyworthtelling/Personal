@@ -3,7 +3,7 @@ namespace Constitution.Domain.Recipes;
 /// <summary>The words the recipe box shows (book pp.13–14). Static copy, written once; none of it is composed.</summary>
 public static class RecipeBoxText
 {
-    public const string Invitation = "Ten family favourites, and the planning can begin.";
+    public const string Invitation = "Ten family favorites, and the planning can begin.";
 
     public const string Footnote = "Weekly meal sheets start on the Thursday after the tenth card.";
 
@@ -49,7 +49,7 @@ public sealed record EmptyBoxState(
 /// </summary>
 public static class EmptyBox
 {
-    /// <summary>How many family favourites the household offers before the first plan (the brief's first run).</summary>
+    /// <summary>How many family favorites the household offers before the first plan (the brief's first run).</summary>
     public const int Target = 10;
 
     public static EmptyBoxState For(RecipeBox box)

@@ -57,7 +57,7 @@ public sealed class DrivePulpUsageSource
         catch (Exception exception)
         {
             // Still a status and never a throw, but not a silent one: why Drive could not be read is the only trace of it.
-            logger?.LogWarning(exception, "Pulp's usage file could not be read from Drive.");
+            logger?.LogWarning(exception, "Pulp’s usage file could not be read from Drive.");
             return new PulpUsageReadResult(PulpUsageReadStatus.Unreadable);
         }
 

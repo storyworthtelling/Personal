@@ -62,8 +62,8 @@ public class DownloadsActivity : Activity
 
         var explainer = PaperUi.Secondary(this,
             "Downloads are measured in playback time and share one allowance across music and podcasts. " +
-            "Each one is removed ten days after it arrives — playing it does not extend that, so the phone " +
-            "does not slowly fill up with things you meant to get to.");
+            "Each one is removed ten days after it arrives — playing it doesn’t extend that, so the phone " +
+            "doesn’t slowly fill up with things you meant to get to.");
         explainer.SetPadding(0, 0, 0, PaperTheme.Dp(this, DesignTokens.Space.X4));
         page.AddView(explainer);
 

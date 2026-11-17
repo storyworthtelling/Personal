@@ -243,7 +243,7 @@ public partial class SetupPage : LedgerBinderPage
         catch (Exception ex)
         {
             // Drive being unreachable just means "can't tell right now", so the row stays hidden.
-            logger.LogWarning(ex, "Could not read the shared Claude key's presence from the vault.");
+            logger.LogWarning(ex, "Could not read the shared Claude key’s presence from the vault.");
             sharedKeyPresent = null;
         }
 
@@ -417,7 +417,7 @@ public partial class SetupPage : LedgerBinderPage
         if (result.NeedsAttention)
         {
             // Behind the fold, not an alert (audit W8.2b): settings still saved here, so this is a thing to know.
-            dogEarState.SetNotice(VaultBackupNotice, new DogEarNotice("The vault backup did not finish.", result.Message, DogEarHue.Problem));
+            dogEarState.SetNotice(VaultBackupNotice, new DogEarNotice("The vault backup didn’t finish.", result.Message, DogEarHue.Problem));
             dogEar.Refresh();
         }
     }
@@ -571,7 +571,7 @@ public partial class SetupPage : LedgerBinderPage
         var options = new List<string> { "Rename" };
         if (index > 0) options.Add("Move up");
         if (index < categoryRows.Count - 1) options.Add("Move down");
-        options.Add("Remove");
+        options.Add("Delete");
 
         var action = await PaperCards.Choose(this, categoryName, null, options);
         switch (action)
@@ -599,14 +599,14 @@ public partial class SetupPage : LedgerBinderPage
                 await ReloadCategoriesAsync();
                 break;
 
-            case "Remove":
+            case "Delete":
                 // Undo-first (DESIGN.md §7): the soft delete (D55) has already written through, so its past
                 // months keep their totals, and the dog-ear — fixed in the corner, wherever the list is
                 // scrolled to — holds the way back for the suite's one undo window.
                 await budgetService.SetCategoryActiveAsync(category.Id, isActive: false, CancellationToken.None);
                 await ReloadCategoriesAsync();
                 dogEarState.BeginUndo(
-                    $"Removed {categoryName}",
+                    $"Deleted {categoryName}",
                     reverse: () => _ = UndoRemoveCategoryAsync(category),
                     DateTimeOffset.Now,
                     Storyworthtelling.Maui.Views.DogEar.UndoWindow());
@@ -642,7 +642,7 @@ public partial class SetupPage : LedgerBinderPage
             var options = await voiceOptions.RefreshAsync(CancellationToken.None);
             claudeSet = !string.IsNullOrEmpty(options.ApiKey);
         }
-        catch { /* best-effort: Drive being unreachable just means "can't tell right now" */ }
+        catch { /* best-effort: Drive being unreachable just means "can’t tell right now" */ }
         sb.AppendLine($"  Claude (voice, set in Folio): {(claudeSet ? "Working" : "Not set.")}");
         sb.AppendLine();
 
@@ -739,7 +739,7 @@ public partial class SetupPage : LedgerBinderPage
             sending.Failed(result.Error ?? result.Refusal?.ToString() ?? "not uploaded");
         }
         DiagnosticsStatusLabel.Text = result.Succeeded
-            ? $"Logs sent: {result.Confirmed} of {result.Planned} batches confirmed in Drive."
-            : MauiLogLoop.Status ?? $"Logs not sent: {result.Error}";
+            ? $"Logs sent: {result.Confirmed} of {result.Planned} saved to Drive."
+            : MauiLogLoop.Status ?? "Logs not sent: " + Storyworthtelling.Diagnostics.PlainError.Describe(result.Error);
     }
 }

@@ -13,7 +13,7 @@ public class MealDeadlineTrailTests
 
     public static IEnumerable<object[]> EveryPhrase()
     {
-        yield return [new MealDeadlineOutcome.NotThePlanner("The other phone holds this week's planning.")];
+        yield return [new MealDeadlineOutcome.NotThePlanner("The other phone holds this week’s planning.")];
         foreach (var because in Enum.GetValues<MealDeadlineNothingBecause>())
         {
             yield return [new MealDeadlineOutcome.NothingToDecide(because, "A sentence.")];
@@ -60,7 +60,7 @@ public class MealDeadlineTrailTests
     [Fact]
     public void NoPhraseQuotesASentence()
     {
-        var phrase = MealDeadlineTrail.LogPhrase(new MealDeadlineOutcome.Stopped(MealDeadlineStoppedBecause.AnswersUnreadable, "Sam's reason was oats."));
+        var phrase = MealDeadlineTrail.LogPhrase(new MealDeadlineOutcome.Stopped(MealDeadlineStoppedBecause.AnswersUnreadable, "Sam’s reason was oats."));
 
         Assert.DoesNotContain("Sam", phrase, StringComparison.Ordinal);
         Assert.DoesNotContain("oats", phrase, StringComparison.Ordinal);

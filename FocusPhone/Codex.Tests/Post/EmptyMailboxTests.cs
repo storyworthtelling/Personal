@@ -138,7 +138,7 @@ public class EmptyMailboxTests
     {
         var available = EmptyMailbox.Available(state, now);
         var index = available.ToList().FindIndex(seed => seed.Id == seedId);
-        Assert.True(index >= 0, $"Seed '{seedId}' is not currently available.");
+        Assert.True(index >= 0, $"Seed '{seedId}' isn’t currently available.");
         return index;
     }
 

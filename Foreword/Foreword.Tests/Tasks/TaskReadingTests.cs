@@ -19,7 +19,7 @@ namespace Foreword.Tests.Tasks;
 public class TaskReadingTests
 {
     private const string Lawn =
-        "mow the lawn once this weekend, saturday if it's dry, needs about three dry hours, april to october";
+        "mow the lawn once this weekend, saturday if it’s dry, needs about three dry hours, april to october";
 
     private static ClaudeTaskReader Reader(Func<HttpRequestMessage, HttpResponseMessage> respond) =>
         new(new HttpClient(new StubHandler(respond)),
@@ -87,7 +87,7 @@ public class TaskReadingTests
     public async Task JsonWrappedInProseIsStillRead()
     {
         var reader = Reader(_ => Reply(
-            "Here's the rule:\n```json\n{\"title\":\"Vitamins\",\"kind\":\"rule\",\"repeat\":\"daily\"}\n```\nHope that helps."));
+            "Here’s the rule:\n```json\n{\"title\":\"Vitamins\",\"kind\":\"rule\",\"repeat\":\"daily\"}\n```\nHope that helps."));
 
         Assert.Equal("Vitamins", (await reader.Read("vitamins every day"))!.Title);
     }
@@ -126,7 +126,7 @@ public class TaskReadingTests
     [Fact]
     public async Task AReplyThatIsNotTheShapeAskedForReadsAsNothing()
     {
-        var reader = Reader(_ => Reply("I'm afraid I can't help with that."));
+        var reader = Reader(_ => Reply("I’m afraid I can’t help with that."));
 
         Assert.Null(await reader.Read(Lawn));
     }

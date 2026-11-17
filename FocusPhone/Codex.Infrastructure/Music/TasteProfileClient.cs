@@ -26,7 +26,7 @@ public sealed class TasteProfileClient : ITasteProfileClient
         "You are a music-taste analyst distilling how one listener actually listens, from passive signals " +
         "only (completions, skips, replays, whether they choose albums vs shuffle, and time of day) — never " +
         "ratings. You are given the CURRENT PROFILE (possibly empty) and NEW EVIDENCE aggregated from their " +
-        "recent listening. Update the profile, folding the evidence into what's already there rather than " +
+        "recent listening. Update the profile, folding the evidence into what’s already there rather than " +
         "replacing it. Infer taste, not a track log. Respond with ONLY a JSON object: " +
         "{\"summary\":string,\"loves\":[string],\"leans\":[string],\"avoids\":[string]," +
         "\"topGenres\":[string],\"topArtists\":[string],\"listensBy\":[string],\"explicitAdvisory\":bool}. " +

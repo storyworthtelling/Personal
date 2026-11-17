@@ -95,7 +95,7 @@ public sealed record RegenerationCard(string Title, string Subtitle, string? Act
         return new RegenerationCard(
             $"Regenerate {books.Count} reviewed {noun}?",
             $"{titles}. About ${dollars} in model calls, a rough estimate. Each report is rewritten in the new form and "
-            + "replaces the one in Drive; nothing is sent to the reMarkable, and your voice profile is not touched.",
+            + "replaces the one in Drive; nothing is sent to the reMarkable, and your voice profile isn’t touched.",
             $"Regenerate {books.Count} {noun} (about ${dollars})");
     }
 }

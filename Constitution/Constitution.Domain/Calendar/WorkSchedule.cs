@@ -108,7 +108,7 @@ public sealed class WorkSchedule
             var where = failure.LineNumber is { } line && failure.BytePositionInLine is { } column
                 ? $" (line {line + 1}, position {column + 1})"
                 : string.Empty;
-            return Unrecognised($"The saved work schedule is not valid JSON{where}.");
+            return Unrecognised($"The saved work schedule isn’t valid JSON{where}.");
         }
 
         using (document)
@@ -125,17 +125,17 @@ public sealed class WorkSchedule
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
-            return Unrecognised("The saved work schedule is not a JSON object.");
+            return Unrecognised("The saved work schedule isn’t a JSON object.");
         }
 
         if (!TryProperty(root, "Shifts", out var list))
         {
-            return Unrecognised("The saved work schedule has no Shifts list, so it is not the schedule Foreword keeps.");
+            return Unrecognised("The saved work schedule has no Shifts list, so it isn’t the schedule Foreword keeps.");
         }
 
         if (list.ValueKind != JsonValueKind.Array)
         {
-            return Unrecognised("Shifts in the saved work schedule is not a list.");
+            return Unrecognised("Shifts in the saved work schedule isn’t a list.");
         }
 
         var shifts = new List<WorkShift>();
@@ -160,7 +160,7 @@ public sealed class WorkSchedule
         {
             if (keywords.ValueKind != JsonValueKind.Array || keywords.EnumerateArray().Any(word => word.ValueKind != JsonValueKind.String))
             {
-                return Unrecognised("OffKeywords in the saved work schedule is not a list of words.");
+                return Unrecognised("OffKeywords in the saved work schedule isn’t a list of words.");
             }
 
             words = CleanWords(keywords.EnumerateArray().Select(word => word.GetString()!));
@@ -175,7 +175,7 @@ public sealed class WorkSchedule
         problem = null;
         if (element.ValueKind != JsonValueKind.Object)
         {
-            problem = $"Shift {number} in the Shifts list of the saved work schedule is not an object.";
+            problem = $"Shift {number} in the Shifts list of the saved work schedule isn’t an object.";
             return null;
         }
 

@@ -172,6 +172,6 @@ public partial class DiagnosticsPage : BinderPage
         }
         SendLogsButton.Text = result.Succeeded
             ? $"Logs sent: {result.Confirmed} of {result.Planned} batches confirmed in Drive."
-            : MauiLogLoop.Status ?? $"Logs not sent: {result.Error}";
+            : MauiLogLoop.Status ?? "Logs not sent: " + Storyworthtelling.Diagnostics.PlainError.Describe(result.Error);
     }
 }

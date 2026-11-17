@@ -57,7 +57,7 @@ public class RecipeMapTests
             new RecipeId("apple-crisp"), "Crème brûlée \"light\"", Cuisine.French,
             [new Ingredient("¾", "cup", "brown sugar"), new Ingredient("1", null, "vanilla bean, split")],
             [new RecipeStep("Bake 40 min, until bubbling.", 40, false)],
-            8, "Grandma's card", forKids: true);
+            8, "Grandma’s card", forKids: true);
 
         foreach (var recipe in new[] { RecipeData.Chili(), bare, accents }.Concat(RecipeData.Box()))
         {

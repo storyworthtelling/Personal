@@ -31,7 +31,7 @@ public static class SettingsCopy
     /// <summary>The paragraph under the Google account heading. Her screen has none.</summary>
     public static string? GoogleIntro(InstallRole role) => role == InstallRole.Hers
         ? null
-        : "Sign in with Google to back up your keys to the secrets vault and to greet you in your own voice from your shared Drive profile. Skip it to keep neutral copy and local-only settings.";
+        : "Sign in with Google to back up your keys to the vault and to greet you in your own voice from your shared Drive profile. Skip it to keep neutral copy and local-only settings.";
 
     /// <summary>The subhead over her signed-in account line.</summary>
     public const string SignedInHeading = "Signed in";

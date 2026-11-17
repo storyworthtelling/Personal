@@ -188,7 +188,7 @@ public class MealPlacementEngineTests
     public async Task AnUnreadableCalendarGetsNothingPlaced()
     {
         var scenario = new Scenario();
-        var unreadable = CalendarsWith(lee: CalendarRead.Unreadable("Lee's calendar did not answer."));
+        var unreadable = CalendarsWith(lee: CalendarRead.Unreadable("Lee’s calendar didn’t answer."));
 
         var run = await scenario.RunAsync(RequestFor(WeekOf(CookedOn(1, Pasta, Lee, 30)), unreadable));
 

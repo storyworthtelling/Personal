@@ -84,7 +84,7 @@ public class PrintedTypeScaleTests
 
         Assert.True(offenders.Count == 0,
             "These name a Skia colour instead of a Paper & Ink role, so the sheets are drawn in a "
-            + "palette the design system does not contain:\n" + string.Join("\n", offenders));
+            + "palette the design system doesn’t contain:\n" + string.Join("\n", offenders));
     }
 
     private static string Root()

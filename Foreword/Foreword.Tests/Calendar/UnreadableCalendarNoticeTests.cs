@@ -32,7 +32,7 @@ public class UnreadableCalendarNoticeTests
         var detail = UnreadableCalendarNotice.Detail(["Shared with me", "Family"]);
 
         Assert.Equal(
-            "Could not read Shared with me, Family. Skipped this morning; the rest of the day went out. "
+            "Couldn’t read Shared with me, Family. Skipped this morning; the rest of the day went out. "
             + "It will be tried again tomorrow.",
             detail);
     }

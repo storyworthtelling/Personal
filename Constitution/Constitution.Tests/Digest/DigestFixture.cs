@@ -19,7 +19,7 @@ internal static class DigestFixture
             new DigestSession(new DateOnly(2026, 3, 12), "Mobility", 20, SessionOutcome.Skipped, null),
             new DigestSession(new DateOnly(2026, 3, 13), "Strength", 45, SessionOutcome.Done, "hard"),
         ],
-        ["Wednesday's walk moved to Thursday for the forecast."]);
+        ["Wednesday’s walk moved to Thursday for the forecast."]);
 
     /// <summary>One reading a day for <paramref name="days"/> days ending the day before the Saturday, each <paramref name="value"/>.</summary>
     public static List<BodyReading> Flat(BodySignal signal, double value, int days = 100)

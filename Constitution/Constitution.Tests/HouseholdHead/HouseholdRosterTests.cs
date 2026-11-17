@@ -37,7 +37,7 @@ public class HouseholdRosterTests
     {
         using var rig = new HeadRig();
         await Hold(rig, RosterData.Household());
-        rig.Drive.Content = "this is not an envelope";
+        rig.Drive.Content = "this isn’t an envelope";
         await rig.Service.SyncAsync(CancellationToken.None);
 
         Assert.Null(rig.Service.Roster);

@@ -20,11 +20,11 @@
                          not on the screen at all (owner's ruling, audit W8.4b). -->
                     <VerticalStackLayout x:Name="ApiKeysSection" Spacing="16" IsVisible="False">
                         <VerticalStackLayout x:Name="ClaudeKeyBlock" Spacing="16" IsVisible="False">
-                            <Label Text="Claude (Anthropic) API key" Style="{StaticResource FieldLabel}" />
+                            <Label Text="Claude key" Style="{StaticResource FieldLabel}" />
                             <Label x:Name="ClaudeStatusLabel" IsVisible="False" Style="{StaticResource ErrorLabel}" />
-                            <Entry x:Name="ClaudeKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="sk-ant-..."
+                            <Entry x:Name="ClaudeKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="sk-ant-…"
                                    Style="{StaticResource MonoEntry}" />
-                            <Label Text="Builds the design bible and storyboards the book."
+                            <Label Text="Reads the manuscript and writes the revision report."
                                    Style="{StaticResource SecondaryLabel}" />
                             <ContentView x:Name="ClaudeConsoleLink" />
                         </VerticalStackLayout>
@@ -32,16 +32,16 @@
                         <VerticalStackLayout x:Name="GeminiKeyBlock" Spacing="16" IsVisible="False">
                             <Label Text="Gemini API key" Style="{StaticResource FieldLabel}" />
                             <Label x:Name="GeminiStatusLabel" IsVisible="False" Style="{StaticResource ErrorLabel}" />
-                            <Entry x:Name="GeminiKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="AIza..."
+                            <Entry x:Name="GeminiKeyEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="AIza…"
                                    Style="{StaticResource MonoEntry}" />
-                            <Label Text="Renders the panel images."
+                            <Label Text="Paints the scene images."
                                    Style="{StaticResource SecondaryLabel}" />
                             <ContentView x:Name="GeminiConsoleLink" />
                         </VerticalStackLayout>
                     </VerticalStackLayout>
 
                     <Label Text="Google account" Style="{StaticResource FieldLabel}" />
-                    <Label Text="Sign in with the Google account on this phone to pick a Doc to convert. Grant the documents and Drive read permissions when prompted."
+                    <Label Text="Sign in with the Google account on this phone to pick a manuscript. Grant the documents and Drive read permissions when prompted."
                            Style="{StaticResource SecondaryLabel}" />
                     <Button x:Name="GoogleSignInButton" Text="Sign in with Google"
                             Clicked="OnGoogleSignInClicked" Style="{StaticResource SecondaryButton}" />
@@ -73,12 +73,12 @@
 
             <kit:SettingsGroup Title="Vault">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
+                    <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app’s keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
                            Style="{StaticResource SecondaryLabel}" />
                     <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" />
                     <Entry x:Name="VaultPassphraseEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="Choose a passphrase"
                            Style="{StaticResource MonoEntry}" />
-                    <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
+                    <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it’s the one thing not stored in the vault."
                            Style="{StaticResource SecondaryLabel}" />
                     <Label x:Name="VaultStatusLabel" Style="{StaticResource StatusLine}" />
                 </VerticalStackLayout>
@@ -86,7 +86,7 @@
 
             <kit:SettingsGroup Title="Delivery">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="When a book finishes, copy its volume PDFs and revision report into a folder beside the manuscript in your Google Drive. Needs the Drive permission — sign in again after turning this on, and if Google doesn't ask for it, the app's OAuth client still needs the drive.file scope added."
+                    <Label Text="When a book finishes, copy its volume PDFs and revision report into a folder beside the manuscript in your Google Drive. Needs the Drive permission — sign in again after turning this on, and if Google doesn’t ask for it, the app’s OAuth client still needs the drive.file scope added."
                            Style="{StaticResource SecondaryLabel}" />
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0" Text="Archive finished books" VerticalOptions="Center" />
@@ -96,7 +96,7 @@
                         <Label Grid.Column="0" Text="Free up space after archiving" VerticalOptions="Center" />
                         <Switch Grid.Column="1" x:Name="FreeSpaceSwitch" Toggled="OnFreeSpaceToggled" />
                     </Grid>
-                    <Label Text="Freeing space deletes the panel and page images once the upload is confirmed. The PDFs are always kept."
+                    <Label Text="Freeing space deletes the scene images once the upload is confirmed. The PDFs are always kept."
                            Style="{StaticResource SecondaryLabel}" />
                     <Label Text="Also send the finished report to your reMarkable tablet, to read and annotate by hand."
                            Style="{StaticResource SecondaryLabel}" />
@@ -109,7 +109,7 @@
 
             <kit:SettingsGroup Title="Reports">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="Rewrite the reports of the books already reviewed in the current form: scenes from your own breaks, the seven readers, the round table, the series bible. Each book's latest draft is read again and its report in Drive is replaced; nothing is sent to the reMarkable."
+                    <Label Text="Rewrite the reports of the books already reviewed in the current form: scenes from your own breaks, the seven readers, the round table, the series bible. Each book’s latest draft is read again and its report in Drive is replaced; nothing is sent to the reMarkable."
                            Style="{StaticResource SecondaryLabel}" />
                     <Button x:Name="RegenerateButton" Text="Regenerate reviewed books"
                             Clicked="OnRegenerateClicked" Style="{StaticResource SecondaryButton}" />
@@ -119,7 +119,7 @@
 
             <kit:SettingsGroup Title="Progress backup">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="Save your whole library — every conversion and rendered page — to a file you choose. If you reinstall the app or move to a new phone, restore the file to pick up a long conversion where you left off."
+                    <Label Text="Save your whole library — every book and every report — to a file you choose. If you reinstall the app or move to a new phone, restore the file and a review picks up where it stopped."
                            Style="{StaticResource SecondaryLabel}" />
                     <Button x:Name="BackupButton" Text="Back up progress"
                             Clicked="OnBackupClicked" Style="{StaticResource SecondaryButton}" />
@@ -133,7 +133,7 @@
 
             <kit:SettingsGroup Title="Diagnostics">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="See what each project is doing and what's gone wrong. Status snapshot is the quickest read; Export bundles the snapshot and both logs into one file to share."
+                    <Label Text="See what each project is doing and what’s gone wrong. Status snapshot is the quickest read; Export bundles the snapshot and both logs into one file to share."
                            Style="{StaticResource SecondaryLabel}" />
                     <Button x:Name="StatusSnapshotButton" Text="Status snapshot"
                             Clicked="OnStatusSnapshotClicked" Style="{StaticResource SecondaryButton}" />

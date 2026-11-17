@@ -158,7 +158,7 @@ public sealed class VoiceGoogleAccount
         if (resultCode != Result.Ok || data is null)
         {
             Finish(t => t.AccountCancelled(DateTimeOffset.Now));
-            tcs.TrySetException(new InvalidOperationException("Account selection was cancelled."));
+            tcs.TrySetException(new InvalidOperationException("No account was picked."));
             return;
         }
 

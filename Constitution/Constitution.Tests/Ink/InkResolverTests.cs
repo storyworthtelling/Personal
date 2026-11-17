@@ -184,7 +184,7 @@ public class InkResolverTests
     {
         var page = InkFixture.Page(new InkTargetRead("pushups", true, confidence));
         var ask = Assert.IsType<InkResolution.NeedsAsking>(fixture.One(page, InkFixture.WorkoutBox));
-        Assert.Equal(["Ticked", "Not ticked"], [ask.First, ask.Second]);
+        Assert.Equal(["Checked", "Not checked"], [ask.First, ask.Second]);
     }
 
     [Fact]

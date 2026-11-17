@@ -168,10 +168,10 @@ public class HouseholdConvergenceTests
         {
             foreach (var right in replicas)
             {
-                Assert.True(HouseholdMerge.Merge(left, right).ContentEquals(HouseholdMerge.Merge(right, left)), $"seed {seed}: merge was not commutative");
+                Assert.True(HouseholdMerge.Merge(left, right).ContentEquals(HouseholdMerge.Merge(right, left)), $"seed {seed}: merge wasn’t commutative");
             }
 
-            Assert.True(HouseholdMerge.Merge(left, left).ContentEquals(left), $"seed {seed}: merge was not idempotent");
+            Assert.True(HouseholdMerge.Merge(left, left).ContentEquals(left), $"seed {seed}: merge wasn’t idempotent");
         }
 
         // One full round of reading each other, and every device holds the same household.
@@ -180,7 +180,7 @@ public class HouseholdConvergenceTests
             writer.Replica = replicas.Aggregate(writer.Replica, HouseholdMerge.Merge);
         }
 
-        Assert.All(writers, writer => Assert.True(writer.Replica.ContentEquals(expected), $"seed {seed}: {writer.Id} did not converge"));
+        Assert.All(writers, writer => Assert.True(writer.Replica.ContentEquals(expected), $"seed {seed}: {writer.Id} didn’t converge"));
 
         tally.FinalTombstones += expected.Records.Count(record => record.IsTombstone);
         tally.FinalLive += expected.Records.Count(record => !record.IsTombstone);

@@ -14,7 +14,7 @@ public static class MealRosterReading
 {
     public const string NoRoster = "There is no household roster on this phone yet, so nobody knows who is eating.";
     public const string EmptyRoster = "The household roster has no one on it, so nobody knows who is eating.";
-    public const string ShortRoster = "A person on the household roster cannot be read, so a headcount would leave someone out.";
+    public const string ShortRoster = "A person on the household roster can’t be read, so a headcount would leave someone out.";
 
     public static MealRosterRead From(RosterView? view, string? blockedSentence)
     {
@@ -40,8 +40,8 @@ public static class MealRosterReading
 /// <summary>Turns the household file into the pantry the meal sheet reads. Pure.</summary>
 public static class MealPantryReading
 {
-    public const string NoFile = "There is no household file on this phone yet, so the sheet's groceries are listed with nothing on hand.";
-    public const string Duplicate = "The pantry lists one ingredient twice and cannot be read as it stands.";
+    public const string NoFile = "There is no household file on this phone yet, so the sheet’s groceries are listed with nothing on hand.";
+    public const string Duplicate = "The pantry lists one ingredient twice and can’t be read as it stands.";
 
     /// <param name="document">The phone's copy of the household file.</param>
     /// <param name="fileMet">False while this phone has not met the household file (an empty copy then means "no file yet", not "nothing on the shelf").</param>

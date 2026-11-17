@@ -26,7 +26,7 @@ internal static class SignalWording
         BodySignal.ActiveMinutes => $"{value.ToString("0", Invariant)} min",
         BodySignal.Strength => $"{value.ToString("0", Invariant)} lb",
         BodySignal.Calories => $"{value.ToString("N0", Invariant)} kcal",
-        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body's signals."),
+        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body’s signals."),
     };
 
     /// <summary>

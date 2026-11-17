@@ -67,7 +67,7 @@ public class PageFurnitureTests
     public void EveryTabHasItsOwnAreaClassOnTheFrozenId(string name, string id)
     {
         var file = HeadSources().SingleOrDefault(path => Path.GetFileName(path) == name + "Area.cs");
-        Assert.True(file is not null, $"{name}Area.cs was not found under Constitution.Android/.");
+        Assert.True(file is not null, $"{name}Area.cs wasn’t found under Constitution.Android/.");
 
         var source = File.ReadAllText(file!);
         Assert.Contains($"class {name}Area", source, StringComparison.Ordinal);
@@ -81,7 +81,7 @@ public class PageFurnitureTests
     public void TheShellFiltersTheTabsThroughVisiblePillars()
     {
         var shell = HeadSources().SingleOrDefault(path => Path.GetFileName(path) == "ConstitutionActivity.cs");
-        Assert.True(shell is not null, "ConstitutionActivity.cs was not found under Constitution.Android/.");
+        Assert.True(shell is not null, "ConstitutionActivity.cs wasn’t found under Constitution.Android/.");
 
         Assert.Contains("ConstitutionAreas.Visible(", File.ReadAllText(shell!), StringComparison.Ordinal);
     }
@@ -90,7 +90,7 @@ public class PageFurnitureTests
     public void TheShellLaysThePageOutThroughPageFrameLayout()
     {
         var frame = HeadSources().SingleOrDefault(path => Path.GetFileName(path) == "PageFrame.cs");
-        Assert.True(frame is not null, "PageFrame.cs was not found under Constitution.Android/.");
+        Assert.True(frame is not null, "PageFrame.cs wasn’t found under Constitution.Android/.");
 
         Assert.Contains("PageFrameLayout.Compute(", File.ReadAllText(frame!), StringComparison.Ordinal);
     }
@@ -99,7 +99,7 @@ public class PageFurnitureTests
     public void PillarsAreStoredUnderTheFrozenFileAndKeys()
     {
         var store = HeadSources().SingleOrDefault(path => Path.GetFileName(path) == "PillarStore.cs");
-        Assert.True(store is not null, "PillarStore.cs was not found under Constitution.Android/.");
+        Assert.True(store is not null, "PillarStore.cs wasn’t found under Constitution.Android/.");
 
         var source = File.ReadAllText(store!);
         Assert.Contains("ConstitutionIdentity.SettingsPreferencesName", source, StringComparison.Ordinal);

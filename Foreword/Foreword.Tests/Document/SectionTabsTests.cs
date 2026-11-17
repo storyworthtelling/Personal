@@ -16,7 +16,7 @@ public class SectionTabsTests
     {
         var fits = BinderStrip.Fits(ForewordSheet.Landscape.DesignHeight, SectionTabs.FirstTabTop);
 
-        Assert.True(fits >= Enum.GetValues<DaySection>().Length, $"The Day's sheet holds {fits} tabs.");
+        Assert.True(fits >= Enum.GetValues<DaySection>().Length, $"The Day’s sheet holds {fits} tabs.");
     }
 
     [Fact]

@@ -30,7 +30,7 @@ public sealed record HouseholdCalendarRow(string Key, string Label, string? Id, 
 public sealed class HouseholdGroupModel
 {
     public const string NoHouseholdFileSentence =
-        "The household file is not set up on this phone yet, so the people are not listed. The choices below are kept on this phone.";
+        "The household file isn’t set up on this phone yet, so the people aren’t listed. The choices below are kept on this phone.";
 
     private const string ChildTag = "child";
     private const string AdultTag = "adult";
@@ -59,7 +59,7 @@ public sealed class HouseholdGroupModel
 
     public IReadOnlyList<HouseholdPickupRow> Pickup { get; private init; } = [];
 
-    public HouseholdTimeRow Bedtime { get; private init; } = new("Children's bedtime", string.Empty, string.Empty, true);
+    public HouseholdTimeRow Bedtime { get; private init; } = new("Children’s bedtime", string.Empty, string.Empty, true);
 
     public HouseholdTimeRow Dinner { get; private init; } = new("Family dinner", string.Empty, string.Empty, true);
 
@@ -86,7 +86,7 @@ public sealed class HouseholdGroupModel
             ? roster.Adults.Select(entry => new HouseholdPickupRow(entry.Name, entry.OnPickup, editor.CanEdit)).ToList()
             : (saved?.Adults ?? []).Select(adult => new HouseholdPickupRow(adult.Name, adult.OnPickup ?? true, true)).ToList();
 
-        var bedtime = Row("Children's bedtime", "Nothing is planned in the hour before", saved?.Bedtime, BedtimeRoutine.Assumed.Bedtime);
+        var bedtime = Row("Children’s bedtime", "Nothing is planned in the hour before", saved?.Bedtime, BedtimeRoutine.Assumed.Bedtime);
         var dinner = Row("Family dinner", "Nothing else is planned over it", saved?.DinnerStart, FamilyDinner.Assumed.Start);
 
         var parts = new List<string>();
@@ -148,7 +148,7 @@ public sealed class HouseholdGroupModel
             SetupGap.NoAdultDeliversHere => "which adult this phone delivers for",
             SetupGap.DeliversHereIsNotAnAdult => "an adult to deliver for",
             SetupGap.FamilyCalendarNotSet => "the family calendar",
-            SetupGap.ChildrenCalendarsNotSet => "the children's calendar",
+            SetupGap.ChildrenCalendarsNotSet => "the children’s calendar",
             _ => throw new ArgumentOutOfRangeException(nameof(gaps), gap, "That gap has no words yet."),
         });
         return "Still missing: " + string.Join(", ", words) + ".";

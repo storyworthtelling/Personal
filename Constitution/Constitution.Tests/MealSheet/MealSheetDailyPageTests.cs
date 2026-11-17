@@ -48,7 +48,7 @@ public class MealSheetDailyPageTests
         var page = Breakfast();
         var text = Rendered(page);
 
-        Assert.Contains("WEEKEND · SAT–SUN", text);
+        Assert.Contains("Weekend · Sat–Sun", text);
         Assert.Contains("Banana pancakes, everyone", text);
         Assert.Contains("Cheese quesadillas, salsa, fruit", text);
         Assert.Equal(["Breakfast", "Lunch"], page.Printed.Where(i => i.Name is "weekend-breakfast-person" or "weekend-lunch-person").Select(i => i.Text));
@@ -73,7 +73,7 @@ public class MealSheetDailyPageTests
                 Assert.Equal(yes.Bounds.CentreY, reason.Bounds.CentreY, 0.01);
                 Assert.Equal(409f, reason.Bounds.Right, 0.01);
                 Assert.True(reason.Bounds.Left > yes.Bounds.Right + 150f, "the reason field is at the other end of the row from YES");
-                Assert.Single(page.Printed, i => i.OwnerId == id && i.Text == "YES");
+                Assert.Single(page.Printed, i => i.OwnerId == id && i.Text == "Yes");
                 Assert.Single(page.Printed, i => i.OwnerId == reason.Id && i.Text == "No, because");
             }
         }
@@ -89,8 +89,8 @@ public class MealSheetDailyPageTests
         var text = Rendered(page);
 
         Assert.Equal(BoxYes, page.Map.Targets.Where(t => t.Kind == InkTargetKind.StandardTick).Select(t => t.Id));
-        Assert.Contains("IN THE BOX", text);
-        Assert.Contains("SEPARATE SNACK", text);
+        Assert.Contains("In the box", text);
+        Assert.Contains("Separate snack", text);
         Assert.Contains("For the children, Monday to Friday. Nothing needs heating.", text);
         foreach (var words in new[] { "Sandwich", "Sunflower butter and jam", "Clementine", "Cheese stick", "Fruit or veg", "Cucumber slices", "Oat granola bar" })
         {
@@ -106,8 +106,8 @@ public class MealSheetDailyPageTests
         var page = Breakfast();
         var text = Rendered(page);
 
-        Assert.Contains("WEEKDAY BREAKFAST · MON–FRI", text);
-        Assert.Contains("WEEKDAY LUNCH · MON–FRI", text);
+        Assert.Contains("Weekday breakfast · Mon–Fri", text);
+        Assert.Contains("Weekday lunch · Mon–Fri", text);
         Assert.Contains("Easy, uncooked weekday prep. Weekends are planned the same way.", text);
         Assert.Equal(WeekdayBreakfast, RowIds(page).Where(id => id.StartsWith("breakfast-", StringComparison.Ordinal) && id.EndsWith("-yes", StringComparison.Ordinal)));
         Assert.Equal(
@@ -143,8 +143,8 @@ public class MealSheetDailyPageTests
     {
         var pages = Pages();
 
-        Assert.Contains("WEEKLY MEAL SHEET · 2 OF 5", Rendered(pages[1]));
-        Assert.Contains("WEEKLY MEAL SHEET · 3 OF 5", Rendered(pages[2]));
+        Assert.Contains("Weekly meal sheet · 2 of 5", Rendered(pages[1]));
+        Assert.Contains("Weekly meal sheet · 3 of 5", Rendered(pages[2]));
         Assert.Equal("2 of 5", pages[1].Printed.Single(i => i.Name == "page-number").Text);
         Assert.Equal("3 of 5", pages[2].Printed.Single(i => i.Name == "page-number").Text);
         Assert.Contains("Constitution · Meals · week of Nov 15 · both tablets", Rendered(pages[1]));

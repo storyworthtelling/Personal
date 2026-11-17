@@ -67,7 +67,7 @@ public sealed class DrivePrayerArchive(IDriveTextFile file) : IPrayerArchive, IP
         if (string.IsNullOrEmpty(passphrase))
         {
             throw new PrayerArchiveLockedException(
-                "The prayer archive was not written: there is no vault passphrase, and encrypting "
+                "The prayer archive wasn’t written: there is no vault passphrase, and encrypting "
                 + "the journal under an empty one would make it unreadable to every other install.");
         }
 
@@ -79,7 +79,7 @@ public sealed class DrivePrayerArchive(IDriveTextFile file) : IPrayerArchive, IP
         if (!existing.Writable)
         {
             throw new PrayerArchiveLockedException(
-                "The prayer archive was not written: the file already in Drive could not be "
+                "The prayer archive wasn’t written: the file already in Drive couldn’t be "
                 + $"read ({Told(existing.Status)}), and it is the only copy of what was written.");
         }
 

@@ -13,7 +13,7 @@ public sealed class ManifestPermissionTests
         var sources = PulpSource.Files(".cs")
             .Where(file => PulpSource.Relative(file).Contains("Pulp.Android", StringComparison.Ordinal))
             .ToList();
-        Assert.True(sources.Count >= 10, "The scan should cover the head's sources, found " + sources.Count);
+        Assert.True(sources.Count >= 10, "The scan should cover the head’s sources, found " + sources.Count);
 
         var declared = sources.Any(file => File.ReadAllText(file)
             .Contains("[assembly: UsesPermission(Android.Manifest.Permission.Internet)]", StringComparison.Ordinal));
@@ -24,7 +24,7 @@ public sealed class ManifestPermissionTests
     public void TheWorkflowChecksTheBuiltApkForInternet()
     {
         var workflow = Path.Combine(PulpSource.Root(), "..", ".github", "workflows", "build-pulp.yml");
-        Assert.True(File.Exists(workflow), "build-pulp.yml was not found at " + workflow);
+        Assert.True(File.Exists(workflow), "build-pulp.yml wasn’t found at " + workflow);
         var text = File.ReadAllText(workflow);
         Assert.Contains("INTERNET", text, StringComparison.Ordinal);
         Assert.Contains("dump permissions", text, StringComparison.Ordinal);

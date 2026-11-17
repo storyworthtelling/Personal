@@ -1366,7 +1366,7 @@ public sealed class ProjectService
 
         if (analysis.PdfStatus != WorkStatus.Completed)
         {
-            report.AppendLine($"  Report: could not be rendered ({analysis.PdfStatus})");
+            report.AppendLine($"  Report: couldn’t be rendered ({analysis.PdfStatus})");
             return;
         }
 

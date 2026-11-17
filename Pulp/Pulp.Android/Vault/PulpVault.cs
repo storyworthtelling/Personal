@@ -116,7 +116,7 @@ internal sealed class PulpVault
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
         {
             // The publish's own read of the vault can throw before it reaches its write (no token, no network).
-            services.Diagnostics.Warn(LogSources.Vault, "Pulp's keys could not be published to the vault.", exception);
+            services.Diagnostics.Warn(LogSources.Vault, "Pulp’s keys could not be published to the vault.", exception);
             return VaultSaveOutcome.WriteFailed;
         }
 
@@ -175,6 +175,6 @@ internal sealed class PulpVault
         PulpCredentialIds.StreamingAvailability => keys.StreamingAvailabilityKey,
         PulpCredentialIds.Omdb => keys.OmdbKey,
         PulpCredentialIds.YouTube => keys.YouTubeKey,
-        _ => throw new ArgumentOutOfRangeException(nameof(credentialId), credentialId, "Not one of Pulp's keys."),
+        _ => throw new ArgumentOutOfRangeException(nameof(credentialId), credentialId, "Not one of Pulp’s keys."),
     };
 }

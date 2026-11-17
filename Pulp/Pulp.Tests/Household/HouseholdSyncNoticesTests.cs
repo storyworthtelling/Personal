@@ -14,7 +14,7 @@ public class HouseholdSyncNoticesTests
     [InlineData(HouseholdUnreadableReason.NoPassphrase)]
     public void AnUnreadableFileRaisesANoticeUnderOneKey(HouseholdUnreadableReason why)
     {
-        var change = HouseholdSyncNotices.For(HouseholdSyncStatus.Unreadable(why, "Cannot open.", null), Now);
+        var change = HouseholdSyncNotices.For(HouseholdSyncStatus.Unreadable(why, "Can’t open.", null), Now);
 
         Assert.NotNull(change.Raise);
         Assert.Equal(change.Raise!.Key, change.Key);
@@ -23,7 +23,7 @@ public class HouseholdSyncNoticesTests
     [Fact]
     public void ASyncedOrOfflineStatusWithdrawsTheSameKey()
     {
-        var raised = HouseholdSyncNotices.For(HouseholdSyncStatus.Unreadable(HouseholdUnreadableReason.Damaged, "Cannot open.", null), Now);
+        var raised = HouseholdSyncNotices.For(HouseholdSyncStatus.Unreadable(HouseholdUnreadableReason.Damaged, "Can’t open.", null), Now);
 
         foreach (var status in new[] { HouseholdSyncStatus.Synced(Now), HouseholdSyncStatus.Offline(null, "timeout"), HouseholdSyncStatus.WaitingForShare(null, "x") })
         {

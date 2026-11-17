@@ -24,7 +24,7 @@ public static class DeskStatus
         {
             "Completed" => "Review delivered.",
             "Failed" => "Stopped.",
-            "Cancelled" => "Stopped by you.",
+            "Cancelled" => "Stopped by you.",  // not copy: a stage, id or wire word
             _ when stuck => $"Stopped · {core}",
             _ => core + "…",
         };
@@ -47,19 +47,19 @@ public static class DeskStatus
             case "Failed":
                 // Errors are never voiced (audit W10.5): the desk shows why in plain words where the line would go.
                 return null;
-            case "Cancelled":
+            case "Cancelled":  // not copy: a stage, id or wire word
                 return "The owner stopped this review before it finished. " +
-                       "Do not say or imply that it is complete.";
+                       "Don’t say or imply that it is complete.";
         }
 
         if (s.NeedsAttention)
             return null;
 
-        return $"The review is still in progress and is NOT finished. Right now: {Core(s)}. " +
-               "Do not say or imply that the draft or the report is complete.";
+        return $"The review is still in progress and is NOT finished. Right now: {Core(s)}. " +  // not copy: a stage, id or wire word
+               "Don’t say or imply that the draft or the report is complete.";
     }
 
-    private static bool Active(NovelStatus s) => s.Stage is not ("Completed" or "Failed" or "Cancelled");
+    private static bool Active(NovelStatus s) => s.Stage is not ("Completed" or "Failed" or "Cancelled");  // not copy: a stage, id or wire word
 
     // The sentence for the stage, without its trailing ellipsis. The report stage names the step.
     private static string Core(NovelStatus s) => s.Stage switch
@@ -82,7 +82,7 @@ public static class DeskStatus
             return string.IsNullOrWhiteSpace(s.DeliveryNote) ? null : s.DeliveryNote;
 
         var plain = Storyworthtelling.Diagnostics.PlainError.Describe(s.LastError, "Claude");
-        if (plain.Length == 0 || s.Stage is "Cancelled")
+        if (plain.Length == 0 || s.Stage is "Cancelled")  // not copy: a stage, id or wire word
             return null;
 
         var said = char.ToUpperInvariant(plain[0]) + plain[1..];

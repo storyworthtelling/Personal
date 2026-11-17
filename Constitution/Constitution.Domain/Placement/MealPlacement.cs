@@ -165,13 +165,13 @@ public static class MealPlacement
             var weekday = dinner.Day.DayOfWeek;
             var name = weekday.ToString();
             var adult = rules.FindAdult(dinner.Cook!)
-                ?? throw new ArgumentException($"{name}'s cook is not one of the household's adults, so no cook block was made.", nameof(week));
+                ?? throw new ArgumentException($"{name}’s cook is not one of the household’s adults, so no cook block was made.", nameof(week));
             var card = recipes.FirstOrDefault(item => item.Id == dinner.Recipe)
-                ?? throw new ArgumentException($"{name}'s dinner names a card that is not in the box.", nameof(recipes));
+                ?? throw new ArgumentException($"{name}’s dinner names a card that is not in the box.", nameof(recipes));
             var dinnerStart = MealFacts.DinnerWindow(rules, dinner.Day).Start;
             if (dinner.CookEnd != dinnerStart)
             {
-                throw new ArgumentException($"{name}'s cook block does not end where the family dinner starts, so the week has to be planned again.", nameof(week));
+                throw new ArgumentException($"{name}’s cook block does not end where the family dinner starts, so the week has to be planned again.", nameof(week));
             }
 
             var cookStart = dinner.CookStart!.Value;
@@ -242,7 +242,7 @@ public static class MealPlacement
 
         if (windows.Count == 0)
         {
-            throw new ArgumentException($"There is no room before {name}'s cook block for a slow cooker start in the morning.", nameof(options));
+            throw new ArgumentException($"There is no room before {name}’s cook block for a slow cooker start in the morning.", nameof(options));
         }
 
         return windows;

@@ -35,7 +35,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private const string ExtractionInstruction =
         "You are a visual-development analyst preparing a graphic-novel design bible. Your list becomes the " +
-        "illustrator's reference sheets, so any character or place you omit gets drawn from scratch and " +
+        "illustrator’s reference sheets, so any character or place you omit gets drawn from scratch and " +
         "breaks visual consistency. Be EXHAUSTIVE. List EVERY CHARACTER that appears or is described — " +
         "named or unnamed, major, minor, background, or a briefly-glimpsed walk-on (e.g. \"a scarred " +
         "innkeeper\", \"two guards at the gate\") — and EVERY SETTING/LOCATION/SET that appears or is " +
@@ -51,8 +51,8 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "Use [] when none are present, and \"\" for an unknown scale. No prose outside the JSON.";
 
     private const string ArtStyleInstruction =
-        "You are an art director choosing the visual style for illustrated evidence images of a novel's " +
-        "scenes. From the prose sample and the cast below, infer the book's genre, tone, period and " +
+        "You are an art director choosing the visual style for illustrated evidence images of a novel’s " +
+        "scenes. From the prose sample and the cast below, infer the book’s genre, tone, period and " +
         "setting, then describe ONE cohesive illustration style for the WHOLE book — medium, rendering, " +
         "linework, colour palette, lighting and mood — in a single vivid sentence an illustrator could " +
         "follow consistently. Respond with ONLY a JSON object: {\"artStyle\":string}. No prose outside the JSON.";
@@ -60,24 +60,24 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     // One detected scene, judged on its own (release A3–A4). Nudge never write: the verdict and the notes
     // point at problems and never supply the author's sentences.
     private const string SceneJudgementInstruction =
-        "You are judging ONE scene of a manuscript as a developmental editor. You are given the scene's own " +
-        "text, the story so far when it begins, the book's dominant voice, and the cast and settings it names. " +
+        "You are judging ONE scene of a manuscript as a developmental editor. You are given the scene’s own " +
+        "text, the story so far when it begins, the book’s dominant voice, and the cast and settings it names. " +
         "Respond with ONLY a JSON object: {\"accomplishes\":string,\"call\":\"Keep|Tighten|Rewrite|Cut\"," +
         "\"tension\":number,\"verdict\":string,\"inconsistencies\":[{\"kind\":\"Voice|Tense|Characterisation|Setting\"," +
         "\"detail\":string,\"excerpt\":string,\"severity\":\"Must|Should|Consider\"}]}. accomplishes = what this scene does for the plot and for the " +
         "characters, in one or two sentences. call = Keep (it works), Tighten (it works but runs long or repeats), " +
         "Rewrite (it does not yet do its job), or Cut (the book loses nothing without it). tension = how much " +
         "pressure the scene carries, from 0 (calm) to 1 (peak). verdict = one or two sentences on why the call. " +
-        "inconsistencies = places where the scene's voice drifts from the book's, its tense slips, a character " +
+        "inconsistencies = places where the scene’s voice drifts from the book’s, its tense slips, a character " +
         "acts or sounds unlike the story so far without cause, or a setting contradicts what was established; " +
         "an empty list when there are none. excerpt = a short verbatim quote (under fifteen words) from THIS " +
         "scene where the inconsistency is, so the note can be written on that line. severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). You diagnose and point: " +
-        "never write replacement prose, never rewrite a sentence, never supply the author's words.";
+        "never write replacement prose, never rewrite a sentence, never supply the author’s words.";
 
     private const string SceneImageInstruction =
         "You are a visual-development artist illustrating ONE scene of a novel for a fidelity check: the " +
-        "image will be placed beside the prose to test whether the scene's key beat lands visually AS " +
-        "WRITTEN. From the scene text and the cast/settings below, choose the scene's EMOTIONAL PEAK — the " +
+        "image will be placed beside the prose to test whether the scene’s key beat lands visually AS " +
+        "WRITTEN. From the scene text and the cast/settings below, choose the scene’s EMOTIONAL PEAK — the " +
         "single most important dramatic moment — and describe one wordless illustration of it: who is " +
         "present, what they are doing, where, and the mood, grounded in the details the prose actually " +
         "gives. Depict a SPECIFIC moment of action or feeling, not a posed portrait. If a list of MOMENTS " +
@@ -98,7 +98,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "\"proseObservations\":[string],\"dialogueObservations\":[string],\"sceneBeats\":[string]," +
         "\"summarizedMoments\":[string],\"thinSpots\":[string],\"offPageEvents\":[string]," +
         "\"runningState\":string}. runningState = the UPDATED story-so-far after this excerpt: extend STORY " +
-        "SO FAR with this excerpt's plot developments, the current state of each character, open questions, " +
+        "SO FAR with this excerpt’s plot developments, the current state of each character, open questions, " +
         "and planted-but-unpaid setups — a few tight paragraphs, cumulative, so the next excerpt inherits it. " +
         "characterBeats = decisions, " +
         "changes, or motivation shifts; setupsAndPayoffs = planted elements or promises (note if paid " +
@@ -159,14 +159,14 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "use \"\" when the finding is about the book as a whole or no phrase was quoted." +
         " severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). " +
         "Set \"chapter\" on each revisionPlan item the same way. " +
-        "genre: infer the book's genre. wordCountRange: the word-count range publishers expect for that " +
+        "genre: infer the book’s genre. wordCountRange: the word-count range publishers expect for that " +
         "genre (e.g. \"90,000–120,000\"). " +
         "pacingCurve: one entry PER CHAPTER in reading order with tension from 0.0 (calm) to 1.0 (peak), and " +
-        "\"driver\": three to six words on what drives or drains that chapter's tension (\"the storm breaks\", " +
+        "\"driver\": three to six words on what drives or drains that chapter’s tension (\"the storm breaks\", " +
         "\"backstory stalls the chase\"), printed over its point on the chart. The curve is what makes " +
         "a saggy stretch visible; copy the chapter label from the notes. " +
         "Provide AT LEAST FOUR reviews from DISTINCT, fair perspectives — a DEVELOPMENTAL EDITOR (structure, " +
-        "arcs, stakes), the TARGET-GENRE READER (where they're gripped, bored, confused, moved), the SKEPTIC " +
+        "arcs, stakes), the TARGET-GENRE READER (where they’re gripped, bored, confused, moved), the SKEPTIC " +
         "(the harshest fair read), and an AGENT & ACQUIRING EDITOR (is it sellable, is it ready, where it " +
         "sits in the market, and a readiness read: early draft / revision / near-submittable) — differing " +
         "but honest, each with real strengths and weaknesses. " +
@@ -182,7 +182,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "whole manuscript in reading order; each carries the chapter it was taken from, and " +
         "lineEditCandidates/proseObservations/dialogueObservations are the raw material for " +
         "your three sections. Consolidate them into the patterns and edits that matter for the WHOLE " +
-        "book — merge duplicates, drop the trivial, keep the author's own words when quoting. Respond " +
+        "book — merge duplicates, drop the trivial, keep the author’s own words when quoting. Respond " +
         "with ONLY a JSON object: " +
         "{\"lineEdits\":[{\"chapter\":string,\"excerpt\":string,\"suggestion\":string,\"reason\":string,\"kind\":string,\"severity\":\"Must|Should|Consider\"}]," +
         "\"proseNotes\":[{\"chapter\":string,\"pattern\":string,\"evidence\":string,\"fix\":string,\"severity\":\"Must|Should|Consider\"}]," +
@@ -206,39 +206,39 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "none. Every item has a severity: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). Use [] when none. No prose outside the JSON.";
 
     private const string VoiceConsistencyInstruction =
-        "You are a developmental editor assessing a manuscript's VOICE CONSISTENCY for an author preparing " +
+        "You are a developmental editor assessing a manuscript’s VOICE CONSISTENCY for an author preparing " +
         "it for publication. You are given a representative prose sample from each chapter, each tagged " +
-        "with its chapter. First infer the book's DOMINANT authorial voice — its register, diction, " +
+        "with its chapter. First infer the book’s DOMINANT authorial voice — its register, diction, " +
         "sentence cadence, tone, and narrative stance — from the body of samples. Then flag the passages " +
         "whose prose DRIFTS from that dominant voice: a chapter that slips into a different register, an " +
         "out-of-place tonal shift, diction or rhythm unlike the rest. Judge consistency of VOICE only — " +
-        "not quality, plot, or subject matter. A deliberately distinct voice (a different POV character's " +
+        "not quality, plot, or subject matter. A deliberately distinct voice (a different POV character’s " +
         "chapter, a letter or document embedded in the text) is NOT a defect, so flag only drift that " +
         "reads as unintentional. Respond with ONLY a JSON object: " +
         "{\"dominantVoice\":string,\"divergences\":[{\"chapter\":string,\"excerpt\":string," +
         "\"divergence\":string,\"suggestion\":string,\"severity\":\"Must|Should|Consider\"}]}. dominantVoice: two or three sentences " +
-        "characterizing the book's established voice. excerpt: quote the divergent prose VERBATIM from the " +
+        "characterizing the book’s established voice. excerpt: quote the divergent prose VERBATIM from the " +
         "sample so the author can find it. divergence: how it departs from the dominant voice. suggestion: " +
         "how to bring it into line. severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). Report AT MOST 20 divergences, the clearest ones, and use [] when the " +
         "voice is consistent throughout. No prose outside the JSON.";
 
     private const string ReconciliationInstruction =
-        "You are reconciling a manuscript's revision findings ACROSS DRAFTS. You are given the PRIOR draft's " +
-        "findings (each with a stable id, category, chapter, and text) and the CURRENT draft's findings (each " +
+        "You are reconciling a manuscript’s revision findings ACROSS DRAFTS. You are given the PRIOR draft’s " +
+        "findings (each with a stable id, category, chapter, and text) and the CURRENT draft’s findings (each " +
         "with a numeric index). For each CURRENT finding, decide whether it is the SAME underlying issue as one " +
         "of the prior findings — the same plot hole, inconsistency, inaccuracy, or pacing problem — even if the " +
         "wording, phrasing, or chapter citation has moved between drafts, or whether it is a genuinely NEW " +
         "issue. Match CONSERVATIVELY: only when it is really the same issue, not merely a similar topic or the " +
         "same chapter. Respond with ONLY a JSON object: {\"matches\":[{\"index\":int,\"threadId\":string|null}]}. " +
-        "index: the current finding's index. threadId: the id of the prior finding it is the same issue as, or " +
+        "index: the current finding’s index. threadId: the id of the prior finding it is the same issue as, or " +
         "null when it is new. Include exactly one entry per current finding, and never map two current findings " +
         "to the same prior id. No prose outside the JSON.";
 
     private const string ExpansionInstruction =
         "You are a developmental editor helping an author whose early drafts run SHORT. Your job here is " +
         "ADDITIVE: find what the book is missing and where it could grow. You are given the per-chunk notes " +
-        "(each chunk's summarized moments, off-page events, thin spots, character beats, and setups), a " +
-        "running story-state, the manuscript's actual WORD COUNT, and its GENRE. You NUDGE, you never write: " +
+        "(each chunk’s summarized moments, off-page events, thin spots, character beats, and setups), a " +
+        "running story-state, the manuscript’s actual WORD COUNT, and its GENRE. You NUDGE, you never write: " +
         "every suggestion is a POINTER the author acts on themselves — never drafted prose, never an example " +
         "scene, never sample lines. Respond with ONLY a JSON object: " +
         "{\"scenesToAdd\":[{\"kind\":string,\"location\":string,\"missing\":string,\"why\":string," +
@@ -253,40 +253,40 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         "SUMMARIZED passage that could become a shown scene (the main lever for adding words) or \"Tighten\" " +
         "for an OVER-shown passage that runs long; quote the excerpt VERBATIM and give a pointer, not a " +
         "rewrite; each showVsTell note has a severity: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). targetLow/targetHigh = the typical published word-count range for this genre (integers; use " +
-        "0/0 if you can't judge it). Give AT MOST 15 scenesToAdd and 15 showVsTell, the most significant, and " +
+        "0/0 if you can’t judge it). Give AT MOST 15 scenesToAdd and 15 showVsTell, the most significant, and " +
         "use [] when there are none. No prose outside the JSON.";
 
     private const string SeriesContinuityInstruction =
         "You are a continuity editor checking a novel that is a LATER BOOK in a series against the canon its " +
-        "PRIOR book established. You are given the prior book's canon — its cast and settings with the " +
+        "PRIOR book established. You are given the prior book’s canon — its cast and settings with the " +
         "descriptions the prior book established, where its story stood at the end, and the unresolved problems " +
-        "it left open — and this book's per-chunk notes and running story state. Do TWO things. (1) Find " +
+        "it left open — and this book’s per-chunk notes and running story state. Do TWO things. (1) Find " +
         "CONTRADICTIONS: places where this book contradicts what the prior book established — a character " +
         "described or behaving inconsistently with their canon, a place / world rule / timeline that clashes, a " +
-        "fact that cannot be true if the prior book's was. Be specific and CONSERVATIVE: a deliberate " +
+        "fact that cannot be true if the prior book’s was. Be specific and CONSERVATIVE: a deliberate " +
         "development, reveal, or change over time is NOT a contradiction — flag only genuine clashes. (2) For " +
-        "each of the prior book's OPEN THREADS, judge whether this book ADDRESSES it (resolves or meaningfully " +
+        "each of the prior book’s OPEN THREADS, judge whether this book ADDRESSES it (resolves or meaningfully " +
         "advances it), IGNORES it (never touches it), or CONTRADICTS it. You NUDGE, you never rewrite: point at " +
         "the problem, never draft the fix. Respond with ONLY a JSON object: " +
         "{\"breaks\":[{\"chapter\":string,\"established\":string,\"contradiction\":string,\"excerpt\":string,\"severity\":\"Must|Should|Consider\"}]," +
         "\"carriedThreads\":[{\"established\":string,\"status\":string}]}. breaks: chapter = where in THIS book " +
         "(\"Chapter 4\", \"\" if unknown); established = what the prior book set; contradiction = what this book " +
-        "says instead; excerpt = a short phrase from THIS book's notes, verbatim, where the clash is (\"\" if none); severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). carriedThreads: established = the prior open thread verbatim; status = one of " +
+        "says instead; excerpt = a short phrase from THIS book’s notes, verbatim, where the clash is (\"\" if none); severity = how much it matters: \"Must\" (the book does not work until it is fixed), \"Should\" (it weakens the book), or \"Consider\" (a refinement). carriedThreads: established = the prior open thread verbatim; status = one of " +
         "\"Addressed\", \"Ignored\", \"Contradicted\". Give one carriedThreads entry per open thread provided. " +
         "Use [] when there are no breaks. No prose outside the JSON.";
 
     // Appended when the book is checked against the series bible (R22–R24).
     private const string SeriesBibleCheckInstruction =
-        " You are given the SERIES BIBLE of the books written before this one, in place of the prior book's canon: each " +
-        "entry with the book that established it, the story time it holds as of, and that book's own words. Where this " +
+        " You are given the SERIES BIBLE of the books written before this one, in place of the prior book’s canon: each " +
+        "entry with the book that established it, the story time it holds as of, and that book’s own words. Where this " +
         "book and the bible disagree, the EARLIER-WRITTEN book is canon and this book is the one to flag, even when this " +
         "book is set earlier in story time. Read the bible against where this book sits in story time: a character " +
         "younger, a place not yet built or a thread not yet opened is no clash in a book set before it. Check four things " +
         "and give each break a kind: \"Contradicted fact\" (a fact this book cannot share with the bible), \"Character " +
-        "drift\" (a character who acts, speaks or is described unlike the bible's without the story earning it), \"Dropped " +
+        "drift\" (a character who acts, speaks or is described unlike the bible’s without the story earning it), \"Dropped " +
         "thread\" (an open thread this book should take up and does not, or abandons), \"Timeline error\" (an order, age, " +
         "date or interval that cannot be true). For each break also give \"book\" (the title of the earlier book it " +
-        "contradicts) and \"quote\" (that book's own words for what it established, copied from the bible's quoted " +
+        "contradicts) and \"quote\" (that book’s own words for what it established, copied from the bible’s quoted " +
         "passage, or \"\" when the bible has none).";
 
     private readonly HttpClient httpClient;
@@ -600,13 +600,13 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var scene = new { Number = number, Chapter = chapter };
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException(
-                $"Scene {scene.Number}'s judgement came back with nothing readable as JSON; the pass is retried.");
+                $"Scene {scene.Number}’s judgement came back with nothing readable as JSON; the pass is retried.");
 
         var dto = JsonResponse.Deserialize<SceneJudgementDto>(json);
         if (dto is null || string.IsNullOrWhiteSpace(dto.Accomplishes))
-            throw new InvalidOperationException($"Scene {scene.Number}'s judgement did not say what the scene accomplishes.");
+            throw new InvalidOperationException($"Scene {scene.Number}’s judgement did not say what the scene accomplishes.");
         if (!Enum.TryParse<SceneCall>(dto.Call?.Trim(), ignoreCase: true, out var call) || !Enum.IsDefined(call))
-            throw new InvalidOperationException($"Scene {scene.Number}'s judgement gave no keep/tighten/rewrite/cut call (got '{dto.Call}').");
+            throw new InvalidOperationException($"Scene {scene.Number}’s judgement gave no keep/tighten/rewrite/cut call (got '{dto.Call}').");
 
         var inconsistencies = (dto.Inconsistencies ?? [])
             .Where(item => !string.IsNullOrWhiteSpace(item.Detail))
@@ -964,7 +964,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         + "book, and do not suggest changes.\n\n"
         + "Reply with JSON only: {\"entries\": [{\"kind\": \"character, setting, rule, event or thread\", \"name\": "
         + "\"the name the book uses most\", \"aliases\": [\"other names the book uses for it\"], \"era\": \"the story "
-        + "time this holds as of, in the book's own terms, or an empty string\", \"text\": \"what the book establishes, "
+        + "time this holds as of, in the book’s own terms, or an empty string\", \"text\": \"what the book establishes, "
         + "in one or two sentences\", \"quote\": \"a short passage (under twenty words) copied verbatim from the book "
         + "that establishes it, or an empty string\"}]}";
 
@@ -996,7 +996,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private const string PlacementInstruction =
         "You place a book in its series' story time. Given the series bible of the books written before it and where "
-        + "this book's story stands, say where it takes place against them: after one book, before one book, between "
+        + "this book’s story stands, say where it takes place against them: after one book, before one book, between "
         + "two books, or, when it is set far from all of them, in an era of its own, named in the series' own terms. "
         + "Use only the book titles given.\n\n"
         + "Reply with JSON only: {\"kind\": \"after, before, between or era\", \"book\": \"a title (the earlier one, "
@@ -1032,9 +1032,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var reply = await SendRoundTable(reviews, HostInstruction(length), user, nameof(RoundTableHost), cancellationToken);
 
         var json = JsonResponse.ExtractObject(reply)
-                   ?? throw new InvalidOperationException("The round table host's move came back with no JSON.");
+                   ?? throw new InvalidOperationException("The round table host’s move came back with no JSON.");
         var dto = JsonResponse.Deserialize<HostMoveDto>(json)
-                  ?? throw new InvalidOperationException("The round table host's move came back unreadable.");
+                  ?? throw new InvalidOperationException("The round table host’s move came back unreadable.");
         return new HostMove(dto.Says?.Trim() ?? string.Empty, dto.Next?.Trim() ?? string.Empty,
             dto.Ask?.Trim() ?? string.Empty, dto.Answering?.Trim() ?? string.Empty, dto.Close)
         {
@@ -1077,9 +1077,9 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
             + "stands where\"]}";
         var reply = await SendRoundTable(reviews, instruction, Transcript(table), nameof(RoundTableClose), cancellationToken);
         var json = JsonResponse.ExtractObject(reply)
-                   ?? throw new InvalidOperationException("The round table's close came back with no JSON.");
+                   ?? throw new InvalidOperationException("The round table’s close came back with no JSON.");
         var dto = JsonResponse.Deserialize<ClosingDto>(json)
-                  ?? throw new InvalidOperationException("The round table's close came back unreadable.");
+                  ?? throw new InvalidOperationException("The round table’s close came back unreadable.");
         return new RoundTableClosing(dto.Says?.Trim() ?? string.Empty, new RoundTableSummary(
             [.. (dto.Agreed ?? []).Where(line => !string.IsNullOrWhiteSpace(line)).Select(line => line.Trim())],
             [.. (dto.StillDiffer ?? []).Where(line => !string.IsNullOrWhiteSpace(line)).Select(line => line.Trim())]));
@@ -1145,7 +1145,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         var where = placement is null
             ? string.Empty
             : $"WHERE THIS BOOK SITS IN THE SERIES' STORY TIME: {placement.Where}"
-              + (placement.Confirmed ? " (the author's word)" : " (Folio's guess, not yet confirmed by the author)") + "\n\n";
+              + (placement.Confirmed ? " (the author’s word)" : " (Folio’s guess, not yet confirmed by the author)") + "\n\n";
         var userContent =
             $"THIS BOOK'S TITLE: {title}\n\n" +
             where +
@@ -1258,21 +1258,21 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
 
     private static string RevisionPlanInstruction(StoryLength length) =>
         $"You are given {Spelled(PersonaCatalogue.All.Count)} independent reads of one {ManuscriptLength.Noun(length)}: "
-        + $"{Spelled(PersonaCatalogue.Sections.Count)} structural sections and {Spelled(PersonaCatalogue.Readers.Count)} readers, none of whom saw the others' notes. Produce the author's revision plan. "
+        + $"{Spelled(PersonaCatalogue.Sections.Count)} structural sections and {Spelled(PersonaCatalogue.Readers.Count)} readers, none of whom saw the others' notes. Produce the author’s revision plan. "
         + "Where several reads name the same thing, that is one item and it ranks higher for it. Reply with "
         + "JSON only: {\"revisionPlan\": [{\"priority\": \"Must|Should|Consider\", \"chapter\": \"Ch. 12-15\", "
         + "\"issue\": \"what is wrong\", \"suggestedFix\": \"what to do about it — a direction, never "
-        + "replacement prose\", \"draws\": [\"f1a2b3c4d\"]}]}. You diagnose and point; you never write the author's sentences for them. "
+        + "replacement prose\", \"draws\": [\"f1a2b3c4d\"]}]}. You diagnose and point; you never write the author’s sentences for them. "
         + "You are also given \"findings\": every note written on the manuscript, each with an \"id\". In "
         + "\"draws\", copy the ids of the findings each item rests on, most telling first — the author follows "
         + "the first one to the page — and leave it empty when no listed finding is behind the item.";
 
     // Said only on a later draft, after the plan's own instruction (R19).
     private const string ComparisonInstruction =
-        " You are also given \"previousPlan\": the last draft's plan, numbered. Add to each item \"since\": "
+        " You are also given \"previousPlan\": the last draft’s plan, numbered. Add to each item \"since\": "
         + "\"new\" if the last plan had nothing like it, \"open\" if the last plan raised it and it still stands, or "
         + "\"regressed\" if the last draft had fixed it or made it smaller and it has come back or grown. And add, "
-        + "beside revisionPlan, \"fixed\": the numbers of the last plan's items that no read raises any more.";
+        + "beside revisionPlan, \"fixed\": the numbers of the last plan’s items that no read raises any more.";
 
     public async Task<SectionRead> ReadSection(
         Persona persona, string manuscript, ReadingFrame frame, CancellationToken cancellationToken)
@@ -1319,7 +1319,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
     {
         var json = JsonResponse.ExtractObject(reply)
             ?? throw new InvalidOperationException(
-                $"{persona.Name} replied with nothing this could read as a review. A reader's pass is "
+                $"{persona.Name} replied with nothing this could read as a review. A reader’s pass is "
                 + "all-or-nothing: a page that prints half a read is worse than one that admits the "
                 + "read failed.");
 
@@ -1662,7 +1662,7 @@ public sealed class ClaudeAnalysisClient : IClaudeAnalysisClient
         if (stopReason == "max_tokens")
             throw new ResponseTruncatedException(
                 $"Claude response was truncated at the {maxTokens}-token output limit " +
-                "(stop_reason=max_tokens); the response is incomplete. Increase the request's " +
+                "(stop_reason=max_tokens); the response is incomplete. Increase the request’s " +
                 "max_tokens budget.");
 
         return text.ToString();

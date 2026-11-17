@@ -36,7 +36,7 @@ public class VoiceLinePlanTests
     public void ANewDayComposesAgain()
     {
         Assert.Equal(VoiceLineAction.Compose,
-            VoiceLinePlan.Decide(Playlist, true, Kept(Playlist, "Yesterday's line.", Today.AddDays(-1)), Now, Today));
+            VoiceLinePlan.Decide(Playlist, true, Kept(Playlist, "Yesterday’s line.", Today.AddDays(-1)), Now, Today));
     }
 
     [Fact]

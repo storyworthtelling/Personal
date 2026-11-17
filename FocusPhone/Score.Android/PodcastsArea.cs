@@ -329,7 +329,7 @@ public sealed class PodcastsArea : ScoreArea
     {
         if (subscriptions.Ordered.Count == 0)
         {
-            return "No shows yet. Tap Manage to add a podcast or import an OPML file.";
+            return "No shows yet. Tap Manage to add a podcast or import a podcast list.";
         }
 
         return isRefreshing ? "Fetching episodes…" : "Nothing new to hear.";
@@ -483,7 +483,7 @@ public sealed class PodcastsArea : ScoreArea
     {
         if (episode.AudioUrl is not { Length: > 0 } url || episode.Duration is not { } duration)
         {
-            Say("That episode doesn't say how long it is, so it can't be budgeted for.");
+            Say("That episode doesn’t say how long it is, so it can’t be budgeted for.");
             return;
         }
 
@@ -774,7 +774,7 @@ public sealed class PodcastsArea : ScoreArea
             // Never let a media-stack fault die silently — capture the stack trace
             // to the rolling log and give the user a brief, honest message.
             AudioDiagnostics.LogWarning("Playback", "Starting playback failed.", e);
-            Say("Couldn't start playback — see Manage → Diagnostics.");
+            Say("Couldn’t start playback. Try again; Settings → Diagnostics → Recent failures has the details.");
         }
     }
 
@@ -851,7 +851,7 @@ public sealed class PodcastsArea : ScoreArea
         catch (Exception e)
         {
             AudioDiagnostics.LogWarning("Queue", $"Arrangement ({arrangement}) failed.", e);
-            Say("Couldn't arrange the queue — see Manage → Diagnostics.");
+            Say("Couldn’t arrange the queue. Try again; Settings → Diagnostics → Recent failures has the details.");
         }
     }
 
@@ -1001,11 +1001,11 @@ public sealed class PodcastsArea : ScoreArea
         // Failure may speak (DESIGN.md §7), but not once per feed: summarize when several fail.
         if (failedHosts.Count == 1)
         {
-            Say($"{failedHosts[0]} didn't answer. It retries on the next refresh.");
+            Say($"{failedHosts[0]} didn’t answer. It retries on the next refresh.");
         }
         else if (failedHosts.Count > 1)
         {
-            Say($"{failedHosts.Count} shows didn't answer. They retry on the next refresh.");
+            Say($"{failedHosts.Count} shows didn’t answer. They retry on the next refresh.");
         }
 
         RecomputeDoneAndRebuild();

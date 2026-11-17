@@ -39,7 +39,7 @@ public class ClaudeTasteJudgeTests
 
     private const string Dislikes = "{\"verdict\":\"lasting\",\"lessons\":[{\"kind\":\"ingredient\",\"subject\":\"mushrooms\",\"stance\":\"dislikes\"}]}";
 
-    private static readonly TasteEvidence Evidence = new(Sam, TasteEvidenceKind.Denial, "the mushrooms again, I cannot stand them", Risotto, Day(3));
+    private static readonly TasteEvidence Evidence = new(Sam, TasteEvidenceKind.Denial, "the mushrooms again, I can’t stand them", Risotto, Day(3));
 
     private static HttpResponseMessage Reply(string text, string? stop = null) => new(HttpStatusCode.OK)
     {
@@ -85,7 +85,7 @@ public class ClaudeTasteJudgeTests
 
         await judge.JudgeAsync(Evidence, CancellationToken.None);
 
-        Assert.Equal("Dish: Invented mushroom risotto\nReason: the mushrooms again, I cannot stand them", UserText(handler.Body));
+        Assert.Equal("Dish: Invented mushroom risotto\nReason: the mushrooms again, I can’t stand them", UserText(handler.Body));
         using var body = JsonDocument.Parse(handler.Body);
         Assert.Equal(["max_tokens", "messages", "model", "system"], body.RootElement.EnumerateObject().Select(property => property.Name).Order().ToArray());
         Assert.Equal(TasteJudgePrompt.System, TextOf(body.RootElement.GetProperty("system")));

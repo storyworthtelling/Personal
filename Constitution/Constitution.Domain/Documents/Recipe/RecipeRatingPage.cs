@@ -7,7 +7,7 @@ namespace Constitution.Domain.Documents;
 /// <summary>
 /// The rating page, the last page of tonight's recipe (book p.9, C-2.5.4): "Who liked it?" with a row per eater naming the
 /// dish that person ate (D37), the approved Loved / Fine / Never again circle lanes (D14), the last rating of that dish
-/// pre-underlined or "FIRST TIME · PLEASE CIRCLE", the Never-again rule printed at the foot, and the "We didn't cook this
+/// pre-underlined or "First time · circle one", the Never-again rule printed at the foot, and the "We didn't cook this
 /// tonight" box (D68).
 ///
 /// <para><b>One model builds the page, the rules that read it and the rows the taste profile reads</b>
@@ -26,12 +26,12 @@ public static class RecipeRatingPage
     public const int MostEaters = 4;
 
     private const string Title = "Who liked it?";
-    private const string Kicker = "RECIPE · TONIGHT’S RATINGS · THE COOK RATES FOR EVERYONE";
-    private const string FirstTime = "FIRST TIME · PLEASE CIRCLE";
+    private const string Kicker = "Recipe · tonight’s ratings · the cook rates for everyone";
+    private const string FirstTime = "First time · circle one";
     private const string RuleFirst = "“Never again” from one person means this dish is planned only";
     private const string RuleSecond = "when they eat something else or are away.";
     private const string DidntCookWords = "We didn’t cook this tonight";
-    private const string DidntCookHint = "Tick it and the ratings are ignored; its fresh ingredients are written off.";
+    private const string DidntCookHint = "Check it and the ratings are ignored; its fresh ingredients are written off.";
 
     /// <summary>
     /// The name column runs 36 to 119, 8 points short of the first lane. The book's own first dish line, "Sheet-pan chicken",
@@ -179,7 +179,7 @@ public static class RecipeRatingPage
 
         var tick = new InkTarget(
             RecipeIds.DidntCook, InkTargetKind.StandardTick,
-            new InkRect(PageDraft.Left, last + TickDrop, InkTargets.StandardTickSize, InkTargets.StandardTickSize), "we did not cook this dinner tonight");
+            new InkRect(PageDraft.Left, last + TickDrop, InkTargets.StandardTickSize, InkTargets.StandardTickSize), "we didn’t cook this dinner tonight");
         draft.Target(tick);
         draft.Line(PrintedRole.Strong, TickLabelLeft, last + TickLabelDrop, 220f, DidntCookWords, owner: tick.Id, name: "didnt-cook-label");
         draft.Line(PrintedRole.Small, TickLabelLeft, last + TickHintDrop, PageDraft.RightEdge - TickLabelLeft, DidntCookHint, owner: tick.Id, name: "didnt-cook-hint");
@@ -212,7 +212,7 @@ public static class RecipeRatingPage
         ArgumentNullException.ThrowIfNull(model);
         if (string.IsNullOrWhiteSpace(model.Cook))
         {
-            throw new ArgumentException("The rating page needs the cook's name for its footer.", nameof(model));
+            throw new ArgumentException("The rating page needs the cook’s name for its footer.", nameof(model));
         }
 
         if (model.Rows.Count is < 1 or > MostEaters)
@@ -229,7 +229,7 @@ public static class RecipeRatingPage
         {
             if (string.IsNullOrWhiteSpace(row.Name) || row.Name.Trim().Length > NameChars)
             {
-                throw new ArgumentException($"The name '{row.Name}' does not fit the rating row's name column; it takes one to {NameChars} characters.", nameof(model));
+                throw new ArgumentException($"The name '{row.Name}' does not fit the rating row’s name column; it takes one to {NameChars} characters.", nameof(model));
             }
 
             if (string.IsNullOrWhiteSpace(row.Dish))

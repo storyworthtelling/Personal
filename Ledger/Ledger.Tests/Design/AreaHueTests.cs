@@ -53,7 +53,7 @@ public class AreaHueTests
 
         var order = new[] { "Accounts", "Snowball", "Budget", "Savings", "Settings" };
         var positions = order.Select(name => source.IndexOf($"\"{name}\"", StringComparison.Ordinal)).ToList();
-        Assert.True(positions.All(p => p >= 0), "One of the five areas is not built as a BinderArea with that label.");
+        Assert.True(positions.All(p => p >= 0), "One of the five areas isn’t built as a BinderArea with that label.");
         Assert.Equal(positions, positions.OrderBy(p => p));
     }
 
@@ -113,8 +113,8 @@ public class AreaHueTests
         separation = separation > 180.0 ? 360.0 - separation : separation;
 
         Assert.True(separation <= SameHueToleranceDegrees,
-            $"{area}'s mark ({markHex}, {markHue:0.#}°) and fill ({fillHex}, {fillHue:0.#}°) read as "
-            + $"different hues ({separation:0.#}° apart) — a mark/fill pair should be one hue's two tiers.");
+            $"{area}’s mark ({markHex}, {markHue:0.#}°) and fill ({fillHex}, {fillHue:0.#}°) read as "
+            + $"different hues ({separation:0.#}° apart) — a mark/fill pair should be one hue’s two tiers.");
     }
 
     // ---- helpers ----
@@ -127,7 +127,7 @@ public class AreaHueTests
     {
         var source = LedgerAreasSource();
         var named = Regex.Match(source, $@"{area}{tier}Hex\s*=\s*(?<type>AppIdentityTokens|PaperColorTokens)\.(?<member>\w+);");
-        Assert.True(named.Success, $"{area}{tier}Hex in LedgerAreas.cs does not name a token constant.");
+        Assert.True(named.Success, $"{area}{tier}Hex in LedgerAreas.cs doesn’t name a token constant.");
         var type = named.Groups["type"].Value == "AppIdentityTokens"
             ? typeof(Storyworthtelling.Paper.AppIdentityTokens)
             : typeof(Storyworthtelling.Paper.PaperColorTokens);

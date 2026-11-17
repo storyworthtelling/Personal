@@ -73,7 +73,7 @@ public class ArticlePageTests
     {
         using var document = Compose(Article("Chip makers", "Business", abstractOnly: true));
 
-        Assert.Contains("the full article did not fetch", document.GetPage(1).Text,
+        Assert.Contains("the full article didn’t fetch", document.GetPage(1).Text,
             StringComparison.OrdinalIgnoreCase);
     }
 
@@ -83,7 +83,7 @@ public class ArticlePageTests
     {
         using var document = Compose(Article("The river towns"));
 
-        Assert.DoesNotContain("did not fetch", document.GetPage(1).Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("didn’t fetch", document.GetPage(1).Text, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

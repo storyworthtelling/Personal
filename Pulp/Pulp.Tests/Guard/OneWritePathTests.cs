@@ -24,7 +24,7 @@ public class OneWritePathTests
     {
         var hits = Head().Where(file => pattern.IsMatch(file.Text)).Select(file => file.Path).ToList();
 
-        Assert.True(hits.Any(allowed), $"The one place that {what} was not found; the guard has nothing to protect.");
+        Assert.True(hits.Any(allowed), $"The one place that {what} wasn’t found; the guard has nothing to protect.");
         var strays = hits.Where(path => !allowed(path)).ToList();
         Assert.True(strays.Count == 0, $"Only one place {what}; also found in: {string.Join(", ", strays)}");
     }
@@ -45,7 +45,7 @@ public class OneWritePathTests
         OnlyIn(
             new Regex(@"HouseholdMaps\.ParentPick\b"),
             path => path == "Pulp.Android/App/PulpServices.cs",
-            "writes a child's pick (removed by key, D255)");
+            "writes a child’s pick (removed by key, D255)");
 
     [Fact]
     public void OnlyThePickerWritesHandleAPickerChange() =>

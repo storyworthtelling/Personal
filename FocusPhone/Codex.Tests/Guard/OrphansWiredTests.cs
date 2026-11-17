@@ -82,7 +82,7 @@ public class OrphansWiredTests
     {
         var errand = LogLoopSource.File("FocusPhone/Plate.Android/ErrandActivity.cs");
 
-        Assert.DoesNotContain("cannot record for another app", errand, StringComparison.Ordinal);
+        Assert.DoesNotContain("can’t record for another app", errand, StringComparison.Ordinal);
         Assert.Contains("VideoErrand.Limits(", errand, StringComparison.Ordinal);
         Assert.Contains("PrepareRecording(", errand, StringComparison.Ordinal);
         Assert.Contains("VideoErrand.IsUsable(", errand, StringComparison.Ordinal);

@@ -49,7 +49,7 @@ public class HeldLeagueCarriesNoScoreTests
         Assert.True(walk.MembersChecked >= 15, $"The walk checked only {walk.MembersChecked} members.");
 
         Assert.True(walk.Offences.Count == 0,
-            "A held league's view model can carry a result:\n" + string.Join("\n", walk.Offences));
+            "A held league’s view model can carry a result:\n" + string.Join("\n", walk.Offences));
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public class HeldLeagueCarriesNoScoreTests
 
         if (type.Assembly != home && type.Assembly != typeof(HeldLeague).Assembly)
         {
-            result.Offences.Add($"{path}: {type.FullName} comes from outside Pulp's Domain and cannot be walked");
+            result.Offences.Add($"{path}: {type.FullName} comes from outside Pulp’s Domain and can’t be walked");
             return;
         }
 

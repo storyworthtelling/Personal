@@ -20,7 +20,7 @@ public class HouseholdSyncFailureTests
         Assert.Equal(Now.AddHours(-2), status.LastSynced);
         var line = HouseholdSyncText.Line(status, Now);
         Assert.Contains("sign in again", line, StringComparison.Ordinal);
-        Assert.DoesNotContain("couldn't be reached", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("couldn’t be reached", line, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public class HouseholdSyncFailureTests
         Assert.Equal(HouseholdSyncState.Retrying, status.State);
         var line = HouseholdSyncText.Line(status, Now);
         Assert.Contains("tries again", line, StringComparison.Ordinal);
-        Assert.DoesNotContain("couldn't be reached", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("couldn’t be reached", line, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -39,6 +39,6 @@ public class HouseholdSyncFailureTests
     {
         var line = HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now).WentOffline("no network"), Now);
 
-        Assert.Contains("couldn't be reached", line, StringComparison.Ordinal);
+        Assert.Contains("couldn’t be reached", line, StringComparison.Ordinal);
     }
 }

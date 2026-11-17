@@ -20,7 +20,7 @@ public class RoundTablePageTests
 
     private static readonly RoundTable Show = new RoundTable(
     [
-        new RoundTableTurn(RoundTablePlan.HostId, "Welcome. Hugo loved it and Nick did not."),
+        new RoundTableTurn(RoundTablePlan.HostId, "Welcome. Hugo loved it and Nick didn’t."),
         new RoundTableTurn("agent", "The opening sold me in a line."),
         new RoundTableTurn("harsh-critic", "And the middle lost me in a chapter.") { Answering = "agent" },
         new RoundTableTurn(RoundTablePlan.HostId, "Thank you both."),

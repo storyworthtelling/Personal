@@ -28,7 +28,7 @@ public class SyncWatchReachTests
         foreach (var screen in Screens)
         {
             var file = head.SingleOrDefault(candidate => candidate.Path == "Pulp.Android/" + screen);
-            Assert.False(file == default, screen + " was not found; the guard has nothing to read.");
+            Assert.False(file == default, screen + " wasn’t found; the guard has nothing to read.");
             Assert.Contains("new SyncWatch(", file.Text, StringComparison.Ordinal);
             Assert.Matches(@"OnResume\(\)\s*\{[^}]*syncWatch\??\.Resume\(\)", file.Text);
             Assert.Matches(@"OnPause\(\)\s*\{[^}]*syncWatch\??\.Pause\(\)", file.Text);

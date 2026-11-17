@@ -127,7 +127,7 @@ public class PersonaCoverageTests
 
         Assert.Equal("What would I steal, and what would I do differently", writer.Question);
         Assert.Equal(ModelTier.Strong, writer.Tier);
-        Assert.Equal("I wish I'd written it; I'd steal everything and change nothing", writer.ScoreAnchors[^1]);
+        Assert.Equal("I wish I’d written it; I’d steal everything and change nothing", writer.ScoreAnchors[^1]);
     }
 
     /// <summary>The Acquiring editor writes the edit letter (R35): its question and its approved anchors.</summary>
@@ -142,7 +142,7 @@ public class PersonaCoverageTests
              "the letter would be long; the problems are structural",
              "three substantive changes would lift it a level",
              "a light letter; the changes are refinements",
-             "I'd have nothing to ask for"],
+             "I’d have nothing to ask for"],
             editor.ScoreAnchors);
     }
 

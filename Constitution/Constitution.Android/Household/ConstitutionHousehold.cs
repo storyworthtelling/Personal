@@ -158,7 +158,7 @@ public sealed class ConstitutionHousehold
             // The vault read goes through the Google client and the HTTP stack, whose failures cannot be listed; the phone carries
             // on with the role it remembers, and the failure is on the trail by type, never by message.
             log.Outcome("vault unreachable");
-            HeadLog.Warn(LogTag, "The vault's owner marker could not be read: " + exception.GetType().Name);
+            HeadLog.Warn(LogTag, "The vault’s owner marker could not be read: " + exception.GetType().Name);
         }
     }
 

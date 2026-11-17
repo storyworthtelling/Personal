@@ -80,7 +80,7 @@ public static class GroceryBudget
             {
                 State = GroceryBudgetState.Unknown,
                 Month = month,
-                Sentence = "Index has not sent a grocery budget for this month yet.",
+                Sentence = "Index hasn’t sent a grocery budget for this month yet.",
             };
         }
 
@@ -89,7 +89,7 @@ public static class GroceryBudget
         if (projected > held.Budget)
         {
             var over = projected - held.Budget;
-            var lead = weekEstimate is null ? string.Empty : "This week's groceries would run ";
+            var lead = weekEstimate is null ? string.Empty : "This week’s groceries would run ";
             return new GroceryBudgetStatus
             {
                 State = GroceryBudgetState.Over,
@@ -97,7 +97,7 @@ public static class GroceryBudget
                 Budget = held.Budget,
                 Spent = held.Spent,
                 OverBy = over,
-                Sentence = lead + BudgetPayload.FormatAmount(over) + " over this month's " + budget + " grocery budget.",
+                Sentence = lead + BudgetPayload.FormatAmount(over) + " over this month’s " + budget + " grocery budget.",
             };
         }
 
@@ -110,8 +110,8 @@ public static class GroceryBudget
             Spent = held.Spent,
             Remaining = left,
             Sentence = weekEstimate is null
-                ? BudgetPayload.FormatAmount(left) + " left of this month's " + budget + " grocery budget."
-                : "This week's groceries fit: " + BudgetPayload.FormatAmount(left) + " would be left of this month's " + budget + " grocery budget.",
+                ? BudgetPayload.FormatAmount(left) + " left of this month’s " + budget + " grocery budget."
+                : "This week’s groceries fit: " + BudgetPayload.FormatAmount(left) + " would be left of this month’s " + budget + " grocery budget.",
         };
     }
 }

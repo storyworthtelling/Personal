@@ -101,7 +101,7 @@ internal sealed class LeaseHeartbeatMap : RecordMap<LeaseHeartbeat>
             record.Word("role", LeaseFields.Roles),
             LeaseFields.Instant(record, "beat"),
             LeaseFields.Length(record, "lease"));
-        return KeyOf(value) == record.Key ? value : throw record.Fail("install", "does not belong to this record's key");
+        return KeyOf(value) == record.Key ? value : throw record.Fail("install", "does not belong to this record’s key");
     }
 }
 
@@ -129,7 +129,7 @@ internal sealed class LeaseClaimMap : RecordMap<LeaseClaim>
             LeaseFields.Whole(record, "week"),
             LeaseFields.Instant(record, "taken"),
             LeaseFields.Length(record, "lease"));
-        return KeyOf(value) == record.Key ? value : throw record.Fail("week", "does not belong to this record's key");
+        return KeyOf(value) == record.Key ? value : throw record.Fail("week", "does not belong to this record’s key");
     }
 }
 

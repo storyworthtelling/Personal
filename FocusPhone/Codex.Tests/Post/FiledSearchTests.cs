@@ -130,7 +130,7 @@ public class FiledSearchTests
 
     [Theory]
     [InlineData(null)]
-    [InlineData("I could not find anything.")]
+    [InlineData("I couldn’t find anything.")]
     [InlineData("""{"lines":[1]}""")]
     public void AGarbledAnswerSaysSo(string? reply)
     {
@@ -148,7 +148,7 @@ public class FiledSearchTests
         var entries = new[]
         {
             Entry("one", subject: "Plumber", daysAgo: 1),
-            Entry("both", subject: "Plumber's invoice", daysAgo: 5),
+            Entry("both", subject: "Plumber’s invoice", daysAgo: 5),
             Entry("newer", subject: "Plumber visit", daysAgo: 0),
             Entry("none", subject: "Dinner"),
             Entry("accent", who: "Zoë", subject: "Plumber invoice", daysAgo: 9),
@@ -206,13 +206,13 @@ public class FiledSearchTests
         var catalogue = Three();
 
         var system = FiledSearchPrompt.System(catalogue);
-        var ask = FiledSearchPrompt.Ask("the plumber's quote", shownLines: [2, 3], today: new DateOnly(2026, 11, 5));
+        var ask = FiledSearchPrompt.Ask("the plumber’s quote", shownLines: [2, 3], today: new DateOnly(2026, 11, 5));
 
         Assert.EndsWith(catalogue.Text, system);
         Assert.Contains("at most 5", system);
         Assert.Contains("2026-11-05", ask);
         Assert.Contains("Thursday", ask);
-        Assert.Contains("the plumber's quote", ask);
+        Assert.Contains("the plumber’s quote", ask);
         Assert.Contains("Already shown: 2, 3", ask);
         Assert.Contains("Already shown: none", FiledSearchPrompt.Ask("x", [], new DateOnly(2026, 11, 5)));
     }

@@ -92,9 +92,9 @@ public class FamilyReadTests
     {
         foreach (var family in new[] { KeyFamily.Workout, KeyFamily.HouseholdMeal })
         {
-            var entry = Kept(Keyed("Somebody's hour", key), family);
+            var entry = Kept(Keyed("Somebody’s hour", key), family);
 
-            Assert.Equal("Somebody's hour", entry.Title);
+            Assert.Equal("Somebody’s hour", entry.Title);
             Assert.Equal(Availability.Busy, entry.Availability);
         }
     }

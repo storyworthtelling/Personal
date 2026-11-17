@@ -44,7 +44,7 @@ public class HouseholdSyncLoopTests
 
         var running = loop.RunAsync(stop.Token);
         Assert.True(await Reached(() => passes >= 1), "The first pass never ran.");
-        Assert.True(await Reached(() => faults.Count == 1), "The failed pass was not reported.");
+        Assert.True(await Reached(() => faults.Count == 1), "The failed pass wasn’t reported.");
 
         loop.Ask();
         Assert.True(await Reached(() => passes >= 2), "The loop stopped after the timeout; sync never ran again.");

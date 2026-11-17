@@ -13,7 +13,7 @@ public class CalendarSeamsGuardTests
     private static string Source()
     {
         var file = ConstitutionSource.Files(".cs").SingleOrDefault(path => Path.GetFileName(path) == FileName);
-        Assert.True(file is not null, FileName + " was not found under Constitution/.");
+        Assert.True(file is not null, FileName + " wasn’t found under Constitution/.");
         return File.ReadAllText(file!);
     }
 

@@ -21,7 +21,7 @@ public static class BodySignals
         BodySignal.Sleep => new Spec("sleep", "Sleep", "hours", RisingIs.Better, SeatWords.SteadyBand(SignalUnit.Hours)),
         BodySignal.Strength => new Spec("strength", "Strength", "lb", RisingIs.Better, 10),
         BodySignal.Calories => new Spec("calories", "Calories", "kcal", RisingIs.Neutral, 100),
-        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body's signals."),
+        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body’s signals."),
     };
 
     /// <summary>The signals Health Connect supplies, in the order the plan names them.</summary>

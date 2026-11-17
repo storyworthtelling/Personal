@@ -15,7 +15,7 @@ public class TodayModelTests
 
         Assert.NotNull(clipping);
         Assert.Equal("Workout · 5:30", clipping.Kicker);
-        Assert.Equal("Strength, 40 minutes", clipping.Headline);
+        Assert.Equal("Strength, 40 min", clipping.Headline);
         Assert.Equal("Score 132 bpm · Steady", clipping.ScoreLine);
     }
 

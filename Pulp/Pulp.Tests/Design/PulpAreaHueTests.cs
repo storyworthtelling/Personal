@@ -43,7 +43,7 @@ public class PulpAreaHueTests
             .ToArray();
 
         Assert.True(clashes.Length == 0,
-            "A divider the same colour as another divider is not a divider (§9):\n" + string.Join("\n", clashes));
+            "A divider the same colour as another divider isn’t a divider (§9):\n" + string.Join("\n", clashes));
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class PulpAreaHueTests
         foreach (var area in PulpAreas.All)
         {
             // The binder draws the glyph in pencil from the suite's one set (DESIGN.md §10), inked by the tab.
-            Assert.True(Storyworthtelling.Materials.TabGlyphs.All.ContainsKey(area.Glyph), $"{area.Label}'s glyph {area.Glyph} is not in TabGlyphs");
+            Assert.True(Storyworthtelling.Materials.TabGlyphs.All.ContainsKey(area.Glyph), $"{area.Label}’s glyph {area.Glyph} isn’t in TabGlyphs");
 
             // And the head draws the glyph the table names, not a neighbour's.
             Assert.Contains($"PulpArea.{area.Area} => TabGlyphs.{area.Glyph},", File.ReadAllText(PalettePath()));

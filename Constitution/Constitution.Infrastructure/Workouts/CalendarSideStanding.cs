@@ -13,7 +13,7 @@ namespace Constitution.Infrastructure.Workouts;
 /// <param name="NotReadyBecause">Why the run cannot read the calendars, or null when it can try.</param>
 public sealed record CalendarSideStanding(string? Owner, IReadOnlyList<AssumedSetting> Assumed, string? NotReadyBecause)
 {
-    public const string SignInReason = "Google is not signed in on this phone.";
+    public const string SignInReason = "Google isn’t signed in on this phone.";
 
     public bool IsReady => NotReadyBecause is null;
 
@@ -48,7 +48,7 @@ public sealed record CalendarSideStanding(string? Owner, IReadOnlyList<AssumedSe
 /// <summary>The household's setup file in the app's private storage, read without ever throwing.</summary>
 public static class PlanningSetupFile
 {
-    public const string UnreadableReason = "The saved household setup could not be opened.";
+    public const string UnreadableReason = "The saved household setup couldn’t be opened.";
 
     public static HouseholdSetupRead Read(string path)
     {

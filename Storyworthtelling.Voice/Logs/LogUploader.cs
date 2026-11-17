@@ -64,7 +64,7 @@ public sealed class LogUploader(IDriveLogFolder folder, LogOutbox outbox, LogIns
         var confirmed = outcomes.Count(o => o.Confirmed);
         if (error is null && confirmed < run.Batches.Count)
         {
-            error = $"{run.Batches.Count - confirmed} of {run.Batches.Count} batches did not read back the same.";
+            error = $"{run.Batches.Count - confirmed} of {run.Batches.Count} batches didn’t read back the same.";
         }
         return new LogUploadResult(run.Batches.Count, confirmed, null, error, trashed, trashError);
     }

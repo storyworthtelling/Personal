@@ -54,7 +54,7 @@ public static class TodayModel
 
         return new TodayClipping(
             $"Workout · {SeatWords.Clock(plan.WorkoutStart!.Value)}",
-            $"{SeatWords.Sentence(plan.WorkoutKind!)}, {plan.WorkoutMinutes} minutes",
+            $"{SeatWords.Sentence(plan.WorkoutKind!)}, {plan.WorkoutMinutes} min",
             plan.ScoreBpm is { } bpm ? WorkoutWords.Score(bpm) : null);
     }
 

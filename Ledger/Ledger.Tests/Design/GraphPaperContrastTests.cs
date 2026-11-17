@@ -53,6 +53,6 @@ public class GraphPaperContrastTests
     {
         var tooDark = DesignTestHelpers.CompositeOver(IdentityGroundHex, PaperBackgroundHex, 0.16);
         var ratio = DesignTestHelpers.ContrastRatio(MutedInkHex, tooDark);
-        Assert.True(ratio < 3.0, $"16% was expected to breach muted ink's 3:1 floor, but measured {ratio:0.00}:1.");
+        Assert.True(ratio < 3.0, $"16% was expected to breach muted ink’s 3:1 floor, but measured {ratio:0.00}:1.");
     }
 }

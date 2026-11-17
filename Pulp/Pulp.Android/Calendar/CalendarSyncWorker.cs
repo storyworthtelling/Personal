@@ -74,8 +74,8 @@ public class CalendarSyncWorker : Worker
 
             // One constant sentence per verdict; each part goes alongside it, so the hook can read what Google said.
             var message = advice == CalendarAdvice.Retry
-                ? "The Pulp calendar could not be written tonight; WorkManager will try again."
-                : "The Pulp calendar write failed and will not mend by retrying tonight.";
+                ? "The Pulp calendar couldn’t be written tonight; WorkManager will try again."
+                : "The Pulp calendar write failed and won’t mend by retrying tonight.";
             foreach (var part in CalendarFailures.Parts(exception))
             {
                 CalendarSyncHooks.Warn?.Invoke(message, part);

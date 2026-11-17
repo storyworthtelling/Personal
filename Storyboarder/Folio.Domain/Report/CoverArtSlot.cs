@@ -52,7 +52,7 @@ public static class CoverArtSlot
         if (imageWidth <= 0 || imageHeight <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(imageWidth),
-                $"A jacket of {imageWidth}×{imageHeight} cannot be cropped; the decode should have "
+                $"A jacket of {imageWidth}×{imageHeight} can’t be cropped; the decode should have "
                 + "failed before this point rather than handing on an empty image.");
         }
 

@@ -35,7 +35,7 @@ internal static class MealSheetItemPage
     public static InkPageLayout Build(MealSheetModel model, int sheetNumber, string title, string intro, IReadOnlyList<MealSheetGroup> groups)
     {
         var draft = new PageDraft(title) { Section = title == MealSheetItems.BreakfastTitle ? "Breakfast" : title };
-        draft.Kicker($"{MealSheetDocument.Kind} · {sheetNumber.ToString(CultureInfo.InvariantCulture)} OF {model.Pages.ToString(CultureInfo.InvariantCulture)}");
+        draft.Kicker($"{MealSheetDocument.Kind} · {sheetNumber.ToString(CultureInfo.InvariantCulture)} of {model.Pages.ToString(CultureInfo.InvariantCulture)}");
         draft.Line(PrintedRole.Small, PageDraft.Left, IntroBaseline, PageDraft.FullWidth, intro, name: "intro");
 
         var heading = FirstHeading;
@@ -76,7 +76,7 @@ internal static class MealSheetItemPage
         if (lines.Count > MaxTextLines)
         {
             throw new ArgumentException(
-                $"{item.Label}'s line in '{group}' ('{item.Text}') takes {lines.Count} lines and a row holds {MaxTextLines}; shorten it.", nameof(item));
+                $"{item.Label}’s line in '{group}' ('{item.Text}') takes {lines.Count} lines and a row holds {MaxTextLines}; shorten it.", nameof(item));
         }
 
         var baseline = top + BlockCentre - LinePitch * lines.Count / 2f + 5f;

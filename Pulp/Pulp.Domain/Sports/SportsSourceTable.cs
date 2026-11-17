@@ -110,10 +110,10 @@ public sealed class SportsSourceTable
     /// </summary>
     public static SportsSourceTable Default { get; } = new(
         [
-            new SportsSourceInfo(SportsSourceIds.MlbStats, "MLB Stats API", "MLB's notice permits individual, non-commercial use"),
-            new SportsSourceInfo(SportsSourceIds.Espn, "ESPN's public JSON", "unofficial, no published terms"),
+            new SportsSourceInfo(SportsSourceIds.MlbStats, "MLB Stats API", "MLB’s notice permits individual, non-commercial use"),
+            new SportsSourceInfo(SportsSourceIds.Espn, "ESPN’s public JSON", "unofficial, no published terms"),
             new SportsSourceInfo(
-                SportsSourceIds.PwhlCalendar, "the PWHL's own calendar file",
+                SportsSourceIds.PwhlCalendar, "the PWHL’s own calendar file",
                 "the file its site offers for syncing to a calendar; its terms forbid other automated reading, so nothing else of the site is touched"),
         ],
         [

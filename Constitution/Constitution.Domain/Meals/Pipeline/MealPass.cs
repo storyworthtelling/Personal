@@ -51,8 +51,8 @@ public interface IMealPassStamps
 /// <summary>The stamp as JSON; the names are frozen.</summary>
 public static class MealPassStampCodec
 {
-    public const string NotJson = "The meal pass stamp is not valid JSON.";
-    public const string WrongShape = "The meal pass stamp is not in a shape this version reads.";
+    public const string NotJson = "The meal pass stamp isn’t valid JSON.";
+    public const string WrongShape = "The meal pass stamp isn’t in a shape this version reads.";
 
     public const int Version = 1;
 

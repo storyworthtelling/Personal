@@ -106,7 +106,7 @@ public class SettingsRefreshSourceTests
     {
         var setup = Source(SetupCode);
         var tapped = NoDoubleLinkTests.ExtractMethod(setup, "private async void OnCategoryTapped(object? sender, EventArgs e)");
-        var remove = tapped[tapped.IndexOf("case \"Remove\":", StringComparison.Ordinal)..];
+        var remove = tapped[tapped.IndexOf("case \"Delete\":", StringComparison.Ordinal)..];
 
         Assert.Contains("dogEarState.BeginUndo(", remove, StringComparison.Ordinal);
         Assert.Contains("DogEar.UndoWindow()", remove, StringComparison.Ordinal);
@@ -130,7 +130,7 @@ public class SettingsRefreshSourceTests
         Assert.True(
             setup.IndexOf("SetCorner(dogEar, dogEarState)", StringComparison.Ordinal) is var corner and >= 0
             && corner > setup.IndexOf("Wrap(LedgerArea.Settings", StringComparison.Ordinal),
-            "The dog-ear has to be given to the frame's corner after Wrap has built it.");
+            "The dog-ear has to be given to the frame’s corner after Wrap has built it.");
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class SettingsRefreshSourceTests
 
         Assert.DoesNotContain("pendingCategoryRemoval", setup, StringComparison.Ordinal);
         Assert.DoesNotContain("UndoBar", xaml + setup, StringComparison.Ordinal);
-        Assert.Matches(@"dogEarState\.BeginUndo\(\s*\$""Removed \{categoryName\}""", setup);
+        Assert.Matches(@"dogEarState\.BeginUndo\(\s*\$""Deleted \{categoryName\}""", setup);
         Assert.Matches(@"dogEarState\.BeginUndo\(\s*\$""Removed \{row\.Name\}""", setup);
     }
 
@@ -156,8 +156,8 @@ public class SettingsRefreshSourceTests
         var setup = Source(SetupCode);
 
         Assert.DoesNotContain("Shown here so a quiet greeting", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("so there's no Replace", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("so there's no Replace", setup, StringComparison.Ordinal);
+        Assert.DoesNotContain("so there’s no Replace", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("so there’s no Replace", setup, StringComparison.Ordinal);
     }
 
     [Fact]

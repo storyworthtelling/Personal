@@ -60,7 +60,7 @@ public class TasteInkTests
         var reading = TasteInk.ReadRatings(
         [
             Asked("rate-sam"),
-            new InkResolution.NotRead("rate-lee", "The page was not read."),
+            new InkResolution.NotRead("rate-lee", "The page wasn’t read."),
             new InkResolution.Undecided("rate-robin"),
             new InkResolution.Unchanged("rate-juniper"),
         ], Rows, Day(3), didntCook: false);

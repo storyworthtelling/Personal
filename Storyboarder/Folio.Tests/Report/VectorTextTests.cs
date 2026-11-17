@@ -95,11 +95,11 @@ public class VectorTextTests
         }
 
         var added = Pages(large) - Pages(small);
-        Assert.True(added > 3, "The larger report did not actually run to more pages.");
+        Assert.True(added > 3, "The larger report didn’t actually run to more pages.");
 
         var perPage = (large.Length - small.Length) / (double)added;
         Assert.True(perPage < 8_000,
-            $"A page costs {perPage:N0} bytes, which is bitmap territory — check the pages are not being "
+            $"A page costs {perPage:N0} bytes, which is bitmap territory — check the pages aren’t being "
             + "rasterised on their way into the sink.");
     }
 

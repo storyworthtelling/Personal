@@ -97,7 +97,7 @@ public class WorksheetTwoPageRegionsTests
         foreach (var box in WorksheetPainter.BoxesFor(plan).Select(PdfProbe.OnPage))
         {
             var line = $"\"{box.Name}\" at ({box.Left:0.0}, {box.Top:0.0}, {box.Width:0.0}, {box.Height:0.0})";
-            Assert.True(instruction.Contains(line, StringComparison.Ordinal), $"the prompt does not describe {line}");
+            Assert.True(instruction.Contains(line, StringComparison.Ordinal), $"the prompt doesn’t describe {line}");
             var lineText = instruction.Split('\n').Single(l => l.Contains(line, StringComparison.Ordinal));
             Assert.Contains($"page {box.Page + 1}", lineText, StringComparison.Ordinal);
         }
@@ -134,10 +134,10 @@ public class WorksheetTwoPageRegionsTests
         Assert.Equal(2, document.NumberOfPages);
         var pageTwo = document.GetPage(2).Text;
 
-        Assert.DoesNotContain("The rest of this month's categories", pageTwo, StringComparison.Ordinal);
-        Assert.DoesNotContain("SEPTEMBER", pageTwo, StringComparison.Ordinal);
-        Assert.Contains("SET ASIDE", pageTwo, StringComparison.Ordinal);
-        Assert.Contains("ADD A CATEGORY", pageTwo, StringComparison.Ordinal);
+        Assert.DoesNotContain("The rest of this month’s categories", pageTwo, StringComparison.Ordinal);
+        Assert.DoesNotContain("September", pageTwo, StringComparison.Ordinal);
+        Assert.Contains("Set aside", pageTwo, StringComparison.Ordinal);
+        Assert.Contains("Add a category", pageTwo, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public class WorksheetTwoPageRegionsTests
         using var document = PdfDocument.Open(new MemoryStream(WorksheetPainter.Paint(plan)));
         var pageTwo = document.GetPage(2).Text;
 
-        Assert.Contains("The rest of this month's categories", pageTwo, StringComparison.Ordinal);
-        Assert.Contains("SEPTEMBER", pageTwo, StringComparison.Ordinal);
+        Assert.Contains("The rest of this month’s categories", pageTwo, StringComparison.Ordinal);
+        Assert.Contains("September", pageTwo, StringComparison.Ordinal);
     }
 }

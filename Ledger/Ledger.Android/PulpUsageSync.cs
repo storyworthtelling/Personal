@@ -41,7 +41,7 @@ public sealed class PulpUsageSync(DrivePulpUsageSource source, ILogger<PulpUsage
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Reading Pulp's usage file failed; the last good copy stands.");
+            logger.LogWarning(ex, "Reading Pulp’s usage file failed; the last good copy stands.");
         }
         finally
         {

@@ -38,7 +38,7 @@ public sealed class HandOffPlanner
             if (!roster.Contains(child.Child) || !roster.IsChild(child.Child))
             {
                 throw new ArgumentException(
-                    $"There are child rules for '{child.Child}', whom the roster does not name as a child; the roster alone says who is a child.",
+                    $"There are child rules for '{child.Child}', whom the roster doesn’t name as a child; the roster alone says who is a child.",
                     nameof(childRules));
             }
 

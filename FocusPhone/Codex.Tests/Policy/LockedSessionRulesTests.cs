@@ -148,7 +148,7 @@ public class LockedSessionRulesTests
         var staleClose = LockedSessionRules.OnReading(Record(), Reading(PlaybackSessionState.Stopped), early);
         Assert.Null(staleClose.Release);
 
-        var oldTitle = LockedSessionRules.OnReading(Record("Last Night's Show"), Reading(PlaybackSessionState.Playing, "Harbor Lights"), early);
+        var oldTitle = LockedSessionRules.OnReading(Record("Last Night’s Show"), Reading(PlaybackSessionState.Playing, "Harbor Lights"), early);
         Assert.Null(oldTitle.Release);
         Assert.Equal("Harbor Lights", oldTitle.Record.Title);
     }
@@ -273,7 +273,7 @@ public class LockedSessionRulesTests
     {
         // Within the settle window the previous session's title arrives first, then the real one.
         var stale = LockedSessionRules.OnReading(
-            Record(confirmed: false), Reading(PlaybackSessionState.Playing, "Last Night's Show", position: 3_000_000), At(TimeSpan.FromSeconds(4)));
+            Record(confirmed: false), Reading(PlaybackSessionState.Playing, "Last Night’s Show", position: 3_000_000), At(TimeSpan.FromSeconds(4)));
         var real = LockedSessionRules.OnReading(
             stale.Record, Reading(PlaybackSessionState.Playing, "Harbor Lights", position: 0), At(TimeSpan.FromSeconds(12)));
 

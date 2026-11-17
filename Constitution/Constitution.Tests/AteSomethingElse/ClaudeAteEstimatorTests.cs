@@ -153,7 +153,7 @@ public class ClaudeAteEstimatorTests
     [Fact]
     public async Task ASenselessReplyIsCouldNotEstimate()
     {
-        var (estimator, _, _) = Make((_, _) => Reply("Sorry, I can't do that."));
+        var (estimator, _, _) = Make((_, _) => Reply("Sorry, I can’t do that."));
 
         Assert.IsType<AteOutcome.Unreadable>(await estimator.EstimateAsync("ignored.jpg", CancellationToken.None));
     }

@@ -49,7 +49,7 @@ public sealed class BoundedTasteJudge(ITasteJudge inner, int most) : ITasteJudge
         cancellation.ThrowIfCancellationRequested();
         if (stopped is not null)
         {
-            return new TasteJudgement.Unavailable(stopped.Reason, "Not asked again this pass: " + (stopped.Detail ?? "the judge could not answer."));
+            return new TasteJudgement.Unavailable(stopped.Reason, "Not asked again this pass: " + (stopped.Detail ?? "the judge couldn’t answer."));
         }
 
         if (Asked >= most)

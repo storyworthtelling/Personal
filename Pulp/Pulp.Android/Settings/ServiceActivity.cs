@@ -146,7 +146,7 @@ public class ServiceActivity : Activity
             catch (Exception exception)
             {
                 services.Diagnostics.Warn("settings", "A service page could not read the household.", exception);
-                RunOnUiThread(() => ShowStatus("This service couldn't be read just now."));
+                RunOnUiThread(() => ShowStatus("This service couldn’t be read just now."));
             }
         }, token);
     }
@@ -157,7 +157,7 @@ public class ServiceActivity : Activity
         if (service is null)
         {
             // A record names a service this build's catalogue does not carry (a newer writer's).
-            column.AddView(PaperUi.Secondary(this, "Pulp doesn't know this service yet, so it can't be set up here."));
+            column.AddView(PaperUi.Secondary(this, "Pulp doesn’t know this service yet, so it can’t be set up here."));
             return;
         }
 
@@ -171,7 +171,7 @@ public class ServiceActivity : Activity
         column.AddView(SettingsViews.CheckRow(this, $"The household has {name}", had, SetHad));
         if (!loaded || !had)
         {
-            column.AddView(PaperUi.Secondary(this, $"Tick it to open titles on {name} from Pulp."), SettingsViews.Spaced(this, DesignTokens.Space.X1));
+            column.AddView(PaperUi.Secondary(this, $"Check it to open titles on {name} from Pulp."), SettingsViews.Spaced(this, DesignTokens.Space.X1));
             return;
         }
 
@@ -207,13 +207,13 @@ public class ServiceActivity : Activity
         // ---- Flyleaf (D8) ----
         column.AddView(SettingsViews.Subheading(this, "Flyleaf"));
         column.AddView(SettingsViews.CheckRow(this, "Hide from Flyleaf", !plan.ShownInFlyleaf, hide => SetPlan(plan with { ShownInFlyleaf = !hide })));
-        column.AddView(Muted($"Off Flyleaf's tray, {name} opens only through Pulp, on a title."));
+        column.AddView(Muted($"Off Flyleaf’s tray, {name} opens only through Pulp, on a title."));
     }
 
     /// <summary>D166: on the phone the household is shared with the service is read, not changed.</summary>
     private void RenderReadOnly(string name)
     {
-        column.AddView(PaperUi.Body(this, had ? $"The household has {name}." : $"The household doesn't have {name}."));
+        column.AddView(PaperUi.Body(this, had ? $"The household has {name}." : $"The household doesn’t have {name}."));
         if (had)
         {
             column.AddView(Muted(ServiceRowText.Tier(plan)), SettingsViews.Spaced(this, DesignTokens.Space.X1));

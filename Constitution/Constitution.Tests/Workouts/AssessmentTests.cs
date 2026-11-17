@@ -146,7 +146,7 @@ public class AssessmentTests
     [Fact]
     public void AnUnreadableCalendarStillPlansNothing()
     {
-        var calendars = CalendarsWith(sam: Constitution.Domain.Calendar.CalendarRead.Unreadable("could not be read"));
+        var calendars = CalendarsWith(sam: Constitution.Domain.Calendar.CalendarRead.Unreadable("couldn’t be read"));
         var week = AssessmentPlanner.Plan(Request(calendars, bothAdults: false));
 
         Assert.Empty(SamOf(week.Plan).Sessions);

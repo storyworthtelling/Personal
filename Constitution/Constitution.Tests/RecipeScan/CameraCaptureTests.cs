@@ -140,7 +140,7 @@ public class CameraCaptureTests
 
         Assert.Contains("camera", sentence, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("recipe", sentence, StringComparison.Ordinal);
-        Assert.Contains("not kept", sentence, StringComparison.Ordinal);
+        Assert.Contains("aren’t kept", sentence, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public class CameraCaptureTests
     {
         var sentence = CameraAccess.DeniedSentence;
 
-        Assert.Contains("camera was not allowed", sentence, StringComparison.Ordinal);
+        Assert.Contains("camera wasn’t allowed", sentence, StringComparison.Ordinal);
         Assert.Contains(RecipePickerText.TypeInTitle, sentence, StringComparison.Ordinal);
     }
 

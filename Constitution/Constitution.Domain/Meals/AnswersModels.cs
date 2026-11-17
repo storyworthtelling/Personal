@@ -32,7 +32,7 @@ public sealed record MealAnswer
     {
         if (person.Value is null)
         {
-            throw new ArgumentException("An answer is somebody's; there is no person here.", nameof(person));
+            throw new ArgumentException("An answer is somebody’s; there is no person here.", nameof(person));
         }
 
         PlanningWeek.RequireStart(week, nameof(week));

@@ -239,7 +239,7 @@ public sealed class FileLogger : ILoggerProvider
             }
             catch (FormatException)
             {
-                message = "(the message could not be formatted)";
+                message = "(the message couldn’t be formatted)";
             }
             owner.Append(owner.Line(category, logLevel, message, exception, quiet));
         }

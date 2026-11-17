@@ -54,7 +54,7 @@ public static class SnowballHistoryCodec
         }
         catch (JsonException)
         {
-            return Refused("the document is not valid JSON");
+            return Refused("the document isn’t valid JSON");
         }
     }
 
@@ -62,7 +62,7 @@ public static class SnowballHistoryCodec
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
-            return Refused("the document is not a JSON object");
+            return Refused("the document isn’t a JSON object");
         }
 
         if (!TryArray(root, "weeks", out var weekElements) || weekElements.GetArrayLength() == 0)
@@ -87,7 +87,7 @@ public static class SnowballHistoryCodec
             if (element.ValueKind != JsonValueKind.String
                 || !DateOnly.TryParseExact(element.GetString(), DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var week))
             {
-                return Refused($"week {weekIndex} is not a {DateFormat} date");
+                return Refused($"week {weekIndex} isn’t a {DateFormat} date");
             }
             if (!weekSet.Add(week))
             {
@@ -122,7 +122,7 @@ public static class SnowballHistoryCodec
             rowIndex++;
             if (element.ValueKind != JsonValueKind.Object)
             {
-                return Refused($"row {rowIndex} is not an object");
+                return Refused($"row {rowIndex} isn’t an object");
             }
 
             var loan = element.TryGetProperty("loan", out var loanProperty) && loanProperty.ValueKind == JsonValueKind.String
@@ -130,7 +130,7 @@ public static class SnowballHistoryCodec
                 : null;
             if (loan is null || !loanSet.Contains(loan))
             {
-                return Refused($"row {rowIndex} names a loan that is not in \"loans\"");
+                return Refused($"row {rowIndex} names a loan that isn’t in \"loans\"");
             }
 
             if (!element.TryGetProperty("week", out var weekProperty)
@@ -138,7 +138,7 @@ public static class SnowballHistoryCodec
                 || !DateOnly.TryParseExact(weekProperty.GetString(), DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var week)
                 || !weekSet.Contains(week))
             {
-                return Refused($"row {rowIndex} names a week that is not in \"weeks\"");
+                return Refused($"row {rowIndex} names a week that isn’t in \"weeks\"");
             }
 
             if (!element.TryGetProperty("balance", out var balanceProperty)

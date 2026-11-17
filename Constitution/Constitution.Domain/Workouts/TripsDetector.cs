@@ -126,7 +126,7 @@ internal static class HotelPhrase
     private static bool IsName(string word, Adult adult)
     {
         var plain = Plain(word);
-        if (plain.EndsWith("'s", StringComparison.OrdinalIgnoreCase))
+        if (plain.EndsWith("’s", StringComparison.OrdinalIgnoreCase))
         {
             plain = plain[..^2];
         }

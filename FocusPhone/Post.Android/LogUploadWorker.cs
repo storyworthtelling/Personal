@@ -68,5 +68,5 @@ internal static class PostLogUpload
 
     public static Task<LogUploadResult> RunAsync(Context context, CancellationToken cancellationToken) =>
         HeadDiagnostics.Current?.UploadAsync(cancellationToken)
-        ?? Task.FromResult(new LogUploadResult(0, 0, null, "Post's diagnostics were not installed."));
+        ?? Task.FromResult(new LogUploadResult(0, 0, null, "Post’s diagnostics were not installed."));
 }

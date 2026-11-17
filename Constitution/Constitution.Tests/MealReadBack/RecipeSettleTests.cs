@@ -67,7 +67,7 @@ public class RecipeSettleTests
     {
         using var rig = new MealRig();
         var document = Recipe();
-        var doubt = new InkResolution.NeedsAsking(RecipeIds.RatingGroup(3), "Robin's rating of Buttered noodles", "Fine", "Never again", "cause-rate-3");
+        var doubt = new InkResolution.NeedsAsking(RecipeIds.RatingGroup(3), "Robin’s rating of Buttered noodles", "Fine", "Never again", "cause-rate-3");
 
         rig.Hook.Settled(document, RecipeResult(document, NextMorning, Circle(1, "Loved"), doubt, Circle(4, "Fine")));
 
@@ -82,7 +82,7 @@ public class RecipeSettleTests
 
         rig.Hook.Settled(
             document,
-            RecipeResult(document, NextMorning, new InkResolution.NotRead(RecipeIds.RatingGroup(1), "The page was not read."), Circle(2, "Spicy")));
+            RecipeResult(document, NextMorning, new InkResolution.NotRead(RecipeIds.RatingGroup(1), "The page wasn’t read."), Circle(2, "Spicy")));
 
         Assert.Empty(rig.Ratings());
     }

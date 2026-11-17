@@ -7,7 +7,7 @@ public static class VaultPageText
 
     public const string AccountHeading = "Google account";
 
-    public const string NotSignedIn = "Not signed in. Pulp finds the vault in this account's Drive.";
+    public const string NotSignedIn = "Not signed in. Pulp finds the vault in this account’s Drive.";
 
     public const string SignIn = "Sign in with Google";
 
@@ -18,7 +18,7 @@ public static class VaultPageText
     public const string PassphraseHint = "The passphrase your other apps use";
 
     public const string PassphraseHelper =
-        "The same passphrase as your other apps. It is shown so you can check it letter by letter; it is the one thing the vault cannot keep for you.";
+        "The same passphrase as your other apps. It is shown so you can check it letter by letter; it is the one thing the vault can’t keep for you.";
 
     public const string KeysHeading = "Keys";
 

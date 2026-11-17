@@ -89,7 +89,7 @@ public sealed class TidalCredentialsProvider(Func<Task<TidalTokenPollResult>> re
                 // If this throws, the coroutine that is awaiting p1 hangs forever —
                 // there is nothing further this method can do about it, but it must
                 // not vanish silently.
-                AudioDiagnostics.LogWarning(LogTag, $"ResumeWith itself threw — the caller's coroutine will hang: {e}");
+                AudioDiagnostics.LogWarning(LogTag, $"ResumeWith itself threw — the caller’s coroutine will hang: {e}");
             }
         });
 
@@ -102,7 +102,7 @@ public sealed class TidalCredentialsProvider(Func<Task<TidalTokenPollResult>> re
             // condition device testing needs to catch, logged so it is easy to find.
             AudioDiagnostics.LogWarning(LogTag,
                 "CoroutineSuspended() bridge call failed; returning null instead of the real sentinel " +
-                "(unverified whether the SDK's caller handles that the same way).");
+                "(unverified whether the SDK’s caller handles that the same way).");
         }
 
         return sentinel;

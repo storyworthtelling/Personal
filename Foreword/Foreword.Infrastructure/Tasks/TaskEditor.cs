@@ -48,15 +48,15 @@ public class TaskEditor(ITaskStore store, IGoogleTasksClient google)
             store.Delete(task.Id);
             return TaskSaveResult.Ok;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Google refused — no scope granted, a revoked token. The edit is kept here so it is not
             // lost, and the screen is TOLD: a divergent copy kept quietly is exactly the drift the
             // mirror exists to prevent, and doing it silently is worse than failing.
             store.Save(task);
             return new TaskSaveResult(false,
-                $"Saved on this phone only — Google would not take the change ({ex.Message}). "
-                + "It needs the Tasks write permission.");
+                "Saved on this phone only — Google wouldn’t take the change. "
+                + "Sign in again in Settings so Foreword can write to Tasks.");
         }
     }
 
@@ -81,10 +81,10 @@ public class TaskEditor(ITaskStore store, IGoogleTasksClient google)
             store.Delete(task.Id);
             return TaskSaveResult.Ok;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return new TaskSaveResult(false,
-                $"Google would not remove it ({ex.Message}). It needs the Tasks write permission.");
+                "Google wouldn’t remove it. Sign in again in Settings so Foreword can write to Tasks.");
         }
     }
 }

@@ -58,7 +58,7 @@ public static class ScrapLayout
             if (double.IsNaN(scrap.ContentHeightDp) || double.IsInfinity(scrap.ContentHeightDp) || scrap.ContentHeightDp < 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(scraps), scrap.ContentHeightDp,
-                    $"Scrap '{scrap.Id}' has a content height that is not a plain non-negative number of dp.");
+                    $"Scrap '{scrap.Id}' has a content height that isn’t a plain non-negative number of dp.");
             }
 
             var style = ScrapStyle.For(scrap.Kind);

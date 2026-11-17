@@ -39,7 +39,7 @@ public class DateConverterTests : IDisposable
             .ToList();
 
         Assert.True(unconverted.Count == 0,
-            "SQLite cannot order by or compare a DateTimeOffset, and throws where one is queried. "
+            "SQLite can’t order by or compare a DateTimeOffset, and throws where one is queried. "
             + "These are stored without a converter:\n" + string.Join("\n", unconverted));
     }
 

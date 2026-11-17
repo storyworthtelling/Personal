@@ -51,9 +51,9 @@ public class ReadingPlanTests
     {
         Assert.True(ReadingPlan.Estimate > TimeSpan.FromMinutes(9),
             $"The read is estimated at {ReadingPlan.Estimate.TotalMinutes:0.0} minutes, which would fit the "
-            + "old nine-minute cycle — check the measured per-pass figures, because F49 says it does not.");
+            + "old nine-minute cycle — check the measured per-pass figures, because F49 says it doesn’t.");
         Assert.True(ReadingPlan.Estimate < TimeSpan.FromMinutes(30),
-            "The read outgrew even the foreground session's budget.");
+            "The read outgrew even the foreground session’s budget.");
     }
 
     [Fact]

@@ -60,9 +60,9 @@ public static class DigestBody
         ArgumentNullException.ThrowIfNull(patterns);
         var date = saturday.ToDateTime(TimeOnly.MinValue);
         var first = new PageDraft("Body");
-        first.Kicker($"SATURDAY DIGEST · {firstPage} OF {pages}");
+        first.Kicker($"Saturday digest · {firstPage} of {pages}");
         var second = new PageDraft("Body");
-        second.Kicker($"SATURDAY DIGEST · {firstPage + 1} OF {pages}");
+        second.Kicker($"Saturday digest · {firstPage + 1} of {pages}");
 
         for (var index = 0; index < series.Count; index++)
         {

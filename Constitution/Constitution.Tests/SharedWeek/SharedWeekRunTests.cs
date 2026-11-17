@@ -172,7 +172,7 @@ public class SharedWeekRunTests
     [Fact]
     public async Task AnUnreadableHouseholdFileStopsItWithTheFilesOwnSentence()
     {
-        plans.Answer = new WeekPlansRead.Blocked("The household file cannot be opened.");
+        plans.Answer = new WeekPlansRead.Blocked("The household file can’t be opened.");
 
         var outcome = await RunAsync(Inside);
 
@@ -184,7 +184,7 @@ public class SharedWeekRunTests
     [Fact]
     public async Task AnUnreadableBoxStopsItAndSendsNothing()
     {
-        weeks.Box.Answer = new RecipeBoxRead.Unavailable("The box cannot be read.");
+        weeks.Box.Answer = new RecipeBoxRead.Unavailable("The box can’t be read.");
 
         var outcome = await RunAsync(Inside);
 
@@ -195,7 +195,7 @@ public class SharedWeekRunTests
     [Fact]
     public async Task AnUnreadableTasteProfileStopsItAndSendsNothing()
     {
-        weeks.Taste.Answer = new MealTasteRead.Unreadable("The taste profile cannot be read.");
+        weeks.Taste.Answer = new MealTasteRead.Unreadable("The taste profile can’t be read.");
 
         var outcome = await RunAsync(Inside);
 

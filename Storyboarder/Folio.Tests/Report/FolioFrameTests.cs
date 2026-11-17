@@ -129,11 +129,11 @@ public class FolioFrameTests
     public void NoSheetIsOnlyItsFrame()
     {
         var prose = string.Join("\n\n", Enumerable.Range(1, 30).Select(i =>
-            $"Ruth stood at the sea wall and did not look back at the house. Paragraph {i} goes on for a line or two more."));
+            $"Ruth stood at the sea wall and didn’t look back at the house. Paragraph {i} goes on for a line or two more."));
         var pdf = new AnalysisDocumentRenderer().Render(
             SampleAnalysis.Of() with
             {
-                LineEdits = [new LineEdit("Chapter 1", "did not look back at the house", "Show her walking away.", "Weaker than the action.")],
+                LineEdits = [new LineEdit("Chapter 1", "didn’t look back at the house", "Show her walking away.", "Weaker than the action.")],
                 Reviews = [.. PersonaCatalogue.Readers.Select(persona => new Review(
                     persona.Id, "It holds.", "A read in character.", ["The opening."], ["The middle."], "A shorter middle."))],
             },

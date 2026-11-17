@@ -30,7 +30,7 @@ public static class CameraWords
     public static string ForShutter(CameraAccess access) => access switch
     {
         CameraAccess.NotAllowed => "Plate needs the camera to take a picture. Allow it when the phone asks.",
-        CameraAccess.Refused => "Camera access is off for Plate. Turn it on in the phone's settings, under Apps, Plate, Permissions.",
+        CameraAccess.Refused => "Camera access is off for Plate. Turn it on in the phone’s settings, under Apps, Plate, Permissions.",
         _ => "The camera is still starting. Try again in a moment.",
     };
 }

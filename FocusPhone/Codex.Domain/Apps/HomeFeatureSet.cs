@@ -45,7 +45,7 @@ public sealed record HomeFeatureSet(IReadOnlyList<string> Packages)
         if (!Packages.Contains(existingPackage))
         {
             throw new ArgumentException(
-                $"'{existingPackage}' is not featured on the home shelf.", nameof(existingPackage));
+                $"'{existingPackage}' isn’t featured on the home shelf.", nameof(existingPackage));
         }
         if (Packages.Contains(newPackage))
         {

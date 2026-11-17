@@ -120,14 +120,14 @@ public class DayPageBoundsTests
                 ],
                 Travel = TravelTable.Of("Home", [("The school", "Veterans Park", 25)]),
             },
-            Voice = "Two of Sam's land on top of each other at half three, and the lawn has moved to today.",
+            Voice = "Two of Sam’s land on top of each other at half three, and the lawn has moved to today.",
             ChecklistVoice = "Eight things, and the lawn is the only one that will take you an hour.",
             Outlook = [At(Household.Jo, 16, 17, "Jo — orthodontist follow-up appointment")],
             Tasks =
             [
                 Printed("Vitamins"),
                 Printed("Mow the lawn", Day.AddDays(-1)),
-                Printed("Book Jo's orthodontist follow-up appointment"),
+                Printed("Book Jo’s orthodontist follow-up appointment"),
                 Printed("Bins out"),
             ],
             Weather = Forecast(),

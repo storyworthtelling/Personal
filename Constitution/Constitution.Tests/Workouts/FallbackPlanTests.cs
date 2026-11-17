@@ -41,7 +41,7 @@ public class FallbackPlanTests
             Assert.Empty(PlanRules.Violations(request, outcome.Plan));
             Assert.True(
                 Shape(WorkoutPlanner.Plan(request).Plans.SelectMany(item => item.Sessions)).SequenceEqual(Shape(outcome.Plan.Plans.SelectMany(item => item.Sessions))),
-                $"{where}: not the rules planner's week");
+                $"{where}: not the rules planner’s week");
         }
 
         Assert.True(planned > 100, $"only {planned} sessions across the generated weeks");

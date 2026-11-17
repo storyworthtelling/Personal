@@ -71,8 +71,8 @@ public class ColumnsAreDataTests
         }
 
         Assert.True(offenders.Count == 0,
-            "These write a column's name into the code. Columns are set up in Foreword and kept with "
-            + "the account's settings; the code may only know Watch:\n" + string.Join("\n", offenders));
+            "These write a column’s name into the code. Columns are set up in Foreword and kept with "
+            + "the account’s settings; the code may only know Watch:\n" + string.Join("\n", offenders));
     }
 
     private static string Root()

@@ -99,10 +99,10 @@ public class FollowUpPageDriftTests
         using var document = Open(OverPlan());
         var page = document.GetPage(1);
 
-        Assert.Equal(FollowUpRegions.PreviousRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "SEPT")).BoundingBox.Right), Tolerance);
-        Assert.Equal(FollowUpRegions.WroteRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "WROTE")).BoundingBox.Right), Tolerance);
-        Assert.Equal(FollowUpRegions.SuggestRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "SUGGEST")).BoundingBox.Right), Tolerance);
-        Assert.Equal(FollowUpRegions.FinalBoxLeft, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "FINAL")).BoundingBox.Left), Tolerance);
+        Assert.Equal(FollowUpRegions.PreviousRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "Sept")).BoundingBox.Right), Tolerance);
+        Assert.Equal(FollowUpRegions.WroteRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "Wrote")).BoundingBox.Right), Tolerance);
+        Assert.Equal(FollowUpRegions.SuggestRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "Suggest")).BoundingBox.Right), Tolerance);
+        Assert.Equal(FollowUpRegions.FinalBoxLeft, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "Final")).BoundingBox.Left), Tolerance);
 
         // Clothing 104 / 248 / 104 and Gifts 55 / 158 / 111 — figures of different widths end on one edge.
         Assert.Equal(FollowUpRegions.PreviousRight, PdfProbe.BoardX((float)Assert.Single(WordsIn(page, "$55")).BoundingBox.Right), Tolerance);
@@ -154,10 +154,10 @@ public class FollowUpPageDriftTests
         using var document = Open(OverPlan());
         var text = document.GetPage(1).Text;
 
-        Assert.Contains("SEPT", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("LAST MONTH", text, StringComparison.Ordinal);
-        Assert.Contains("furthest above September's spending", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("above last month's", text, StringComparison.Ordinal);
+        Assert.Contains("Sept", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Last month", text, StringComparison.Ordinal);
+        Assert.Contains("furthest above September’s spending", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("above last month’s", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -167,8 +167,8 @@ public class FollowUpPageDriftTests
         using var document = Open(plan);
         var text = document.GetPage(1).Text;
 
-        Assert.Contains("furthest above December's spending", text, StringComparison.Ordinal);
-        Assert.Contains("DEC", text, StringComparison.Ordinal);
+        Assert.Contains("furthest above December’s spending", text, StringComparison.Ordinal);
+        Assert.Contains("Dec", text, StringComparison.Ordinal);
     }
 
     // ---- "Extra payment", with the loan's name ----

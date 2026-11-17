@@ -129,7 +129,7 @@ public class ClaudeTemplateAuthorTests
     [Fact]
     public async Task OnlyTheAllowedWordsLeaveThePhone()
     {
-        var reason = "Sam could not stand the pith";
+        var reason = "Sam couldn’t stand the pith";
         var library = Lib(
             Approved("tpl-weekend-breakfast-oats", MealTemplateSlot.WeekendBreakfast, "Oat pancakes"),
             Rejected("tpl-box-fruit-melon", MealTemplateSlot.BoxFruit, "Cold melon", reason),
@@ -226,7 +226,7 @@ public class ClaudeTemplateAuthorTests
     }
 
     [Theory]
-    [InlineData("I'm sorry, I can't help with that.")]
+    [InlineData("I’m sorry, I can’t help with that.")]
     [InlineData("{\"templates\":[")]
     [InlineData("{\"templates\":[]}")]
     [InlineData("{\"templates\":[{\"slot\":\"box-fruit\"}]}")]

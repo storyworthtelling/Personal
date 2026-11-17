@@ -136,7 +136,7 @@ public class SheetFrameTests
         sink.EndPage();
 
         using var pdf = PdfDocument.Open(sink.Close());
-        Assert.Contains("SET AND DELIVERED BY INDEX", pdf.GetPage(1).Text.Replace("  ", " "));
+        Assert.Contains("Set and delivered by Index", pdf.GetPage(1).Text.Replace("  ", " "));
         Assert.True(top < sheet.DesignHeight - SheetFrame.Margin - SheetFrame.ColophonMarkSize);
     }
 

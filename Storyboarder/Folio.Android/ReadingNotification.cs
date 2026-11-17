@@ -27,8 +27,8 @@ internal static class ReadingNotification
     {
         EnsureChannel(context);
         return new NotificationCompat.Builder(context, ChannelId)
-            .SetContentTitle("Folio")!
-            .SetContentText(sentence)!
+            // The step is the title: Android already shows the app’s name above it (audit W11).
+            .SetContentTitle(sentence)!
             .SetSmallIcon(global::Android.Resource.Drawable.StatSysDownload)!
             .SetOngoing(true)!
             .SetOnlyAlertOnce(true)!

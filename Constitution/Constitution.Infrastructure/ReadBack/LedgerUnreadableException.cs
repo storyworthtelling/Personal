@@ -6,4 +6,4 @@ namespace Constitution.Infrastructure.ReadBack;
 /// whatever the unknown entries held, with a file that no longer has them.
 /// </summary>
 public sealed class LedgerUnreadableException() : InvalidOperationException(
-    "The skip ledger could not be read in full, so it was left untouched and yesterday's page was kept until it can be.");
+    "The skip ledger couldn’t be read in full, so it was left untouched and yesterday’s page was kept until it can be.");

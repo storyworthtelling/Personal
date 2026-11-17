@@ -99,14 +99,14 @@ public class ShelfCoverArtTests
             .ToList();
 
         Assert.True(missing.Count == 0,
-            "Mapped to a drawable that is not in Flyleaf's drawable folder: " + string.Join(", ", missing));
+            "Mapped to a drawable that isn’t in Flyleaf’s drawable folder: " + string.Join(", ", missing));
     }
 
     private static string CoverResourcesBlock()
     {
         var home = Path.Combine(
             Design.DesignTestHelpers.FocusPhoneRoot(), "Flyleaf.Android", "HomeActivity.cs");
-        Assert.True(File.Exists(home), "Flyleaf's HomeActivity has moved; this guard watches nothing.");
+        Assert.True(File.Exists(home), "Flyleaf’s HomeActivity has moved; this guard watches nothing.");
 
         var source = File.ReadAllText(home);
         var start = source.IndexOf("CoverResources = new()", StringComparison.Ordinal);

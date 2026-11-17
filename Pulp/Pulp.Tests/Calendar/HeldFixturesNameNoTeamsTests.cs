@@ -94,7 +94,7 @@ public class HeldFixturesNameNoTeamsTests
                 .ToList();
 
             Assert.True(offences.Count == 0,
-                "A held league's calendar line names a team, which says who won the round before:\n"
+                "A held league’s calendar line names a team, which says who won the round before:\n"
                 + string.Join("\n", offences));
         }
     }

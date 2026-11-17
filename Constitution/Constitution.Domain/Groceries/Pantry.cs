@@ -73,7 +73,7 @@ public sealed class Pantry
         foreach (var dinner in week.Dinners.Where(item => item.Kind == DinnerKind.Cooked && uncookedDays.Contains(item.Day)))
         {
             var card = recipes.FirstOrDefault(item => item.Id == dinner.Recipe)
-                ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}'s dinner names a card that is not in the box, so its stock could not be worked out.", nameof(recipes));
+                ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}’s dinner names a card that is not in the box, so its stock could not be worked out.", nameof(recipes));
             foreach (var ingredient in card.Ingredients)
             {
                 Reckon(next, ingredient.Name);

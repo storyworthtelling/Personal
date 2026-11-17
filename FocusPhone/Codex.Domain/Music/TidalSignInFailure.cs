@@ -40,17 +40,17 @@ public static class TidalSignInFailure
 
         if (Mentions(text, "invalid_client") || Mentions(text, "unauthorized_client"))
         {
-            return "TIDAL rejected the app's credentials. Check the client id and secret in the vault.";
+            return "TIDAL rejected the app’s credentials. Check the client id and secret in the vault.";
         }
 
         if (Mentions(text, "invalid_scope"))
         {
-            return "TIDAL won't grant this app the permissions Score asks for.";
+            return "TIDAL won’t grant this app the permissions Score asks for.";
         }
 
         // Everything else — no network, a timeout, a shape nobody has seen — is the
         // kind of thing that genuinely may work on the next try.
-        return "Couldn't reach TIDAL. Try again in a moment.";
+        return "Couldn’t reach TIDAL. Try again in a moment.";
     }
 
     /// <summary>
@@ -60,8 +60,8 @@ public static class TidalSignInFailure
     /// the app in TIDAL's developer portal, which the page checks before anything else.
     /// </summary>
     public const string WhileAtTidal =
-        "Finish signing in, and TIDAL will send you back here. If TIDAL's page shows an " +
-        "error instead, the app's redirect URI or scopes in TIDAL's developer portal don't " +
+        "Finish signing in, and TIDAL will send you back here. If TIDAL’s page shows an " +
+        "error instead, the app’s redirect URI or scopes in TIDAL’s developer portal don’t " +
         "match what Score asks for.";
 
     /// <summary>

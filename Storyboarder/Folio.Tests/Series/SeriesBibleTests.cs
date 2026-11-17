@@ -184,7 +184,7 @@ public class SeriesBibleTests
     [Fact]
     public void AQuoteTheBookDoesNotContainIsDroppedButTheFactKept()
     {
-        const string manuscript = "Wren held the tiller with her scarred\nleft hand and did not look back.";
+        const string manuscript = "Wren held the tiller with her scarred\nleft hand and didn’t look back.";
         var facts = BibleQuotes.Keep(manuscript,
         [
             Fact(BibleKind.Character, "Wren Abernay", "Scarred left hand.", "her scarred left hand"),
@@ -212,7 +212,7 @@ public class SeriesBibleTests
         Assert.Contains("Year of the flood", text);
         Assert.Contains("her scarred left hand", text);
         Assert.Contains("Scarred right hand.", text);
-        Assert.Contains("the author's correction", text);
+        Assert.Contains("the author’s correction", text);
         Assert.Equal(string.Empty, BibleText.For(SeriesBible.Empty));
     }
 

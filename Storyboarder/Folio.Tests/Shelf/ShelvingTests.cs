@@ -66,7 +66,7 @@ public class ShelvingTests : IDisposable
         var status = await NewService().GetStatusAsync(id, CancellationToken.None);
 
         Assert.NotNull(status);
-        Assert.False(status!.Shelved, "Finishing a review is not the same event as putting the book away.");
+        Assert.False(status!.Shelved, "Finishing a review isn’t the same event as putting the book away.");
     }
 
     [Fact]

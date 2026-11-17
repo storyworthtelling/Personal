@@ -224,7 +224,7 @@ public class VectorPdfSinkTests
         var lossy = WithPicture(new VectorPdfSink(imageQuality: 80), picture);
 
         Assert.True(lossy.Length < lossless.Length / 3,
-            $"lossy {lossy.Length:N0} bytes was not under a third of lossless {lossless.Length:N0}");
+            $"lossy {lossy.Length:N0} bytes wasn’t under a third of lossless {lossless.Length:N0}");
     }
 
     [Fact]

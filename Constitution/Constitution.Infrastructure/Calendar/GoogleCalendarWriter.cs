@@ -33,8 +33,8 @@ public sealed class GoogleCalendarWriter(
     private const int PageSize = 250;
     private const int MostPages = 40;
 
-    public const string OwnNotSet = "This person's calendar is not set.";
-    public const string NotTrusted = "The calendar's answer could not be trusted.";
+    public const string OwnNotSet = "This person’s calendar isn’t set.";
+    public const string NotTrusted = "The calendar’s answer couldn’t be trusted.";
     public const string NoIdGiven = "Google gave no id for the new event.";
 
     private readonly Func<CancellationToken, Task<CalendarService>> service = service ?? throw new ArgumentNullException(nameof(service));
@@ -118,7 +118,7 @@ public sealed class GoogleCalendarWriter(
             var events = await request.ExecuteAsync(cancellationToken);
             foreach (var googleEvent in events.Items ?? [])
             {
-                if (string.Equals(googleEvent.Status, "cancelled", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(googleEvent.Status, "cancelled", StringComparison.OrdinalIgnoreCase))  // not copy: Google's own status word
                 {
                     continue;
                 }

@@ -144,7 +144,7 @@ public sealed class HeadDiagnostics
         catch (Exception e)
         {
             // Kept by its shape, never its message (audit 08 §6, §28).
-            Quiet(LogSources.Vault, "Shared key verdicts did not sync", e);
+            Quiet(LogSources.Vault, "Shared key verdicts didn’t sync", e);
         }
     }
 

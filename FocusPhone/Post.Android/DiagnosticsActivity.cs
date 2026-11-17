@@ -127,7 +127,7 @@ public class DiagnosticsActivity : Activity
             }
             else
             {
-                action.Failed(result.Refusal is not null ? "waiting for the vault passphrase" : result.Error ?? "did not complete");
+                action.Failed(result.Refusal is not null ? "waiting for the vault passphrase" : result.Error ?? "didn’t complete");
             }
             RunOnUiThread(() =>
             {
@@ -137,7 +137,7 @@ public class DiagnosticsActivity : Activity
                 {
                     DogEar.ShowNotices(this, undoHost!,
                     [
-                        new DogEar.Notice("The logs did not reach Drive.",
+                        new DogEar.Notice("The logs didn’t reach Drive.",
                             result.Refusal is not null
                                 ? "Set the vault passphrase in Settings; the logs wait on the phone until then."
                                 : "They are still on the phone and will go with the next weekly upload.",
@@ -153,7 +153,7 @@ public class DiagnosticsActivity : Activity
         if (GetSystemService(Context.ClipboardService) is ClipboardManager clipboard)
         {
             clipboard.PrimaryClip = ClipData.NewPlainText(
-                "FocusPhone diagnostics", PostDiagnostics.BuildExport(this));
+                "Post diagnostics", PostDiagnostics.BuildExport(this));
             // Success is the button saying so (§5), not a toast.
             copyButton!.Text = "Copied";
         }

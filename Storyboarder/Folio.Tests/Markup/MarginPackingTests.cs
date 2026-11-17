@@ -85,7 +85,7 @@ public class MarginPackingTests
 
         var packed = MarginColumn.Place(notes, Column);
 
-        Assert.True(packed.NotesDeferred > 0, "Forty notes of 50pt cannot fit the column.");
+        Assert.True(packed.NotesDeferred > 0, "Forty notes of 50pt can’t fit the column.");
         Assert.True(packed.TextHeight < Column,
             "The page ran its full height while deferring notes — a note is now on a different page "
             + "from the line it concerns.");

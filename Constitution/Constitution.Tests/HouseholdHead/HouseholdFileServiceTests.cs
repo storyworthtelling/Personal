@@ -81,7 +81,7 @@ public class HouseholdFileServiceTests
     public async Task AnUnreadableFileRefusesEveryEdit()
     {
         using var rig = new HeadRig();
-        rig.Drive.Content = "this is not an envelope";
+        rig.Drive.Content = "this isn’t an envelope";
         await rig.Service.SyncAsync(CancellationToken.None);
 
         await Assert.ThrowsAsync<HouseholdUnreadableException>(() => Seed(rig));
@@ -94,7 +94,7 @@ public class HouseholdFileServiceTests
     public async Task AskingAgainLiftsTheBlockOnceItIsReadable()
     {
         using var rig = new HeadRig();
-        rig.Drive.Content = "this is not an envelope";
+        rig.Drive.Content = "this isn’t an envelope";
         await rig.Service.SyncAsync(CancellationToken.None);
         rig.Drive.Content = null;
 

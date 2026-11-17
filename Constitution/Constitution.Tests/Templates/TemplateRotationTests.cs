@@ -86,7 +86,7 @@ public class TemplateRotationTests
     public void ARejectedTemplateIsNeverPrinted()
     {
         var library = new TemplateLibrary(
-            [.. Full().Templates, Rejected("tpl-weekend-lunch-bad", MealTemplateSlot.WeekendLunch, "cold liver", "Robin will not eat it")],
+            [.. Full().Templates, Rejected("tpl-weekend-lunch-bad", MealTemplateSlot.WeekendLunch, "cold liver", "Robin won’t eat it")],
             []);
 
         for (var weeks = 0; weeks < 40; weeks++)

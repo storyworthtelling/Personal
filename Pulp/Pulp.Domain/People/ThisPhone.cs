@@ -33,7 +33,7 @@ public sealed record ThisPhoneAnswer(ThisPhoneStatus Status, ViewerId? Viewer);
 public static class ThisPhone
 {
     /// <summary>What every page says when the answer is nobody but a roster exists. Never voiced.</summary>
-    public const string UnmatchedSentence = "This phone isn't matched to anyone in the household yet.";
+    public const string UnmatchedSentence = "This phone isn’t matched to anyone in the household yet.";
 
     public static ThisPhoneAnswer Resolve(HouseholdRoster? roster, ViewerId? recorded)
     {

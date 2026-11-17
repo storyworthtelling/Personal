@@ -125,7 +125,7 @@ internal static class CallEndedNotePrompt
         {
             // The identity resolver is a convenience over the raw key; never let it stop
             // the note from landing on at least the number's own (unmerged) thread.
-            PostDiagnostics.LogWarning("CallNote", "Could not resolve the caller's identity", e);
+            PostDiagnostics.LogWarning("CallNote", "Could not resolve the caller’s identity", e);
             return rawKey;
         }
     }

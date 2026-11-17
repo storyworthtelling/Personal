@@ -80,7 +80,7 @@ public static class TextSend
 
     /// <summary>What the owner is told when a text could not go by any route.</summary>
     public const string UnavailableReason =
-        "Post could not reach Google Messages and has no permission to send a plain text. "
+        "Post couldn’t reach Google Messages and has no permission to send a plain text. "
         + "Your words are still in the box; try again once the phone is online.";
 }
 

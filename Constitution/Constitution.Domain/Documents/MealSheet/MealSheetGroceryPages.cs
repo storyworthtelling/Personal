@@ -16,12 +16,12 @@ internal static class MealSheetGroceryPages
 {
     public const string Title = "Groceries";
     public const string ContinuedTitle = "Groceries, continued";
-    public const string ListHeading = "THIS WEEK’S GROCERIES · BY STORE SECTION";
+    public const string ListHeading = "This week’s groceries · by store section";
     public const string PreviewLine = "A preview only; the Keep note is sent separately.";
     public const string EmptyLine = "Nothing to buy this week.";
-    public const string StaplesHeading = "STAPLES · TICK WHAT WE NEED MORE OF";
+    public const string StaplesHeading = "Staples · check what we need more of";
     public const string NewStaplePrompt = "Something we always keep that isn’t listed? Write it on a line.";
-    public const string OverWord = "OVER BUDGET";
+    public const string OverWord = "Over budget";
     public const string OverAdvice = "Say no to a dinner to bring it down.";
 
     private const float Top = 78f;
@@ -155,17 +155,17 @@ internal static class MealSheetGroceryPages
         foreach (var section in list.Sections)
         {
             var word = Aisles.Words.Word(section.Aisle);
-            var label = Aisles.Label(section.Aisle).ToUpperInvariant();
+            var label = Aisles.Label(section.Aisle);
             var text = string.Join(", ", section.Lines.Select(l => string.IsNullOrEmpty(l.Quantity) ? l.Name : $"{l.Name} ({l.Quantity})"));
             var lines = PageText.Wrap(text, BodyChars);
 
-            flow.Need(HeadingPitch + LinePitch, label + " · CONTINUED");
+            flow.Need(HeadingPitch + LinePitch, label + " · continued");
             flow.Draft.Line(PrintedRole.Label, PageDraft.Left, flow.Y + 10f, PageDraft.FullWidth, label, name: word + "-aisle");
             flow.Advance(HeadingPitch);
             var number = 0;
             foreach (var line in lines)
             {
-                flow.Need(LinePitch, label + " · CONTINUED");
+                flow.Need(LinePitch, label + " · continued");
                 flow.Draft.Line(PrintedRole.Body, PageDraft.Left, flow.Y + 12.2f, PageDraft.FullWidth, line, name: $"list-{word}-{++number}");
                 flow.Advance(LinePitch);
             }
@@ -176,14 +176,14 @@ internal static class MealSheetGroceryPages
         if (list.ExtraLines.Count > 0)
         {
             // D111: plain lines that are not ingredients, each on its own line after the aisles ("Tuesday dinner").
-            var extraLabel = GroceryList.ExtraHeading.ToUpperInvariant();
-            flow.Need(HeadingPitch + LinePitch, extraLabel + " · CONTINUED");
+            var extraLabel = GroceryList.ExtraHeading;
+            flow.Need(HeadingPitch + LinePitch, extraLabel + " · continued");
             flow.Draft.Line(PrintedRole.Label, PageDraft.Left, flow.Y + 10f, PageDraft.FullWidth, extraLabel, name: "extra-heading");
             flow.Advance(HeadingPitch);
             var extraNumber = 0;
             foreach (var extra in list.ExtraLines)
             {
-                flow.Need(LinePitch, extraLabel + " · CONTINUED");
+                flow.Need(LinePitch, extraLabel + " · continued");
                 flow.Draft.Line(PrintedRole.Body, PageDraft.Left, flow.Y + 12.2f, PageDraft.FullWidth, extra, name: $"list-extra-{++extraNumber}");
                 flow.Advance(LinePitch);
             }
@@ -202,7 +202,7 @@ internal static class MealSheetGroceryPages
             return;
         }
 
-        const string Continued = "STAPLES · CONTINUED";
+        const string Continued = "Staples · continued";
         for (var start = 0; start < staples.Count; start += Columns)
         {
             var row = staples.Skip(start).Take(Columns).Select(s => (Staple: s, Lines: PageText.Wrap(s.Name, NameChars))).ToList();
@@ -312,7 +312,7 @@ internal static class MealSheetGroceryPages
         private void Begin(string title)
         {
             var draft = new PageDraft(title) { Section = Title };
-            draft.Kicker($"{MealSheetDocument.Kind} · {(firstSheet + drafts.Count).ToString(CultureInfo.InvariantCulture)} OF {total.ToString(CultureInfo.InvariantCulture)}");
+            draft.Kicker($"{MealSheetDocument.Kind} · {(firstSheet + drafts.Count).ToString(CultureInfo.InvariantCulture)} of {total.ToString(CultureInfo.InvariantCulture)}");
             drafts.Add(draft);
             Y = Top;
         }

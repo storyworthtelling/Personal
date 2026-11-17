@@ -11,7 +11,7 @@ internal static class InkConfidence
         if (double.IsNaN(confidence) || confidence < 0d || confidence > 1d)
         {
             throw new ArgumentOutOfRangeException(
-                name, confidence, "A read's confidence is a number from 0 to 1; anything else cannot be compared with the 0.75 floor.");
+                name, confidence, "A read’s confidence is a number from 0 to 1; anything else can’t be compared with the 0.75 floor.");
         }
 
         return confidence;

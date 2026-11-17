@@ -84,9 +84,9 @@ public record UpdateRunResult(UpdateRunState State, IReadOnlyList<AppInstallResu
     /// </summary>
     public string Summarize() => State switch
     {
-        UpdateRunState.NoToken => "No update token is set, so updates can't be checked.",
-        UpdateRunState.NotDeviceOwner => "Not the device owner, so updates can't install.",
-        UpdateRunState.FetchFailed => $"Couldn't reach GitHub ({Error}).",
+        UpdateRunState.NoToken => "No update token is set, so updates can’t be checked.",
+        UpdateRunState.NotDeviceOwner => "Not the device owner, so updates can’t install.",
+        UpdateRunState.FetchFailed => $"Couldn’t reach GitHub ({Error}).",
         _ => SummarizeRun(),
     };
 
@@ -104,7 +104,7 @@ public record UpdateRunResult(UpdateRunState State, IReadOnlyList<AppInstallResu
         {
             var reason = failed[0].Error;
             var detail = string.IsNullOrWhiteSpace(reason) ? "" : $" ({reason})";
-            parts.Add($"{failed.Count} couldn't install{detail}.");
+            parts.Add($"{failed.Count} couldn’t install{detail}.");
         }
         return parts.Count == 0 ? "Everything is up to date." : string.Join(" ", parts);
     }

@@ -66,7 +66,7 @@ public static class SmsRole
         if (!messagesInstalled)
         {
             return new(true, false,
-                "Google Messages is not installed.",
+                "Google Messages isn’t installed.",
                 "Post sends and receives texts through Google Messages. Install it from the Play Store, "
                 + "then open Post again.");
         }
@@ -76,7 +76,7 @@ public static class SmsRole
                 "Google Messages needs to be the texting app to keep RCS on, and Post now works through it. "
                 + "Open Messages and let it become the default.")
             : new(true, true,
-                "Google Messages is not your texting app.",
+                "Google Messages isn’t your texting app.",
                 "Post works through Google Messages, and Messages keeps RCS on only as the texting app. "
                 + "Open Messages and let it become the default.");
     }

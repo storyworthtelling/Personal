@@ -41,8 +41,8 @@ public sealed class PrayerDeliveryService(
             // nothing may be read back or saved, because the file that is there cannot be read and
             // must not be written over.
             logger.LogWarning(
-                "The prayer archive could not be opened ({Status}); delivering a page with nothing "
-                + "on it and leaving yesterday's sheet alone", opened.Status);
+                "The prayer archive couldn’t be opened ({Status}); delivering a page with nothing "
+                + "on it and leaving yesterday’s sheet alone", opened.Status);
 
             await Upload(date, Compose(date, new PrayerArchive(), PrayerText.Empty).Document);
             return;
@@ -62,7 +62,7 @@ public sealed class PrayerDeliveryService(
         {
             // No new sheet means yesterday's is the only one on the tablet. Keep it.
             logger.LogWarning(
-                "Prayer upload failed for {Date}; keeping yesterday's sheet and saving nothing", date);
+                "Prayer upload failed for {Date}; keeping yesterday’s sheet and saving nothing", date);
             return;
         }
 
@@ -232,11 +232,11 @@ public sealed class PrayerDeliveryService(
         try
         {
             await remarkable.MoveToTrash(docId);
-            logger.LogInformation("Moved yesterday's prayer sheet {Id} to trash", docId);
+            logger.LogInformation("Moved yesterday’s prayer sheet {Id} to trash", docId);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Could not trash yesterday's prayer sheet {Id}", docId);
+            logger.LogWarning(ex, "Could not trash yesterday’s prayer sheet {Id}", docId);
         }
     }
 }

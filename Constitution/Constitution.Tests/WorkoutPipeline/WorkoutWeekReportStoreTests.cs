@@ -77,7 +77,7 @@ public sealed class WorkoutWeekReportStoreTests : IDisposable
     [Fact]
     public void TheUnreadableReasonQuotesNothingFromTheFile()
     {
-        var read = Assert.IsType<WorkoutWeekRecordRead.Unreadable>(WorkoutWeekReportCodec.Decode("{ Sam's secret"));
+        var read = Assert.IsType<WorkoutWeekRecordRead.Unreadable>(WorkoutWeekReportCodec.Decode("{ Sam’s secret"));
 
         Assert.DoesNotContain("secret", read.Reason, StringComparison.Ordinal);
     }

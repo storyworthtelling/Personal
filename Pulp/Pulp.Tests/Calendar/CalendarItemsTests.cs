@@ -77,7 +77,7 @@ public class CalendarItemsTests
             [Episode("Saltmarsh", Today.AddDays(1), Sam), Episode("Quarry Road", Today.AddDays(1), Alex)],
             [
                 Release("High Pass", Today.AddDays(2), new PlaylistShelf("Rainy Sundays", Alex, Shared: true)),
-                Release("Low Tide", Today.AddDays(2), new PlaylistShelf("Alex's own", Alex, Shared: false)),
+                Release("Low Tide", Today.AddDays(2), new PlaylistShelf("Alex’s own", Alex, Shared: false)),
             ],
             [Game("g-alex", new DateTimeOffset(2026, 10, 12, 1, 0, 0, TimeSpan.Zero), GameStage.RegularSeason, Alex)],
             [Plan("plan-alex", Today, null, Alex), Plan("plan-both", Today, null, Alex, Sam)]);
@@ -96,7 +96,7 @@ public class CalendarItemsTests
                 "High Pass",
                 Today.AddDays(2),
                 new PlaylistShelf("Rainy Sundays", Alex, Shared: true),
-                new PlaylistShelf("Alex's own", Alex, Shared: false)),
+                new PlaylistShelf("Alex’s own", Alex, Shared: false)),
         ]);
 
         var item = Assert.Single(CalendarItems.ForViewer(sources, Sam, Today, Zone, NothingHeld));
@@ -109,14 +109,14 @@ public class CalendarItemsTests
     {
         var sources = Sources(
             [Episode("Saltmarsh", Today.AddDays(1), Sam), Episode("Quarry Road", Today.AddDays(1), Alex)],
-            releases: [Release("Low Tide", Today.AddDays(2), new PlaylistShelf("Alex's own", Alex, Shared: false))]);
+            releases: [Release("Low Tide", Today.AddDays(2), new PlaylistShelf("Alex’s own", Alex, Shared: false))]);
 
         var items = CalendarItems.ForHousehold(sources, Today, Zone, NobodyHolds);
 
         Assert.Equal([Alex], items.Single(item => item.Name == "Quarry Road").Whose);
         Assert.Equal([Sam], items.Single(item => item.Name == "Saltmarsh").Whose);
         Assert.Equal([Alex], items.Single(item => item.Name == "Low Tide").Whose);
-        Assert.Equal(["Alex's own"], items.Single(item => item.Name == "Low Tide").Playlists);
+        Assert.Equal(["Alex’s own"], items.Single(item => item.Name == "Low Tide").Playlists);
     }
 
     [Fact]

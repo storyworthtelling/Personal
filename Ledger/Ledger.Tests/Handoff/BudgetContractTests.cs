@@ -38,7 +38,7 @@ public class BudgetContractTests
     public void ConstitutionsConstantsMatchByContent()
     {
         var path = Path.Combine(RepoRoot(), "Constitution", "Constitution.Domain", "ConstitutionIdentity.cs");
-        Assert.True(File.Exists(path), "Constitution's identity file is missing (the receiving side has not landed).");
+        Assert.True(File.Exists(path), "Constitution’s identity file is missing (the receiving side hasn’t landed).");
         var source = File.ReadAllText(path);
 
         Assert.Equal(ConstitutionBudgetContract.Package, Constant(source, "ApplicationId"));
@@ -65,14 +65,14 @@ public class BudgetContractTests
     private static string Constant(string source, string name)
     {
         var match = Regex.Match(source, name + @"\s*=\s*""([^""]+)""");
-        Assert.True(match.Success, $"{name} not found in Constitution's identity file.");
+        Assert.True(match.Success, $"{name} not found in Constitution’s identity file.");
         return match.Groups[1].Value;
     }
 
     private static string Suffix(string source, string name)
     {
         var match = Regex.Match(source, name + @"\s*=\s*ApplicationId\s*\+\s*""([^""]+)""");
-        Assert.True(match.Success, $"{name} is not ApplicationId + a literal in Constitution's identity file.");
+        Assert.True(match.Success, $"{name} isn’t ApplicationId + a literal in Constitution’s identity file.");
         return match.Groups[1].Value;
     }
 

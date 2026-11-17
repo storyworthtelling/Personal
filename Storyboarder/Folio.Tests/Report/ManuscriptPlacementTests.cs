@@ -30,7 +30,7 @@ public class ManuscriptPlacementTests
         new("The Salt Line", 3, 94_200, new DateTimeOffset(2026, 9, 12, 0, 0, 0, TimeSpan.Zero), null, null);
 
     private const string Manuscript =
-        "Ruth stood at the sea wall and did not look back at the house.\n\n"
+        "Ruth stood at the sea wall and didn’t look back at the house.\n\n"
         + "The tide was already turning, the way it always did at this hour.";
 
     // Unique to the real heading — the front contents page prints the row title alone, with no
@@ -49,10 +49,10 @@ public class ManuscriptPlacementTests
         var readers = pages.FindIndex(page => page.Contains("READERS", StringComparison.OrdinalIgnoreCase)
             && page.Contains(BookLines.Spell(PersonaCatalogue.Readers.Count), StringComparison.OrdinalIgnoreCase));
 
-        Assert.True(manuscript >= 0, "The manuscript's own page never printed — check the fixture's excerpt still matches.");
+        Assert.True(manuscript >= 0, "The manuscript’s own page never printed — check the fixture’s excerpt still matches.");
         Assert.True(readers >= 0, "The readers' contents page never printed.");
         Assert.True(manuscript < readers,
-            $"The manuscript's own page is page {manuscript + 1} and the readers start on page "
+            $"The manuscript’s own page is page {manuscript + 1} and the readers start on page "
             + $"{readers + 1}: the centre of the report is printing after the voices that read it, "
             + "not before.");
     }
@@ -63,9 +63,9 @@ public class ManuscriptPlacementTests
             {
                 LineEdits = [new LineEdit(
                     "Chapter 1",
-                    "did not look back at the house",
+                    "didn’t look back at the house",
                     "Cut the negation; show her walking away instead.",
-                    "Telling us what she didn't do is weaker than the action itself.")],
+                    "Telling us what she didn’t do is weaker than the action itself.")],
                 Reviews = Reads(),
             },
             Cover, Array.Empty<SceneEvidence>(), manuscript: Manuscript);
@@ -77,7 +77,7 @@ public class ManuscriptPlacementTests
             $"{persona.Name} arrives at the middle.",
             "A read long enough to be a read.",
             [$"{persona.Name} found something that works."],
-            [$"{persona.Name} found something that does not."],
+            [$"{persona.Name} found something that doesn’t."],
             "Something specific would have to change before this reader changed their mind."))
     ];
 

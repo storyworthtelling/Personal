@@ -72,7 +72,7 @@ public class DiagnosticsRedactionTests
         const string signature = "BuildDiagnosticsSummaryAsync()";
 
         var signatureIndex = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.True(signatureIndex >= 0, "BuildDiagnosticsSummaryAsync() was not found in SetupPage.xaml.cs.");
+        Assert.True(signatureIndex >= 0, "BuildDiagnosticsSummaryAsync() wasn’t found in SetupPage.xaml.cs.");
 
         var openBrace = source.IndexOf('{', signatureIndex);
         Assert.True(openBrace >= 0, "No opening brace found after BuildDiagnosticsSummaryAsync().");

@@ -29,9 +29,9 @@ public class DigestAssemblerTests
     [Fact]
     public void AnUnavailableStoreStopsItWithItsReason()
     {
-        var sources = new FakeSources { Unavailable = "The skip ledger could not be read." };
+        var sources = new FakeSources { Unavailable = "The skip ledger couldn’t be read." };
         var stopped = Assert.IsType<DigestAssembly.NotReady>(DigestAssembler.Assemble("Sam", DigestFixture.Saturday, sources));
-        Assert.Equal("The skip ledger could not be read.", stopped.Reason);
+        Assert.Equal("The skip ledger couldn’t be read.", stopped.Reason);
     }
 
     [Fact]

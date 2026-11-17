@@ -62,7 +62,7 @@ public class GatedChangesSourceTests
         foreach (Match call in calls)
         {
             var before = area[Math.Max(0, call.Index - 400)..call.Index];
-            Assert.True(before.Contains("Task.Run(", StringComparison.Ordinal), $"{call.Value} is not inside Task.Run.");
+            Assert.True(before.Contains("Task.Run(", StringComparison.Ordinal), $"{call.Value} isn’t inside Task.Run.");
         }
 
         Assert.DoesNotMatch(new Regex(@"\.Wait\(|\.Result;|\.Result\)|GetAwaiter\(\)\.GetResult", RegexOptions.None, Limit), area);

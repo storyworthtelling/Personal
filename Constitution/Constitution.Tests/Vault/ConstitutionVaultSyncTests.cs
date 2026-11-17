@@ -148,7 +148,7 @@ public class ConstitutionVaultSyncTests
                 drive.Content = VaultEnvelope.Write("{}", Invented.OtherPassphrase);
                 break;
             case VaultReadOutcome.Corrupt:
-                drive.Content = "{ this is not an envelope";
+                drive.Content = "{ this isn’t an envelope";
                 break;
             case VaultReadOutcome.Empty:
                 drive.Content = null;

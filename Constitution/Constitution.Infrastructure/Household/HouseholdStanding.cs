@@ -43,20 +43,20 @@ public sealed record HouseholdStanding(
 /// <summary>The words the head says about the household file. Every one is a fixed sentence.</summary>
 public static class HouseholdSentences
 {
-    public const string NotCompared = "The household file has not been compared with Drive yet.";
+    public const string NotCompared = "The household file hasn’t been compared with Drive yet.";
 
     public const string NoVaultKey =
         "There is no vault passphrase on this phone, so the household file stays on it until one is entered under Vault.";
 
     public const string NoAccount = "No Google account is signed in, so the household file stays on this phone until one is.";
 
-    public const string Offline = "Drive could not be reached, so the household file stays on this phone and goes up on a later pass.";
+    public const string Offline = "Drive couldn’t be reached, so the household file stays on this phone and goes up on a later pass.";
 
     public const string OtherPhoneWriting =
-        "The other phone was saving at the same moment; this phone's changes are kept and go up on the next pass.";
+        "The other phone was saving at the same moment; this phone’s changes are kept and go up on the next pass.";
 
     public const string LocalDamaged =
-        "This phone's own copy of the household file is damaged and does not open, so nothing was read from it or changed.";
+        "This phone’s own copy of the household file is damaged and doesn’t open, so nothing was read from it or changed.";
 
     public static string WaitingForShare(string fileName) =>
         $"No household file is shared with this account yet. The owner shares '{fileName}' from their Drive; until then this phone keeps its household to itself.";
@@ -85,13 +85,13 @@ public static class HouseholdSentences
         switch (reason)
         {
             case HouseholdUnreadableReason.NoPassphrase:
-                return "The household file in Drive does not open: there is no vault passphrase on this phone, and the file is locked with one. Nothing was changed there.";
+                return "The household file in Drive doesn’t open: there is no vault passphrase on this phone, and the file is locked with one. Nothing was changed there.";
             case HouseholdUnreadableReason.WrongPassphrase:
-                return "The household file in Drive does not open with this phone's vault passphrase. Nothing was changed there; check the passphrase under Vault.";
+                return "The household file in Drive doesn’t open with this phone’s vault passphrase. Nothing was changed there; check the passphrase under Vault.";
             case HouseholdUnreadableReason.Damaged:
-                return "The household file in Drive is damaged and does not open. Nothing was changed there.";
+                return "The household file in Drive is damaged and doesn’t open. Nothing was changed there.";
             case HouseholdUnreadableReason.NewerFormat:
-                return "The household file in Drive was written by a newer version of Constitution and does not open here. Nothing was changed there; update this phone.";
+                return "The household file in Drive was written by a newer version of Constitution and doesn’t open here. Nothing was changed there; update this phone.";
             default:
                 throw new ArgumentOutOfRangeException(nameof(reason), reason, "This reason has no sentence; add one here.");
         }

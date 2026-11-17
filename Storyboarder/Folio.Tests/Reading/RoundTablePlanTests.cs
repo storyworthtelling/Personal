@@ -101,7 +101,7 @@ public class RoundTablePlanTests
         var table = RoundTablePlan.Apply(RoundTable.Empty, new HostMove("Hello.", "agent", "First?", "", false), Panel);
         table = RoundTablePlan.Spoken(table, "I loved it.");
 
-        table = RoundTablePlan.Apply(table, new HostMove("That's our show.", "", "", "", Close: true), Panel);
+        table = RoundTablePlan.Apply(table, new HostMove("That’s our show.", "", "", "", Close: true), Panel);
 
         Assert.False(table.CloseAsked);
         Assert.NotNull(table.Next);
@@ -215,7 +215,7 @@ public class RoundTablePlanTests
     public void WhileARebuttalIsOwedTheShowIsOnTheDisagreementsAndTopicsDoNotCount()
     {
         var table = RoundTablePlan.Apply(Begun(Panel),
-            new HostMove("Let's talk structure.", "agent", "Hugo?", "", false) { Topic = "Structure" }, Panel);
+            new HostMove("Let’s talk structure.", "agent", "Hugo?", "", false) { Topic = "Structure" }, Panel);
 
         Assert.Equal(RoundTablePhase.Disagreements, RoundTablePlan.Phase(table, Panel));
         Assert.Empty(table.Covered);
@@ -240,7 +240,7 @@ public class RoundTablePlanTests
     {
         var panel = new[] { Read("agent", 7), Read("harsh-critic", 6) };
 
-        var table = RoundTablePlan.Apply(Begun(panel), new HostMove("That's the show.", "", "", "", Close: true), panel);
+        var table = RoundTablePlan.Apply(Begun(panel), new HostMove("That’s the show.", "", "", "", Close: true), panel);
 
         // The close is refused and the next topic is raised instead, for a reader to answer.
         Assert.False(table.CloseAsked);

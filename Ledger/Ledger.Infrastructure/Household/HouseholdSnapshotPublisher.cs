@@ -81,7 +81,7 @@ public sealed class HouseholdSnapshotPublisher
             var read = await sealedFile.ReadAsync(passphrase, cancellationToken);
             if (read.Status == SealedReadStatus.Unreachable)
             {
-                return HouseholdSnapshotPublishResult.Failed(read.Detail ?? "Drive could not be read.");
+                return HouseholdSnapshotPublishResult.Failed(read.Detail ?? "Drive couldn’t be read.");
             }
 
             var existing = HouseholdSnapshotReader.Interpret(VaultStatus(read.Status), read.Plaintext);
@@ -116,7 +116,7 @@ public sealed class HouseholdSnapshotPublisher
             var written = await sealedFile.WriteAsync(json, passphrase, read, SealedWriteOptions.Default, cancellationToken);
             return written.Succeeded
                 ? HouseholdSnapshotPublishResult.Published()
-                : HouseholdSnapshotPublishResult.Failed(written.Detail ?? $"The household file was not written ({written.Outcome}).");
+                : HouseholdSnapshotPublishResult.Failed(written.Detail ?? $"The household file wasn’t written ({written.Outcome}).");
         }
         catch (Exception ex)
         {

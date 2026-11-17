@@ -410,7 +410,7 @@ public class PlateActivity : AppCompatActivity
         {
             // No line. Never a crash on the room the owner just opened.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet("Caption", "Darkroom caption did not complete", e);
+            HeadLog.Quiet("Caption", "Darkroom caption didn’t complete", e);
         }
         finally
         {

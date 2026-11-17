@@ -125,8 +125,8 @@ public class DesignTokensTests
     {
         var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, DesignTokens.Identity.Plate.Ground);
         Assert.True(ratio >= 4.5,
-            $"Ink on Plate's binding cloth is {ratio:F2}:1, below AA — the inverted framing "
-            + "(rule, brackets and lettering) would not be legible on the cover.");
+            $"Ink on Plate’s binding cloth is {ratio:F2}:1, below AA — the inverted framing "
+            + "(rule, brackets and lettering) wouldn’t be legible on the cover.");
     }
 
     // Pulp's identity ladder: amber, OKLCH 70 degrees (D275, superseding D202's marigold
@@ -164,8 +164,8 @@ public class DesignTokensTests
     {
         var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, DesignTokens.Identity.Pulp.Cloth);
         Assert.True(ratio >= 4.5,
-            $"Ink on Pulp's amber cloth is {ratio:F2}:1, below AA — the inverted framing "
-            + "(rule, flourishes and title) would not be legible on the cover.");
+            $"Ink on Pulp’s amber cloth is {ratio:F2}:1, below AA — the inverted framing "
+            + "(rule, flourishes and title) wouldn’t be legible on the cover.");
     }
 
     // IconStudio paints the icon and the cover from its own copy of the ladder; the Domain
@@ -187,7 +187,7 @@ public class DesignTokensTests
 
         var declared = Regex.Match(tokens, $@"{hexName}\s*=\s*""(#[0-9A-Fa-f]{{6}})""");
         Assert.True(declared.Success,
-            $"IconStudio/Tokens.cs declares no {hexName}, so Pulp's icon and cover cannot stand on "
+            $"IconStudio/Tokens.cs declares no {hexName}, so Pulp’s icon and cover can’t stand on "
             + "its identity and silently fall back to plain paper.");
 
         var domain = tier switch
@@ -244,7 +244,7 @@ public class DesignTokensTests
     public void ConstitutionInkFramingClearsContrastOnItsLightBinding()
     {
         var ratio = DesignTestHelpers.ContrastRatio(DesignTokens.Ink, DesignTokens.Identity.Constitution.Cloth);
-        Assert.True(ratio >= 4.5, $"Ink on Constitution's cerulean cloth is {ratio:F2}:1, below AA.");
+        Assert.True(ratio >= 4.5, $"Ink on Constitution’s cerulean cloth is {ratio:F2}:1, below AA.");
     }
 
     // Foreword's and Folio's shelf bindings (D277) are copies of values registered elsewhere —
@@ -259,7 +259,7 @@ public class DesignTokensTests
     {
         var source = File.ReadAllText(Path.Combine(DesignTestHelpers.FocusPhoneRoot(), "..", sourceFile));
         var declared = Regex.Match(source, $@"{hexName}\s*=\s*""(#[0-9A-Fa-f]{{6}})""");
-        Assert.True(declared.Success, $"{sourceFile} declares no {hexName}; the shelf's copy has nothing to agree with.");
+        Assert.True(declared.Success, $"{sourceFile} declares no {hexName}; the shelf’s copy has nothing to agree with.");
 
         var domain = domainToken switch
         {
@@ -303,7 +303,7 @@ public class DesignTokensTests
             }
             var separation = Oklch.HueSeparation(hue, roleHue);
             Assert.True(separation >= MinimumRoleSeparation,
-                $"{app}'s {identityTier} sits {separation:F1} degrees from the {role} role " +
+                $"{app}’s {identityTier} sits {separation:F1} degrees from the {role} role " +
                 $"(minimum {MinimumRoleSeparation}) — an identity that close reads as a status.");
         }
     }
@@ -341,10 +341,10 @@ public class DesignTokensTests
             Oklch.FromHex(pulpTier).HueDegrees, PaletteSpec.RoleWheel[ColorRole.Caution].Hue);
 
         Assert.True(separation >= 14.0,
-            $"Pulp's {pulpTier} is now {separation:F1} degrees from Caution, closer than the 14.3 "
+            $"Pulp’s {pulpTier} is now {separation:F1} degrees from Caution, closer than the 14.3 "
             + "recorded in D275 (14.5 to 15.3 per tier as this guard measures them) — the departure has got worse, which is a new decision, not a drift.");
         Assert.True(separation < MinimumRoleSeparation,
-            $"Pulp's {pulpTier} is now {separation:F1} degrees from Caution, clear of the "
+            $"Pulp’s {pulpTier} is now {separation:F1} degrees from Caution, clear of the "
             + $"{MinimumRoleSeparation} floor — the recorded departure is no longer needed; delete it.");
     }
 
@@ -432,7 +432,7 @@ public class DesignTokensTests
         foreach (var asset in declared)
         {
             var file = Path.Combine(fonts, Path.GetFileName(asset));
-            Assert.True(File.Exists(file), $"{asset} is declared but {file} does not exist");
+            Assert.True(File.Exists(file), $"{asset} is declared but {file} doesn’t exist");
         }
 
         Assert.Equal(
@@ -485,7 +485,7 @@ public class DesignTokensTests
         };
         for (var i = 0; i < scale.Length; i++)
         {
-            Assert.True(scale[i] % 4 == 0, $"Spacing {scale[i]} is not a multiple of 4");
+            Assert.True(scale[i] % 4 == 0, $"Spacing {scale[i]} isn’t a multiple of 4");
             if (i > 0)
             {
                 Assert.True(scale[i] > scale[i - 1], "Spacing scale not ascending");

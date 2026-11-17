@@ -16,5 +16,5 @@ public static class PodcastHttp
     /// content, to a client that sends no User-Agent — and neither .NET nor
     /// ExoPlayer sends a useful one by default.
     /// </summary>
-    public const string UserAgent = "FocusPhone-Podcasts/1.0 (+https://storyworthtelling.com)";
+    public const string UserAgent = "FocusPhone-Podcasts/1.0 (+https://storyworthtelling.com)";  // not copy: a stage, id or wire word
 }

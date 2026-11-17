@@ -94,5 +94,5 @@ public class ThisPhoneTests
 
     [Fact]
     public void ThereIsOneSentenceForAnUnmatchedPhone() =>
-        Assert.Equal("This phone isn't matched to anyone in the household yet.", ThisPhone.UnmatchedSentence);
+        Assert.Equal("This phone isn’t matched to anyone in the household yet.", ThisPhone.UnmatchedSentence);
 }

@@ -101,7 +101,7 @@ public sealed class TidalPlaybackBridge : Java.Lang.Object, IFlowCollector
         {
             var result = player.PlaybackEngine.Events.Collect(this, new RootContinuation(LogTag));
             Android.Util.Log.Debug(LogTag, $"Events.Collect(...) returned {result} synchronously " +
-                "(expected: the coroutine-suspended sentinel — a hot, player-lifetime flow should not " +
+                "(expected: the coroutine-suspended sentinel — a hot, player-lifetime flow shouldn’t " +
                 "complete this early).");
         }
         catch (Exception e)
@@ -168,7 +168,7 @@ public sealed class TidalPlaybackBridge : Java.Lang.Object, IFlowCollector
         public ICoroutineContext Context => Kotlin.Coroutines.EmptyCoroutineContext.Instance!;
 
         public void ResumeWith(Java.Lang.Object result) =>
-            HeadLog.Warn(logTag, $"Events.Collect's root continuation resumed with {result} — " +
-                "the events flow ended or was cancelled, which should not happen while the Player is alive.");
+            HeadLog.Warn(logTag, $"Events.Collect’s root continuation resumed with {result} — " +
+                "the events flow ended or was cancelled, which shouldn’t happen while the Player is alive.");
     }
 }

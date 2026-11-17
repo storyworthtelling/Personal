@@ -48,11 +48,11 @@ public static class ReaderRead
         }
         if (review.Weaknesses is not { Count: > 0 })
         {
-            return $"{who} found nothing that does not work — which is a failed pass, not a kind one";
+            return $"{who} found nothing that doesn’t work — which is a failed pass, not a kind one";
         }
         if (string.IsNullOrWhiteSpace(review.Condition))
         {
-            return $"{who} attached no condition, so the verdict is an opinion the author cannot act on";
+            return $"{who} attached no condition, so the verdict is an opinion the author can’t act on";
         }
         if (!scored)
         {
@@ -64,7 +64,7 @@ public static class ReaderRead
         }
         if (string.IsNullOrWhiteSpace(review.ScoreReason))
         {
-            return $"{who} gave a score with no reason, so the number cannot be argued with";
+            return $"{who} gave a score with no reason, so the number can’t be argued with";
         }
         return null;
     }

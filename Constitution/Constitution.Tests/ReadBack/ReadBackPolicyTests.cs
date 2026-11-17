@@ -67,7 +67,7 @@ public class ReadBackPolicyTests
     [Fact]
     public void AQuestionDoesNotKeepTheDocument()
     {
-        Assert.Null(ReadBackPolicy.WhyKept([Page(2, new InkResolution.NeedsAsking("done", "squat", "Ticked", "Not ticked", "read:squat:Ticked|Not ticked"))]));
+        Assert.Null(ReadBackPolicy.WhyKept([Page(2, new InkResolution.NeedsAsking("done", "squat", "Checked", "Not checked", "read:squat:Checked|Not checked"))]));
     }
 
     [Fact]

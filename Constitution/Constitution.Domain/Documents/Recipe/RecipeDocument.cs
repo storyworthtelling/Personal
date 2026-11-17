@@ -173,7 +173,7 @@ public static class RecipeDocument
         RecipeDocumentModel model, PageNumbers numbers, DateTime startAt, IReadOnlyList<string> stepTexts)
     {
         var layouts = new List<InkPageLayout>();
-        var draft = StartPage(model, model.Title, $"RECIPE · {model.SourceLine.ToUpperInvariant()}", 1, numbers.Total);
+        var draft = StartPage(model, model.Title, $"Recipe · {model.SourceLine}", 1, numbers.Total);
 
         var baseline = HeadcountBaseline;
         var headcount = HeadcountText(model.Headcount);
@@ -219,7 +219,7 @@ public static class RecipeDocument
                 if (at + depth > ContentLimit)
                 {
                     layouts.Add(draft.ToLayout());
-                    draft = StartPage(model, model.Title, "RECIPE · INGREDIENTS, CONTINUED", layouts.Count + 1, numbers.Total);
+                    draft = StartPage(model, model.Title, "Recipe · ingredients, continued", layouts.Count + 1, numbers.Total);
                     labelAt = ContinuedLabelBaseline;
                     onThisPage = 0;
                     at = labelAt + FirstRowGap;
@@ -227,7 +227,7 @@ public static class RecipeDocument
 
                 if (onThisPage == 0)
                 {
-                    var text = group.Key.ToUpperInvariant() + (inGroup > 0 ? " (CONTINUED)" : string.Empty);
+                    var text = group.Key + (inGroup > 0 ? " (continued)" : string.Empty);
                     draft.Line(PrintedRole.Label, PageDraft.Left, labelAt, PageDraft.ColumnWidth, text, name: inGroup > 0 ? $"group-{groupNumber}-continued" : $"group-{groupNumber}");
                 }
 
@@ -246,7 +246,7 @@ public static class RecipeDocument
         if (TailEnd(lastRow, equipmentLines, notes.Count) > ContentLimit)
         {
             layouts.Add(draft.ToLayout());
-            draft = StartPage(model, model.Title, "RECIPE · INGREDIENTS, CONTINUED", layouts.Count + 1, numbers.Total);
+            draft = StartPage(model, model.Title, "Recipe · ingredients, continued", layouts.Count + 1, numbers.Total);
             lastRow = ContinuedLabelBaseline - EquipmentRuleGap;
         }
 
@@ -272,7 +272,7 @@ public static class RecipeDocument
         draft.Rule("equipment-rule", PageDraft.Left, rule, PageDraft.ColumnWidth, 0f);
 
         var labelAt = rule + EquipmentLabelGap;
-        draft.Line(PrintedRole.Label, PageDraft.Left, labelAt, PageDraft.ColumnWidth, "HAVE OUT", name: "equipment-label");
+        draft.Line(PrintedRole.Label, PageDraft.Left, labelAt, PageDraft.ColumnWidth, "Have out", name: "equipment-label");
         var at = labelAt + FirstEquipmentGap - EquipmentPitch;
         var item = 0;
         foreach (var lines in equipment)
@@ -398,8 +398,8 @@ public static class RecipeDocument
         var slow = model.Steps!.Any(s => s.Morning);
         var title = slow ? model.Title : "Steps";
         var kicker = slow
-            ? "RECIPE · SLOW COOKER · ARRIVES BEFORE THE MORNING BLOCK"
-            : $"RECIPE · TIMED BACK FROM DINNER AT {StepFace(model.DinnerAt)}";
+            ? "Recipe · slow cooker · arrives before the morning block"
+            : $"Recipe · timed back from dinner at {StepFace(model.DinnerAt)}";
         var leadWords = slow
             ? "Started in the morning, ready at dinner. Morning steps first."
             : clock.SqueezedTo is { } now
@@ -415,7 +415,7 @@ public static class RecipeDocument
         for (var i = 0; i < dealt.Count; i++)
         {
             var page = firstPage + i;
-            var draft = StartPage(model, title, i == 0 ? kicker : kicker + " · CONTINUED", page, numbers.Total, StepsNotesTop, "Steps");
+            var draft = StartPage(model, title, i == 0 ? kicker : kicker + " · continued", page, numbers.Total, StepsNotesTop, "Steps");
             var lead = i == 0 ? leadWords : $"Continued from page {(page - 1).ToString(CultureInfo.InvariantCulture)}.";
             draft.Line(PrintedRole.Small, PageDraft.Left, LeadBaseline, PageDraft.FullWidth, lead, name: "step-lead");
             DrawRows(draft, dealt[i], firstRule, ref number);
@@ -427,7 +427,7 @@ public static class RecipeDocument
 
     private static List<InkPageLayout> KidsPages(RecipeDocumentModel model, RecipeKidsMeal meal, PageNumbers numbers, int firstPage)
     {
-        const string kicker = "RECIPE · THE CHILDREN’S DINNER TONIGHT";
+        const string kicker = "Recipe · the children’s dinner tonight";
         var clock = RecipeSchedule.Plan(meal.Steps, model.DinnerAt, model.StartAt, model.NotBefore);
         var rows = clock.Rows.Select(r => ToRow(r, meal.DinnerLine.Trim(), null, numbers)).ToList();
 
@@ -448,7 +448,7 @@ public static class RecipeDocument
         }
 
         var labelAt = Math.Max(FirstGroupBaseline, baseline + GroupLabelGap);
-        draft.Line(PrintedRole.Label, PageDraft.Left, labelAt, PageDraft.ColumnWidth, "INGREDIENTS", name: "group-1");
+        draft.Line(PrintedRole.Label, PageDraft.Left, labelAt, PageDraft.ColumnWidth, "Ingredients", name: "group-1");
         var at = labelAt + FirstRowGap;
         var lastRow = at;
         var count = 0;
@@ -458,7 +458,7 @@ public static class RecipeDocument
             lastRow = Row(draft, count, count == 1 ? at : lastRow + RowPitch, ingredient.Quantity.Trim(), ingredient.Name.Trim());
         }
 
-        PageDraft.RequireRoom(lastRow, ContentLimit, $"The children's ingredients for {meal.Title} ({count} ingredients)");
+        PageDraft.RequireRoom(lastRow, ContentLimit, $"The children’s ingredients for {meal.Title} ({count} ingredients)");
 
         var firstRule = lastRow + KidsRuleGap;
         var laterRule = FirstRule;
@@ -471,7 +471,7 @@ public static class RecipeDocument
         for (var i = 1; i < dealt.Count; i++)
         {
             var page = firstPage + i;
-            var more = StartPage(model, meal.Title.Trim(), kicker + " · CONTINUED", page, numbers.Total, StepsNotesTop, "Kids");
+            var more = StartPage(model, meal.Title.Trim(), kicker + " · continued", page, numbers.Total, StepsNotesTop, "Kids");
             more.Line(PrintedRole.Small, PageDraft.Left, LeadBaseline, PageDraft.FullWidth, $"Continued from page {(page - 1).ToString(CultureInfo.InvariantCulture)}.", name: "step-lead");
             DrawRows(more, dealt[i], laterRule, ref number);
             layouts.Add(more.ToLayout());
@@ -511,7 +511,7 @@ public static class RecipeDocument
         var minutes = model.TotalMinutes.ToString(CultureInfo.InvariantCulture);
         var total = model.HandsOnMinutes is { } hands
             ? $"{minutes} minutes, {hands.ToString(CultureInfo.InvariantCulture)} of them hands-on"
-            : $"{minutes} minutes";
+            : $"{minutes} min";
         return [$"Dinner {TimeFormats.Clock12(model.DinnerAt)}", $"start {TimeFormats.Clock12(startAt)}", total];
     }
 
@@ -624,7 +624,7 @@ public static class RecipeDocument
         {
             if (model.KidsMeal is not null)
             {
-                throw new ArgumentException($"'{model.Title}' has a children's dinner but no timed steps to hand the cook over from.", nameof(model));
+                throw new ArgumentException($"'{model.Title}' has a children’s dinner but no timed steps to hand the cook over from.", nameof(model));
             }
 
             if (model.Pages < 1 || model.KidsDinnerPage is { } kids && (kids < 2 || kids > model.Pages))
@@ -647,7 +647,7 @@ public static class RecipeDocument
 
         if (model.KidsMeal is null && model.Steps.FirstOrDefault(s => s.KidsHandOff) is { } stranded)
         {
-            throw new ArgumentException($"The step '{stranded.Text}' sends the cook to the children's page but there is no children's dinner tonight.", nameof(model));
+            throw new ArgumentException($"The step '{stranded.Text}' sends the cook to the children’s page but there is no children’s dinner tonight.", nameof(model));
         }
 
         if (model.KidsMeal is { } meal)
@@ -658,7 +658,7 @@ public static class RecipeDocument
 
     private static void ValidateKids(RecipeKidsMeal meal)
     {
-        Require(meal.Title, "title", "the children's dinner");
+        Require(meal.Title, "title", "the children’s dinner");
         Require(meal.ShortName, "short name", $"'{meal.Title}'");
         Require(meal.WhyLine, "line saying why tonight is different", $"'{meal.Title}'");
         Require(meal.DinnerLine, "final line", $"'{meal.Title}'");
@@ -674,7 +674,7 @@ public static class RecipeDocument
 
         foreach (var ingredient in meal.Ingredients)
         {
-            Require(ingredient.Name, "name", "a children's ingredient");
+            Require(ingredient.Name, "name", "a children’s ingredient");
         }
 
         if (meal.Steps.Count == 0)

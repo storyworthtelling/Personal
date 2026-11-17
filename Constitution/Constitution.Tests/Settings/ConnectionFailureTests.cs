@@ -14,13 +14,13 @@ public class ConnectionFailureTests
     private const string Echo = "example-one-time-code-echo";
 
     [Fact]
-    public void ARefusedCodeNamesTheStatus()
+    public void ARefusedCodeSaysToGetAFreshOne()
     {
         var failure = new HttpRequestException(Echo, null, HttpStatusCode.BadRequest);
 
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, failure, callerCancelled: false);
 
-        Assert.Equal("The tablet did not accept that code (BadRequest).", sentence);
+        Assert.Equal("The reMarkable didn’t accept that code. Get a fresh one and try again.", sentence);
     }
 
     [Fact]
@@ -30,8 +30,8 @@ public class ConnectionFailureTests
 
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, failure, callerCancelled: false);
 
-        Assert.Contains("could not be reached", sentence, StringComparison.Ordinal);
-        Assert.DoesNotContain("did not accept", sentence, StringComparison.Ordinal);
+        Assert.Contains("couldn’t be reached", sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("didn’t accept", sentence, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -67,7 +67,7 @@ public class ConnectionFailureTests
 
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, failure, callerCancelled: false);
 
-        Assert.Contains("could not read", sentence, StringComparison.Ordinal);
+        Assert.Contains("couldn’t read", sentence, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -81,19 +81,20 @@ public class ConnectionFailureTests
     [Fact]
     public void ASignInThatDidNotCompleteKeepsItsOwnExplanation()
     {
-        // These come from the shared sign-in code ("Account selection was cancelled."), written for the person.
+        // These come from the shared sign-in code ("No account was picked."), written for the person.
         var sentence = ConnectionFailure.Sentence(
-            ConnectionAct.SignIn, new InvalidOperationException("Account selection was cancelled."), callerCancelled: false);
+            ConnectionAct.SignIn, new InvalidOperationException("No account was picked."), callerCancelled: false);
 
-        Assert.Equal("Sign-in did not complete. Account selection was cancelled.", sentence);
+        Assert.Equal("Sign-in didn’t complete. No account was picked.", sentence);
     }
 
     [Fact]
-    public void AnythingElseNamesOnlyItsType()
+    public void AnythingElseSaysToTryAgainAndNamesNothing()
     {
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, new ArithmeticException(Echo), callerCancelled: false);
 
-        Assert.Contains("ArithmeticException", sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("ArithmeticException", sentence, StringComparison.Ordinal);
+        Assert.Contains("Try again", sentence, StringComparison.Ordinal);
         Assert.DoesNotContain(Echo, sentence, StringComparison.Ordinal);
     }
 

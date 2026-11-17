@@ -44,7 +44,7 @@ public static class SeriesBibleDocument
         writer.Heading(name, title, ReportPalette.Ink, ruled: true);
         writer.Paragraph(
             "The series bible: what the books have established, kept for continuity. The earliest-written book is canon, "
-            + "and the author's corrections win over every book.", bodyItalic, ReportPalette.InkSoft);
+            + "and the author’s corrections win over every book.", bodyItalic, ReportPalette.InkSoft);
 
         writer.Heading("The books", heading, ReportPalette.Ink);
         foreach (var book in bible.Books)
@@ -83,7 +83,7 @@ public static class SeriesBibleDocument
 
         if (entry.Correction.Length > 0)
         {
-            writer.Paragraph("The author's correction", bodyBold, ReportPalette.Ink);
+            writer.Paragraph("The author’s correction", bodyBold, ReportPalette.Ink);
             writer.Paragraph(entry.Correction, body, ReportPalette.Ink);
         }
         writer.Gap(PageGeometry.BlockGap);

@@ -39,7 +39,7 @@ public class SectionRoutingTests
         // The persona summary prints under its own Pacing heading, strictly after Themes closes —
         // not folded into the Themes bullets it used to overwrite.
         Assert.True(themes >= 0 && pacingPersona > themes,
-            "The pacing persona's summary should print after Themes, not inside it.");
+            "The pacing persona’s summary should print after Themes, not inside it.");
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public class SectionRoutingTests
         {
             SeriesContinuity = new SeriesContinuity("The Salt Road",
             [
-                new SeriesBreak("Ch. 3", "Wren's left hand is scarred.", "Her right hand is the scarred one.")
+                new SeriesBreak("Ch. 3", "Wren’s left hand is scarred.", "Her right hand is the scarred one.")
                 {
                     Kind = ContinuityKinds.CharacterDrift, Book = "The Salt Road", Quote = "her scarred left hand",
                 },
@@ -161,7 +161,7 @@ public class SectionRoutingTests
                 },
             ], [])
             {
-                Assumption = "This assumes the book takes place after \u201CThe Salt Road\u201D, which has not been confirmed.",
+                Assumption = "This assumes the book takes place after \u201CThe Salt Road\u201D, which hasn’t been confirmed.",
             },
         };
 
@@ -173,7 +173,7 @@ public class SectionRoutingTests
         Assert.Contains("herscarredleft", flat, StringComparison.Ordinal);
         Assert.Contains("Droppedthread", flat, StringComparison.Ordinal);
         Assert.Contains("Nobodylooksfortheledger.", flat, StringComparison.Ordinal);
-        Assert.Contains("hasnotbeenconfirmed", flat, StringComparison.Ordinal);
+        Assert.Contains("tbeenconfirmed", flat, StringComparison.Ordinal);
     }
 
     private static byte[] Render(BookAnalysisResult analysis) =>

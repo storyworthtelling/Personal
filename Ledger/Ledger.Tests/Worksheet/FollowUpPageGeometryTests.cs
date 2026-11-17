@@ -10,7 +10,7 @@ namespace Index.Tests.Worksheet;
 /// R-G12 (INDEX-P11-REMEDIATION-PLAN.md §2.1.1, §10): no writable box on the follow-up page may sit on
 /// top of anything printed. The page used to put the two "change another line" boxes a fixed 56pt
 /// below the actionable table while the "Everything else, as written" list was drawn from the same
-/// anchor, so the boxes were painted over printed figures and the "CHANGE ANOTHER LINE" label landed
+/// anchor, so the boxes were painted over printed figures and the "Change another line" label landed
 /// below the boxes it labels.
 ///
 /// <para>This is asserted on what was actually PAINTED: the page is rendered to a PDF and every glyph's
@@ -103,7 +103,7 @@ public class FollowUpPageGeometryTests
         using var document = PdfDocument.Open(new MemoryStream(FollowUpPainter.Paint(plan)));
         var words = document.GetPage(1).GetWords().Select(w => (w.Text, Rect: ToTopLeft(w.BoundingBox))).ToList();
 
-        var label = words.Single(w => w.Text == "CHANGE");
+        var label = words.Single(w => w.Text == "Change");
         var firstBoxTop = changeBoxes.Min(b => b.Top);
         var lastBoxBottom = changeBoxes.Max(b => b.Top + b.Height);
         var sentence = words.Single(w => w.Text == "If");
@@ -156,8 +156,8 @@ public class FollowUpPageGeometryTests
         using var document = PdfDocument.Open(new MemoryStream(FollowUpPainter.Paint(MakePlan(0))));
         var text = document.GetPage(1).Text;
 
-        Assert.DoesNotContain("EVERYTHING ELSE", text, StringComparison.Ordinal);
-        Assert.Contains("CHANGE ANOTHER LINE", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Everything else", text, StringComparison.Ordinal);
+        Assert.Contains("Change another line", text, StringComparison.Ordinal);
 
         using var withTwo = PdfDocument.Open(new MemoryStream(FollowUpPainter.Paint(MakePlan(2))));
         Assert.Contains("EVERYTHING ELSE, AS WRITTEN", withTwo.GetPage(1).Text, StringComparison.Ordinal);

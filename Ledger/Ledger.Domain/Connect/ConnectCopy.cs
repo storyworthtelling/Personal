@@ -4,7 +4,7 @@ namespace Index.Domain.Connect;
 /// Every word on the connect page (mockup 5), in one place so a test can hold it against the drawing
 /// instead of a loose "contains". Two rules the copy keeps on purpose:
 ///
-/// <para><b>No timings.</b> How long Admin mode takes to open and how long it stays open are Flyleaf's
+/// <para><b>No timings.</b> How long admin mode takes to open and how long it stays open are Flyleaf's
 /// to change, so no Index screen repeats them (D133). <c>AdminModeUntimedTests</c> reads this file.</para>
 ///
 /// <para><b>No instruction to confirm.</b> Coming back from Chrome is enough: the page checks for a
@@ -15,8 +15,8 @@ public static class ConnectCopy
     // ---- frame 1: Admin mode needed ----
     public const string NeededHeading = "Admin mode needed";
     public const string NeededWhy =
-        "Your bank’s sign-in page opens in Chrome, and this phone only runs Chrome while Admin mode is open.";
-    public const string NeededWhere = "Open Admin mode from Flyleaf’s settings, then come back here.";
+        "Your bank’s sign-in page opens in Chrome, and this phone only runs Chrome while admin mode is open.";
+    public const string NeededWhere = "Open admin mode from Flyleaf’s settings, then come back here.";
     public const string NeededNotRequired =
         "Balances don’t need it. Once a bank is connected they refresh every day without a browser.";
 

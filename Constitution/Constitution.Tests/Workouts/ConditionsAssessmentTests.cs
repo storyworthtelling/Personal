@@ -165,7 +165,7 @@ public class ConditionsAssessmentTests
 
     [Fact]
     public void AnUnavailableForecastIsNotBadEither() =>
-        Assert.Null(ConditionsAssessment.Of(ConditionsRead.Unavailable("The forecast service did not answer."), At(1, 17), At(1, 18), Limits));
+        Assert.Null(ConditionsAssessment.Of(ConditionsRead.Unavailable("The forecast service didn’t answer."), At(1, 17), At(1, 18), Limits));
 
     // ---- the read itself ----
 

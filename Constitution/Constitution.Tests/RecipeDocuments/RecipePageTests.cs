@@ -33,7 +33,7 @@ public class RecipePageTests
         var text = Rendered(page);
 
         Assert.Equal("Sheet-pan chicken", page.Title);
-        Assert.Contains("RECIPE · FROM THE RECIPE BOX · FAMILY CARD", text);
+        Assert.Contains("Recipe · From the recipe box · family card", text);
         Assert.Contains("Constitution · Recipe · Tue Nov 17 · Lee", text);
         Assert.Contains("1 of 4", text);
         Assert.Equal("1 of 4", page.Printed.Single(i => i.Name == "page-number").Text);
@@ -102,9 +102,9 @@ public class RecipePageTests
     [Fact]
     public void GroupsRunInTheOrderTheyAreUsed()
     {
-        var labels = Texts(Page(), PrintedRole.Label).Where(t => t is not "NOTES" and not "HAVE OUT" && !t.StartsWith("RECIPE", StringComparison.Ordinal));
+        var labels = Texts(Page(), PrintedRole.Label).Where(t => t is not "Notes" and not "Have out" && !t.StartsWith("Recipe ·", StringComparison.Ordinal));
 
-        Assert.Equal(["CHICKEN", "POTATOES", "TO FINISH"], labels);
+        Assert.Equal(["Chicken", "Potatoes", "To finish"], labels);
     }
 
     [Fact]
@@ -148,7 +148,8 @@ public class RecipePageTests
         using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([Page()]));
         var letters = document.GetPage(1).Letters;
         var quantity = letters.First(l => l.FontName.Contains("Cascadia", StringComparison.OrdinalIgnoreCase));
-        var name = letters.First(l => l.Value == "b" && l.Location.X > 100);
+        // The ingredient’s own line: the kicker above it now has lower-case letters too.
+        var name = letters.First(l => l.Value == "b" && l.Location.X > 100 && l.StartBaseLine.Y <= quantity.StartBaseLine.Y + 20);
 
         Assert.Equal(mono.Metrics.Descent - mono.Metrics.Ascent, item.Bounds.Height, 0.1f);
         Assert.Equal(name.StartBaseLine.Y, quantity.StartBaseLine.Y, 0.05);
@@ -171,12 +172,12 @@ public class RecipePageTests
         var page = document.GetPage(1);
 
         Assert.Equal(112f, Baseline(page, "With"), 1.5f);
-        Assert.Equal(162f, Baseline(page, "CHICKEN"), 1.5f);
+        Assert.Equal(162f, Baseline(page, "Chicken"), 1.5f);
         Assert.Equal(180f, Baseline(page, "bone-in"), 1.5f);
         Assert.Equal(237f, Baseline(page, "salt,"), 1.5f);
-        Assert.Equal(260f, Baseline(page, "POTATOES"), 1.5f);
-        Assert.Equal(339f, Baseline(page, "FINISH"), 1.5f);
-        Assert.Equal(419f, Baseline(page, "HAVE"), 1.5f);
+        Assert.Equal(260f, Baseline(page, "Potatoes"), 1.5f);
+        Assert.Equal(339f, Baseline(page, "finish"), 1.5f);
+        Assert.Equal(419f, Baseline(page, "Have"), 1.5f);
         Assert.Equal(437f, Baseline(page, "Large"), 1.5f);
         Assert.Equal(519f, Baseline(page, "Scaled"), 1.5f);
         Assert.Equal(533f, Baseline(page, "children’s"), 1.5f);
@@ -234,7 +235,7 @@ public class RecipePageTests
         Assert.Equal(RecipeIds.Notes, notes.Id);
         Assert.Equal(InkTargetKind.NotesMargin, notes.Kind);
         Assert.Equal(318f, notes.Bounds.Left);
-        Assert.Contains("NOTES", Rendered(page));
+        Assert.Contains("Notes", Rendered(page));
         Assert.Empty(page.Violations());
     }
 

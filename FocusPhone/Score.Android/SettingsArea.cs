@@ -63,7 +63,7 @@ public sealed class SettingsArea : ScoreArea
             new(SettingsAnatomy.Vault, null, body =>
             {
                 body.AddView(PaperUi.Secondary(Host,
-                    "The one secret that isn't in the vault — set the same passphrase in every app and each " +
+                    "The one secret that isn’t in the vault — set the same passphrase in every app and each " +
                     "restores its own keys. Shown in the clear on purpose, so it can be read back and copied."));
                 var passphrase = PaperUi.MonoField(Host, "Vault passphrase");
                 passphrase.Text = VaultPassphraseStore.Passphrase;
@@ -96,8 +96,7 @@ public sealed class SettingsArea : ScoreArea
         sections.Add(new(SettingsAnatomy.Diagnostics, null, body =>
         {
             body.AddView(PaperUi.Secondary(Host,
-                "There is no adb after the cutover, so failures are written here instead of to a log " +
-                "nobody can reach."));
+                "Score keeps its recent failures here, so they can be read and shared."));
             body.AddView(PaperUi.SecondaryButton(Host, "Recent failures",
                 () => Host.StartActivity(new Android.Content.Intent(Host, typeof(AudioDiagnosticsActivity)))));
 

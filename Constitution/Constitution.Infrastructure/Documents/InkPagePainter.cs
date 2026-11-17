@@ -17,7 +17,7 @@ internal static class InkPagePainter
         if (violations.Count > 0)
         {
             throw new InvalidOperationException(
-                $"The page '{layout.Title}' breaks the ink-target rules and was not printed: "
+                $"The page '{layout.Title}' breaks the ink-target rules and wasn’t printed: "
                 + string.Join("; ", violations.Select(v => $"{v.Kind} at {v.TargetId} ({v.Other})")));
         }
 

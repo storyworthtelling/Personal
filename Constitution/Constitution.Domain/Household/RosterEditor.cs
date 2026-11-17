@@ -47,7 +47,7 @@ public sealed record RosterEditResult(HouseholdDocument Document, RosterRefusal?
 /// </summary>
 public sealed class RosterEditor
 {
-    public const string PartnerReadOnlySentence = "The household roster is the owner's to change, on their phone.";
+    public const string PartnerReadOnlySentence = "The household roster is the owner’s to change, on their phone.";
 
     public RosterEditor(RosterRole role) => Role = role;
 

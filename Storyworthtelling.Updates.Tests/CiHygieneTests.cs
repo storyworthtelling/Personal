@@ -96,7 +96,7 @@ public class CiHygieneTests
             .Where(project => File.Exists(RepoFile(project)) && !all.Contains("dotnet test " + project, StringComparison.Ordinal))
             .ToList();
 
-        Assert.True(missing.Count == 0, "A tool's tests that no workflow runs:\n" + string.Join("\n", missing));
+        Assert.True(missing.Count == 0, "A tool’s tests that no workflow runs:\n" + string.Join("\n", missing));
     }
 
     [Fact]

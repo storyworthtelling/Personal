@@ -33,7 +33,7 @@ public class TabletPagesAreTheTabletsTests
             .Select(Relative)
             .ToList();
 
-        Assert.True(found.Count == 0, "Take the page's size from its TabletSheet:\n" + string.Join("\n", found));
+        Assert.True(found.Count == 0, "Take the page’s size from its TabletSheet:\n" + string.Join("\n", found));
     }
 
     private static IEnumerable<string> Sources(params string[] folders) =>

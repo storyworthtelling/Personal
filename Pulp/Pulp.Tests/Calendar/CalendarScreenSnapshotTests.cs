@@ -87,7 +87,7 @@ public class CalendarScreenSnapshotTests
     [Theory]
     [InlineData(HouseholdFileRole.Owner, false, "Calendar not connected yet")]
     [InlineData(HouseholdFileRole.Owner, true, "Calendar connected. Pulp writes the household calendar each night.")]
-    [InlineData(HouseholdFileRole.SharedWith, false, "The household calendar is written from the owner's phone.")]
+    [InlineData(HouseholdFileRole.SharedWith, false, "The household calendar is written from the owner’s phone.")]
     [InlineData(HouseholdFileRole.Unknown, false, "The calendar waits until this phone knows whose it is.")]
     public void TheStatusSentenceSaysWhereTheCalendarStands(HouseholdFileRole role, bool connected, string expected)
     {

@@ -198,7 +198,7 @@ public class WorkoutPlannerTests
     [Fact]
     public void OnePersonsUnreadableCalendarCostsOnlyTheirOwnWeekAndTheSharedOnes()
     {
-        var calendars = CalendarsWith(lee: CalendarRead.Unreadable("Lee's calendar timed out."));
+        var calendars = CalendarsWith(lee: CalendarRead.Unreadable("Lee’s calendar timed out."));
 
         var plan = Plan(calendars);
 
@@ -472,7 +472,7 @@ public class WorkoutPlannerTests
             }
         }
 
-        Assert.True(sundays >= 12, "Sundays were not planned at all, so the test proved nothing.");
+        Assert.True(sundays >= 12, "Sundays weren’t planned at all, so the test proved nothing.");
     }
 
     [Fact]

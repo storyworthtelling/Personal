@@ -52,9 +52,9 @@ public sealed class KeepShareRun(IMealPantrySource pantry, IMealRosterSource ros
 {
     public const string ActionLabel = "Share the list";
     public const string SentSentence = "The list went to Keep.";
-    public const string RefusedSentence = "Keep would not take the list, so it was not sent.";
-    public const string RecordSentence = "The record of dinners nobody wanted could not be read, so those lines are not on it.";
-    private const string NotSent = " The list was not sent.";
+    public const string RefusedSentence = "Keep wouldn’t take the list, so it wasn’t sent.";
+    public const string RecordSentence = "The record of dinners nobody wanted couldn’t be read, so those lines aren’t on it.";
+    private const string NotSent = " The list wasn’t sent.";
 
     public KeepSharePrepared Prepare(MealWeek week, IReadOnlyList<Recipe> cards)
     {

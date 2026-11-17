@@ -44,14 +44,14 @@ public static class VersionCode
         {
             throw new ArgumentOutOfRangeException(nameof(band), band,
                 $"A versionCode band must be between {MinBand} and {MaxBand}: band {MaxBand + 1} and above "
-                + "exceed Android's signed 32-bit versionCode.");
+                + "exceed Android’s signed 32-bit versionCode.");
         }
 
         if (moment.Kind == DateTimeKind.Unspecified)
         {
             throw new ArgumentException(
                 "The moment must say whether it is UTC or local. An unspecified kind would be read as UTC "
-                + "on the build runner and as local on a developer's machine, producing two different codes "
+                + "on the build runner and as local on a developer’s machine, producing two different codes "
                 + "for the same build.", nameof(moment));
         }
 
@@ -60,14 +60,14 @@ public static class VersionCode
         if (minutes < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(moment), moment,
-                $"A versionCode cannot be built from a moment before {Epoch:yyyy-MM-dd}.");
+                $"A versionCode can’t be built from a moment before {Epoch:yyyy-MM-dd}.");
         }
 
         if (minutes >= BandSize)
         {
             throw new ArgumentOutOfRangeException(nameof(moment), moment,
-                "This moment is more than a band's worth of minutes past the epoch, so its code would spill "
-                + "into the next band and collide with another app's numbering.");
+                "This moment is more than a band’s worth of minutes past the epoch, so its code would spill "
+                + "into the next band and collide with another app’s numbering.");
         }
 
         return (band * BandSize) + (int)minutes;

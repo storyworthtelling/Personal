@@ -13,7 +13,7 @@
     <ScrollView>
         <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
 
-            <Label Text="Where this calendar's events print."
+            <Label Text="Where this calendar’s events print."
                    Style="{StaticResource CardCaption}" />
 
             <Border Style="{StaticResource GroupCard}" Margin="0,16,0,0">

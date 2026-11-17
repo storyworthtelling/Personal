@@ -60,7 +60,7 @@ public sealed class DeviceAccountSignInFlow(
         if (resultCode != Result.Ok || data is null)
         {
             DeviceAccountTrail.Cancelled();
-            tcs.TrySetException(new InvalidOperationException("Account selection was cancelled."));
+            tcs.TrySetException(new InvalidOperationException("No account was picked."));
             return;
         }
 

@@ -25,9 +25,9 @@ public class WorkoutCoverTests
     {
         var text = PageText(Cover());
 
-        Assert.Contains("Tick each page as you finish it, and circle how it felt.", text);
+        Assert.Contains("Check each page as you finish it, and circle how it felt.", text);
         Assert.Contains("A page left unticked counts as skipped.", text);
-        Assert.Contains("Stopped early? Tick only the pages you finished; the plan eases from where you stopped.", text);
+        Assert.Contains("Stopped early? Check only the pages you finished; the plan eases from where you stopped.", text);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class WorkoutCoverTests
     {
         var text = PageText(Cover());
 
-        Assert.Contains("WORKOUT · TUESDAY 5:30 PM", text);
+        Assert.Contains("Workout · Tuesday 5:30 pm", text);
         Assert.Contains("Constitution · Strength · Tue Oct 20", text);
         Assert.Contains("1 of 8", text);
     }

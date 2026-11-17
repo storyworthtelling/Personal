@@ -51,6 +51,6 @@ public sealed class HouseholdRoster
         viewers.TryGetValue(viewer, out var entry)
             ? entry.IsChild
             : throw new ArgumentException(
-                $"'{viewer}' is not on the household roster; an unknown viewer is never taken for an adult.",
+                $"'{viewer}' isn’t on the household roster; an unknown viewer is never taken for an adult.",
                 nameof(viewer));
 }

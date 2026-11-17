@@ -80,7 +80,7 @@ internal sealed class DeadlineRig
         _ =>
         {
             LeaseAsks++;
-            return Task.FromResult(new PlanningStanding(MayPlan, null, MayPlan ? "This phone plans this week." : "The other phone holds this week's planning."));
+            return Task.FromResult(new PlanningStanding(MayPlan, null, MayPlan ? "This phone plans this week." : "The other phone holds this week’s planning."));
         },
         Weeks,
         Decisions,

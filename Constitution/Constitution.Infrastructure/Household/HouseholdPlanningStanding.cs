@@ -16,10 +16,10 @@ public sealed record PlanningStanding(bool MayPlan, LeaseDecision? Decision, str
 /// </summary>
 public sealed class HouseholdPlanningStanding(HouseholdFileService service)
 {
-    public const string RoleUnknownSentence = "The household file has not said whose phone this is yet, so this phone does not plan the week.";
+    public const string RoleUnknownSentence = "The household file hasn’t said whose phone this is yet, so this phone doesn’t plan the week.";
 
     public const string NotSyncedSentence =
-        "The household file was not just compared with Drive, so this phone does not plan or decide until it has been; the next pass tries again.";
+        "The household file wasn’t just compared with Drive, so this phone doesn’t plan or decide until it has been; the next pass tries again.";
 
     public async Task<PlanningStanding> AskAsync(CancellationToken cancellationToken)
     {
@@ -114,14 +114,14 @@ public sealed class HouseholdPlanningStanding(HouseholdFileService service)
     {
         LeaseVerdict.Plan => "This phone plans this week.",
         LeaseVerdict.Take => "This phone may take this week; it plans once the claim has settled.",
-        LeaseVerdict.Release => "An old claim is being let go; this phone does not plan until it is.",
+        LeaseVerdict.Release => "An old claim is being let go; this phone doesn’t plan until it is.",
         _ => decision.Reason switch
         {
-            LeaseReason.DocumentUnreadable => "The household file cannot be read, so this phone does not plan the week.",
-            LeaseReason.HeldByAnother => "The other phone holds this week's planning.",
+            LeaseReason.DocumentUnreadable => "The household file can’t be read, so this phone doesn’t plan the week.",
+            LeaseReason.HeldByAnother => "The other phone holds this week’s planning.",
             LeaseReason.ClaimNotSettled => "This phone has taken the week; it plans once the claim has stood long enough.",
-            LeaseReason.OwnerNeverSeen => "This phone has not heard from the owner's phone yet, so it does not plan the week.",
-            _ => "This phone does not plan this week yet.",
+            LeaseReason.OwnerNeverSeen => "This phone hasn’t heard from the owner’s phone yet, so it doesn’t plan the week.",
+            _ => "This phone doesn’t plan this week yet.",
         },
     };
 }

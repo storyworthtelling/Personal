@@ -81,7 +81,7 @@ public static class PaperWebView
         if (!PlayerEmbed.IsEmbedUrl(embed))
         {
             throw new InvalidOperationException(
-                $"The player was about to load {embed.Host}{embed.AbsolutePath}, which is not a YouTube embed of one video; nothing was loaded.");
+                $"The player was about to load {embed.Host}{embed.AbsolutePath}, which isn’t a YouTube embed of one video; nothing was loaded.");
         }
 
         Harden(view, WebPosture.Player, onLinkOut: _ => { }, playerEmbed: embed);

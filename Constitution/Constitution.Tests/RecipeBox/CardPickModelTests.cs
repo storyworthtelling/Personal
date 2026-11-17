@@ -50,9 +50,9 @@ public class CardPickModelTests
     [Fact]
     public void ASourceLabelIsNamedInTheHeader()
     {
-        var card = BoxFixture.Chili() with { SourceLabel = "Grandma's card" };
+        var card = BoxFixture.Chili() with { SourceLabel = "Grandma’s card" };
 
-        Assert.Equal("Mexican · Grandma's card", CardPickModel.Face(card, CardHistory.Never, false, BoxFixture.Today).Header);
+        Assert.Equal("Mexican · Grandma’s card", CardPickModel.Face(card, CardHistory.Never, false, BoxFixture.Today).Header);
     }
 
     [Fact]

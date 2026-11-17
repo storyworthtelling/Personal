@@ -56,7 +56,7 @@ public class WorksheetDeliveryWorker : Worker
         if (!SettingsStore.IsConfigured)
         {
             // No Plaid credentials yet means no income/Snowball data to build a worksheet from.
-            MauiLogLoop.Skipped(nameof(WorksheetDeliveryWorker), "Plaid credentials are not configured yet");
+            MauiLogLoop.Skipped(nameof(WorksheetDeliveryWorker), "Plaid credentials aren’t configured yet");
             return Result.InvokeSuccess();
         }
 

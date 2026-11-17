@@ -74,7 +74,7 @@ public partial class NewTaskPage : BinderPage
         });
 
         StatusLabel.Text =
-            "Couldn't read it just now — kept as you wrote it, and it will print. "
+            "Couldn’t read it just now — kept as you wrote it, and it will print. "
             + "Foreword reads it again on the next morning it can.";
     }
 }

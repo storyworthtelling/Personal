@@ -80,14 +80,14 @@ public static class WaitingNotices
         var detail = Require(sentence, nameof(sentence));
         var titled = Require(titleName, nameof(titleName));
         return new WaitingNotice(
-            HandOffKey(title), $"{titled} was not opened", detail, NoticeRole.Problem, null, NoticeAction.None, at);
+            HandOffKey(title), $"{titled} wasn’t opened", detail, NoticeRole.Problem, null, NoticeAction.None, at);
     }
 
     public static WaitingNotice NotInstalled(string service, TitleId title, DateTimeOffset at)
     {
         var name = Require(service, nameof(service));
         return new WaitingNotice(
-            HandOffKey(title), $"{name} is not installed", HandOffNotice.NotInstalled(name),
+            HandOffKey(title), $"{name} isn’t installed", HandOffNotice.NotInstalled(name),
             NoticeRole.Problem, null, NoticeAction.None, at);
     }
 
@@ -110,15 +110,15 @@ public static class WaitingNotices
         var name = Require(leagueName, nameof(leagueName));
         return new WaitingNotice(
             "sports:" + id,
-            $"The {name} schedule could not be reached",
-            $"Games for {name} are shown as they were the last time the feed answered.",
+            $"The {name} schedule couldn’t be reached",
+            $"Games for {name} are shown as they were when the schedule last loaded. Pulp tries again on its own.",
             NoticeRole.Reference, null, NoticeAction.None, at);
     }
 
     /// <summary>The household file would not open (D46). Shares its slot with the newer-version notice.</summary>
     public static WaitingNotice HouseholdUnreadable(DateTimeOffset at) => new(
         HouseholdKey,
-        "The household file could not be opened",
+        "The household file couldn’t be opened",
         "Shared playlists and settings may be out of date on this phone. Check the passphrase in Settings, under Vault.",
         NoticeRole.Problem, OpenVaultLabel, NoticeAction.OpenVault, at);
 

@@ -96,7 +96,7 @@ public sealed class BusyTime
         ArgumentNullException.ThrowIfNull(calendars);
         CheckRules(rules);
         var adult = rules.FindAdult(person)
-            ?? throw new ArgumentException("The person asked for is not one of the household's adults.", nameof(person));
+            ?? throw new ArgumentException("The person asked for is not one of the household’s adults.", nameof(person));
         if (lastDay < firstDay)
         {
             throw new ArgumentOutOfRangeException(nameof(lastDay), lastDay, "The last day is before the first day.");
@@ -111,9 +111,9 @@ public sealed class BusyTime
         var windowStart = ZoneClock.StartOfDay(firstDay, zone);
         var windowEnd = ZoneClock.StartOfDay(lastDay.AddDays(1), zone);
 
-        var own = Read(calendars.OwnCalendar(adult.Name, windowStart, windowEnd), "the person's own calendar");
+        var own = Read(calendars.OwnCalendar(adult.Name, windowStart, windowEnd), "the person’s own calendar");
         var family = Read(calendars.FamilyCalendar(windowStart, windowEnd), "the family calendar");
-        var children = Read(calendars.ChildrensCalendars(windowStart, windowEnd), "the children's calendars");
+        var children = Read(calendars.ChildrensCalendars(windowStart, windowEnd), "the children’s calendars");
 
         var unreadable = new List<UnreadableCalendar>();
         AddIfUnreadable(unreadable, CalendarSource.Own, own);

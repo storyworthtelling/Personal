@@ -69,7 +69,7 @@ public class HiddenAppsContractTests
     private static string CourierSource()
     {
         var path = Path.Combine(PulpSource.Root(), CourierPath);
-        Assert.True(File.Exists(path), $"{CourierPath} was not found.");
+        Assert.True(File.Exists(path), $"{CourierPath} wasn’t found.");
         return File.ReadAllText(path);
     }
 
@@ -79,7 +79,7 @@ public class HiddenAppsContractTests
         Assert.True(File.Exists(path), $"{FlyleafContract} not found at {path}; is FocusPhone checked out?");
         var match = Regex.Match(
             File.ReadAllText(path), $@"public const string {Regex.Escape(name)}\s*=\s*""([^""]*)""\s*;");
-        Assert.True(match.Success, $"Could not find HiddenAppsHandoff.{name} in {FlyleafContract}.");
+        Assert.True(match.Success, $"Couldn’t find HiddenAppsHandoff.{name} in {FlyleafContract}.");
         return match.Groups[1].Value;
     }
 }

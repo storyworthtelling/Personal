@@ -96,7 +96,7 @@ public class ThisWeekModelTests
         var sunday = Build(Tuesday).Days[0];
 
         Assert.Equal("Leftovers", sunday.Dish);
-        Assert.Equal("Saturday's meatballs, again.", sunday.ReasonLine);
+        Assert.Equal("Saturday’s meatballs, again.", sunday.ReasonLine);
     }
 
     [Fact]
@@ -187,20 +187,20 @@ public class ThisWeekModelTests
     [Fact]
     public void AnUnreadableCalendarIsNeverNothingOn()
     {
-        var week = MealWeek.NotPlanned(WeekFixture.Sunday, MealStop.CalendarUnreadable, "A calendar could not be read.");
+        var week = MealWeek.NotPlanned(WeekFixture.Sunday, MealStop.CalendarUnreadable, "A calendar couldn’t be read.");
         var model = Build(Tuesday, WeekFixture.Snapshot(week));
 
         Assert.Equal(WeekState.CalendarUnreadable, model.State);
-        Assert.Equal("A calendar could not be read.", model.Status);
+        Assert.Equal("A calendar couldn’t be read.", model.Status);
     }
 
     [Fact]
     public void UnavailableQuotesOnlyItsFixedReason()
     {
-        var model = MealsWeekModel.Build(new MealWeekScreenRead.Unavailable("The saved meal week could not be read."), Tuesday);
+        var model = MealsWeekModel.Build(new MealWeekScreenRead.Unavailable("The saved meal week couldn’t be read."), Tuesday);
 
         Assert.Equal(WeekState.Unavailable, model.State);
-        Assert.Equal("The saved meal week could not be read.", model.Status);
+        Assert.Equal("The saved meal week couldn’t be read.", model.Status);
     }
 
     [Fact]

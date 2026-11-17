@@ -52,7 +52,7 @@ public sealed record RosterPerson
 
         if (Role == MemberRole.Child && OnPickup)
         {
-            throw new ArgumentException("A child is never on pickup; pickup is an adult's.", nameof(OnPickup));
+            throw new ArgumentException("A child is never on pickup; pickup is an adult’s.", nameof(OnPickup));
         }
 
         if (GoogleAddress is { } address && !LooksLikeAnAddress(address))

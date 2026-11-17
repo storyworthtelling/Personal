@@ -271,7 +271,7 @@ public sealed class FileWorkoutLearning : IWorkoutLearning, IReadBackSettled
 
         return new State(
             skipRead.Ledger, progression.Ledger, soreness.Ledger, baselines, weeks,
-            unreadable.Count == 0 ? null : $"The {string.Join(" and the ", unreadable)} could not be read, so nothing was planned from them.");
+            unreadable.Count == 0 ? null : $"The {string.Join(" and the ", unreadable)} couldn’t be read, so nothing was planned from them.");
     }
 
     private string? Text(string file)

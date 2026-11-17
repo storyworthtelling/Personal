@@ -16,9 +16,9 @@ public class ReaderConditionTests
     private static Review Whole() => new(
         "developmental-editor",
         "Sound spine, one soft section.",
-        "A sustained assessment of the book's structure, in character, at length.",
+        "A sustained assessment of the book’s structure, in character, at length.",
         ["The spine holds from the first chapter."],
-        ["The middle four chapters do one chapter's work."],
+        ["The middle four chapters do one chapter’s work."],
         "The middle compressed to two chapters.")
     { Score = 6, ScoreReason = "Sound bones with one soft stretch." };
 

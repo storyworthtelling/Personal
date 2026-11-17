@@ -11,7 +11,7 @@ public class PosterTempFileTests
     private static string Source()
     {
         var file = Path.Combine(PulpSource.Root(), "Pulp.Android", "Components", "Posters.cs");
-        Assert.True(File.Exists(file), "Posters.cs was not found at " + file);
+        Assert.True(File.Exists(file), "Posters.cs wasn’t found at " + file);
         return File.ReadAllText(file);
     }
 

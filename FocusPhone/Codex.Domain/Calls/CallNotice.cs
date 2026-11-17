@@ -64,7 +64,7 @@ public static class CallNotice
     public static string Line(CallNoticeKind kind, bool surfaced, bool opened = true) =>
         !surfaced ? $"CALL {kind}: already surfaced for this ring"
         : opened ? $"CALL {kind}: surfaced the call screen"
-        : $"CALL {kind}: the call screen did not open";
+        : $"CALL {kind}: the call screen didn’t open";
 
     public static string? ActionLabel(CallNoticeKind kind) => kind switch
     {

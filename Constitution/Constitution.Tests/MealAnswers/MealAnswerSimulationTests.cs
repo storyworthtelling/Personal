@@ -28,7 +28,7 @@ public class MealAnswerSimulationTests
         for (var arrival = 0; arrival < 4; arrival++)
         {
             var planner = simulation.Arrive(arrival);
-            Assert.True(planner.ContentEquals(simulation.Truth), $"seed {seed}, arrival {arrival}: the files did not converge");
+            Assert.True(planner.ContentEquals(simulation.Truth), $"seed {seed}, arrival {arrival}: the files didn’t converge");
             Assert.Equal(expected, Summary(MealDeadline.Decide(MealAnswerRecords.Read(planner).Answers, Deadline, now)));
         }
     }

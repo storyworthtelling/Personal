@@ -137,7 +137,7 @@ internal sealed class PlaylistsScreen
                 services.Diagnostics.Warn("playlists", "The playlists could not be read.", exception);
                 host.RunOnUiThread(() =>
                 {
-                    status = "Your playlists couldn't be read just now.";
+                    status = "Your playlists couldn’t be read just now.";
                     invalidate();
                 });
             }
@@ -570,7 +570,7 @@ internal sealed class PlaylistsScreen
         var others = data!.Playlists.Where(playlist => playlist.Id != source.Id).ToList();
         if (others.Count == 0)
         {
-            ActionCard.Show(host, overlay(), "Move to another playlist", "There's no other playlist yet.");
+            ActionCard.Show(host, overlay(), "Move to another playlist", "There’s no other playlist yet.");
             return;
         }
 
@@ -624,7 +624,7 @@ internal sealed class PlaylistsScreen
     {
         column.AddView(PaperUi.BodyMuted(host, "A few words for the evening — a rainy Sunday, a long drive — or start from one of your playlists."));
 
-        var field = PaperUi.Field(host, "What's it for?");
+        var field = PaperUi.Field(host, "What’s it for?");
         field.Text = promptDraft;
         field.Enabled = !making;
         field.TextChanged += (_, _) => promptDraft = field.Text ?? string.Empty;

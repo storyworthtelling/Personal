@@ -239,7 +239,7 @@ public class ForewordInvariantsTests
     private static string ComponentSource(string typeName)
     {
         var file = RepoFiles("*.cs").SingleOrDefault(f => Path.GetFileName(f) == $"{typeName}.cs");
-        Assert.True(file is not null, $"{typeName}.cs was not found anywhere in the repository.");
+        Assert.True(file is not null, $"{typeName}.cs wasn’t found anywhere in the repository.");
         return File.ReadAllText(file!);
     }
 

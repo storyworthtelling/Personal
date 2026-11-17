@@ -101,6 +101,10 @@ public static class TrailLines
         "connect",
         "corrupt",
         "could",
+        // A contraction (W11: couldn’t, didn’t) splits at its apostrophe into these parts.
+        "couldn",
+        "didn",
+        "t",
         "data",
         "datasyncinprogress",
         "date",

@@ -94,11 +94,11 @@ public class DeskStatusTests
     {
         var line = DeskStatus.Of(Status(
             stage: "Completed", step: null,
-            deliveryNote: "It did not reach the reMarkable: the PDF is 173 MB and the tablet takes up to 100 MB."));
+            deliveryNote: "It didn’t reach the reMarkable: the PDF is 173 MB and the tablet takes up to 100 MB."));
 
         Assert.Equal("Latest", line.Heading);
         Assert.Equal("Review delivered.", line.Summary);
-        Assert.Equal("It did not reach the reMarkable: the PDF is 173 MB and the tablet takes up to 100 MB.", line.Problem);
+        Assert.Equal("It didn’t reach the reMarkable: the PDF is 173 MB and the tablet takes up to 100 MB.", line.Problem);
         Assert.False(line.Stuck);
     }
 
@@ -121,7 +121,7 @@ public class DeskStatusTests
 
         Assert.Contains("NOT finished", facts);
         Assert.Contains("read 3 of 17", facts);
-        Assert.Contains("Do not say or imply", facts);
+        Assert.Contains("Don’t say or imply", facts);
     }
 
     [Fact]

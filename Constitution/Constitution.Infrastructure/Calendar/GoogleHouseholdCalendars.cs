@@ -32,16 +32,16 @@ public sealed class GoogleHouseholdCalendars(
     private const int PageSize = 250;
     private const int MostPages = 40;
 
-    public const string OwnNotSet = "This person's calendar is not set.";
-    public const string FamilyNotSet = "The family calendar is not set.";
-    public const string ChildrenNotSet = "The children's calendars are not set.";
+    public const string OwnNotSet = "This person’s calendar isn’t set.";
+    public const string FamilyNotSet = "The family calendar isn’t set.";
+    public const string ChildrenNotSet = "The children’s calendars aren’t set.";
     public const string TooManyEvents = "A calendar has more events than can be read at once.";
 
     private readonly Func<CancellationToken, Task<CalendarService>> service = service ?? throw new ArgumentNullException(nameof(service));
     private readonly Func<HouseholdSetupRead> setup = setup ?? throw new ArgumentNullException(nameof(setup));
 
     private readonly KeyFamily? ownFamily = ownFamily == KeyFamily.Unknown
-        ? throw new ArgumentOutOfRangeException(nameof(ownFamily), ownFamily, "No run owns the unknown family, and dropping its events would drop somebody's time.")
+        ? throw new ArgumentOutOfRangeException(nameof(ownFamily), ownFamily, "No run owns the unknown family, and dropping its events would drop somebody’s time.")
         : ownFamily;
 
     public async Task<HouseholdCalendarSnapshot> ReadAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellation)

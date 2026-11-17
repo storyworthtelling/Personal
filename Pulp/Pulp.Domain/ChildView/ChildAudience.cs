@@ -37,7 +37,7 @@ public sealed class ChildAudience
         ArgumentNullException.ThrowIfNull(children);
         if (children.Count == 0 || children.Any(child => child is null))
         {
-            throw new ArgumentException("A child's audience needs each child's rules; with none it would have nobody to be strict for.", nameof(children));
+            throw new ArgumentException("A child’s audience needs each child’s rules; with none it would have nobody to be strict for.", nameof(children));
         }
 
         return new ChildAudience(children.DistinctBy(child => child.Child).ToList());

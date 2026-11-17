@@ -46,7 +46,7 @@ public class MakersMarkEverywhereTests
         var source = ReadRepoFile(relativePath);
         Assert.True(
             source.Contains("owner_medallion.png", StringComparison.Ordinal),
-            $"{app}'s {relativePath} no longer shows the owner's medallion on its Settings screen.");
+            $"{app}’s {relativePath} no longer shows the owner’s medallion on its Settings screen.");
     }
 
     [Theory]
@@ -56,8 +56,8 @@ public class MakersMarkEverywhereTests
         var source = ReadRepoFile(relativePath);
         Assert.True(
             source.Contains("PaperUi.BuildNumber(", StringComparison.Ordinal),
-            $"{app}'s {relativePath} no longer calls PaperUi.BuildNumber, so its Settings screen "
-            + "has no way to show the owner's medallion.");
+            $"{app}’s {relativePath} no longer calls PaperUi.BuildNumber, so its Settings screen "
+            + "has no way to show the owner’s medallion.");
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class MakersMarkEverywhereTests
         var source = ReadRepoFile(SharedPaperUiPath);
         Assert.True(
             source.Contains("owner_medallion", StringComparison.Ordinal),
-            "PaperUi.BuildNumber no longer resolves the owner's medallion — every native head "
+            "PaperUi.BuildNumber no longer resolves the owner’s medallion — every native head "
             + "(Post, Flyleaf, Score, Plate) loses the mark from its Settings screen at once.");
     }
 

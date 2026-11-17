@@ -16,9 +16,9 @@ namespace Constitution.Infrastructure.Household;
 /// </summary>
 public sealed class HouseholdWeekPlanPublisher(HouseholdFileService service) : IWeekPlanPublisher
 {
-    public const string FileSentence = "The household file cannot be opened, so the week was not shared with the other phone.";
-    public const string CopySentence = "This phone's copy of the household is damaged, so the week was not shared with the other phone.";
-    public const string StoreSentence = "This phone's copy of the household could not be written, so the week was not shared with the other phone.";
+    public const string FileSentence = "The household file can’t be opened, so the week wasn’t shared with the other phone.";
+    public const string CopySentence = "This phone’s copy of the household is damaged, so the week wasn’t shared with the other phone.";
+    public const string StoreSentence = "This phone’s copy of the household couldn’t be written, so the week wasn’t shared with the other phone.";
 
     public async Task<WeekPlanPublication> PublishAsync(SharedWeekPlan plan, CancellationToken cancellation)
     {

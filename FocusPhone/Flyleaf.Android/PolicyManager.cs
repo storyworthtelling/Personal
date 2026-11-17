@@ -35,7 +35,7 @@ public static class PolicyManager
         {
             HeadLog.Warn(Tag, "Not device owner; policy not applied. This is expected during development.");
             new PolicyAuditStore(context).Record(PolicyEventKind.NotDeviceOwner,
-                "Policy not applied: the app is not the device owner.");
+                "Policy not applied: the app isn’t the device owner.");
             return;
         }
 
@@ -98,7 +98,7 @@ public static class PolicyManager
         if (!dpm.SetStatusBarDisabled(admin, plan.DisableStatusBar))
         {
             HeadLog.Warn(Tag, "Could not disable the status bar; not permitted in the current state.");
-            events.Add(Event(PolicyEventKind.ConfigFailed, "Could not disable the status bar (not permitted in the current state)."));
+            events.Add(Event(PolicyEventKind.ConfigFailed, "Couldn’t disable the status bar (not permitted in the current state)."));
         }
 
         // Skipped, not attempted, while there is no active network: the platform throws a bare,
@@ -123,7 +123,7 @@ public static class PolicyManager
                 if (result != PrivateDnsSet.NoError)
                 {
                     var reason = result == PrivateDnsSet.ErrorHostNotServing
-                        ? "host is not serving DNS-over-TLS (unreachable now)"
+                        ? "host isn’t serving DNS-over-TLS (unreachable now)"
                         : "the platform rejected the setting";
                     HeadLog.Warn(Tag, $"Private DNS not set to {plan.PrivateDnsHost}: {reason} ({result}).");
                     events.Add(Event(PolicyEventKind.ConfigFailed,
@@ -139,7 +139,7 @@ public static class PolicyManager
                 // names the real reason. Include the cause's type and message so the next log is diagnosable.
                 var detail = DescribeThrowable(e);
                 HeadLog.Warn(Tag, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}");
-                events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not set private DNS to {plan.PrivateDnsHost} yet: {detail}"));
+                events.Add(Event(PolicyEventKind.ConfigFailed, $"Couldn’t set private DNS to {plan.PrivateDnsHost} yet: {detail}"));
             }
         }
 
@@ -155,7 +155,7 @@ public static class PolicyManager
             catch (Java.Lang.Exception e)
             {
                 HeadLog.Warn(Tag, $"Could not un-hide {package}: {DescribeThrowable(e)}");
-                events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not un-hide {package}: {DescribeThrowable(e)}"));
+                events.Add(Event(PolicyEventKind.ConfigFailed, $"Couldn’t un-hide {package}: {DescribeThrowable(e)}"));
             }
         }
 
@@ -168,7 +168,7 @@ public static class PolicyManager
             if (failed is { Length: > 0 })
             {
                 HeadLog.Warn(Tag, $"Could not suspend: {string.Join(", ", failed)}");
-                events.Add(Event(PolicyEventKind.SuspendFailed, $"Could not suspend: {string.Join(", ", failed)}"));
+                events.Add(Event(PolicyEventKind.SuspendFailed, $"Couldn’t suspend: {string.Join(", ", failed)}"));
             }
         }
 
@@ -188,7 +188,7 @@ public static class PolicyManager
             if (failed is { Length: > 0 })
             {
                 HeadLog.Warn(Tag, $"Could not un-suspend: {string.Join(", ", failed)}");
-                events.Add(Event(PolicyEventKind.ReleaseFailed, $"Could not un-suspend (kept quarantined): {string.Join(", ", failed)}"));
+                events.Add(Event(PolicyEventKind.ReleaseFailed, $"Couldn’t un-suspend (kept quarantined): {string.Join(", ", failed)}"));
             }
         }
 
@@ -297,13 +297,13 @@ public static class PolicyManager
                         PermissionGrantState.Granted))
                 {
                     HeadLog.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet; will retry next policy pass.");
-                    events.Add(Event(PolicyEventKind.GrantFailed, $"Could not grant {grant.Permission} to {grant.Package} yet (will retry)."));
+                    events.Add(Event(PolicyEventKind.GrantFailed, $"Couldn’t grant {grant.Permission} to {grant.Package} yet (will retry)."));
                 }
             }
             catch (Java.Lang.Exception e)
             {
                 HeadLog.Warn(Tag, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}");
-                events.Add(Event(PolicyEventKind.GrantFailed, $"Could not grant {grant.Permission} to {grant.Package} yet: {e.Message}"));
+                events.Add(Event(PolicyEventKind.GrantFailed, $"Couldn’t grant {grant.Permission} to {grant.Package} yet: {e.Message}"));
             }
         }
     }
@@ -325,13 +325,13 @@ public static class PolicyManager
                     PermissionGrantState.Granted))
             {
                 HeadLog.Warn(Tag, "Could not self-grant BLUETOOTH_CONNECT yet; will retry next policy pass.");
-                events.Add(Event(PolicyEventKind.GrantFailed, "Could not self-grant BLUETOOTH_CONNECT yet (will retry)."));
+                events.Add(Event(PolicyEventKind.GrantFailed, "Couldn’t self-grant BLUETOOTH_CONNECT yet (will retry)."));
             }
         }
         catch (Java.Lang.Exception e)
         {
             HeadLog.Warn(Tag, $"Could not self-grant BLUETOOTH_CONNECT yet: {e.Message}");
-            events.Add(Event(PolicyEventKind.GrantFailed, $"Could not self-grant BLUETOOTH_CONNECT yet: {e.Message}"));
+            events.Add(Event(PolicyEventKind.GrantFailed, $"Couldn’t self-grant BLUETOOTH_CONNECT yet: {e.Message}"));
         }
     }
 
@@ -373,7 +373,7 @@ public static class PolicyManager
         catch (Java.Lang.Exception e)
         {
             HeadLog.Warn(Tag, $"Could not lock down the login browser {login.Package}: {e.Message}");
-            events.Add(Event(PolicyEventKind.ConfigFailed, $"Could not lock down the login browser {login.Package}: {e.Message}"));
+            events.Add(Event(PolicyEventKind.ConfigFailed, $"Couldn’t lock down the login browser {login.Package}: {e.Message}"));
         }
     }
 

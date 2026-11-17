@@ -113,7 +113,7 @@ public sealed class MealReadBackSettled(HouseholdFileService household) : IReadB
         if (unreadable > 0)
         {
             throw new MealReadBackException(
-                $"{unreadable} answer record(s) in the household file could not be read by this version, so they were left as they are and the page is kept.");
+                $"{unreadable} answer record(s) in the household file couldn’t be read by this version, so they were left as they are and the page is kept.");
         }
     }
 
@@ -126,7 +126,7 @@ public sealed class MealReadBackSettled(HouseholdFileService household) : IReadB
         return matches.Count == 1
             ? matches[0].Id
             : throw new MealReadBackException(
-                $"The adult this tablet belongs to is on the household roster {matches.Count} times as an adult, so their answers were not recorded and the page is kept.");
+                $"The adult this tablet belongs to is on the household roster {matches.Count} times as an adult, so their answers weren’t recorded and the page is kept.");
     }
 
     // ---- the recipe page ----
@@ -200,7 +200,7 @@ public sealed class MealReadBackSettled(HouseholdFileService household) : IReadB
         if (unreadable > 0 || unidentified > 0)
         {
             throw new MealReadBackException(
-                $"{unidentified} rating row(s) could not be matched to one person and one dish, and {unreadable} rating record(s) could not be read by this version; "
+                $"{unidentified} rating row(s) couldn’t be matched to one person and one dish, and {unreadable} rating record(s) couldn’t be read by this version; "
                 + "the rest were recorded and the page is kept.");
         }
     }

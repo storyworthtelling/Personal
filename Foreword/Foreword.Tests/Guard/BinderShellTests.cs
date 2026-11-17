@@ -51,7 +51,7 @@ public class BinderShellTests
 
             if (!source.Contains(": BinderPage", StringComparison.Ordinal))
             {
-                wrong.Add($"{name} does not derive from BinderPage.");
+                wrong.Add($"{name} doesn’t derive from BinderPage.");
             }
             else if (!source.Contains("Wrap(ForewordArea.", StringComparison.Ordinal))
             {
@@ -76,7 +76,7 @@ public class BinderShellTests
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "These draw a Display label of their own; the header already carries the screen's name: "
+            "These draw a Display label of their own; the header already carries the screen’s name: "
             + string.Join(", ", offenders));
     }
 

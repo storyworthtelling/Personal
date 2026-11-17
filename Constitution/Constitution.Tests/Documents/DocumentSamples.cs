@@ -52,7 +52,7 @@ internal static class DocumentSamples
             var top = 96f + row * 56f;
             var yes = InkTargets.TickRows($"yes{row + 1}", 36, top + 11, ["serve this dinner"])[0];
             targets.Add(yes);
-            printed.Add(Text($"yes{row + 1}-label", PrintedRole.Label, 62, top + 14, 30, 16, "YES", yes.Id));
+            printed.Add(Text($"yes{row + 1}-label", PrintedRole.Label, 62, top + 14, 30, 16, "Yes", yes.Id));
             printed.Add(Text($"dish{row + 1}", PrintedRole.Body, 98, top + 12, 92, 18, dishes[row], null));
 
             var reason = InkTargets.NoBecause($"no{row + 1}", yes, 409, 119);

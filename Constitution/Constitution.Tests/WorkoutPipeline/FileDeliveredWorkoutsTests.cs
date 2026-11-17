@@ -104,7 +104,7 @@ public sealed class FileDeliveredWorkoutsTests : IDisposable
     public void AnUnreadableFileIsSetAsideAndIgnored()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(PathOf())!);
-        File.WriteAllText(PathOf(), "{ this is not the file");
+        File.WriteAllText(PathOf(), "{ this isn’t the file");
 
         var store = Make();
 

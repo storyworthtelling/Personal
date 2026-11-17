@@ -143,7 +143,7 @@ public class TripsFreeingTests
     [Fact]
     public async Task NothingElseInTheTitleReachesTheLookup()
     {
-        var asked = await AskedWith(CalendarEntry.Timed("Lee's birthday dinner: Juniper Hotel, table for 8, ref 88123", At(3, 18), At(3, 20)));
+        var asked = await AskedWith(CalendarEntry.Timed("Lee’s birthday dinner: Juniper Hotel, table for 8, ref 88123", At(3, 18), At(3, 20)));
 
         var sent = Assert.Single(asked);
         Assert.DoesNotContain("birthday", sent, StringComparison.OrdinalIgnoreCase);

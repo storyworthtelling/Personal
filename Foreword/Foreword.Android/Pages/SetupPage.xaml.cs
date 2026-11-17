@@ -48,7 +48,7 @@ public partial class SetupPage : BinderPage
         // Read from the worker's own constants, so the screen cannot state a delivery time the
         // schedule does not use.
         var scheduled = new DateTime(1, 1, 1, DeliveryWorker.DeliveryHour, DeliveryWorker.DeliveryMinute, 0);
-        DeliveryTimeLabel.Text = scheduled.ToString("h:mm tt").ToLowerInvariant();
+        DeliveryTimeLabel.Text = Storyworthtelling.Time.TimeFormats.Clock12(scheduled);
 
         DestinationLabel.Text = string.IsNullOrEmpty(CredentialStore.GoogleAccountEmail)
             ? "Your reMarkable"
@@ -130,7 +130,7 @@ public partial class SetupPage : BinderPage
             .GetRequiredService<CalendarColumnMapper>().Owner;
         var email = CredentialStore.GoogleAccountEmail;
 
-        OwnerLabel.Text = $"{owner}'s";
+        OwnerLabel.Text = $"{owner}’s";
 
         InstallCaption.Text = string.IsNullOrEmpty(email)
             ? "Sign in to Google and this fills itself in."
@@ -381,7 +381,7 @@ public partial class SetupPage : BinderPage
         var wanted = new (string Id, string Title, string Hint, Func<string> Read, Action<string> Write)[]
         {
             (CredentialIds.NytCookie, "New York Times — session cookie",
-                "Log into nytimes.com, open DevTools → Application → Cookies, copy the NYT-S value.",
+                "Sign in at nytimes.com in a computer’s browser, then copy the NYT-S cookie from the browser’s site settings.",
                 () => CredentialStore.NytSessionCookie, v => { CredentialStore.NytSessionCookie = v; MarkChanged(ForewordVaultSection.NytCookie); }),
             (CredentialIds.NytApiKey, "New York Times — API key",
                 "Used to fetch the top stories list.",
@@ -500,7 +500,7 @@ public partial class SetupPage : BinderPage
         }
 
         // Said under the passphrase, where the backup is set up, not in an alert (audit W8.2b).
-        VaultProblemLabel.Text = result.NeedsAttention ? "The vault backup did not finish: " + result.Message : string.Empty;
+        VaultProblemLabel.Text = result.NeedsAttention ? "The vault backup didn’t finish: " + result.Message : string.Empty;
         VaultProblemLabel.IsVisible = result.NeedsAttention;
     }
 
@@ -550,7 +550,7 @@ public partial class SetupPage : BinderPage
             pairing.Failed($"HTTP {(int?)ex.StatusCode}");
             PairingTrail.Failed(pairingTrail, ex);
             RemarkableStatusLabel.Text =
-                $"Pairing refused ({(int?)ex.StatusCode}) — the code may have expired. Ask for a new one.";
+                "The reMarkable didn’t accept that code. Get a fresh one and pair again.";
         }
         catch (Exception ex)
         {
@@ -565,7 +565,7 @@ public partial class SetupPage : BinderPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            GoogleStatusLabel.Text = "Could not start sign-in — no active window.";
+            GoogleStatusLabel.Text = "Couldn’t start sign-in — no active window.";
             return;
         }
 

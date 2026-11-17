@@ -121,7 +121,7 @@ public sealed class SportsFeeds
                 }
                 catch (Exception exception) when (IsThisLeaguesFault(exception, cancellationToken))
                 {
-                    warn($"League {league} could not be refreshed ({exception.GetType().Name}); the cached copy stands.", exception);
+                    warn($"League {league} couldn’t be refreshed ({exception.GetType().Name}); the cached copy stands.", exception);
                     unreachable[league] = current.Feed.League;
                 }
             }
@@ -161,7 +161,7 @@ public sealed class SportsFeeds
         var read = cache.Read(league);
         if (read.Status == CacheReadStatus.Unreadable)
         {
-            warn(read.Problem ?? $"The cached league {league} could not be read.", null);
+            warn(read.Problem ?? $"The cached league {league} couldn’t be read.", null);
         }
 
         return read.Entry;
@@ -179,12 +179,12 @@ public sealed class SportsFeeds
         }
         catch (CatalogueLookupException exception)
         {
-            warn($"League {league} could not be looked at ({exception.Failure}); its teams are unknown until it can be.", exception);
+            warn($"League {league} couldn’t be looked at ({exception.Failure}); its teams are unknown until it can be.", exception);
             return null;
         }
         catch (Exception exception) when (IsThisLeaguesFault(exception, cancellationToken))
         {
-            warn($"League {league} could not be looked at ({exception.GetType().Name}); its teams are unknown until it can be.", exception);
+            warn($"League {league} couldn’t be looked at ({exception.GetType().Name}); its teams are unknown until it can be.", exception);
             return null;
         }
     }
@@ -202,7 +202,7 @@ public sealed class SportsFeeds
         }
         catch (CatalogueLookupException exception)
         {
-            warn($"League {league} could not be refreshed ({exception.Failure}); the cached copy stands.", exception);
+            warn($"League {league} couldn’t be refreshed ({exception.Failure}); the cached copy stands.", exception);
             unreachable[league] = current.Feed.League;
             return current;
         }
@@ -234,7 +234,7 @@ public sealed class SportsFeeds
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Security.SecurityException or NotSupportedException)
         {
-            warn($"League {feed.League.Id} could not be saved to the cache ({exception.Message}); it is used as fetched.", exception);
+            warn($"League {feed.League.Id} couldn’t be saved to the cache ({exception.Message}); it is used as fetched.", exception);
         }
     }
 

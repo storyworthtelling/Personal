@@ -17,7 +17,7 @@ public sealed class GoogleScopesTests
         var files = ConstitutionSource.Files(".cs")
             .Where(file => ConstitutionSource.Relative(file).Contains("Constitution.Android", StringComparison.Ordinal))
             .ToList();
-        Assert.True(files.Count >= 10, "The scan should cover the head's sources, found " + files.Count);
+        Assert.True(files.Count >= 10, "The scan should cover the head’s sources, found " + files.Count);
 
         var offenders = files
             .Where(file => !Path.GetFileName(file).Equals("ConstitutionGoogle.cs", StringComparison.Ordinal))
@@ -56,7 +56,7 @@ public sealed class ManifestPermissionTests
         var sources = ConstitutionSource.Files(".cs")
             .Where(file => ConstitutionSource.Relative(file).Contains("Constitution.Android", StringComparison.Ordinal))
             .ToList();
-        Assert.True(sources.Count >= 10, "The scan should cover the head's sources, found " + sources.Count);
+        Assert.True(sources.Count >= 10, "The scan should cover the head’s sources, found " + sources.Count);
 
         var declared = sources.Any(file => File.ReadAllText(file)
             .Contains("[assembly: UsesPermission(Android.Manifest.Permission.Internet)]", StringComparison.Ordinal));
@@ -67,7 +67,7 @@ public sealed class ManifestPermissionTests
     public void TheWorkflowChecksTheBuiltApkForInternet()
     {
         var workflow = Path.Combine(ConstitutionSource.Root(), "..", ".github", "workflows", "build-constitution.yml");
-        Assert.True(File.Exists(workflow), "build-constitution.yml was not found at " + workflow);
+        Assert.True(File.Exists(workflow), "build-constitution.yml wasn’t found at " + workflow);
         var text = File.ReadAllText(workflow);
         Assert.Contains("INTERNET", text, StringComparison.Ordinal);
         Assert.Contains("dump permissions", text, StringComparison.Ordinal);

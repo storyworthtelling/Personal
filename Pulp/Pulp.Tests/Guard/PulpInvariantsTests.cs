@@ -76,7 +76,7 @@ public class PulpInvariantsTests
     {
         var activity = PulpSource.Files(".cs")
             .SingleOrDefault(file => Path.GetFileName(file) == "MainActivity.cs");
-        Assert.True(activity is not null, "MainActivity.cs was not found under Pulp/.");
+        Assert.True(activity is not null, "MainActivity.cs wasn’t found under Pulp/.");
 
         Assert.Contains("Name = PulpIdentity.MainActivityName", File.ReadAllText(activity!), StringComparison.Ordinal);
     }
@@ -154,7 +154,7 @@ public class PulpInvariantsTests
     public void HideWatchedPreferencesAreFrozen()
     {
         var preference = typeof(PulpIdentity).Assembly.GetType("Pulp.Domain.Library.HideWatchedPreference");
-        Assert.True(preference is not null, "Pulp.Domain.Library.HideWatchedPreference was not found.");
+        Assert.True(preference is not null, "Pulp.Domain.Library.HideWatchedPreference wasn’t found.");
         Assert.Equal("pulp-playlist-hide-watched", ConstantOf(preference!, "FileName"));
         Assert.Equal("hide-watched:", ConstantOf(preference!, "KeyPrefix"));
     }
@@ -168,7 +168,7 @@ public class PulpInvariantsTests
     {
         var store = PulpSource.Files(".cs")
             .SingleOrDefault(file => PulpSource.Relative(file) == "Pulp.Android/Playlists/HideWatchedStore.cs");
-        Assert.True(store is not null, "Pulp.Android/Playlists/HideWatchedStore.cs was not found.");
+        Assert.True(store is not null, "Pulp.Android/Playlists/HideWatchedStore.cs wasn’t found.");
 
         var source = File.ReadAllText(store!);
         Assert.Contains("GetSharedPreferences(HideWatchedPreference.FileName", source, StringComparison.Ordinal);
@@ -187,7 +187,7 @@ public class PulpInvariantsTests
     public void SportsFoldPreferencesAreFrozen()
     {
         var preference = typeof(PulpIdentity).Assembly.GetType("Pulp.Domain.Sports.SportsFoldPreference");
-        Assert.True(preference is not null, "Pulp.Domain.Sports.SportsFoldPreference was not found.");
+        Assert.True(preference is not null, "Pulp.Domain.Sports.SportsFoldPreference wasn’t found.");
         Assert.Equal("pulp-sports-fold", ConstantOf(preference!, "FileName"));
         Assert.Equal("fold:", ConstantOf(preference!, "KeyPrefix"));
     }
@@ -198,7 +198,7 @@ public class PulpInvariantsTests
     {
         var store = PulpSource.Files(".cs")
             .SingleOrDefault(file => PulpSource.Relative(file) == "Pulp.Android/Sports/SportsFoldStore.cs");
-        Assert.True(store is not null, "Pulp.Android/Sports/SportsFoldStore.cs was not found.");
+        Assert.True(store is not null, "Pulp.Android/Sports/SportsFoldStore.cs wasn’t found.");
 
         var source = File.ReadAllText(store!);
         Assert.Contains("GetSharedPreferences(SportsFoldPreference.FileName", source, StringComparison.Ordinal);
@@ -212,14 +212,14 @@ public class PulpInvariantsTests
     private static string ConstantOf(Type type, string name)
     {
         var field = type.GetField(name);
-        Assert.True(field is not null && field.IsLiteral, $"{type.Name}.{name} is not a const.");
+        Assert.True(field is not null && field.IsLiteral, $"{type.Name}.{name} isn’t a const.");
         return (string)field!.GetRawConstantValue()!;
     }
 
     private static string ConstantValue(string name)
     {
         var field = typeof(PulpIdentity).GetField(name);
-        Assert.True(field is not null && field.IsLiteral, $"PulpIdentity.{name} is not a const.");
+        Assert.True(field is not null && field.IsLiteral, $"PulpIdentity.{name} isn’t a const.");
         return (string)field!.GetRawConstantValue()!;
     }
 
@@ -227,7 +227,7 @@ public class PulpInvariantsTests
     {
         var head = PulpSource.Files(".csproj")
             .SingleOrDefault(file => Path.GetFileName(file) == "Pulp.Android.csproj");
-        Assert.True(head is not null, "Pulp.Android.csproj was not found under Pulp/.");
+        Assert.True(head is not null, "Pulp.Android.csproj wasn’t found under Pulp/.");
         return head!;
     }
 }

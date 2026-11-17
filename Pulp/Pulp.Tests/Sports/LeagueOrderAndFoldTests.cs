@@ -30,7 +30,7 @@ public class LeagueOrderAndFoldTests
     [Fact]
     public void PreseasonThenOffSeasonComeLastEachBySoonestReturn()
     {
-        var offLate = Make("off-late", "Lakeshore Women's Hockey", SeasonPhase.OffSeason, Today.AddDays(-30), Today.AddDays(200));
+        var offLate = Make("off-late", "Lakeshore Women’s Hockey", SeasonPhase.OffSeason, Today.AddDays(-30), Today.AddDays(200));
         var offSoon = Make("off-soon", "Valley Rowing", SeasonPhase.OffSeason, Today.AddDays(-60), Today.AddDays(40));
         var pre = Make("pre", "Southern Rules League", SeasonPhase.Preseason, Today.AddDays(150), Today.AddDays(3));
         var inSeason = Make("in", "Coastal Football League", SeasonPhase.RegularSeason, Today.AddDays(300));
@@ -64,7 +64,7 @@ public class LeagueOrderAndFoldTests
     public void NoLeagueStartsOpenWhenNoneIsInSeason()
     {
         var pre = Make("pre", "Southern Rules League", SeasonPhase.Preseason, Today.AddDays(150), Today.AddDays(3));
-        var off = Make("off", "Lakeshore Women's Hockey", SeasonPhase.OffSeason, Today.AddDays(-30), Today.AddDays(20));
+        var off = Make("off", "Lakeshore Women’s Hockey", SeasonPhase.OffSeason, Today.AddDays(-30), Today.AddDays(20));
 
         var fold = LeagueFold.Starting([pre, off]);
 

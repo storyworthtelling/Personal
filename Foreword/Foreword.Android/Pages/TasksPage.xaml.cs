@@ -146,7 +146,7 @@ public partial class TasksPage : BinderPage
     {
         if (task.CompletedInGoogle)
         {
-            return "Done in Google Tasks — will not print";
+            return "Done in Google Tasks — won’t print";
         }
 
         if (task.Unparsed)

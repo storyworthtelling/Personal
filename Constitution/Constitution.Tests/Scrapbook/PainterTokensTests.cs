@@ -72,7 +72,7 @@ public class PainterTokensTests
         var result = GuardScan.Run(ConstitutionSource.Root(), Find);
         var read = result.Scanned.Count(f => f.StartsWith(Folder, StringComparison.Ordinal) && f.EndsWith(".cs", StringComparison.Ordinal));
 
-        Assert.True(read >= PainterFileFloor, $"Only {read} scrapbook source files were scanned; the painters are not where the guard looks.");
+        Assert.True(read >= PainterFileFloor, $"Only {read} scrapbook source files were scanned; the painters aren’t where the guard looks.");
     }
 
     [Theory]

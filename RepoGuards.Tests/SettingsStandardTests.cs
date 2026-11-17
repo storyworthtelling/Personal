@@ -80,7 +80,7 @@ public partial class SettingsStandardTests
             var xaml = File.ReadAllText(Path.Combine(GuardScan.RepoRoot(), page));
             var groups = MauiGroup().Matches(xaml).Select(match => match.Groups["title"].Value).ToList();
             Assert.True(Storyworthtelling.Updates.SettingsAnatomy.IsInOrder(groups),
-                $"{page} runs {string.Join(", ", groups)}; the suite runs Connections, Vault, the app's own, Diagnostics.");
+                $"{page} runs {string.Join(", ", groups)}; the suite runs Connections, Vault, the app’s own, Diagnostics.");
             Assert.DoesNotContain("StaticResource GroupCard", xaml, StringComparison.Ordinal);
             Assert.DoesNotContain("StaticResource TitleLabel", xaml, StringComparison.Ordinal);
         }
@@ -97,7 +97,7 @@ public partial class SettingsStandardTests
             .Where(hit => !hit.line.TrimStart().StartsWith("//", StringComparison.Ordinal) && WorkingOrReplace().IsMatch(hit.line))
             .Select(hit => $"{Path.GetRelativePath(GuardScan.RepoRoot(), hit.file)}:{hit.index + 1}")
             .ToList();
-        Assert.True(found.Count == 0, "A key that works is not on the screen: no \"Working ✓\" and no Replace:\n" + string.Join("\n", found));
+        Assert.True(found.Count == 0, "A key that works isn’t on the screen: no \"Working ✓\" and no Replace:\n" + string.Join("\n", found));
     }
 
     [GeneratedRegex(@"BuildLine\.Format\(|PaperUi\.BuildNumber\(")]

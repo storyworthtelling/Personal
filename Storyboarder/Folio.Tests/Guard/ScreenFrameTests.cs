@@ -34,8 +34,8 @@ public class ScreenFrameTests
 
         Assert.True(
             source.Contains("FolioBinderPage", StringComparison.Ordinal),
-            $"{screen} is not a FolioBinderPage, so it has no binder tabs, no in-page header and no "
-            + "pinned bar. This is the P9 failure: a strip that exists and is not used.");
+            $"{screen} isn’t a FolioBinderPage, so it has no binder tabs, no in-page header and no "
+            + "pinned bar. This is the P9 failure: a strip that exists and isn’t used.");
     }
 
     [Theory]

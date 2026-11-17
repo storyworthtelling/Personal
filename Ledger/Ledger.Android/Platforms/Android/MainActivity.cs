@@ -50,7 +50,7 @@ public class MainActivity : MauiAppCompatActivity
         {
             IPlatformApplication.Current!.Services.GetRequiredService<ILoggerFactory>()
                 .CreateLogger<MainActivity>()
-                .LogWarning(ex, "Could not settle which install this is; launching as the owner's.");
+                .LogWarning(ex, "Could not settle which install this is; launching as the owner’s.");
         }
 
         var plan = LaunchPlan.For(role);

@@ -278,7 +278,7 @@ public class PlanningLeaseTests
                 plannedByPartner += planners.Contains(Lee) ? 1 : 0;
             }
 
-            Assert.True(run.Converged, $"seed {seed}: the two copies of the file did not converge after a final sync.");
+            Assert.True(run.Converged, $"seed {seed}: the two copies of the file didn’t converge after a final sync.");
             partnerTakes += run.PartnerTakes;
         }
 

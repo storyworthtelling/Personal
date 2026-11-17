@@ -115,7 +115,7 @@ public class SportsScreenTextTests
 
     [Theory]
     [InlineData("Coastal Football League", 3, "CFL")]
-    [InlineData("Lakeshore Women's Hockey", 3, "LWH")]
+    [InlineData("Lakeshore Women’s Hockey", 3, "LWH")]
     [InlineData("Harbor Gulls", 2, "HG")]
     [InlineData("Gulls", 2, "GU")]
     [InlineData("Bay Herons of the North", 3, "BHN")]
@@ -127,9 +127,9 @@ public class SportsScreenTextTests
     public void PlayNamesTheChannelAndAdmitsPulpCannotOpenTheGameYet()
     {
         Assert.Equal(
-            "On Gridline TV · channel 7. Pulp can't open this game for you yet.",
+            "On Gridline TV · channel 7. Pulp can’t open this game for you yet.",
             SportsScreenText.PlayNote("On Gridline TV · channel 7"));
-        Assert.Equal("Pulp can't open this game for you yet.", SportsScreenText.PlayNote(null));
+        Assert.Equal("Pulp can’t open this game for you yet.", SportsScreenText.PlayNote(null));
     }
 
     [Fact]

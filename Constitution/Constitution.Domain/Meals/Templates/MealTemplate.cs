@@ -145,7 +145,7 @@ public sealed record MealTemplate
 
         if (Words.Length == 0 || Words.Length > MaxWordsLength || !Prints(Words))
         {
-            throw new ArgumentException($"A template's words are 1 to {MaxWordsLength} characters and must fit a row of the sheet.", nameof(Words));
+            throw new ArgumentException($"A template’s words are 1 to {MaxWordsLength} characters and must fit a row of the sheet.", nameof(Words));
         }
 
         if (Reason is { } reason && (string.IsNullOrWhiteSpace(reason) || reason.Length > MaxReasonLength))
@@ -162,7 +162,7 @@ public sealed record MealTemplate
         };
         if (!consistent)
         {
-            throw new ArgumentException("A template's approval and reason must agree with its status.", nameof(Status));
+            throw new ArgumentException("A template’s approval and reason must agree with its status.", nameof(Status));
         }
     }
 

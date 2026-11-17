@@ -40,7 +40,7 @@ internal sealed class FakeHeldCalendar : ICalendarWriter, IWorkoutEventEditor
         FindCalls++;
         if (Unavailable)
         {
-            return Task.FromResult(CalendarLookup.Unavailable("The calendar could not be looked into."));
+            return Task.FromResult(CalendarLookup.Unavailable("The calendar couldn’t be looked into."));
         }
 
         var wanted = keys.ToHashSet();

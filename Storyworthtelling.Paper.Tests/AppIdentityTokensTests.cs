@@ -22,9 +22,9 @@ public class AppIdentityTokensTests
         var mark = Oklch.FromHex(AppIdentityTokens.ConstitutionMarkHex);
 
         Assert.True(Oklch.HueSeparation(document.HueDegrees, mark.HueDegrees) <= 2.5,
-            $"The Document cerulean is {document.HueDegrees:F1}°, off the ladder's {mark.HueDegrees:F1}°.");
+            $"The Document cerulean is {document.HueDegrees:F1}°, off the ladder’s {mark.HueDegrees:F1}°.");
         Assert.True(document.C < mark.C,
-            $"The Document profile is muted: chroma {document.C:F3} must sit below the screen mark's {mark.C:F3}.");
+            $"The Document profile is muted: chroma {document.C:F3} must sit below the screen mark’s {mark.C:F3}.");
     }
 
     /// <summary>The Document profile adds exactly one identity colour, and it is not a ladder tier.</summary>

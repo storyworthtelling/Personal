@@ -154,7 +154,7 @@ public class ManualPostItSourceTests
         var build = add.IndexOf("BuildBody();", StringComparison.Ordinal);
         var wrap = add.IndexOf("Wrap(LedgerArea.", StringComparison.Ordinal);
         Assert.True(build >= 0 && wrap >= 0, "The Add form no longer builds its body and wraps it.");
-        Assert.True(build < wrap, "The Add form calls Wrap before BuildBody, so BuildBody's Content = … replaces the binder frame.");
+        Assert.True(build < wrap, "The Add form calls Wrap before BuildBody, so BuildBody’s Content = … replaces the binder frame.");
 
         // And nothing else sets Content on the page after the frame is up.
         var contentAssignments = Regex.Matches(add, @"(?<![\w.])Content = ");
@@ -175,7 +175,7 @@ public class ManualPostItSourceTests
     private static string MethodBody(string source, string signature)
     {
         var start = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.True(start >= 0, $"Could not find `{signature}`.");
+        Assert.True(start >= 0, $"Couldn’t find `{signature}`.");
 
         var open = source.IndexOf('{', source.IndexOf(')', start));
         var depth = 0;

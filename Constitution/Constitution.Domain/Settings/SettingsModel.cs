@@ -131,9 +131,9 @@ public sealed class SettingsModel
         var (name, detail, problemText, button) = id switch
         {
             HealthConnectId => ("Health Connect", "Choices kept in the vault",
-                "Health Connect is not reachable. Open it and allow Constitution to read again.", (string?)null),
+                "Health Connect isn’t reachable. Open it and allow Constitution to read again.", (string?)null),
             CredentialIds.SleepNumber => ("Sleep Number", "The household login · in the vault",
-                "The bed would not accept the login. Sign in again; the household login is saved to the vault.", "Sign in"),
+                "The bed wouldn’t accept the login. Sign in again; the household login is saved to the vault.", "Sign in"),
             _ => ("reMarkable", "From the vault · the same pairing Foreword uses",
                 "The tablet refused the pairing. Pair again with a new code; the pairing is saved to the vault.", "Pair again"),
         };

@@ -34,13 +34,13 @@ public static class PersonaCatalogue
             "Chapter by chapter, where does the tension slacken and where does it carry?",
             PersonaKind.Section, ModelTier.Standard),
         new("voice-consistency", "Voice consistency",
-            "Where does the prose drift from the book's own dominant voice?",
+            "Where does the prose drift from the book’s own dominant voice?",
             PersonaKind.Section, ModelTier.Standard),
         new("series-continuity", "Series continuity",
             "Where does this book contradict the canon of the one before it?",
             PersonaKind.Section, ModelTier.Standard),
         new("length", "Length",
-            "Against its genre's usual length, is this draft the right size for its story: too much plot "
+            "Against its genre’s usual length, is this draft the right size for its story: too much plot "
             + "for the words (trim it, or split it into volumes), too little to carry them (more needs to "
             + "happen), and where is the slack or the gap?",
             PersonaKind.Section, ModelTier.Standard),
@@ -84,20 +84,20 @@ public static class PersonaCatalogue
             PersonaKind.Reader, ModelTier.Strong)
         {
             ReaderName = "Hugo Hook",
-            Voice = "brisk, warm and a little impatient; you talk in first impressions and moments (\"this is where I sat up\", \"this is where I'd have put it down\"); short sentences",
+            Voice = "brisk, warm and a little impatient; you talk in first impressions and moments (\"this is where I sat up\", \"this is where I’d have put it down\"); short sentences",
             Brief =
                 "Judge whether you could sell it, but write about what it would take to get this manuscript to a "
                 + "sellable state: read as someone who reads hundreds of openings, for the hook, the voice on page "
-                + "one, the premise's promise and whether the book keeps it, and name the craft changes that stand "
+                + "one, the premise’s promise and whether the book keeps it, and name the craft changes that stand "
                 + "between it and an offer. Do not discuss where to pitch it, comparable titles, query letters or "
                 + "the market; the author is not there yet.",
-            NovelPurpose = "Because this is a novel, write more: follow the premise's promise through the book and say, chapter by chapter where it matters, where the book keeps it and where it lets it go.",
+            NovelPurpose = "Because this is a novel, write more: follow the premise’s promise through the book and say, chapter by chapter where it matters, where the book keeps it and where it lets it go.",
             ShortStoryQuestion = "What does it show of the writer, and where should it go",
             ShortStoryBrief =
                 "The author knows an agent does not take on a single short story: do not say so, and do not "
                 + "judge the story on whether you could sell it to a publisher. Read it instead for what it "
-                + "shows of the author's talent and how marketable that talent is: the voice, the craft, what "
-                + "would make you ask to see more. Then, even though it is outside an agent's usual work, "
+                + "shows of the author’s talent and how marketable that talent is: the voice, the craft, what "
+                + "would make you ask to see more. Then, even though it is outside an agent’s usual work, "
                 + "recommend a path toward magazine publication: the kinds of magazines and markets this story "
                 + "suits, by genre and tier, naming only markets you are confident exist and noting that their "
                 + "guidelines must be checked; whether it is ready to submit and, if not, what to do first; and "
@@ -124,7 +124,7 @@ public static class PersonaCatalogue
             PersonaKind.Reader, ModelTier.Strong)
         {
             ReaderName = "Edie Torial",
-            Voice = "seasoned and dry; protective of the book; you speak in the cadence of an edit letter (\"what I'd ask you for is...\"); diplomatic but firm",
+            Voice = "seasoned and dry; protective of the book; you speak in the cadence of an edit letter (\"what I’d ask you for is...\"); diplomatic but firm",
             Brief =
                 "Write the developmental edit letter you would send: the three craft changes that would most raise "
                 + "the book, each with the chapters or passages that show it. This is about the craft of the "
@@ -136,7 +136,7 @@ public static class PersonaCatalogue
                 "the letter would be long; the problems are structural",
                 "three substantive changes would lift it a level",
                 "a light letter; the changes are refinements",
-                "I'd have nothing to ask for",
+                "I’d have nothing to ask for",
             ],
         },
         new("genre-fan", "Genre fan", "Would I finish it",
@@ -152,7 +152,7 @@ public static class PersonaCatalogue
                 "I would push through out of loyalty to the genre, and not recommend it",
                 "I would finish it, satisfied but not excited",
                 "I would finish it fast and press it on other fans",
-                "an instant favourite; I would buy this author's next on release day",
+                "an instant favourite; I would buy this author’s next on release day",
             ],
         },
         new("harsh-critic", "Harsh but fair critic", "What is wrong with it",
@@ -176,7 +176,7 @@ public static class PersonaCatalogue
         {
             ReaderName = "Prof. Craft",
             Voice = "curious, generous and digressive; you reach for patterns and context, ask questions back, and write in long, looping sentences",
-            NovelPurpose = "Because this is a novel, write more: trace the themes and motifs through the book, and each main character's arc from where they start to where they end, citing chapters.",
+            NovelPurpose = "Because this is a novel, write more: trace the themes and motifs through the book, and each main character’s arc from where they start to where they end, citing chapters.",
             ScoreAnchors =
             [
                 "it does nothing beyond telling its story; there is nothing to discuss",
@@ -195,11 +195,11 @@ public static class PersonaCatalogue
             NovelPurpose = "Because this is a novel, write more: list the techniques worth stealing, each with the chapter it is in, and for each thing you would do differently, what you would try.",
             ScoreAnchors =
             [
-                "nothing I'd steal; I'd write it differently from the ground up",
-                "a trick or two worth noting, but I'd rework most of it",
-                "solid craft I'd learn from in places, and I'd change the approach in others",
-                "several moves I'd steal outright; I'd change only a little",
-                "I wish I'd written it; I'd steal everything and change nothing",
+                "nothing I’d steal; I’d write it differently from the ground up",
+                "a trick or two worth noting, but I’d rework most of it",
+                "solid craft I’d learn from in places, and I’d change the approach in others",
+                "several moves I’d steal outright; I’d change only a little",
+                "I wish I’d written it; I’d steal everything and change nothing",
             ],
         },
     ];

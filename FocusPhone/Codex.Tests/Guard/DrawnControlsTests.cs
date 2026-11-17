@@ -32,7 +32,7 @@ public class DrawnControlsTests
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "These views handle their own touches without implementing IDrawnControls, so the tap watch cannot "
+            "These views handle their own touches without implementing IDrawnControls, so the tap watch can’t "
             + "tell a tap on what they draw from a tap on nothing: " + string.Join(", ", offenders));
     }
 

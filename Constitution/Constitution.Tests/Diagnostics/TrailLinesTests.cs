@@ -75,8 +75,8 @@ public class TrailLinesTests
         yield return ["a url", Body("see https:" + "//example.com")];
         yield return ["a quote", Body("body read \"weight\": ok")];
         yield return ["no prefix at all", "body read weight: ok, 2 readings"];
-        yield return ["a source it does not know", Stamp + "INFO Elsewhere — body read weight: ok"];
-        yield return ["a stamp it does not know", "[yesterday at lunch] INFO Body — body read weight: ok"];
+        yield return ["a source it doesn’t know", Stamp + "INFO Elsewhere — body read weight: ok"];
+        yield return ["a stamp it doesn’t know", "[yesterday at lunch] INFO Body — body read weight: ok"];
         yield return ["an empty message", Body(string.Empty)];
     }
 

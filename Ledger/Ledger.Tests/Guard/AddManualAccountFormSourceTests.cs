@@ -141,7 +141,7 @@ public class AddManualAccountFormSourceTests
     private static string MethodBody(string source, string signature)
     {
         var start = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.True(start >= 0, $"Could not find `{signature}`.");
+        Assert.True(start >= 0, $"Couldn’t find `{signature}`.");
 
         var open = source.IndexOf('{', source.IndexOf(')', start));
         var depth = 0;

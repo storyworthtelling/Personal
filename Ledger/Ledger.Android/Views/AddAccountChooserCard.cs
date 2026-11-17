@@ -23,7 +23,7 @@ public static class AddAccountChooserCard
         rows.Children.Add(BuildRow(
             ActionIconKind.Bank,
             "Connect a bank",
-            "Sign in through Plaid. On this phone, needs Admin mode.",
+            "Sign in through Plaid. On this phone, needs admin mode.",
             primary: true,
             () => { onDismiss(); onConnectBank(); }));
         rows.Children.Add(BuildRow(

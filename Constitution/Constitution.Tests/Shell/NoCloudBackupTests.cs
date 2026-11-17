@@ -22,7 +22,7 @@ public sealed class NoCloudBackupTests
     public void TheApplicationOptsOutOfAutoBackup()
     {
         var sources = HeadSources();
-        Assert.True(sources.Count >= 10, "The scan should cover the head's sources, found " + sources.Count);
+        Assert.True(sources.Count >= 10, "The scan should cover the head’s sources, found " + sources.Count);
 
         var declaration = sources
             .Select(File.ReadAllText)
@@ -35,7 +35,7 @@ public sealed class NoCloudBackupTests
     public void NoFileIsPlacedInTheBackedUpDirectory()
     {
         var sources = HeadSources();
-        Assert.True(sources.Count >= 10, "The scan should cover the head's sources, found " + sources.Count);
+        Assert.True(sources.Count >= 10, "The scan should cover the head’s sources, found " + sources.Count);
 
         var offenders = new List<string>();
         foreach (var file in sources)

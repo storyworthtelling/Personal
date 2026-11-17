@@ -11,14 +11,14 @@ namespace Constitution.Tests.Calendar.Google;
 public class CalendarErrorsTests
 {
     [Theory]
-    [InlineData(HttpStatusCode.Unauthorized, "Google did not accept the sign-in for a calendar.")]
+    [InlineData(HttpStatusCode.Unauthorized, "Google didn’t accept the sign-in for a calendar.")]
     [InlineData(HttpStatusCode.Forbidden, "Google refused access to a calendar; it may not be shared.")]
-    [InlineData(HttpStatusCode.NotFound, "A calendar was not found; it may not be shared.")]
+    [InlineData(HttpStatusCode.NotFound, "A calendar wasn’t found; it may not be shared.")]
     [InlineData(HttpStatusCode.Gone, "A calendar or event is gone.")]
     [InlineData(HttpStatusCode.TooManyRequests, "Google asked Constitution to slow down.")]
-    [InlineData(HttpStatusCode.InternalServerError, "Google could not answer.")]
-    [InlineData(HttpStatusCode.BadGateway, "Google could not answer.")]
-    [InlineData(HttpStatusCode.ServiceUnavailable, "Google could not answer.")]
+    [InlineData(HttpStatusCode.InternalServerError, "Google couldn’t answer.")]
+    [InlineData(HttpStatusCode.BadGateway, "Google couldn’t answer.")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "Google couldn’t answer.")]
     [InlineData(HttpStatusCode.BadRequest, "Google answered with an error.")]
     public void EachStatusHasItsSentence(HttpStatusCode status, string expected)
     {
@@ -48,14 +48,14 @@ public class CalendarErrorsTests
     public void ANetworkFailureIsDescribed()
     {
         Assert.True(CalendarErrors.TryDescribe(new HttpRequestException("The text the platform gave."), CancellationToken.None, out var reason));
-        Assert.Equal("A calendar could not be reached.", reason);
+        Assert.Equal("A calendar couldn’t be reached.", reason);
     }
 
     [Fact]
     public void ATimeoutIsDescribed()
     {
         Assert.True(CalendarErrors.TryDescribe(new TaskCanceledException("Timed out.", new TimeoutException()), CancellationToken.None, out var reason));
-        Assert.Equal("A calendar did not answer in time.", reason);
+        Assert.Equal("A calendar didn’t answer in time.", reason);
     }
 
     [Fact]

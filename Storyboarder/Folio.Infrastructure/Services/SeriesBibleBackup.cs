@@ -85,7 +85,7 @@ public sealed class SeriesBibleBackup(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "The series bible's Drive doc was not written ({Occasion}); it is tried again at the next change", occasion);
+            logger.LogWarning(ex, "The series bible’s Drive doc was not written ({Occasion}); it is tried again at the next change", occasion);
             return false;
         }
     }

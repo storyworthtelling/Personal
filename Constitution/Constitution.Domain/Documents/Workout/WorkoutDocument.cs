@@ -12,12 +12,12 @@ namespace Constitution.Domain.Documents;
 public static class WorkoutDocument
 {
     /// <summary>The Tick / circle / skipped rule, as the book words it (p.5).</summary>
-    public const string TickRule = "Tick each page as you finish it, and circle how it felt.";
+    public const string TickRule = "Check each page as you finish it, and circle how it felt.";
 
     public const string SkippedRule = "A page left unticked counts as skipped.";
 
     /// <summary>The stopped-early rule (D24), which moved to the cover when the last page went.</summary>
-    public const string StoppedEarlyRule = "Stopped early? Tick only the pages you finished; the plan eases from where you stopped.";
+    public const string StoppedEarlyRule = "Stopped early? Check only the pages you finished; the plan eases from where you stopped.";
 
     private const float DoseBaseline = 148f;
 
@@ -51,7 +51,7 @@ public static class WorkoutDocument
         var shift = sore ? SoreShift : 0f;
         var draft = new PageDraft(model.Title) { Section = "Workout" };
 
-        draft.Kicker($"WORKOUT · {PageDraft.DayAndTime(model.Start)}");
+        draft.Kicker($"Workout · {PageDraft.DayAndTime(model.Start)}");
         draft.Footer(model.Title, model.Start, 1, pages);
         if (model.Soreness is { } soreness)
         {
@@ -133,10 +133,10 @@ public static class WorkoutDocument
         var sore = model.Soreness;
         var draft = new PageDraft(exercise.Name) { Section = "Exercises" };
 
-        var kicker = $"EXERCISE {index + 1} OF {model.Exercises.Count} · {model.Title.ToUpperInvariant()}";
+        var kicker = $"Exercise {index + 1} of {model.Exercises.Count} · {model.Title}";
         if (sore is not null)
         {
-            kicker += $" · WORKING AROUND YOUR {sore.Place.ToUpperInvariant()}";
+            kicker += $" · working around your {sore.Place}";
         }
 
         draft.Kicker(kicker);
@@ -185,7 +185,7 @@ public static class WorkoutDocument
         var bpm = sore is not null && TempoBands.Of(exercise.ScoreBpm) != TempoBand.Easy
             ? TempoBands.Default(TempoBand.Easy)
             : exercise.ScoreBpm;
-        draft.Line(PrintedRole.Label, PageDraft.Left, labelBaseline, PageDraft.ColumnWidth, "SET SCORE TO");
+        draft.Line(PrintedRole.Label, PageDraft.Left, labelBaseline, PageDraft.ColumnWidth, "Set score to");
         draft.Line(PrintedRole.Strong, PageDraft.Left, labelBaseline + 20f, PageDraft.ColumnWidth, ScoreLine(bpm));
         var end = draft.Voice(exercise.Encouragement, labelBaseline + 48f, labelBaseline + 20f, true);
 

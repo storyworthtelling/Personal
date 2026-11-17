@@ -27,7 +27,7 @@ public static class WorkoutKeys
         foreach (var session in plan.Sessions.OrderBy(item => item.Start))
         {
             keys[session] = numbered.KeyOf(plan.Person, session)
-                ?? throw new InvalidOperationException("A session in this person's plan does not name them as a participant, so it has no key for them.");
+                ?? throw new InvalidOperationException("A session in this person’s plan does not name them as a participant, so it has no key for them.");
         }
 
         return keys;
@@ -44,6 +44,6 @@ public static class WorkoutKeys
         ArgumentNullException.ThrowIfNull(session);
         var week = weeks.First(item => session.Day >= item.Plan.WeekStart && session.Day < item.Plan.WeekStart.AddDays(7));
         return SessionKeys.For(week.Plan, assignments).IssueOf(person, session)
-            ?? throw new InvalidOperationException("That session is not in the person's plan for its week, so it has no key.");
+            ?? throw new InvalidOperationException("That session is not in the person’s plan for its week, so it has no key.");
     }
 }

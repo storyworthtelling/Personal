@@ -21,10 +21,10 @@ public static class DiagnosticsPhrases
 
     public static string Of(DiagnosticsOutcome outcome) => outcome switch
     {
-        DiagnosticsOutcome.NeverRan => "Has not run yet",
+        DiagnosticsOutcome.NeverRan => "Hasn’t run yet",
         DiagnosticsOutcome.Succeeded => "Done",
         DiagnosticsOutcome.Refused => "Refused by the service",
-        DiagnosticsOutcome.Unreachable => "Could not be reached",
+        DiagnosticsOutcome.Unreachable => "Couldn’t be reached",
         DiagnosticsOutcome.FoundNothingRead => "Document found, nothing read",
         DiagnosticsOutcome.Partial => "Done in part",
         _ => throw Undefined(nameof(outcome)),
@@ -72,5 +72,5 @@ public static class DiagnosticsPhrases
     };
 
     internal static ArgumentOutOfRangeException Undefined(string parameter) =>
-        new(parameter, "That value is not one the Diagnostics export knows.");
+        new(parameter, "That value isn’t one the Diagnostics export knows.");
 }

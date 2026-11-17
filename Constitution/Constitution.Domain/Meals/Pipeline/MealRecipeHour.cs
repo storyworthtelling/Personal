@@ -110,7 +110,7 @@ public abstract record MealRecipesOutcome
 /// </summary>
 public static class MealRecipesTrail
 {
-    public const string NoneDueSentence = "No kept week has a recipe in its hour that is not already on the tablet.";
+    public const string NoneDueSentence = "No kept week has a recipe in its hour that isn’t already on the tablet.";
 
     /// <summary>The line for an outcome; empty for <see cref="MealRecipesOutcome.Done"/>, which the documents step has already written about.</summary>
     public static string LogPhrase(MealRecipesOutcome outcome)

@@ -38,7 +38,7 @@ public class ExercisePageTests
     public void ThePrintedScoreLineIsThePageText()
     {
         Assert.Contains("Score · 132 bpm · Steady", PageText(Squat()));
-        Assert.Contains("SET SCORE TO", PageText(Squat()));
+        Assert.Contains("Set score to", PageText(Squat()));
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public class ExercisePageTests
         var page = document.GetPage(1);
         double Y(string word) => page.GetWords().First(w => w.Text == word).BoundingBox.Bottom;
 
-        var order = new[] { Y("3"), Y("kettlebell"), Y("Rest"), Y("SET"), Y("Five"), Y("HOW"), Y("tick") };
+        var order = new[] { Y("3"), Y("kettlebell"), Y("Rest"), Y("Set"), Y("Five"), Y("How"), Y("check") };
         Assert.Equal(order.OrderByDescending(y => y), order);
     }
 
@@ -189,8 +189,8 @@ public class ExercisePageTests
         Assert.Equal(new InkRect(36f, slot.Bounds.Top, 270f, 150f), slot.Bounds);
         Assert.DoesNotContain(hidden.Printed, i => i.Name == WorkoutIds.FigureSlot);
 
-        var scoreShown = shown.Printed.Single(i => i.Text == "SET SCORE TO").Bounds.Top;
-        var scoreHidden = hidden.Printed.Single(i => i.Text == "SET SCORE TO").Bounds.Top;
+        var scoreShown = shown.Printed.Single(i => i.Text == "Set score to").Bounds.Top;
+        var scoreHidden = hidden.Printed.Single(i => i.Text == "Set score to").Bounds.Top;
         Assert.True(scoreShown > slot.Bounds.Bottom);
         Assert.True(scoreHidden < scoreShown - 100f);
     }
@@ -224,7 +224,7 @@ public class ExercisePageTests
 
         Assert.Equal(91f, notes.Bounds.Width);
         Assert.Equal(318f, notes.Bounds.Left);
-        Assert.Contains(page.Printed, i => i.Text == "NOTES");
+        Assert.Contains(page.Printed, i => i.Text == "Notes");
         Assert.True(page.Printed.Count(i => i.Role == PrintedRole.Dotted) >= 15);
     }
 
@@ -245,7 +245,7 @@ public class ExercisePageTests
         Assert.Equal(8, pages.Count);
         Assert.Equal(["Goblet squat"], pages.Where(p => p.Title == "Goblet squat").Select(p => p.Title));
         Assert.Contains("3 of 8", PageText(pages[2]));
-        Assert.Contains("EXERCISE 2 OF 7 · STRENGTH", PageText(pages[2]));
+        Assert.Contains("Exercise 2 of 7 · Strength", PageText(pages[2]));
         Assert.Contains("Constitution · Strength · Tue Oct 20", PageText(pages[2]));
     }
 

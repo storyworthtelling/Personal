@@ -56,7 +56,7 @@ public class CourierWiringGuardTests
     {
         var text = Services();
         var start = text.IndexOf("private async Task RecordSession(", StringComparison.Ordinal);
-        Assert.True(start > 0, "The session hook's method was not found; the guard has nothing to protect.");
+        Assert.True(start > 0, "The session hook’s method wasn’t found; the guard has nothing to protect.");
         var next = text.IndexOf("\n    // ----", start, StringComparison.Ordinal);
         var hook = next < 0 ? text[start..] : text[start..next];
 

@@ -15,21 +15,21 @@ public static class HandOffNotice
         var service = RequireName(serviceName);
         return refusal switch
         {
-            StartRefusal.Hidden => "This title is not on the list for everyone watching, so it was not opened.",
-            StartRefusal.NotAHome => $"This title is not on {service}, so it was not opened. Pick one of the services it is on.",
-            StartRefusal.ServiceBlocked => $"{service} is blocked for a child watching, so it was not opened.",
+            StartRefusal.Hidden => "This title isn’t on the list for everyone watching, so it wasn’t opened.",
+            StartRefusal.NotAHome => $"This title isn’t on {service}, so it wasn’t opened. Pick one of the services it is on.",
+            StartRefusal.ServiceBlocked => $"{service} is blocked for a child watching, so it wasn’t opened.",
             StartRefusal.ServiceNotAttested =>
-                $"{service} is for adults until its adult profiles are PIN-locked. Lock them in {service}, then tick it in Settings.",
-            StartRefusal.UnknownService => $"Pulp does not know how to open {service}, so nothing was opened.",
+                $"{service} is for adults until its adult profiles are PIN-locked. Lock them in {service}, then check it in Settings.",
+            StartRefusal.UnknownService => $"Pulp doesn’t know how to open {service}, so nothing was opened.",
             _ => throw new ArgumentException(
-                $"'{refusal}' is not a refusal; a hand-off that may start has no notice.", nameof(refusal)),
+                $"'{refusal}' isn’t a refusal; a hand-off that may start has no notice.", nameof(refusal)),
         };
     }
 
     public static string NotInstalled(string serviceName)
     {
         var service = RequireName(serviceName);
-        return $"{service} is not installed on this phone. Install it, then open the title again.";
+        return $"{service} isn’t installed on this phone. Install it, then open the title again.";
     }
 
     /// <summary>D286: the window closed with nothing playing from the service's app.</summary>
@@ -42,7 +42,7 @@ public static class HandOffNotice
     public static string LandedElsewhere(string serviceName)
     {
         var service = RequireName(serviceName);
-        return $"{service} opened, but not on this title. Look for it in {service}, or mark it watched here.";
+        return $"{service} opened, but not on this title. Find it there, or open the title and make another service its home.";
     }
 
     private static string RequireName(string serviceName) =>

@@ -57,7 +57,7 @@ public class CrossRunPropertyTests(ITestOutputHelper output)
                 if (!blind)
                 {
                     Assert.True(reading.WorkoutsOnMeals == 0, $"A workout overlaps a meal event: seed {seed}, meals first {mealsFirst}.");
-                    Assert.True(reading.OnTheOwnersLife == 0, $"An event lands on the owner's own calendar entry: seed {seed}, meals first {mealsFirst}.");
+                    Assert.True(reading.OnTheOwnersLife == 0, $"An event lands on the owner’s own calendar entry: seed {seed}, meals first {mealsFirst}.");
                     Assert.True(world.Fingerprint() == before && again.All(run => run.Created.Count == 0), $"A second pass over the unchanged fortnight wrote something: seed {seed}, meals first {mealsFirst}.");
                 }
             }

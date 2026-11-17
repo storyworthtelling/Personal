@@ -98,7 +98,7 @@ public class FindingMarksTests
                     Book = "The Salt Road", Quote = "he went under at the harbour mouth",
                 }], [])
             {
-                Assumption = "This assumes the book takes place after \u201CThe Salt Road\u201D, which has not been confirmed.",
+                Assumption = "This assumes the book takes place after \u201CThe Salt Road\u201D, which hasn’t been confirmed.",
             },
         };
 
@@ -106,7 +106,7 @@ public class FindingMarksTests
 
         Assert.Equal("Character drift", mark.Label);
         Assert.Contains("\u201Che went under at the harbour mouth\u201D (The Salt Road)", mark.Reason, StringComparison.Ordinal);
-        Assert.Contains("has not been confirmed", mark.Reason, StringComparison.Ordinal);
+        Assert.Contains("hasn’t been confirmed", mark.Reason, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -358,7 +358,7 @@ public class FindingMarksTests
     {
         var analysis = WithFinding("plot", new ReportFinding("Chapter 2", "x") { Excerpt = "nobody spoke to her" }) with
         {
-            RevisionPlan = [new RevisionItem("Must", "Ch. 1-3", "The opening does not commit", "x")],
+            RevisionPlan = [new RevisionItem("Must", "Ch. 1-3", "The opening doesn’t commit", "x")],
         };
 
         Assert.Equal(Folio.Domain.Readiness.ReadinessTier.Must,
@@ -379,7 +379,7 @@ public class FindingMarksTests
     {
         var analysis = WithFinding("plot", new ReportFinding("Chapter 2", "x") { Excerpt = "nobody spoke to her", Severity = severity }) with
         {
-            RevisionPlan = [new RevisionItem("Must", "Ch. 1-3", "The opening does not commit", "x")],
+            RevisionPlan = [new RevisionItem("Must", "Ch. 1-3", "The opening doesn’t commit", "x")],
         };
 
         Assert.Equal(tier, Assert.Single(MarkSource.Build(Manuscript, analysis, Chapters).Marks).Severity);

@@ -175,7 +175,7 @@ public static class ChildFilter
         if (children.Count == 0)
         {
             throw new ArgumentException(
-                "A child's filter needs at least one child; with none it would have nobody to be strict for.",
+                "A child’s filter needs at least one child; with none it would have nobody to be strict for.",
                 nameof(children));
         }
     }

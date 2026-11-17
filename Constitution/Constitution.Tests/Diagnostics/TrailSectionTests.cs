@@ -27,7 +27,7 @@ public class TrailSectionTests
         Assert.Contains("sleepiq sign-in: 200", export);
         Assert.True(
             export.IndexOf("Body trail", StringComparison.Ordinal) < export.IndexOf("Vault trail", StringComparison.Ordinal),
-            "The Body trail comes before the vault's.");
+            "The Body trail comes before the vault’s.");
     }
 
     [Fact]

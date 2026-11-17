@@ -21,7 +21,7 @@ public static class InkReply
         var json = ObjectIn(reply);
         if (json is null)
         {
-            return Unread(document, "The reply was not a readable answer.");
+            return Unread(document, "The reply wasn’t a readable answer.");
         }
 
         try
@@ -50,7 +50,7 @@ public static class InkReply
         catch (JsonException)
         {
             // The braces looked like an object and were not one; that is a reply that could not be read, which is a page not read.
-            return Unread(document, "The reply was not a readable answer.");
+            return Unread(document, "The reply wasn’t a readable answer.");
         }
     }
 

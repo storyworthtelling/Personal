@@ -59,7 +59,7 @@ public static class MealPlanner
             var time = MealFacts.TimeOf(request, adult.Name);
             if (time is null || !time.IsComplete || time.WindowStart > weekOpens || time.WindowEnd < weekCloses)
             {
-                sentence = "A calendar could not be read for the whole week, so no dinners are planned.";
+                sentence = "A calendar couldn’t be read for the whole week, so no dinners are planned.";
                 return MealStop.CalendarUnreadable;
             }
         }
@@ -128,7 +128,7 @@ public static class MealPlanner
 
                 if (!placed)
                 {
-                    notes.Add(recipe.Title + " was marked cook this soon but does not fit this week.");
+                    notes.Add(recipe.Title + " was marked cook this soon but doesn’t fit this week.");
                 }
             }
         }
@@ -155,7 +155,7 @@ public static class MealPlanner
             {
                 foreach (var index in order)
                 {
-                    if (TryPlace(index, recipe, stretch: true, "This week's stretch dish: a card not cooked lately."))
+                    if (TryPlace(index, recipe, stretch: true, "This week’s stretch dish: a card not cooked lately."))
                     {
                         return;
                     }

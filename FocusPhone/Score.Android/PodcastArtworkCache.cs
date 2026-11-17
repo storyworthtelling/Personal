@@ -61,7 +61,7 @@ public sealed class PodcastArtworkCache(Context context)
         catch (Exception e) when (e is not OperationCanceledException)
         {
             AudioDiagnostics.LogWarning(
-                "PodcastArtworkCache", $"Could not fetch artwork for {feedId}.", e);
+                "PodcastArtworkCache", $"Couldn’t fetch artwork for {feedId}.", e);
             return null;
         }
     }

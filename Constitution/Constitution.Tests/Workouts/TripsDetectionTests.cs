@@ -262,7 +262,7 @@ public class TripDetectionTests
     {
         var calendars = CalendarsWith(
             sam: CalendarRead.Of([Away("Conference trip")]),
-            family: CalendarRead.Unreadable("The family calendar did not answer."));
+            family: CalendarRead.Unreadable("The family calendar didn’t answer."));
 
         var read = Detect(calendars);
 
@@ -353,7 +353,7 @@ public class TripCalendarsTests
     [Fact]
     public void AFamilyEntryNamingOnePersonIsLeftAsItWasWhenAHoliday()
     {
-        var entries = Family(Calendars(family: [TripsFixtures.AllDay("Lee's beach vacation", 2, 4, Availability.Free)]));
+        var entries = Family(Calendars(family: [TripsFixtures.AllDay("Lee’s beach vacation", 2, 4, Availability.Free)]));
 
         Assert.Equal(Availability.Free, Assert.Single(entries).Availability);
     }

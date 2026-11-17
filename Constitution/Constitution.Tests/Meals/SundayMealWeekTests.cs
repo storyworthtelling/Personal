@@ -165,7 +165,7 @@ public class SundayMealWeekTests
 
         var rules = ExpectedDocument.ForMealSheet(model, Sam).Pages.Single().Rules.Cast<MealItemRule>().ToList();
 
-        Assert.Equal(SundayFirst.Select(day => day + "'s dinner: nothing planned"), rules.Select(rule => rule.Subject));
+        Assert.Equal(SundayFirst.Select(day => day + "’s dinner: nothing planned"), rules.Select(rule => rule.Subject));
         Assert.Equal(MealSheetIds.DinnerYesSunday, rules[0].YesBoxId);
         Assert.Equal(MealSheetIds.DinnerReasonSaturday, rules[6].ReasonId);
     }

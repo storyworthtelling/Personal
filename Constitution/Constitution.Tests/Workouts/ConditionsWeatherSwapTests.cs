@@ -461,7 +461,7 @@ public class WeatherSwapTests
     {
         var plan = ConditionsFixtures.Week(Tuesday5());
 
-        var result = ConditionsAdapter.Apply(ConditionsFixtures.FreeWeek(), plan, ConditionsRead.Unavailable("The forecast service did not answer."));
+        var result = ConditionsAdapter.Apply(ConditionsFixtures.FreeWeek(), plan, ConditionsRead.Unavailable("The forecast service didn’t answer."));
 
         Assert.False(result.ConditionsWereRead);
         Assert.Empty(result.Changes);
@@ -614,7 +614,7 @@ public class WeatherSwapTests
             rested += result.Changes.Count(change => change.Action == ConditionAction.Rested);
         }
 
-        Assert.True(changed > 100, $"The generated weeks changed only {changed} sessions; the test is not exercising the adapter.");
+        Assert.True(changed > 100, $"The generated weeks changed only {changed} sessions; the test isn’t exercising the adapter.");
         Assert.True(rested > 0, "No generated week rested a session.");
     }
 
@@ -678,7 +678,7 @@ public class WeatherSwapTests
     [Fact]
     public async Task AnUnavailableSourceChangesNothing()
     {
-        var source = new FakeSource(ConditionsRead.Unavailable("The forecast service did not answer."));
+        var source = new FakeSource(ConditionsRead.Unavailable("The forecast service didn’t answer."));
 
         var result = await ConditionsAdapter.AdaptAsync(ConditionsFixtures.FreeWeek(), ConditionsFixtures.Week(Tuesday5()), source, CancellationToken.None);
 
@@ -690,7 +690,7 @@ public class WeatherSwapTests
     public void NothingHereReachesTheNetwork()
     {
         var files = ConditionsAndTripsSources.Files();
-        Assert.True(files.Count >= 5, $"The guard found only {files.Count} files; it is not reading the real sources.");
+        Assert.True(files.Count >= 5, $"The guard found only {files.Count} files; it isn’t reading the real sources.");
         foreach (var file in files)
         {
             var text = File.ReadAllText(file);

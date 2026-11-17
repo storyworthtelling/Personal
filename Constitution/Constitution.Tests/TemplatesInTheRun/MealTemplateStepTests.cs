@@ -25,7 +25,7 @@ public class MealTemplateStepTests
     [Fact]
     public async Task AnUnreadableLibraryIsNeverAnEmptyOne()
     {
-        var store = new FakeTemplateStore { Answer = new TemplateLibraryRead.Unreadable("The household file does not open.") };
+        var store = new FakeTemplateStore { Answer = new TemplateLibraryRead.Unreadable("The household file doesn’t open.") };
         var author = new FakeTemplateAuthor();
 
         var result = await RunAsync(store, author);
@@ -278,7 +278,7 @@ public class MealTemplateStepTests
     [Fact]
     public async Task ARefusedSaveMeansNothingIsPrinted()
     {
-        var store = new FakeTemplateStore(Full()) { RefuseWith = "The household file does not open." };
+        var store = new FakeTemplateStore(Full()) { RefuseWith = "The household file doesn’t open." };
 
         var result = await RunAsync(store);
 

@@ -58,7 +58,10 @@ public class ScoreDownloadService : DownloadService
         }
 
         var channel = new Android.App.NotificationChannel(
-            ChannelId, GetString(Resource.String.downloads_channel), Android.App.NotificationImportance.Low);
+            ChannelId, GetString(Resource.String.downloads_channel), Android.App.NotificationImportance.Low)
+        {
+            Description = "Shown while episodes and albums download.",
+        };
         manager.CreateNotificationChannel(channel);
     }
 

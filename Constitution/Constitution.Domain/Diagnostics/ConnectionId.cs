@@ -44,7 +44,7 @@ public sealed record ConnectionId
 
         if (!ConnectionIds.All.Contains(text, StringComparer.Ordinal))
         {
-            throw new ArgumentException("That is not one of Constitution's connection ids.", nameof(text));
+            throw new ArgumentException("That is not one of Constitution’s connection ids.", nameof(text));
         }
 
         return new ConnectionId(text);

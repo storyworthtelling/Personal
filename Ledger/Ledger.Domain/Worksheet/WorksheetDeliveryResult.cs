@@ -34,7 +34,7 @@ public sealed record WorksheetDeliveryResult(
             return string.Empty;
         }
 
-        var parts = new List<string> { $"read back {LimitsApplied} limit(s)" };
+        var parts = new List<string> { "read back " + Storyworthtelling.Time.Quantities.Count(LimitsApplied.Value, "limit") };
         if (LimitsMarkedUnreadable is > 0)
         {
             parts.Add($"{LimitsMarkedUnreadable} unreadable");

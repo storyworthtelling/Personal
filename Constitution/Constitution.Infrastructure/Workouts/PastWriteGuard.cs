@@ -14,7 +14,7 @@ namespace Constitution.Infrastructure.Workouts;
 public sealed class PastWriteGuard(ICalendarWriter inner, Func<DateTimeOffset> clock) : ICalendarWriter
 {
     /// <summary>What a refused write says. A plain sentence: nothing of the calendar is in it.</summary>
-    public const string Reason = "That session's time has already passed, so no event was made for it.";
+    public const string Reason = "That session’s time has already passed, so no event was made for it.";
 
     private readonly ICalendarWriter inner = inner ?? throw new ArgumentNullException(nameof(inner));
     private readonly Func<DateTimeOffset> clock = clock ?? throw new ArgumentNullException(nameof(clock));

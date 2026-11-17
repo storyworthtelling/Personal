@@ -30,7 +30,7 @@ public class PlanContinuationTests
         var carried = pages.Where(page => page.Contains("(continued)", StringComparison.Ordinal)).ToList();
 
         Assert.True(carried.Count > 0,
-            "A plan of twenty-six items did not spill, so this test is no longer testing anything. "
+            "A plan of twenty-six items didn’t spill, so this test is no longer testing anything. "
             + "Lengthen it until it does.");
         Assert.Contains(carried, page => page.Contains("Should (continued)", StringComparison.Ordinal));
     }

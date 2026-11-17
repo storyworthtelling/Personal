@@ -31,7 +31,7 @@ public class VoicedOccasionTests
 
             Assert.True(offending is null,
                 $"The occasion \"{occasion}\" reads as trouble (\"{offending}\"). Errors are told in "
-                + "plain copy: a voiced failure sounds like banter about the owner's book, and puts a "
+                + "plain copy: a voiced failure sounds like banter about the owner’s book, and puts a "
                 + "model call on the path of reporting that a model call failed.");
         }
     }

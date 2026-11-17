@@ -38,12 +38,12 @@ internal static class Attachments
 
     private static string Describe(AttachmentRef attachment)
     {
-        var size = attachment.SizeBytes > 0 ? $"{attachment.SizeBytes / 1024} KB · " : string.Empty;
+        var size = attachment.SizeBytes > 0 ? Storyworthtelling.Time.Quantities.Size(attachment.SizeBytes) + " · " : string.Empty;
         return AttachmentPlan.For(attachment) switch
         {
             AttachmentAction.OpenInPlate => $"{size}opens in Plate",
             AttachmentAction.ShowInline => $"{size}opens here",
-            AttachmentAction.Refuse => $"{size}Post will not open this kind of file",
+            AttachmentAction.Refuse => $"{size}Post won’t open this kind of file",
             _ => $"{size}opens in whatever can read it",
         };
     }
@@ -59,9 +59,9 @@ internal static class Attachments
             // Said plainly rather than silently doing nothing: a tap that appears to do
             // nothing reads as a broken app, not as a refusal.
             DogEar.SetNotice(host, Overlay(host), NoticeKeys.Attachment, new DogEar.Notice(
-                "Post will not open that file.",
+                "Post won’t open that file.",
                 $"{attachment.FileName} is the kind of file that installs or runs something. "
-                + "Whoever sent it chose its name and its type, so Post does not open it at all.",
+                + "Whoever sent it chose its name and its type, so Post doesn’t open it at all.",
                 PaperTheme.ProblemMark));
             FieldNotesStore.Record(host, notes => notes.WithAttachmentOpened(opened: false));
             return;
@@ -94,8 +94,8 @@ internal static class Attachments
             Android.Util.Log.Warn("Post", $"Could not open an attachment: {e}");
             PostDiagnostics.LogWarning("Attachments", $"Could not open {attachment.FileName}", e);
             DogEar.SetNotice(host, Overlay(host), NoticeKeys.Attachment, new DogEar.Notice(
-                "That attachment would not open.",
-                "Nothing on the phone could read it, or it could not be fetched. Diagnostics has "
+                "That attachment wouldn’t open.",
+                "Nothing on the phone could read it, or it couldn’t be fetched. Diagnostics has "
                 + "the details.",
                 PaperTheme.ProblemMark));
             FieldNotesStore.Record(host, notes => notes.WithAttachmentOpened(opened: false));

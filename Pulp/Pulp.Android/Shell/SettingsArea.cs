@@ -38,7 +38,7 @@ namespace Pulp.Shell;
 public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Settings)
 {
     public const string ReadingStatus = "Reading the household…";
-    public const string UnreadableStatus = "The household couldn't be read just now.";
+    public const string UnreadableStatus = "The household couldn’t be read just now.";
 
     private SettingsAccordion? accordion;
     private CancellationTokenSource? loading;
@@ -159,7 +159,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
                     onTap: () => Host.StartActivity(HouseholdActivity.For(Host))));
             }
 
-            body.AddView(PaperUi.QuietButton(Host, "People, children's rules and this phone", () => Host.StartActivity(HouseholdActivity.For(Host))),
+            body.AddView(PaperUi.QuietButton(Host, "People, children’s rules and this phone", () => Host.StartActivity(HouseholdActivity.For(Host))),
                 SettingsViews.Spaced(Host, DesignTokens.Space.X2));
         });
     }
@@ -262,7 +262,7 @@ public sealed class SettingsArea(Activity host) : PulpAreaPage(host, PulpArea.Se
         }
         catch (PackageManager.NameNotFoundException exception)
         {
-            PulpServices.For(Host).Diagnostics.Warn("settings", "The package manager did not know Pulp's own package.", exception);
+            PulpServices.For(Host).Diagnostics.Warn("settings", "The package manager did not know Pulp’s own package.", exception);
             return null;
         }
     }

@@ -109,7 +109,7 @@ public static class ReadingPrompt
                 $"You are {persona.ReaderName ?? persona.Name}, the {persona.Name.ToLowerInvariant()}, reading the complete {noun} manuscript above, in character. "
                 + (persona.Voice is { } voice ? $"Your voice: {voice}. Let it shape how you write, never what you judge. " : string.Empty)
                 + words + genreLine + series + scale + fan + brief + purpose + NoLineEdits + score
-                + "Nobody else's notes are available to you, and you are not summarising the book.",
+                + "Nobody else’s notes are available to you, and you are not summarising the book.",
             PersonaKind.Section =>
                 $"You are reading the complete {noun} manuscript above for one thing only: {persona.Name}. "
                 + words + genreLine + series + scale + fan + brief
@@ -135,7 +135,7 @@ public static class ReadingPrompt
             ? string.Empty
             : $", where publishers usually expect {genre.WordCountRange.Trim()} words";
         return $"Read from the text, its genre is {genre.Genre.Trim()}{range}; weigh its length and its "
-            + "story against what that genre's readers expect. ";
+            + "story against what that genre’s readers expect. ";
     }
 
     /// <summary>
@@ -145,7 +145,7 @@ public static class ReadingPrompt
     /// </summary>
     private static string FanBrief(GenreFrame genre)
     {
-        var name = genre.IsKnown ? genre.Genre.Trim() : "this book's own genre";
+        var name = genre.IsKnown ? genre.Genre.Trim() : "this book’s own genre";
         return $"You are a devoted reader of {name}, not science fiction, fantasy or horror unless that is "
             + "what this book is. You picked this book up because it is the kind you love, so you "
             + $"want to like it; but you have read a great deal of {(genre.IsKnown ? name : "it")} and you are "

@@ -129,7 +129,7 @@ public class MmsSendReceiver : BroadcastReceiver
 
             if (path is null || !System.IO.File.Exists(path))
             {
-                PostDiagnostics.LogWarning("Mms", "A sent MMS's file was gone before it could be recorded.");
+                PostDiagnostics.LogWarning("Mms", "A sent MMS’s file was gone before it could be recorded.");
                 return;
             }
             var pdu = System.IO.File.ReadAllBytes(path);

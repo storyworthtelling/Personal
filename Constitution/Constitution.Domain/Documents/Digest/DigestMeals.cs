@@ -16,11 +16,11 @@ public static class DigestMeals
     {
         ArgumentNullException.ThrowIfNull(meals);
         var draft = new PageDraft("Meals");
-        draft.Kicker($"SATURDAY DIGEST · {number} OF {pages}");
+        draft.Kicker($"Saturday digest · {number} of {pages}");
         var baseline = 100f;
         if (!string.IsNullOrWhiteSpace(meals.LovedDish))
         {
-            draft.Line(PrintedRole.Label, PageDraft.Left, baseline, PageDraft.FullWidth, "THE DISH THIS HOUSE LOVED");
+            draft.Line(PrintedRole.Label, PageDraft.Left, baseline, PageDraft.FullWidth, "The dish this house loved");
             baseline += 22f;
             draft.Line(PrintedRole.Strong, PageDraft.Left, baseline, PageDraft.FullWidth, meals.LovedDish, name: "loved-dish");
             baseline += 36f;
@@ -28,7 +28,7 @@ public static class DigestMeals
 
         if (!string.IsNullOrWhiteSpace(meals.StretchDish))
         {
-            draft.Line(PrintedRole.Label, PageDraft.Left, baseline, PageDraft.FullWidth, "THE STRETCH");
+            draft.Line(PrintedRole.Label, PageDraft.Left, baseline, PageDraft.FullWidth, "The stretch");
             baseline += 22f;
             var verdict = string.IsNullOrWhiteSpace(meals.StretchVerdict) ? meals.StretchDish : $"{meals.StretchDish} — {meals.StretchVerdict}";
             draft.Line(PrintedRole.Body, PageDraft.Left, baseline, PageDraft.FullWidth, verdict, name: "stretch");
@@ -42,7 +42,7 @@ public static class DigestMeals
             baseline += 18f;
         }
 
-        draft.Line(PrintedRole.Label, PageDraft.Left, baseline, PageDraft.FullWidth, "THE WEEK IN THREE FACTS");
+        draft.Line(PrintedRole.Label, PageDraft.Left, baseline, PageDraft.FullWidth, "The week in three facts");
         baseline += 22f;
         var count = 0;
         foreach (var fact in meals.Facts.Take(3))
@@ -51,7 +51,7 @@ public static class DigestMeals
             baseline += 20f;
         }
 
-        PageDraft.RequireRoom(baseline, PageDraft.NotesBottom - 20f, "The digest's meals page");
+        PageDraft.RequireRoom(baseline, PageDraft.NotesBottom - 20f, "The digest’s meals page");
         draft.Footer("Digest", saturday.ToDateTime(TimeOnly.MinValue), number, pages);
         return draft.ToLayout();
     }
@@ -60,10 +60,10 @@ public static class DigestMeals
     {
         ArgumentNullException.ThrowIfNull(next);
         var draft = new PageDraft("Next week");
-        draft.Kicker($"SATURDAY DIGEST · {number} OF {pages}");
+        draft.Kicker($"Saturday digest · {number} of {pages}");
         var baseline = 100f;
-        baseline = List(draft, "WORKOUTS", next.Workouts, baseline, "workout");
-        baseline = List(draft, "DINNERS", next.Dinners, baseline + 10f, "dinner");
+        baseline = List(draft, "Workouts", next.Workouts, baseline, "workout");
+        baseline = List(draft, "Dinners", next.Dinners, baseline + 10f, "dinner");
 
         baseline += 16f;
         draft.Line(PrintedRole.Strong, PageDraft.Left, baseline, PageDraft.FullWidth, NotesHeading, name: "planner-heading");
@@ -78,7 +78,7 @@ public static class DigestMeals
             top += InkTargets.WriteLineHeight + InkTargets.MinimumClearance;
         }
 
-        PageDraft.RequireRoom(top, 556f, "The digest's next-week page");
+        PageDraft.RequireRoom(top, 556f, "The digest’s next-week page");
         draft.Footer("Digest", saturday.ToDateTime(TimeOnly.MinValue), number, pages);
         return draft.ToLayout();
     }

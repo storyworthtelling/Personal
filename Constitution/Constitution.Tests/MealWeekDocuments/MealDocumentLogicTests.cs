@@ -83,9 +83,9 @@ public class MealDocumentLogicTests
     [Fact]
     public void ABlockedFileIsNoRoster()
     {
-        var read = Assert.IsType<MealRosterRead.Unavailable>(MealRosterReading.From(new RosterView(People(), []), "The file will not open."));
+        var read = Assert.IsType<MealRosterRead.Unavailable>(MealRosterReading.From(new RosterView(People(), []), "The file won’t open."));
 
-        Assert.Equal("The file will not open.", read.Reason);
+        Assert.Equal("The file won’t open.", read.Reason);
     }
 
     [Fact]

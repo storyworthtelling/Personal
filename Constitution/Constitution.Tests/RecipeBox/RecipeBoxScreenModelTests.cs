@@ -59,7 +59,7 @@ public class RecipeBoxScreenModelTests
         Assert.Equal(3, model.Empty.PlaceTitles.Count(title => title is not null));
         Assert.All(model.Empty.PlaceTitles.Skip(3), title => Assert.Null(title));
         Assert.Equal("Scan a recipe card", model.PrimaryAction);
-        Assert.Equal("Ten family favourites, and the planning can begin.", model.Empty.State.Invitation);
+        Assert.Equal("Ten family favorites, and the planning can begin.", model.Empty.State.Invitation);
     }
 
     [Fact]

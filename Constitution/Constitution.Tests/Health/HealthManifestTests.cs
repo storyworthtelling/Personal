@@ -45,7 +45,7 @@ public class HealthManifestTests
         //    legacy action Health Connect resolves on older platforms.
         var source = HeadSources().Where(file => file.Text.Contains(
             "Name = ConstitutionIdentity.HealthRationaleActivityName", StringComparison.Ordinal)).ToList();
-        Assert.True(source.Count == 1, "Exactly one head class must carry the rationale activity's registered name.");
+        Assert.True(source.Count == 1, "Exactly one head class must carry the rationale activity’s registered name.");
         Assert.Contains("[Activity(", source[0].Text, StringComparison.Ordinal);
         Assert.Contains("Exported = true", source[0].Text, StringComparison.Ordinal);
         Assert.Contains("[IntentFilter([\"" + ShowRationale + "\"]", source[0].Text, StringComparison.Ordinal);
@@ -169,7 +169,7 @@ public class HealthManifestTests
             .Select(ConstitutionSource.Relative)
             .ToList();
 
-        Assert.True(mentions.Count == 0, "Lean body mass is not read; remove it from:\n" + string.Join("\n", mentions));
+        Assert.True(mentions.Count == 0, "Lean body mass isn’t read; remove it from:\n" + string.Join("\n", mentions));
     }
 
     // ---- the detectors themselves ----
@@ -229,7 +229,7 @@ public class HealthManifestTests
     private static XDocument HandWrittenManifest()
     {
         var path = Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "Properties", "AndroidManifest.xml");
-        Assert.True(File.Exists(path), "Constitution.Android/Properties/AndroidManifest.xml was not found.");
+        Assert.True(File.Exists(path), "Constitution.Android/Properties/AndroidManifest.xml wasn’t found.");
         return XDocument.Load(path);
     }
 

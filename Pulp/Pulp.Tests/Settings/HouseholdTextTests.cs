@@ -12,7 +12,7 @@ public class HouseholdTextTests
 
     [Fact]
     public void AKnownPhoneNamesItsOwner() =>
-        Assert.Equal("This phone is Sam's.", HouseholdText.ThisPhone(new ThisPhoneAnswer(ThisPhoneStatus.Known, Sam), _ => "Sam"));
+        Assert.Equal("This phone is Sam’s.", HouseholdText.ThisPhone(new ThisPhoneAnswer(ThisPhoneStatus.Known, Sam), _ => "Sam"));
 
     [Fact]
     public void AnUnmatchedPhoneSaysTheSharedSentence() =>

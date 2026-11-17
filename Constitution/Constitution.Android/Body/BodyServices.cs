@@ -55,7 +55,7 @@ public sealed class BodyServices
     {
         var appContext = context.ApplicationContext ?? context;
         var directory = appContext.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep Body's readings in.");
+            ?? throw new InvalidOperationException("The app has no private files folder to keep Body’s readings in.");
         return new JsonBodyStore(Path.Combine(directory, ReadingsFile));
     }
 
@@ -64,7 +64,7 @@ public sealed class BodyServices
     {
         var appContext = context.ApplicationContext ?? context;
         var directory = appContext.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep Body's readings in.");
+            ?? throw new InvalidOperationException("The app has no private files folder to keep Body’s readings in.");
         var log = new BodyLog(appContext);
         var source = new HealthConnectSource(appContext, log);
         var store = CreateStore(appContext);

@@ -33,9 +33,7 @@ public static class PulpUsageLine
         var thisMonth = entries.FirstOrDefault(entry => entry.YearMonth == viewedYearMonth);
         if (thisMonth is { Count: > 0 })
         {
-            return thisMonth.Count == 1
-                ? "Opened 1 time in Pulp"
-                : string.Create(CultureInfo.InvariantCulture, $"Opened {thisMonth.Count} times in Pulp");
+            return "Opened " + Storyworthtelling.Time.Quantities.Times(thisMonth.Count) + " in Pulp";
         }
 
         if (viewedYearMonth != $"{today.Year:D4}-{today.Month:D2}")

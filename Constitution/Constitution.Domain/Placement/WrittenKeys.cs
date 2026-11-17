@@ -132,7 +132,7 @@ public static class WrittenKeysCodec
         }
         catch (JsonException error)
         {
-            return WrittenKeysRead.Unreadable($"The record of written events is not valid JSON ({error.Message}).");
+            return WrittenKeysRead.Unreadable($"The record of written events isn’t valid JSON ({error.Message}).");
         }
     }
 
@@ -140,7 +140,7 @@ public static class WrittenKeysCodec
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
-            return WrittenKeysRead.Unreadable("The record of written events is not a JSON object.");
+            return WrittenKeysRead.Unreadable("The record of written events isn’t a JSON object.");
         }
 
         if (!root.TryGetProperty(VersionField, out var version)
@@ -148,7 +148,7 @@ public static class WrittenKeysCodec
             || !version.TryGetInt32(out var number)
             || number != CurrentVersion)
         {
-            return WrittenKeysRead.Unreadable($"The record of written events is not version {CurrentVersion}, so it was not read.");
+            return WrittenKeysRead.Unreadable($"The record of written events isn’t version {CurrentVersion}, so it wasn’t read.");
         }
 
         if (!root.TryGetProperty(WrittenField, out var written) || written.ValueKind != JsonValueKind.Array)
@@ -161,7 +161,7 @@ public static class WrittenKeysCodec
         {
             if (item.ValueKind != JsonValueKind.String || !PlacementKey.TryFromStored(item.GetString(), out var key))
             {
-                return WrittenKeysRead.Unreadable("The record of written events holds an entry that is not a key this app wrote.");
+                return WrittenKeysRead.Unreadable("The record of written events holds an entry that isn’t a key this app wrote.");
             }
 
             keys.Add(key);

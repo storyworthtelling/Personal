@@ -76,7 +76,7 @@ public sealed class DriveHouseholdStore : IHouseholdStore
         if (result.Outcome == HouseholdPublishOutcome.NotYetShared)
         {
             throw new HouseholdNotSharedException(
-                $"The household was not saved to Drive: no '{FileName}' is visible to this account, and only the owner's account creates it. The owner shares it once from their Drive.");
+                $"The household wasn’t saved to Drive: no '{FileName}' is visible to this account, and only the owner’s account creates it. The owner shares it once from their Drive.");
         }
     }
 
@@ -172,13 +172,13 @@ public sealed class DriveHouseholdStore : IHouseholdStore
             case SealedReadStatus.WrongPassphrase:
                 throw new HouseholdUnreadableException(
                     HouseholdUnreadableReason.WrongPassphrase,
-                    $"'{FileName}' in Drive does not open with this phone's vault passphrase; it is left exactly as it is.");
+                    $"'{FileName}' in Drive doesn’t open with this phone’s vault passphrase; it is left exactly as it is.");
             case SealedReadStatus.Loaded:
                 break;
             default:
                 throw new HouseholdUnreadableException(
                     HouseholdUnreadableReason.Damaged,
-                    $"'{FileName}' in Drive is not a readable encrypted file ({read.Status}); it is left exactly as it is.");
+                    $"'{FileName}' in Drive isn’t a readable encrypted file ({read.Status}); it is left exactly as it is.");
         }
 
         try
@@ -189,7 +189,7 @@ public sealed class DriveHouseholdStore : IHouseholdStore
         {
             throw new HouseholdUnreadableException(
                 exception.IsNewerFormat ? HouseholdUnreadableReason.NewerFormat : HouseholdUnreadableReason.Damaged,
-                $"'{FileName}' in Drive opened but could not be read as a household, so it is left exactly as it is: {exception.Message}",
+                $"'{FileName}' in Drive opened but couldn’t be read as a household, so it is left exactly as it is: {exception.Message}",
                 exception);
         }
     }

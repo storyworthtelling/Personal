@@ -43,7 +43,7 @@ public class MealsTabSourceTests
     [Fact]
     public void TheGuardReadsTheTabAndIsNotVacuous()
     {
-        Assert.True(Files().Count >= 5, "The Meals tab files were not found: " + Files().Count);
+        Assert.True(Files().Count >= 5, "The Meals tab files weren’t found: " + Files().Count);
     }
 
     [Fact]

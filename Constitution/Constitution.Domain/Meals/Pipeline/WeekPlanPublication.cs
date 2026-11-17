@@ -30,7 +30,7 @@ public enum WeekPlanSkipReason
 public sealed record WeekPlanSkipped(RecordKey Key, WeekPlanSkipReason Reason)
 {
     public const string UnknownVersionSentence = "A week plan was written by a newer version of the app, so this phone left it alone.";
-    public const string UnreadableSentence = "A week plan in the household file could not be read, so this phone left it alone.";
+    public const string UnreadableSentence = "A week plan in the household file couldn’t be read, so this phone left it alone.";
 
     public string Sentence => Reason == WeekPlanSkipReason.UnknownVersion ? UnknownVersionSentence : UnreadableSentence;
 }

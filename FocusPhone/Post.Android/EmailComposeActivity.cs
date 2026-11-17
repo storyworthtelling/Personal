@@ -67,7 +67,7 @@ public class EmailComposeActivity : Activity
         var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
         var content = new LinearLayout(this) { Orientation = Orientation.Vertical };
         content.AddView(PaperUi.ProblemLine(this,
-            "Gmail is not set up on this phone yet, so this email cannot be sent."), Row());
+            "Gmail isn’t set up on this phone yet, so this email can’t be sent."), Row());
 
         var framed = BinderFrame.Wrap(
             this, $"Email {name}", PostShellAreas.All[PostShellAreas.Mailbox].Hue, content,
@@ -151,7 +151,7 @@ public class EmailComposeActivity : Activity
         var path = CopyToCache(data.Data);
         if (path is null)
         {
-            attachmentList!.AddView(PaperUi.ProblemLine(this, "That file could not be attached. It may have moved, or the app that holds it would not hand it over."));
+            attachmentList!.AddView(PaperUi.ProblemLine(this, "That file couldn’t be attached. It may have moved, or the app that holds it wouldn’t hand it over."));
             return;
         }
         attachmentPaths.Add(path);

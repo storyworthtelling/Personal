@@ -17,7 +17,7 @@ public class WebTapsSeenTests
         var source = LogLoopSource.File("FocusPhone/Flyleaf.Android/RestrictedBrowserActivity.cs");
 
         var started = Regex.Match(source, @"public override void OnPageStarted\(WebView\? view, string\? url, Android\.Graphics\.Bitmap\? favicon\)\s*\{(?<body>.*?)\n        \}", RegexOptions.Singleline);
-        Assert.True(started.Success, "The browser's web view client should override OnPageStarted.");
+        Assert.True(started.Success, "The browser’s web view client should override OnPageStarted.");
         Assert.Contains("activity.ShowAddress(url)", started.Groups["body"].Value, StringComparison.Ordinal);
     }
 

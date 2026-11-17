@@ -130,7 +130,7 @@ public class PlacementRunnerTests
     public async Task ARecordThatCannotBeReadWritesNothing()
     {
         var calendar = new FakeCalendar();
-        const string Garbled = "{ this is not the record";
+        const string Garbled = "{ this isn’t the record";
         var store = new MemoryKeyStore { Json = Garbled };
 
         var run = await RunAsync(calendar, store, Week());

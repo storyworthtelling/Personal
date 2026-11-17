@@ -169,7 +169,7 @@ public class SorenessTests
         var names = week.Plan.Plans.SelectMany(plan => plan.Sessions).SelectMany(session => session.Session.Exercises).Select(item => item.Name).Distinct().ToList();
 
         Assert.NotEmpty(names);
-        Assert.All(names, name => Assert.True(ExerciseLoads.IsKnown(name), $"'{name}' is not in the loads table."));
+        Assert.All(names, name => Assert.True(ExerciseLoads.IsKnown(name), $"'{name}' isn’t in the loads table."));
     }
 
     // ---- sessions that are not exercise lists ----

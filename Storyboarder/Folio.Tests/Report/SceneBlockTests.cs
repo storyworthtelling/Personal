@@ -75,7 +75,7 @@ public class SceneBlockTests
         Assert.Contains("Last draft: Tighten", text, StringComparison.Ordinal);
         Assert.Contains("It ran long.", text, StringComparison.Ordinal);
         Assert.True(text.IndexOf("It lands now.", StringComparison.Ordinal) < text.IndexOf("It ran long.", StringComparison.Ordinal),
-            "This draft's verdict comes first; the last draft's follows it.");
+            "This draft’s verdict comes first; the last draft’s follows it.");
     }
 
     [Fact]
@@ -99,9 +99,9 @@ public class SceneBlockTests
         var sceneTwoStarts = text.IndexOf("walked the sea wall", StringComparison.Ordinal);
         var blockTwo = text.IndexOf("Shows the village", StringComparison.Ordinal);
 
-        Assert.True(sceneOneEnds >= 0 && sceneOneEnds < blockOne, "Block one should follow scene one's prose.");
+        Assert.True(sceneOneEnds >= 0 && sceneOneEnds < blockOne, "Block one should follow scene one’s prose.");
         Assert.True(blockOne < sceneTwoStarts, "Block one should come before scene two begins.");
-        Assert.True(sceneTwoStarts < blockTwo, "Block two should follow scene two's prose.");
+        Assert.True(sceneTwoStarts < blockTwo, "Block two should follow scene two’s prose.");
     }
 
     [Fact]

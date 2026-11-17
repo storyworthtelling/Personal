@@ -181,7 +181,7 @@ public class BookClothPaletteTests
         var suiteBooks = SuitePackagesNamedInPolicy()
             .Where(package => package != PolicyContext.LauncherPackage)
             .ToList();
-        Assert.True(suiteBooks.Count >= 7, "Expected the suite's books in PolicyContext; found " + suiteBooks.Count);
+        Assert.True(suiteBooks.Count >= 7, "Expected the suite’s books in PolicyContext; found " + suiteBooks.Count);
 
         var hashed = suiteBooks.Where(package => !BookClothPalette.HasChosenBinding(package)).ToList();
 

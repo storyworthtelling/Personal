@@ -99,7 +99,7 @@ public sealed class ClaudeJournalTranscriber : IJournalTranscriber, IPrayerReade
             + $"{{\"{JournalRegions.Journalling}\": string — everything written in the upper region, "
             + "as one block with the line breaks preserved, or \"\" if nothing is written there; "
             + $"\"{JournalRegions.Adding}\": array of strings — one per written line in the lower "
-            + "region, or [] if none. Do not move a line between regions on the strength of what it "
+            + "region, or [] if none. Don’t move a line between regions on the strength of what it "
             + "says. Where it is written is what decides.";
     }
 

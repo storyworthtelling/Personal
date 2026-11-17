@@ -55,7 +55,7 @@ public class TasteProfileTests
     public async Task ALastingLessonUpdatesOnlyThatPerson()
     {
         var judge = new FakeTasteJudge(evidence => new TasteJudgement.Lasting([new TasteLesson(TasteSubjectKind.Ingredient, "mushrooms", TasteStance.Dislikes)]));
-        var evidence = new TasteEvidence(Robin, TasteEvidenceKind.Denial, "I just don't like mushrooms", Risotto, Day(1));
+        var evidence = new TasteEvidence(Robin, TasteEvidenceKind.Denial, "I just don’t like mushrooms", Risotto, Day(1));
 
         var learned = await TasteLearner.LearnAsync([evidence], judge, CancellationToken.None);
         var profile = Build(notes: learned.Notes);

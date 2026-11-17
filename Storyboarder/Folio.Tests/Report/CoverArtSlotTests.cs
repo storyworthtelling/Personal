@@ -18,11 +18,11 @@ public class CoverArtSlotTests
         var slot = CoverArtSlot.Place(top: 120f);
 
         Assert.True(slot.Left > PageGeometry.ContentLeft - 0.001f,
-            $"The slot's left edge ({slot.Left}) is outside the content column ({PageGeometry.ContentLeft}).");
+            $"The slot’s left edge ({slot.Left}) is outside the content column ({PageGeometry.ContentLeft}).");
         Assert.True(slot.Right < PageGeometry.ContentRight + 0.001f,
-            $"The slot's right edge ({slot.Right}) is outside the content column ({PageGeometry.ContentRight}).");
+            $"The slot’s right edge ({slot.Right}) is outside the content column ({PageGeometry.ContentRight}).");
         Assert.True(slot.Bottom < PageGeometry.ContentBottom,
-            $"The slot's foot ({slot.Bottom}) runs past the content box ({PageGeometry.ContentBottom}).");
+            $"The slot’s foot ({slot.Bottom}) runs past the content box ({PageGeometry.ContentBottom}).");
 
         // The margin the eye actually reads: paper between the keyline and the trim, on both sides.
         Assert.True(slot.Left >= PageGeometry.SideMargin,
@@ -48,7 +48,7 @@ public class CoverArtSlotTests
 
         Assert.Equal(318f, slot.Width, 3);
         Assert.Equal(398f, slot.Height, 3);
-        Assert.True(CoverArtSlot.KeylineWidth > 0, "The slot has no keyline, so it is not framed at all.");
+        Assert.True(CoverArtSlot.KeylineWidth > 0, "The slot has no keyline, so it isn’t framed at all.");
     }
 
     /// <summary>

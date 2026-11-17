@@ -24,7 +24,7 @@ public class CameraWordsTests
     public void RefusedForGoodSaysWhereToTurnItOn()
     {
         Assert.False(CameraWords.ShouldAsk(CameraAccess.Refused));
-        Assert.Equal("Camera access is off for Plate. Turn it on in the phone's settings, under Apps, Plate, Permissions.",
+        Assert.Equal("Camera access is off for Plate. Turn it on in the phone’s settings, under Apps, Plate, Permissions.",
             CameraWords.ForShutter(CameraAccess.Refused));
     }
 

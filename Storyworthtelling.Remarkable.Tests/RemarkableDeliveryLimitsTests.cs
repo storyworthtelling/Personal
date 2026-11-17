@@ -27,7 +27,7 @@ public class RemarkableDeliveryLimitsTests
     public void ARefusalSaysWhyInPlainWords()
     {
         Assert.Equal(
-            "the PDF is 173 MB, over the tablet's 100 MB limit",
+            "the PDF is 173 MB, over the tablet’s 100 MB limit",
             RemarkableLimits.TooLarge(173_000_000)!.Sentence);
         Assert.Equal(
             "the phone ran out of memory sending it (173 MB)",

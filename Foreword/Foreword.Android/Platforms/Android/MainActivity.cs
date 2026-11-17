@@ -47,7 +47,7 @@ public class MainActivity : MauiAppCompatActivity
             // Restore is a convenience (the Settings page always accepts the credentials manually), but the reason it did not
             // complete is kept, as Index keeps it (audit 08 §7). The vault's own outcome is already its trail line.
             Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write(
-                "Vault", Microsoft.Extensions.Logging.LogLevel.Warning, "Vault restore at launch did not complete", ex);
+                "Vault", Microsoft.Extensions.Logging.LogLevel.Warning, "Vault restore at launch didn’t complete", ex);
         }
     });
 

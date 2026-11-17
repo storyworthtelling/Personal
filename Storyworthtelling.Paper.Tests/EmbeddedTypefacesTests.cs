@@ -36,7 +36,7 @@ public class EmbeddedTypefacesTests
         var missing = fonts.Where(font => !embedded.Contains(font!)).ToList();
 
         Assert.True(missing.Count == 0,
-            "These ship with every app and cannot be drawn by the library that prints, so Skia "
+            "These ship with every app and can’t be drawn by the library that prints, so Skia "
             + "substitutes something and says nothing:\n" + string.Join("\n", missing));
     }
 

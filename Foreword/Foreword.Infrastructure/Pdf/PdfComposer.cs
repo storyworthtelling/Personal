@@ -198,7 +198,7 @@ public class PdfComposer : IPdfComposer
         var ledeFont = SkiaPageLayout.Serif(PaperTypeScale.Heading);
         var bodyFont = SkiaPageLayout.Sans(PaperTypeScale.Body);
 
-        layout.DrawWrapped(article.Section.ToUpperInvariant(), kickerFont);
+        layout.DrawWrapped(article.Section, kickerFont);
         layout.Advance(4);
 
         layout.DrawWrapped(article.Title, headlineFont, lineSpacing: 1.15);
@@ -215,7 +215,7 @@ public class PdfComposer : IPdfComposer
         // the reader has no way to tell the difference.
         if (article.AbstractOnly)
         {
-            layout.DrawWrapped("Abstract only — the full article did not fetch.", noticeFont);
+            layout.DrawWrapped("Abstract only — the full article didn’t fetch.", noticeFont);
             layout.Advance(4);
         }
 

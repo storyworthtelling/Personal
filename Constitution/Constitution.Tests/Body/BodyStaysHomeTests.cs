@@ -74,7 +74,7 @@ public class BodyStaysHomeTests
         var walk = TypeGraph.Walk(roots, BodyVocabulary.Current.ForbiddenTypes);
         var names = walk.Reached.Select(type => type.Name).ToHashSet();
 
-        Assert.True(roots.Count >= 15, $"Only {roots.Count} payload types were found; the guard is not reading the real surface.");
+        Assert.True(roots.Count >= 15, $"Only {roots.Count} payload types were found; the guard isn’t reading the real surface.");
         foreach (var expected in new[]
         {
             nameof(Notice), nameof(NoticeKind), nameof(NoticeBoard), nameof(WaitingItem), nameof(WaitingPageModel),
@@ -101,7 +101,7 @@ public class BodyStaysHomeTests
             .Where(type => type.Namespace == "Constitution.Domain.Body" && !type.IsNested)
             .Where(type => type.GetCustomAttribute<System.Runtime.CompilerServices.CompilerGeneratedAttribute>() is null)
             .ToList();
-        Assert.True(inTheNamespace.Count >= 9, "The Body namespace looks empty; the guard is not reading the real one.");
+        Assert.True(inTheNamespace.Count >= 9, "The Body namespace looks empty; the guard isn’t reading the real one.");
         Assert.All(inTheNamespace, type => Assert.Contains(type, forbidden));
     }
 
@@ -341,7 +341,7 @@ public class BodyStaysHomeTests
         Assert.All(BodyOutbound.HeadFilesMayHandleBodyAndLeave, path =>
         {
             Assert.EndsWith(".cs", path, StringComparison.Ordinal);
-            Assert.True(File.Exists(Path.Combine(HeadRoot(), path)), $"{path} is on the head allowlist but does not exist.");
+            Assert.True(File.Exists(Path.Combine(HeadRoot(), path)), $"{path} is on the head allowlist but doesn’t exist.");
         });
     }
 
@@ -417,7 +417,7 @@ public class BodyStaysHomeTests
         Assert.True(referencing.Count >= 4);
         Assert.All(referencing, path => Assert.True(
             BodyOutbound.InfrastructureAllowlist.Any(entry => entry.Allows(path)),
-            $"{path} names a Body type and is not allowlisted."));
+            $"{path} names a Body type and isn’t allowlisted."));
     }
 
     [Fact]
@@ -435,7 +435,7 @@ public class BodyStaysHomeTests
                 Assert.EndsWith(".cs", entry.Path, StringComparison.Ordinal);
                 Assert.True(
                     File.Exists(Path.Combine(InfrastructureRoot(), entry.Path)),
-                    $"{entry.Path} is on the allowlist but does not exist.");
+                    $"{entry.Path} is on the allowlist but doesn’t exist.");
             }
         });
         Assert.All(BodyOutbound.SeatFactBuilderFiles, path => Assert.StartsWith("Voice/", path, StringComparison.Ordinal));
@@ -450,7 +450,7 @@ public class BodyStaysHomeTests
             GuardScan.Plant(root, "Voice/SeatLeak.cs", "using Constitution.Domain.Body;\nclass SeatLeak { IBodyStore store; }\n");
             GuardScan.Plant(root, "Vault/Sneaky.cs", "class Sneaky { void F(BodyReading r) { } }\n");
             GuardScan.Plant(root, "Backup/Fine.cs", "class Fine { IBodyStore store; BodyHistory history; }\n");
-            GuardScan.Plant(root, "Voice/Mention.cs", "// IBodyStore is not used here\nclass Mention { string s = \"BodyReading\"; }\n");
+            GuardScan.Plant(root, "Voice/Mention.cs", "// IBodyStore isn’t used here\nclass Mention { string s = \"BodyReading\"; }\n");
 
             var violations = InfrastructureBody.Violations(root.FullName, BodyOutbound.InfrastructureAllowlist);
 
@@ -469,7 +469,7 @@ public class BodyStaysHomeTests
 
         Assert.True(
             offenders.Count == 0,
-            "A file allowed to name Body because it keeps Body on the install can reach the network, Drive or the voice's model:\n"
+            "A file allowed to name Body because it keeps Body on the install can reach the network, Drive or the voice’s model:\n"
             + string.Join("\n", offenders));
     }
 
@@ -635,9 +635,9 @@ internal static class BodyOutbound
     public static IReadOnlyList<AllowedPath> InfrastructureAllowlist { get; } =
     [
         new AllowedPath("Backup/", "the private, encrypted Body backup: the only place Body leaves the install (C-7.4.1, D98)", MayLeave: true),
-        new AllowedPath("Body/", "the install's own Body store and readers: they hold Body here and have no way out"),
+        new AllowedPath("Body/", "the install’s own Body store and readers: they hold Body here and have no way out"),
         .. SeatFactBuilderFiles.Select(file => new AllowedPath(file, "a voice-seat fact builder: the facts a seat needs and no more (D98)")),
-        new AllowedPath("Documents/LiveDigestSources.cs", "reads the install's own Body store for the Saturday digest and holds it in memory with no way out; the digest reaches only the owner's own tablet, through the renderer and delivery service, which never name Body (D165)"),
+        new AllowedPath("Documents/LiveDigestSources.cs", "reads the install’s own Body store for the Saturday digest and holds it in memory with no way out; the digest reaches only the owner’s own tablet, through the renderer and delivery service, which never name Body (D165)"),
     ];
 
     /// <summary>Every type in the payload namespaces, plus the individually registered roots.</summary>

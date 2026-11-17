@@ -114,8 +114,8 @@ public sealed class InstallRoleService
             UnresolvedReason = found.Kind switch
             {
                 HouseholdFileKind.Absent => "No household file has been published yet.",
-                HouseholdFileKind.Unreadable => found.Detail ?? "The household file could not be read.",
-                _ => "The household file does not name a publisher.",
+                HouseholdFileKind.Unreadable => found.Detail ?? "The household file couldn’t be read.",
+                _ => "The household file doesn’t name a publisher.",
             };
             return InstallRole.Owner;
         }

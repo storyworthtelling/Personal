@@ -217,7 +217,7 @@ public sealed class BodyBackup
                 // Another install wrote since the read; tried again after the next quiet window, merged then.
                 return new BodyBackupResult(BodyBackupOutcome.Unreachable, "The backup changed in Drive since it was read; it will be merged and tried again.");
             case SealedWriteOutcome.Unconfirmed:
-                return new BodyBackupResult(BodyBackupOutcome.Failed, "The file written could not be read back; the previous file was put back.");
+                return new BodyBackupResult(BodyBackupOutcome.Failed, "The file written couldn’t be read back; the previous file was put back.");
             case SealedWriteOutcome.Refused:
                 return new BodyBackupResult(BodyBackupOutcome.RefusedUnreadable, written.Detail);
             default:

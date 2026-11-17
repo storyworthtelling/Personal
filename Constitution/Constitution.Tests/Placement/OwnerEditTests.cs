@@ -224,7 +224,7 @@ public class OwnerEditTests
         var files = ConstitutionSource.Files(".cs")
             .Where(file => ConstitutionSource.Relative(file).StartsWith("Constitution.Domain/Placement/", StringComparison.Ordinal))
             .ToList();
-        Assert.True(files.Count >= 6, $"The guard found only {files.Count} placement files; it is not reading them.");
+        Assert.True(files.Count >= 6, $"The guard found only {files.Count} placement files; it isn’t reading them.");
 
         var offenders = files
             .Where(file => Regex.IsMatch(File.ReadAllText(file), @"Domain\.Notices|NoticeBoard|INoticeBoardAccess"))

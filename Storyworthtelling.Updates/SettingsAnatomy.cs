@@ -19,7 +19,7 @@ public static class SettingsAnatomy
         var own = appGroups.ToList();
         if (own.FirstOrDefault(IsShared) is { } taken)
         {
-            throw new ArgumentException($"\"{taken}\" is one of the suite's own groups; an app group needs a name of its own.", nameof(appGroups));
+            throw new ArgumentException($"\"{taken}\" is one of the suite’s own groups; an app group needs a name of its own.", nameof(appGroups));
         }
 
         var order = new List<string>();

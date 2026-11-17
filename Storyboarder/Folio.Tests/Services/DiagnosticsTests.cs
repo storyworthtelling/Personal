@@ -87,7 +87,7 @@ public class DiagnosticsTests : IDisposable
     {
         Seed(new BookAnalysis { PdfStatus = WorkStatus.Failed });
 
-        Assert.Contains("Report: could not be rendered", await Report(), StringComparison.Ordinal);
+        Assert.Contains("Report: couldn’t be rendered", await Report(), StringComparison.Ordinal);
     }
 
     /// <summary>The name the document was delivered under, so the owner can search Drive for it.</summary>

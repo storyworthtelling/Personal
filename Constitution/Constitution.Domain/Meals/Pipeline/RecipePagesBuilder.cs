@@ -37,7 +37,7 @@ public static class RecipePagesBuilder
 
         if (dinner.Kind != DinnerKind.Cooked || dinner.Recipe != card.Id)
         {
-            throw new ArgumentException($"{dinner.Day.DayOfWeek}'s dinner is not a cooked '{card.Title}', so it has no recipe to print.", nameof(dinner));
+            throw new ArgumentException($"{dinner.Day.DayOfWeek}’s dinner is not a cooked '{card.Title}', so it has no recipe to print.", nameof(dinner));
         }
 
         if (card.Steps.Count == 0)
@@ -49,7 +49,7 @@ public static class RecipePagesBuilder
         if (eaters.Count > RecipeRatingPage.MostEaters)
         {
             throw new ArgumentException(
-                $"The rating page holds {RecipeRatingPage.MostEaters} eaters and the household has {eaters.Count}; it cannot ask after everyone.", nameof(people));
+                $"The rating page holds {RecipeRatingPage.MostEaters} eaters and the household has {eaters.Count}; it can’t ask after everyone.", nameof(people));
         }
 
         var headcount = new RecipeHeadcount(eaters.Count(person => person.Role == MemberRole.Adult), eaters.Count(person => person.Role == MemberRole.Child));

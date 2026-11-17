@@ -63,14 +63,14 @@ public static class EmptyMailbox
     public static IReadOnlyList<EmptySeed> Seeds { get; } =
     [
         new("cleared", ["Oh good, you finally cleared up the clutter. It was getting hard to focus around here."]),
-        new("important", ["I hope you didn't delete anything important."]),
+        new("important", ["I hope you didn’t delete anything important."]),
         new("waiting", ["Nothing is waiting."]),
         new("caught-up", ["You are caught up."]),
         new("desk-clear", ["The desk is clear."]),
         new("no-post", ["No post today."]),
         new("go-away",
         [
-            "Hey, maybe go use a different app. I'll notify you if anything comes up here.",
+            "Hey, maybe go use a different app. I’ll notify you if anything comes up here.",
             "Still nothing. I did say I would notify you.",
             "You are back again. There is still nothing. This one is on you.",
             "…",

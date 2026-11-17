@@ -124,7 +124,7 @@ public sealed class DiagnosticsLookupCounter : ILookupCounter
         }
         catch (IOException failure)
         {
-            diagnostics.Warn("lookups", "The month's lookup tally could not be saved.", failure);
+            diagnostics.Warn("lookups", "The month’s lookup tally could not be saved.", failure);
         }
     }
 }

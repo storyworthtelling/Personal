@@ -30,7 +30,7 @@
                     <VerticalStackLayout x:Name="Rows" />
                 </Border>
 
-                <Label Text="One-off requests are written on the journal page, under &quot;Add to the list&quot;. These are the lists that come round again."
+                <Label Text="One-off requests are written on the journal page, under &quot;Add to the list&quot;. These are the lists that come around again."
                        Style="{StaticResource CardCaption}" />
 
             </VerticalStackLayout>

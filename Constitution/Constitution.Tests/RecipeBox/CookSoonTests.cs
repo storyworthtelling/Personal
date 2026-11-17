@@ -61,7 +61,7 @@ public class CookSoonTests
         var state = CookSoon.Press(source, Chili, CookSoonState.Offer);
 
         Assert.Equal(CookSoonState.Unavailable, state);
-        Assert.Equal("Planning is not set up yet, so nothing was placed.", CookSoon.Words(state));
+        Assert.Equal("Planning isn’t set up yet, so nothing was placed.", CookSoon.Words(state));
         Assert.True(CookSoon.OffersAButton(state));
     }
 

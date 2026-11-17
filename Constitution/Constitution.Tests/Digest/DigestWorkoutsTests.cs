@@ -68,7 +68,7 @@ public class DigestWorkoutsTests
     {
         var page = DigestWorkouts.Page(DigestWorkouts.Summarise(DigestFixture.Week()), DigestFixture.Saturday, 1, 5);
         var moved = string.Join(" ", page.Printed.Where(item => item.Name.StartsWith("moved-", StringComparison.Ordinal)).Select(item => item.Text));
-        Assert.Equal("Wednesday's walk moved to Thursday for the forecast.", moved);
+        Assert.Equal("Wednesday’s walk moved to Thursday for the forecast.", moved);
     }
 
     [Fact]

@@ -29,7 +29,7 @@ public sealed class PlaylistEditor
 
     private static readonly PickerOption[] Operators =
     [
-        new("is"), new("contains"), new("is not"),
+        new("is"), new("contains"), new("isn’t"),
     ];
 
     private static readonly PickerOption[] Matches =
@@ -186,8 +186,7 @@ public sealed class PlaylistEditor
         count.Text = selected switch
         {
             0 => "Nothing yet — fill in a value.",
-            1 => "1 track",
-            _ => $"{selected} tracks",
+            _ => Storyworthtelling.Time.Quantities.Count(selected, "track"),
         };
     }
 

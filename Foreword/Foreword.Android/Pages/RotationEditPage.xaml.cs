@@ -64,7 +64,7 @@ public partial class RotationEditPage : BinderPage
         {
             0 => "Add the names. One prints each morning, in this order.",
             1 => "One name, so it prints every morning.",
-            _ => $"{rotation.Members.Count} names, so each comes round every {rotation.Members.Count} days.",
+            _ => $"{rotation.Members.Count} names, so each comes around every {rotation.Members.Count} days.",
         };
     }
 
@@ -210,7 +210,7 @@ public partial class RotationEditPage : BinderPage
         }
         catch (Exception failure)
         {
-            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write("Foreword.Android.Pages.RotationEditPage", Microsoft.Extensions.Logging.LogLevel.Warning, "The list could not be deleted", failure);
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write("Foreword.Android.Pages.RotationEditPage", Microsoft.Extensions.Logging.LogLevel.Warning, "The list couldn’t be deleted", failure);
         }
     }
 

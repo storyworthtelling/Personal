@@ -114,7 +114,7 @@ public sealed class StreamingAvailabilityClient
         var catalogs = services.Select(service => service.SourceId).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (catalogs.Count == 0)
         {
-            throw new ArgumentException("The changes feed needs at least one of the household's services; with none it would report every service.", nameof(services));
+            throw new ArgumentException("The changes feed needs at least one of the household’s services; with none it would report every service.", nameof(services));
         }
 
         var query = new List<(string, string)>

@@ -28,6 +28,6 @@ public static class BodyWindows
         BodyWindow.Month => 30,
         BodyWindow.Quarter => 90,
         BodyWindow.Year => 365,
-        _ => throw new ArgumentOutOfRangeException(nameof(window), window, "That is not one of Body's windows."),
+        _ => throw new ArgumentOutOfRangeException(nameof(window), window, "That is not one of Body’s windows."),
     };
 }

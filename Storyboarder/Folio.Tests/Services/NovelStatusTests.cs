@@ -315,11 +315,11 @@ public class NovelStatusTests : IDisposable
             seed.Context.BookAnalyses.Add(new BookAnalysis
             {
                 NovelId = seed.NovelId, DeliveredToRemarkable = true,
-                RemarkableNote = "It did not reach the reMarkable: the phone ran out of memory."
+                RemarkableNote = "It didn’t reach the reMarkable: the phone ran out of memory."
             }));
 
         var status = await NewService().GetStatusAsync(id, CancellationToken.None);
 
-        Assert.Equal("It did not reach the reMarkable: the phone ran out of memory.", status!.DeliveryNote);
+        Assert.Equal("It didn’t reach the reMarkable: the phone ran out of memory.", status!.DeliveryNote);
     }
 }

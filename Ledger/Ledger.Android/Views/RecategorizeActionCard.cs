@@ -80,30 +80,19 @@ public static class RecategorizeActionCard
 
     private static View BuildRow(RecategorizeCategoryOption category, Action onTap)
     {
+        // The current category says so in words, not with a glyph (audit W11).
         var row = new Grid
         {
-            ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
-            ColumnSpacing = 12,
             Padding = new Thickness(16, 12),
         };
 
-        var check = new Label
-        {
-            Text = category.IsCurrent ? "✓" : string.Empty,
-            Style = PaperResources.Token<Style>("CardRowTitle"),
-            WidthRequest = 16,
-        };
-        row.Children.Add(check);
-        Grid.SetColumn(check, 0);
-
         var name = new Label
         {
-            Text = category.Name,
+            Text = category.IsCurrent ? $"{category.Name} · current" : category.Name,
             Style = PaperResources.Token<Style>("CardRowTitle"),
             FontAttributes = category.IsCurrent ? FontAttributes.Bold : FontAttributes.None,
         };
         row.Children.Add(name);
-        Grid.SetColumn(name, 1);
 
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) => onTap();

@@ -76,7 +76,7 @@ public sealed class LogLoopRun(ILogLoopState state, Action<bool, string> line, F
         }
         else
         {
-            line(true, $"Upload did not complete: {result.Error}");
+            line(true, $"Upload didn’t complete: {result.Error}");
         }
         if (result.Trashed > 0)
         {
@@ -84,7 +84,7 @@ public sealed class LogLoopRun(ILogLoopState state, Action<bool, string> line, F
         }
         if (result.TrashError is not null)
         {
-            line(true, $"Trashing processed files did not complete: {result.TrashError}");
+            line(true, $"Trashing processed files didn’t complete: {result.TrashError}");
         }
     }
 }

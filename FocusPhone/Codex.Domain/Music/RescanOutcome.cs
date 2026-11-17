@@ -25,7 +25,7 @@ public readonly record struct RescanOutcome(int Added, int Changed, int Removed)
     {
         if (IsEmpty)
         {
-            return "Last night's library scan found nothing new — no tracks added, changed, or removed.";
+            return "Last night’s library scan found nothing new — no tracks added, changed, or removed.";
         }
 
         var parts = new List<string>();
@@ -44,7 +44,7 @@ public readonly record struct RescanOutcome(int Added, int Changed, int Removed)
             parts.Add($"{Removed} removed track{(Removed == 1 ? "" : "s")}");
         }
 
-        return $"Last night's library scan found {string.Join(", ", parts)}.";
+        return $"Last night’s library scan found {string.Join(", ", parts)}.";
     }
 }
 

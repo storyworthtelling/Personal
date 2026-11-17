@@ -180,7 +180,7 @@ public sealed class ProjectBackupService
         var free = freeBytes(Path.GetDirectoryName(outputRoot)!);
         if (free < needed)
             throw new IOException(
-                $"There isn't enough free space to restore: it needs about {needed / (1024 * 1024) + 1} MB and the phone has {free / (1024 * 1024)} MB. Nothing was changed.");
+                $"There isn’t enough free space to restore: it needs about {needed / (1024 * 1024) + 1} MB and the phone has {free / (1024 * 1024)} MB. Nothing was changed.");
     }
 
     private void SnapshotDatabase(string snapshotPath)
@@ -239,11 +239,11 @@ public sealed class ProjectBackupService
         using (var stream = File.OpenRead(path))
         {
             if (stream.Read(header, 0, header.Length) < header.Length)
-                throw new InvalidDataException("The backup's database file is truncated or empty.");
+                throw new InvalidDataException("The backup’s database file is truncated or empty.");
         }
 
         if (!header.AsSpan().SequenceEqual(SqliteHeader))
-            throw new InvalidDataException("The backup's database file is not a valid SQLite database.");
+            throw new InvalidDataException("The backup’s database file is not a valid SQLite database.");
     }
 
     private static void CopyDirectory(string source, string destination)

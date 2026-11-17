@@ -23,12 +23,12 @@ internal sealed record BodyMonth(string? SkippedDevice, IReadOnlyList<Mover> Mov
         string? device = null;
         if (facts.SkippedDevice is not null)
         {
-            device = SeatWords.Named(facts.SkippedDevice, "the device's name");
+            device = SeatWords.Named(facts.SkippedDevice, "the device’s name");
         }
         else if (facts.Signals.Count == 0)
         {
             throw new ArgumentException(
-                "Body's monthly sentence needs at least one signal, or the device that skipped a day.", nameof(facts));
+                "Body’s monthly sentence needs at least one signal, or the device that skipped a day.", nameof(facts));
         }
 
         var movers = new List<Mover>();
@@ -36,7 +36,7 @@ internal sealed record BodyMonth(string? SkippedDevice, IReadOnlyList<Mover> Mov
         foreach (var signal in facts.Signals)
         {
             ArgumentNullException.ThrowIfNull(signal);
-            var name = SeatWords.Named(signal.Name, "the signal's name");
+            var name = SeatWords.Named(signal.Name, "the signal’s name");
             SeatWords.Known(signal.Unit);
             var thisMonth = SeatWords.Finite(signal.ThisMonth, name);
             var lastMonth = SeatWords.Finite(signal.LastMonth, name);
@@ -64,9 +64,9 @@ internal sealed record SignalReading(
     public static SignalReading Read(SignalFacts facts)
     {
         ArgumentNullException.ThrowIfNull(facts);
-        var name = SeatWords.Named(facts.Name, "the signal's name");
+        var name = SeatWords.Named(facts.Name, "the signal’s name");
         var when = SeatWords.Named(facts.LatestWhen, "when the reading was taken");
-        var past = SeatWords.Named(facts.PastLabel, "which stretch of the owner's own past it is set against");
+        var past = SeatWords.Named(facts.PastLabel, "which stretch of the owner’s own past it is set against");
         SeatWords.Known(facts.Unit);
         var latest = SeatWords.Finite(facts.Latest, name);
         var average = SeatWords.Finite(facts.PastAverage, name);
@@ -85,8 +85,8 @@ internal sealed record Progression(string Exercise, string Today, string Last, s
     public static Progression? Read(ProgressionFacts facts)
     {
         ArgumentNullException.ThrowIfNull(facts);
-        var exercise = SeatWords.Named(facts.Exercise, "the exercise's name");
-        var unit = SeatWords.Named(facts.Unit, "the load's unit");
+        var exercise = SeatWords.Named(facts.Exercise, "the exercise’s name");
+        var unit = SeatWords.Named(facts.Unit, "the load’s unit");
         var today = SeatWords.Finite(facts.LoadToday, exercise);
         var last = SeatWords.Finite(facts.LoadLast, exercise);
 

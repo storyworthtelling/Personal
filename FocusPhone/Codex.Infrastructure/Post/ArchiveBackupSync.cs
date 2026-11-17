@@ -146,13 +146,13 @@ public sealed class ArchiveBackupSync
         if (!read.Writable)
         {
             return new ArchiveSyncResult(ArchiveSyncOutcome.Refused, Adopt(filing, local, ArchiveSync.Merge(local, legacy)),
-                $"The sealed archive backup did not open ({read.Status}); it is left exactly as it is.");
+                $"The sealed archive backup didn’t open ({read.Status}); it is left exactly as it is.");
         }
 
         var backedUp = read.Status == SealedReadStatus.Loaded ? ArchiveSnapshotCodec.Decode(read.Plaintext) : null;
         if (read.Status == SealedReadStatus.Loaded && backedUp is null)
         {
-            return new ArchiveSyncResult(ArchiveSyncOutcome.Refused, 0, "The sealed archive backup opened but is not an archive; it is left as it is.");
+            return new ArchiveSyncResult(ArchiveSyncOutcome.Refused, 0, "The sealed archive backup opened but isn’t an archive; it is left as it is.");
         }
 
         var merged = ArchiveSync.Merge(ArchiveSync.Merge(local, backedUp), legacy);

@@ -23,13 +23,13 @@ public static class TitlePageText
     public const string Looking = "Looking this title up…";
 
     /// <summary>Neither the cache nor the source could say anything about the title.</summary>
-    public const string NotFound = "This title could not be looked up, and no copy of it is kept on this phone. Try again later.";
+    public const string NotFound = "This title couldn’t be looked up, and no copy of it is kept on this phone. Try again later.";
 
     /// <summary>Play with nobody on the household roster yet: the child gate has nobody to judge for.</summary>
     public const string NoHousehold = "Play waits until the household is set up in Settings.";
 
     /// <summary>The household could not be read into a roster the child gate can judge by; the reason is in Diagnostics.</summary>
-    public const string HouseholdUnreadable = "Play waits until the household's settings can be read. Diagnostics has the reason.";
+    public const string HouseholdUnreadable = "Play waits until the household’s settings can be read. Diagnostics has the reason.";
 
     /// <summary>None of the household's services streams the title.</summary>
     public const string NotOnOurServices = "None of your services streams this title.";

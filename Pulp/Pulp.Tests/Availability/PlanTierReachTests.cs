@@ -21,7 +21,7 @@ public class PlanTierReachTests
             .SelectMany(file => HomeCall.Matches(file.Text).Select(match => (file.Path, Args: match.Groups["args"].Value)))
             .ToList();
 
-        Assert.True(calls.Count >= 10, "Too few where-a-title-plays calls found in the head; the guard is not reading them: " + calls.Count);
+        Assert.True(calls.Count >= 10, "Too few where-a-title-plays calls found in the head; the guard isn’t reading them: " + calls.Count);
         var bare = calls.Where(call => !call.Args.Contains("ServicePlans", StringComparison.Ordinal)).Select(call => call.Path + ": " + call.Args.Trim()).ToList();
         Assert.True(bare.Count == 0, "A screen builds ad-free plans from bare service ids:\n" + string.Join("\n", bare));
     }

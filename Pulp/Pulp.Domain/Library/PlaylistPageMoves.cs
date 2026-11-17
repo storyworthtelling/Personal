@@ -101,7 +101,7 @@ public static class PlaylistPageSummary
 
         if (!playlist.IsVisibleTo(viewer))
         {
-            throw new ArgumentException($"'{playlist.List.Name}' is not {viewer}'s to see (D97).", nameof(viewer));
+            throw new ArgumentException($"'{playlist.List.Name}' is not {viewer}’s to see (D97).", nameof(viewer));
         }
 
         return whose + " · " + titles;

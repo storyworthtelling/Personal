@@ -122,7 +122,7 @@ public sealed class WorkoutsTabModel
             label,
             longDay,
             isToday ? $"Today · {start}" : null,
-            isToday ? $"{kind}, {minutes} minutes" : $"{start} · {minutes} min · {kind}",
+            isToday ? $"{kind}, {minutes} min" : $"{start} · {minutes} min · {kind}",
             isToday ? WorkoutWords.Kit(session.Session) : null,
             score,
             isToday ? null : reason,

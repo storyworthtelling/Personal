@@ -73,7 +73,7 @@ internal sealed class MealAnswerMap : RecordMap<MealAnswer>
             throw new HouseholdRecordException(record.Key, exception.Message);
         }
 
-        return KeyOf(value) == record.Key ? value : throw record.Fail("item", "does not belong to this record's key");
+        return KeyOf(value) == record.Key ? value : throw record.Fail("item", "does not belong to this record’s key");
     }
 
     private static DateTimeOffset ReadAt(RecordReader record)

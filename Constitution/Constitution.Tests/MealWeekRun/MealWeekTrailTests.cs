@@ -32,8 +32,8 @@ public class MealWeekTrailTests
         yield return [new MealWeekOutcome.Planned(Report())];
         yield return [new MealWeekOutcome.Planned(Report(save: MealRecordSave.Unchanged))];
         yield return [new MealWeekOutcome.Planned(Report(earlier: true))];
-        yield return [new MealWeekOutcome.Planned(Report() with { ExtraLinesUnreadable = "The record could not be read." })];
-        yield return [new MealWeekOutcome.Planned(Report(new PlacementRun(null, [], [], "The record could not be read.")))];
+        yield return [new MealWeekOutcome.Planned(Report() with { ExtraLinesUnreadable = "The record couldn’t be read." })];
+        yield return [new MealWeekOutcome.Planned(Report(new PlacementRun(null, [], [], "The record couldn’t be read.")))];
     }
 
     [Theory]

@@ -151,12 +151,12 @@ public sealed class DriveIndexUsageStoreTests
     [Fact]
     public async Task AGarbledFileIsNeverWrittenOver()
     {
-        var drive = new FakeDrive { Content = "this is not an envelope" };
+        var drive = new FakeDrive { Content = "this isn’t an envelope" };
 
         await Assert.ThrowsAsync<IndexUsageUnreadableException>(() =>
             Store(drive).PublishAsync([Payload("netflix", 4)], CancellationToken.None));
 
-        Assert.Equal("this is not an envelope", drive.Content);
+        Assert.Equal("this isn’t an envelope", drive.Content);
     }
 
     [Fact]

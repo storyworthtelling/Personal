@@ -73,7 +73,7 @@ public class UnlockStateMachine
         if (storedState != UnlockState.Locked)
         {
             throw new InvalidOperationException(
-                $"Cannot request an unlock while in state {EffectiveState()}; only a Locked machine accepts a new request.");
+                $"Can’t request an unlock while in state {EffectiveState()}; only a Locked machine accepts a new request.");
         }
         storedState = UnlockState.Pending;
         accumulatedProgress = TimeSpan.Zero;
@@ -96,7 +96,7 @@ public class UnlockStateMachine
         if (state is UnlockState.Pending or UnlockState.Ready)
         {
             throw new InvalidOperationException(
-                $"Cannot change the admin unlock delay while in state {state}; a request is already waiting on it.");
+                $"Can’t change the admin unlock delay while in state {state}; a request is already waiting on it.");
         }
         UnlockDelay = delay;
     }
@@ -107,7 +107,7 @@ public class UnlockStateMachine
         if (storedState != UnlockState.Pending)
         {
             throw new InvalidOperationException(
-                $"Cannot cancel an unlock request while in state {EffectiveState()}; there is no pending request.");
+                $"Can’t cancel an unlock request while in state {EffectiveState()}; there is no pending request.");
         }
         storedState = UnlockState.Locked;
         accumulatedProgress = TimeSpan.Zero;
@@ -119,7 +119,7 @@ public class UnlockStateMachine
         if (EffectiveState() != UnlockState.Ready)
         {
             throw new InvalidOperationException(
-                $"Cannot enter admin mode while in state {EffectiveState()}; the {UnlockDelay.TotalHours}-hour delay must fully elapse first.");
+                $"Can’t enter admin mode while in state {EffectiveState()}; the {UnlockDelay.TotalHours}-hour delay must fully elapse first.");
         }
         storedState = UnlockState.AdminActive;
         adminExpiresAtUtc = clock.UtcNow + AdminDuration;

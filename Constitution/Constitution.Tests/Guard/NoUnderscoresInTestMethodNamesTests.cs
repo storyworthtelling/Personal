@@ -30,7 +30,7 @@ public class NoUnderscoresInTestMethodNamesTests
     public void NoTestMethodNameHoldsAnUnderscore()
     {
         var files = TestFiles();
-        Assert.True(files.Count >= 30, $"The guard found only {files.Count} test files; it is not reading the real suite.");
+        Assert.True(files.Count >= 30, $"The guard found only {files.Count} test files; it isn’t reading the real suite.");
 
         var offenders = files
             .SelectMany(file => Offenders(File.ReadAllText(file)).Select(line => ConstitutionSource.Relative(file) + ": " + line))

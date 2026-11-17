@@ -43,7 +43,7 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
     public const string ReadingStatus = "Finding where you left off.";
 
     /// <summary>The status sentence when the household could not be read; Diagnostics has why.</summary>
-    public const string UnreadableStatus = "Continue watching could not be read just now.";
+    public const string UnreadableStatus = "Continue watching couldn’t be read just now.";
 
     private readonly HashSet<TitleId> hidden = [];
     private WatchingVoice? voice;
@@ -270,7 +270,7 @@ public sealed class WatchingArea(Activity host) : PulpAreaPage(host, PulpArea.Wa
         catch (Exception exception)
         {
             // A voice is never an error on the page (DESIGN.md §14): the seat stays as it was.
-            services.Diagnostics.Warn("watching", "The home's voiced line could not be decided.", exception);
+            services.Diagnostics.Warn("watching", "The home’s voiced line could not be decided.", exception);
         }
     }
 

@@ -93,7 +93,7 @@ public static class GoogleAddress
 {
     public const int Longest = 254;
 
-    public const string Problem = "That doesn't look like an email address.";
+    public const string Problem = "That doesn’t look like an email address.";
 
     public static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 

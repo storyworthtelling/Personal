@@ -82,4 +82,20 @@ public class CategoryCatalogCodecTests
 
         Assert.Equal(new[] { "a", "b" }, decoded.Categories.Select(c => c.Id));
     }
+
+    /// <summary>
+    /// The built-in shelves are named in sentence case now (audit W11). A stored built-in still carrying its old default
+    /// name reads as the new one; a name the owner gave it stays theirs.
+    /// </summary>
+    [Fact]
+    public void ABuiltInShelfKeepingItsOldDefaultNameTakesTheNewOne()
+    {
+        const string stored =
+            """[{"Id":"Travel","Name":"Travel & Transit","Glyph":"folder_travel","Order":1,"Builtin":true},{"Id":"Food","Name":"Our kitchen","Glyph":"folder_food","Order":3,"Builtin":true}]""";
+
+        var decoded = CategoryCatalogCodec.Decode(stored);
+
+        Assert.Equal("Travel and transit", decoded.Categories.Single(c => c.Id == "Travel").Name);
+        Assert.Equal("Our kitchen", decoded.Categories.Single(c => c.Id == "Food").Name);
+    }
 }

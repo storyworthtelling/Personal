@@ -97,7 +97,7 @@ public class AudioDiagnosticsActivity : Activity
         if (GetSystemService(Context.ClipboardService) is ClipboardManager clipboard)
         {
             clipboard.PrimaryClip = ClipData.NewPlainText(
-                "FocusPhone diagnostics", AudioDiagnostics.BuildExport(this));
+                "Score diagnostics", AudioDiagnostics.BuildExport(this));
             // Success is the button saying so (§5), not a toast.
             copyButton!.Text = "Copied";
         }
@@ -107,7 +107,7 @@ public class AudioDiagnosticsActivity : Activity
     {
         var intent = new Intent(Intent.ActionSend);
         intent.SetType("text/plain");
-        intent.PutExtra(Intent.ExtraSubject, "FocusPhone Audio diagnostics");
+        intent.PutExtra(Intent.ExtraSubject, "Score diagnostics");
         intent.PutExtra(Intent.ExtraText, AudioDiagnostics.BuildExport(this));
         StartActivity(Intent.CreateChooser(intent, "Share diagnostics"));
     }

@@ -198,7 +198,7 @@ public sealed class ChildWatchingPage
             }
             catch (Exception exception)
             {
-                services.Diagnostics.Warn("child", "A child's Continue watching could not be read.", exception);
+                services.Diagnostics.Warn("child", "A child’s Continue watching could not be read.", exception);
                 host.RunOnUiThread(() =>
                 {
                     unreadable = rows is null;
@@ -266,7 +266,7 @@ public sealed class ChildWatchingPage
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
-            services.Diagnostics.Warn("child", "A child's sport could not be read.", exception);
+            services.Diagnostics.Warn("child", "A child’s sport could not be read.", exception);
             return null;
         }
     }

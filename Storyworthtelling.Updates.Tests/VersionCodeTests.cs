@@ -53,7 +53,7 @@ public class VersionCodeTests
         for (var i = 1; i < moments.Length; i++)
         {
             Assert.True(VersionCode.For(1, moments[i]) > VersionCode.For(1, moments[i - 1]),
-                $"{moments[i]:O} did not produce a larger code than {moments[i - 1]:O}");
+                $"{moments[i]:O} didn’t produce a larger code than {moments[i - 1]:O}");
         }
     }
 
@@ -149,7 +149,7 @@ public class VersionCodeTests
         {
             var text = File.ReadAllText(workflow);
             Assert.True(text.Contains("./.github/actions/version-code"),
-                $"{Path.GetFileName(workflow)} does not use the shared version-code action.");
+                $"{Path.GetFileName(workflow)} doesn’t use the shared version-code action.");
             // Only the versionCode matters. ApplicationDisplayVersion may keep run_number:
             // it is a display string, never compared, so a reset there is harmless.
             Assert.False(text.Contains("ApplicationVersion=${{ github.run_number")
@@ -185,7 +185,7 @@ public class VersionCodeTests
         {
             var code = VersionCode.For(app.Band, firstUnifiedBuild);
             Assert.True(code > app.LastShippedBeforeUnification,
-                $"{app.Package} would ship {code}, which is not above the {app.LastShippedBeforeUnification} "
+                $"{app.Package} would ship {code}, which isn’t above the {app.LastShippedBeforeUnification} "
                 + "it has already shipped — the update channel would reject it.");
         }
     }
@@ -227,7 +227,7 @@ public class VersionCodeTests
 
         Assert.True(folio.LastShippedBeforeUnification >= onTheDevice,
             $"The recorded ceiling {folio.LastShippedBeforeUnification} is below the {onTheDevice} known "
-            + "to be installed, so the band was chosen against a number that is not true.");
+            + "to be installed, so the band was chosen against a number that isn’t true.");
         Assert.True(VersionCode.For(folio.Band, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc))
             > onTheDevice,
             "Folio would ship below what is on the phone, and the channel refuses it silently.");
@@ -298,7 +298,7 @@ public class ProjectReferenceTests
 
         Assert.True(missing.Count == 0,
             "These projects use Storyworthtelling.Updates without referencing it, which fails as CS0234 "
-            + $"in CI and cannot be caught locally for a MAUI head:\n{string.Join("\n", missing)}");
+            + $"in CI and can’t be caught locally for a MAUI head:\n{string.Join("\n", missing)}");
     }
 
     private static string StripComments(string source) =>

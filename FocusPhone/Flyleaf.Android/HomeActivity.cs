@@ -282,7 +282,7 @@ public class HomeActivity : Activity
             {
                 DogEar.SetNotice(activity, activity.root!, UninstallNoticeKey, succeeded
                     ? null
-                    : new DogEar.Notice("Couldn't uninstall", reason, PaperTheme.ProblemMark));
+                    : new DogEar.Notice("Couldn’t uninstall", reason, PaperTheme.ProblemMark));
                 activity.ReloadScene();
             });
         }
@@ -337,7 +337,7 @@ public class HomeActivity : Activity
         if (CallScreen.Current.Target is not { } target || !CallScreen.Open(target))
         {
             // The call ended between the bar being drawn and the tap.
-            answering.Failed("the call screen did not open");
+            answering.Failed("the call screen didn’t open");
             callBar!.Visibility = ViewStates.Gone;
             return;
         }
@@ -361,8 +361,8 @@ public class HomeActivity : Activity
         {
             // Behind the fold, not a toast (audit W8.2): the update channel may still be installing it.
             DogEar.SetNotice(this, root, NotInstalledNotice, new DogEar.Notice(
-                $"{art!.Label(item.Key)} is not installed.",
-                "Its book is still on the shelf, but the app is not on this phone. If it is one of the suite's, Flyleaf installs it on its next update check.",
+                $"{art!.Label(item.Key)} isn’t installed.",
+                "Its book is still on the shelf, but the app isn’t on this phone. If it is one of the suite’s, Flyleaf installs it on its next update check.",
                 DogEar.Hues.Caution));
         }
     }
@@ -463,7 +463,7 @@ public class HomeActivity : Activity
             {
                 // No uninstaller available (unusual); nothing more we can do from the launcher.
                 DogEar.SetNotice(this, root!, UninstallNoticeKey,
-                    new DogEar.Notice("Couldn't uninstall", "No uninstaller is available on this device.", PaperTheme.ProblemMark));
+                    new DogEar.Notice("Couldn’t uninstall", "No uninstaller is available on this device.", PaperTheme.ProblemMark));
             }
         }
     }
@@ -621,7 +621,7 @@ public class HomeActivity : Activity
         {
             // Best-effort; admin mode always re-enters the token manually.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet(LogSources.Vault, "Update token restore did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Update token restore didn’t complete", e);
         }
     });
 

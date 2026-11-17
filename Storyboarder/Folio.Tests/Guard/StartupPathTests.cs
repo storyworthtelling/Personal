@@ -67,7 +67,7 @@ public class StartupPathTests
     {
         var page = FolioInvariantsTests.HeadFiles()
             .Select(File.ReadAllText)
-            .FirstOrDefault(text => text.Contains("Folio could not start", StringComparison.Ordinal));
+            .FirstOrDefault(text => text.Contains("Folio couldn’t start", StringComparison.Ordinal));
 
         Assert.NotNull(page);
         Assert.Contains("Clipboard.SetTextAsync", page, StringComparison.Ordinal);

@@ -39,7 +39,7 @@ public class MealCodecTests
     {
         var dinners = new[]
         {
-            DinnerChoice.Leftovers(Sunday, "Last night's."),
+            DinnerChoice.Leftovers(Sunday, "Last night’s."),
             DinnerChoice.EatOut(Sunday.AddDays(1), "Out."),
             DinnerChoice.NothingPlanned(Sunday.AddDays(2), "Free."),
             DinnerChoice.Cooked(Sunday.AddDays(3), Id("onion-tart"), Lee, Edt(10, 29, 17), Edt(10, 29, 18), true, true, "New."),

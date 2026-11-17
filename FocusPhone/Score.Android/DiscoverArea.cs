@@ -262,7 +262,7 @@ public sealed class DiscoverArea : ScoreArea
     {
         if (new TidalAccountStore(Host).Load() is null)
         {
-            return PaperUi.Secondary(Host, "Sign in to TIDAL in Settings to search the music catalogue.");
+            return PaperUi.Secondary(Host, "Sign in to TIDAL in Settings to search the music catalog.");
         }
 
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
@@ -306,7 +306,7 @@ public sealed class DiscoverArea : ScoreArea
         var token = await new TidalAccessTokenProvider(Host).RefreshAsync(CancellationToken.None);
         if (token.Status != TidalTokenPollStatus.Success || token.AccessToken is not { Length: > 0 } accessToken)
         {
-            trackSearchStatus = "Couldn't reach TIDAL. Try again in a moment.";
+            trackSearchStatus = "Couldn’t reach TIDAL. Try again in a moment.";
             Invalidate();
             return;
         }
@@ -580,7 +580,7 @@ public sealed class DiscoverArea : ScoreArea
         var token = await new TidalAccessTokenProvider(Host).RefreshAsync(CancellationToken.None);
         if (token.Status != TidalTokenPollStatus.Success || token.AccessToken is not { Length: > 0 } accessToken)
         {
-            actionStatus = "Couldn't reach TIDAL. Try again in a moment.";
+            actionStatus = "Couldn’t reach TIDAL. Try again in a moment.";
             Invalidate();
             return null;
         }
@@ -600,7 +600,7 @@ public sealed class DiscoverArea : ScoreArea
             .SearchAsync(accessToken, $"{pick.Subtitle} {pick.Title}", MusicLibrary.TidalCountryCode, CancellationToken.None);
         if (found.Count == 0)
         {
-            actionStatus = $"Couldn't find “{pick.Title}” on TIDAL.";
+            actionStatus = $"Couldn’t find “{pick.Title}” on TIDAL.";
             Invalidate();
             return;
         }
@@ -633,7 +633,7 @@ public sealed class DiscoverArea : ScoreArea
         var match = Discoveries.FindAlbumTrack(found, pick.Title, pick.Subtitle);
         if (match is null)
         {
-            actionStatus = $"Couldn't find “{pick.Title}” on TIDAL.";
+            actionStatus = $"Couldn’t find “{pick.Title}” on TIDAL.";
             Invalidate();
             return;
         }
@@ -655,7 +655,7 @@ public sealed class DiscoverArea : ScoreArea
             .GetAlbumTracksAsync(accessToken, rawId, MusicLibrary.TidalCountryCode, CancellationToken.None);
         if (tracks.Count == 0)
         {
-            actionStatus = $"Couldn't load “{albumTitle}” from TIDAL.";
+            actionStatus = $"Couldn’t load “{albumTitle}” from TIDAL.";
             Invalidate();
             return;
         }
@@ -699,7 +699,7 @@ public sealed class DiscoverArea : ScoreArea
             .SearchAsync(accessToken, $"{pick.Subtitle} {pick.Title}", MusicLibrary.TidalCountryCode, CancellationToken.None);
         if (found.Count == 0)
         {
-            actionStatus = $"Couldn't find “{pick.Title}” on TIDAL.";
+            actionStatus = $"Couldn’t find “{pick.Title}” on TIDAL.";
             Invalidate();
             return;
         }
@@ -717,7 +717,7 @@ public sealed class DiscoverArea : ScoreArea
         var found = await search.SearchAsync(pick.Title, CancellationToken.None);
         if (found.Count == 0)
         {
-            actionStatus = $"Couldn't find “{pick.Title}” in the podcast directory.";
+            actionStatus = $"Couldn’t find “{pick.Title}” in the podcast directory.";
             Invalidate();
             return;
         }
@@ -748,7 +748,7 @@ public sealed class DiscoverArea : ScoreArea
     {
         if (!MusicSettingsStore.ListeningGeniusEnabled)
         {
-            return "Listening Genius is off, so there's no weekly crate.";
+            return "Listening Genius is off, so there’s no weekly crate.";
         }
 
         return library.Catalog.Songs().Count == 0
