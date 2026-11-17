@@ -116,6 +116,12 @@ jobs:
           -p:AndroidSigningKeyPass=${{ secrets.KEY_PASSWORD }}
           -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
 
+      # Fatal: every package a package depends on is in the graph. Transitive pinning once left
+      # androidx.concurrent.futures out of four heads with no error, and each shipped app died on open
+      # (RepoGuards.Tests/DependencyGraphCheckTests).
+      - name: DEPENDENCY CHECK
+        run: python3 .github/scripts/check-dependency-graph.py .
+
       # Prove the freshly-shipped package id is actually in the APK and FAIL the build if it is
       # not — Index's first ship, so nothing has verified this yet the way the frozen-id checks on
       # the older heads do.

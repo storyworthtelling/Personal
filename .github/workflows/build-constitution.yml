@@ -116,6 +116,12 @@ jobs:
             -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
           echo "::endgroup::"
 
+      # Fatal: every package a package depends on is in the graph. Transitive pinning once left
+      # androidx.concurrent.futures out of four heads with no error, and each shipped app died on open
+      # (RepoGuards.Tests/DependencyGraphCheckTests).
+      - name: DEPENDENCY CHECK
+        run: python3 .github/scripts/check-dependency-graph.py .
+
       # The permission test reads the Release build's merged manifest, which exists only now; the test run
       # before the build skipped it (audit W12.3). The variable makes a missing manifest a failure here.
       - name: Merged manifest permissions

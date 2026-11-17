@@ -110,6 +110,12 @@ jobs:
             -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
           echo "::endgroup::"
 
+      # Fatal: every package a package depends on is in the graph. Transitive pinning once left
+      # androidx.concurrent.futures out of four heads with no error, and each shipped app died on open
+      # (RepoGuards.Tests/DependencyGraphCheckTests).
+      - name: DEPENDENCY CHECK
+        run: python3 .github/scripts/check-dependency-graph.py .
+
       # The update channel installs by package id, so a wrong one is a second app on the phone.
       # Fatal, because that is invisible until the device has two icons.
       - name: APP ID CHECK
