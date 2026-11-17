@@ -150,7 +150,7 @@ jobs:
         run: |
           set -e
           echo "=== FONT CHECK ==="
-          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular"
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSerif4-Black SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular Italianno-Regular"
           for proj in Flyleaf.Android Score.Android; do
             APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
             [ -z "$APK" ] && APK=$(ls -1 "$proj"/bin/Release/net10.0-android/publish/*.apk 2>/dev/null | head -1)
@@ -163,7 +163,7 @@ jobs:
                 exit 1
               fi
             done
-            echo "ok: all six fonts at assets/fonts/"
+            echo "ok: all eight fonts at assets/fonts/"
           done
           echo "=== END FONT CHECK ==="
 

@@ -1,7 +1,7 @@
 # FocusPhone Audio — Phases 6 & 7 Plan
 
 Listening Genius (Phase 6) and Discovery (Phase 7). This is the detailed follow-on to
-`PHASE5-HANDOFF.md`; the original session plan file (`take-up-the-persona-virtual-zebra.md`)
+`FocusPhone/archive/PHASE5-HANDOFF.md` (archived in audit W12); the original session plan file (`take-up-the-persona-virtual-zebra.md`)
 did not survive, so the roadmap for 6–7 is reconstructed here from the locked decisions plus
 the two patterns these phases are modeled on. Phases 8 and 9 are sketched at the end from the
 owner's notes — they're device-heavy and planned in detail closer to the time.

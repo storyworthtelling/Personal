@@ -261,28 +261,20 @@ internal sealed class PageWriter : IDisposable
     }
 
     /// <summary>
-    /// A field label: caps, letterspaced, in the muted ink — the apparatus voice, DESIGN.md §4.
-    /// Skia has no tracking, so the advance is walked by hand.
+    /// A field label in the muted ink, as written: sentence case and no letterspacing (owner's ruling, audit W8.5, held
+    /// for the printed report in W12), the apparatus voice of DESIGN.md §4.
     /// </summary>
     public void Label(string text, float x, float baseline, SKColor? color = null)
     {
         using var font = ReportType.Label();
         using var paint = new SKPaint { Color = color ?? ReportPalette.InkMuted, IsAntialias = true };
-        var tracking = font.Size * 0.1f;
-        var cursor = x;
-        foreach (var glyph in text.ToUpperInvariant())
-        {
-            var s = glyph.ToString();
-            canvas.DrawText(s, cursor, baseline, font, paint);
-            cursor += font.MeasureText(s) + tracking;
-        }
+        canvas.DrawText(text, x, baseline, font, paint);
     }
 
     public float LabelWidth(string text)
     {
         using var font = ReportType.Label();
-        var tracking = font.Size * 0.1f;
-        return text.ToUpperInvariant().Sum(glyph => font.MeasureText(glyph.ToString()) + tracking);
+        return font.MeasureText(text);
     }
 
     // Draws one wordless evidence image: a portrait block, letterboxed on shaded paper, breaking to a

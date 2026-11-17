@@ -37,27 +37,27 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Xamarin.AndroidX.Camera.Camera2" Version="1.5.1.2" />
-    <PackageReference Include="Xamarin.AndroidX.Camera.Lifecycle" Version="1.5.1.2" />
-    <PackageReference Include="Xamarin.AndroidX.Camera.View" Version="1.5.1.2" />
+    <PackageReference Include="Xamarin.AndroidX.Camera.Camera2" />
+    <PackageReference Include="Xamarin.AndroidX.Camera.Lifecycle" />
+    <PackageReference Include="Xamarin.AndroidX.Camera.View" />
     <!-- Video capture. A video is a moment like any other and files in the same camera roll
          the photos do; without this the head could only ever take stills. -->
-    <PackageReference Include="Xamarin.AndroidX.Camera.Video" Version="1.5.2.1" />
+    <PackageReference Include="Xamarin.AndroidX.Camera.Video" />
     <!-- 1.8.0 is a floor, not a preference: ML Kit's Common package requires >= 1.8.0, and
          NuGet treats the downgrade as an error rather than resolving it quietly. -->
-    <PackageReference Include="Xamarin.AndroidX.AppCompat" Version="1.8.0" />
-    <PackageReference Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.6" />
-    <PackageReference Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.2" />
+    <PackageReference Include="Xamarin.AndroidX.AppCompat" VersionOverride="1.8.0" />
+    <PackageReference Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" />
+    <PackageReference Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" />
     <!-- Reading a card or a statement when another app asks. On-device OCR: nothing Plate
          is handed to read leaves the phone to be recognised. -->
-    <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" Version="116.0.1.9" />
+    <PackageReference Include="Xamarin.Google.MLKit.TextRecognition" />
     <!-- Finding faces. ML Kit DETECTS a face; it does not say whose it is, so recognition
          needs an embedding model behind IFaceEmbedder — see FaceRecogniser. -->
-    <PackageReference Include="Xamarin.Google.MLKit.FaceDetection" Version="116.1.7.9" />
+    <PackageReference Include="Xamarin.Google.MLKit.FaceDetection" />
     <!-- Running the face-embedding model. The model FILE is deliberately not in this repo:
          which one to ship carries a licence and a training-data provenance, and the faces
          being matched are the owner's friends. Absent, TfLiteFaceEmbedder reports not-ready
          and the head still finds faces and still takes a hand-written name. -->
-    <PackageReference Include="Xamarin.TensorFlow.Lite" Version="2.16.1.10" />
+    <PackageReference Include="Xamarin.TensorFlow.Lite" />
   </ItemGroup>
 </Project>

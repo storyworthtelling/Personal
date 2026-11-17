@@ -11,7 +11,7 @@
   <!-- The calendar writes use Google's Calendar client directly; it used to arrive only through the
        Storyworthtelling.Google project, which nothing here used (audit 01 §9). -->
   <ItemGroup>
-    <PackageReference Include="Google.Apis.Calendar.v3" Version="1.74.0.4154" />
+    <PackageReference Include="Google.Apis.Calendar.v3" />
   </ItemGroup>
 
   <ItemGroup>

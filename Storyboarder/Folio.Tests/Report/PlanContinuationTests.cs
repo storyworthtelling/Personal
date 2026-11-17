@@ -50,7 +50,10 @@ public class PlanContinuationTests
         var all = string.Concat(Render(Plan(musts: 2, shoulds: 22, considers: 2)));
 
         Assert.True(Occurrences(all, "Should (continued)") >= 1);
-        Assert.Equal(1, Occurrences(all, "Should") - Occurrences(all, "Should (continued)"));
+        // The labels print in sentence case now (audit W12), so a plan that fits says "Should" as many times as its
+        // apparatus does; the long one says it once more only as the repeated, continued heading.
+        var fits = string.Concat(Render(Plan(musts: 2, shoulds: 2, considers: 2)));
+        Assert.Equal(Occurrences(fits, "Should"), Occurrences(all, "Should") - Occurrences(all, "Should (continued)"));
     }
 
     /// <summary>

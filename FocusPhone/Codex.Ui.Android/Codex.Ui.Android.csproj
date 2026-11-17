@@ -19,14 +19,14 @@
 
   <!-- Google Drive read access for the shared voice profile/config. -->
   <ItemGroup>
-    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
-    <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
+    <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="Google.Apis.Drive.v3" />
   </ItemGroup>
 
   <!-- The log loop's shared upload worker (Diagnostics/LoopUploadWorker): the same package and version every
        head already references, so nothing new enters any APK. -->
   <ItemGroup>
-    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" />
   </ItemGroup>
 
   <ItemGroup>

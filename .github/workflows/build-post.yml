@@ -56,6 +56,14 @@ jobs:
         with:
           workload: android
 
+      # JDK 21 like every Android build in the suite (audit W12.3): the runner's default is 17, which
+      # refuses the class files newer bindings ship.
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       # Target the test project directly (not the .sln) so the build never touches the
       # net10.0-android heads, which would require the Android workload.
       - name: Run tests
@@ -222,7 +230,7 @@ jobs:
         run: |
           set -e
           echo "=== FONT CHECK ==="
-          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular"
+          FONTS="SourceSerif4-Regular SourceSerif4-Semibold SourceSerif4-Italic SourceSerif4-Black SourceSans3-Regular SourceSans3-Semibold CascadiaCode-Regular Italianno-Regular"
           APK=$(ls -1 Post.Android/bin/Release/net10.0-android/publish/*-Signed.apk 2>/dev/null | head -1)
           echo "--- $APK"
           ENTRIES=$(unzip -l "$APK")
@@ -233,7 +241,7 @@ jobs:
               exit 1
             fi
           done
-          echo "ok: all six fonts at assets/fonts/"
+          echo "ok: all eight fonts at assets/fonts/"
           echo "=== END FONT CHECK ==="
 
       # Keep only the latest run's artifacts: delete artifacts from older runs of

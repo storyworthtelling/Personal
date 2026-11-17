@@ -18,6 +18,7 @@
   -->
   <PropertyGroup>
     <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
     <UseMaui>true</UseMaui>
     <SingleProject>false</SingleProject>
     <RootNamespace>Storyworthtelling.Maui</RootNamespace>
@@ -36,7 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+    <PackageReference Include="Microsoft.Maui.Controls" VersionOverride="$(MauiVersion)" />
   </ItemGroup>
 
   <!-- The log loop: its pure core (the outbox, the tap judge, the sign-in trail), shared with the native heads. -->
