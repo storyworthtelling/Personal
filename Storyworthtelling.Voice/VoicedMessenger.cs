@@ -42,7 +42,7 @@ public sealed class VoicedMessenger
         var seat = request.Seat ?? request.Purpose;
         if (Warned.TryAdd(("ungrounded:" + seat, DateOnly.FromDateTime(DateTime.Now)), true))
         {
-            var line = $"VOICE UNGROUNDED {seat}: {flagged.Count} word(s) not in its facts";
+            var line = $"VOICE UNGROUNDED {seat}: {flagged.Count} word(s) not in its facts";  // not copy: a log line
             logger?.LogWarning("{Line}", line);
             warn?.Invoke(line);
         }

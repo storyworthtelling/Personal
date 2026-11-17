@@ -26,12 +26,12 @@ public class MorningOutcomeTests
     public void AFailedDocumentIsNamedWithItsReasonAndTheRunRetries()
     {
         var outcome = new MorningOutcome()
-            .Delivered(MorningDocument.Brief, "puzzle only")
+            .Delivered(MorningDocument.Brief, "the crossword only")
             .Failed(MorningDocument.Day, "no network")
             .Delivered(MorningDocument.Prayer);
 
         Assert.True(outcome.AnyFailed);
-        Assert.Equal("The Day didn’t arrive (no network). Delivered: the brief (puzzle only), prayer", outcome.Summary());
+        Assert.Equal("The Day didn’t arrive (no network). Delivered: the brief (the crossword only), prayer", outcome.Summary());
     }
 
     [Fact]

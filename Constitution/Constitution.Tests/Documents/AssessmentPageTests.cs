@@ -22,7 +22,7 @@ public class AssessmentPageTests
         {
             var text = PageText(page);
 
-            Assert.DoesNotContain("HOW WAS IT", text);
+            Assert.DoesNotContain("How was it", text);
             Assert.DoesNotContain("easy", text);
             Assert.DoesNotContain("hard", text);
             Assert.DoesNotContain(page.Map.Targets, t => t.Group == WorkoutIds.Rating);
@@ -59,7 +59,7 @@ public class AssessmentPageTests
         var unit = page.Printed.Single(i => i.Text == "reps");
         Assert.False(unit.Bounds.Overlaps(box.Bounds));
         Assert.True(unit.Bounds.Left >= box.Bounds.Right + InkTargets.MinimumClearance - 0.01f);
-        Assert.Contains("WRITE THE NUMBER", PageText(page));
+        Assert.Contains("Write the number", PageText(page));
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public class AssessmentPageTests
         Assert.Contains("Each test asks for one number, written in its box.", text);
         Assert.Contains("That number sets where week two begins.", text);
         Assert.Contains("There is no score and nothing to beat.", text);
-        Assert.Contains("ASSESSMENT WEEK · DAY 1 OF 3 · MONDAY 5:30 PM", text);
+        Assert.Contains("Assessment week · day 1 of 3 · Monday 5:30 pm", text);
         Assert.Empty(cover.Map.Targets);
         Assert.DoesNotContain(cover.Printed, i => i.Role == PrintedRole.Voice);
     }
@@ -108,13 +108,13 @@ public class AssessmentPageTests
         var pages = Pages();
         var first = PageText(pages[1]);
 
-        Assert.Contains("ASSESSMENT · TEST 1 OF 4", first);
+        Assert.Contains("Assessment · test 1 of 4", first);
         Assert.Contains("As many as you can with good form, then stop.", first);
         Assert.Contains("Knees down is fine; say so in the notes.", first);
         Assert.Contains("Just a starting line.", first);
         Assert.Contains("2 of 5", first);
         Assert.Contains(pages[1].Printed, i => i.Role == PrintedRole.Voice);
-        Assert.Contains("ASSESSMENT · TEST 4 OF 4", PageText(pages[4]));
+        Assert.Contains("Assessment · test 4 of 4", PageText(pages[4]));
     }
 
     [Fact]

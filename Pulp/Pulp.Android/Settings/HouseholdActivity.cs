@@ -537,7 +537,7 @@ public class HouseholdActivity : Activity
                     leaguesAllowed[child].Remove(row.League);
                 }
 
-                Enqueue($"{(ticked ? "allow" : "stop allowing")} {row.League} for {child}", token => ticked
+                Enqueue($"{(ticked ? "allow" : "stop allowing")} {row.League} for {child}", token => ticked  // not copy: the word matched is the variable ticked
                     ? services.PutAsync(HouseholdMaps.ChildLeague, allowance, token)
                     : services.RemoveAsync(HouseholdMaps.ChildLeague, allowance, token));
             }));

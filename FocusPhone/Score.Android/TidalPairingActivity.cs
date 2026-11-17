@@ -271,7 +271,7 @@ public class TidalPairingActivity : Activity
             Forget();
             status = result.Status switch
             {
-                OAuthRedirectStatus.Declined => "Sign-in was cancelled.",
+                OAuthRedirectStatus.Declined => "Sign-in was canceled. Tap Sign in to TIDAL to try again.",
                 OAuthRedirectStatus.StateMismatch => "That sign-in didn’t match the one this screen started.",
                 _ => "Something went wrong signing in to TIDAL. Try again.",
             };

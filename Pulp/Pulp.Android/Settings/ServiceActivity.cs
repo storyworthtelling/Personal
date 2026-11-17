@@ -171,7 +171,7 @@ public class ServiceActivity : Activity
         column.AddView(SettingsViews.CheckRow(this, $"The household has {name}", had, SetHad));
         if (!loaded || !had)
         {
-            column.AddView(PaperUi.Secondary(this, $"Tick it to open titles on {name} from Pulp."), SettingsViews.Spaced(this, DesignTokens.Space.X1));
+            column.AddView(PaperUi.Secondary(this, $"Check it to open titles on {name} from Pulp."), SettingsViews.Spaced(this, DesignTokens.Space.X1));
             return;
         }
 

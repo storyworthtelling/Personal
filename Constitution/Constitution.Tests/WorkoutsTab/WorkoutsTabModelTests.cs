@@ -20,7 +20,7 @@ public class WorkoutsTabModelTests
 
         Assert.True(today.IsToday);
         Assert.Equal("Today · 4:30 pm", today.Kicker);
-        Assert.Equal("Strength, 40 minutes", today.Headline);
+        Assert.Equal("Strength, 40 min", today.Headline);
         Assert.Equal("5 exercises · dumbbells, bands, bench", today.KitLine);
         Assert.Equal("Score 132 bpm · Steady · on your tablet", today.ScoreLine);
     }

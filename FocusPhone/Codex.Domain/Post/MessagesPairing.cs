@@ -41,7 +41,7 @@ public static class MessagesPairing
         PairingFailure.PhoneNotResponding => "Google Messages on this phone didn’t answer. "
             + "Check the phone is online, then try again.",
         PairingFailure.SignedOut => "Google didn’t accept the sign-in. Sign in again.",
-        _ => "The pairing didn’t finish. Try again; the diagnostics log has the details.",
+        _ => "The pairing didn’t finish. Try again; Diagnostics has the details.",
     };
 
     public static bool WorthRetrying(PairingFailure failure) => failure != PairingFailure.NoPhone;
@@ -53,5 +53,5 @@ public static class TextsSetting
     public static string Describe(bool paired, bool connected) =>
         !paired ? "Texts aren’t connected yet. Connect Post to Google Messages to send and read every text here, RCS included."
         : connected ? "Texts go through Google Messages, RCS included."
-        : "Paired with Google Messages; Post reconnects the next time a text arrives or Post syncs.";
+        : "Connected to Google Messages; Post reconnects the next time a text arrives or Post refreshes.";
 }

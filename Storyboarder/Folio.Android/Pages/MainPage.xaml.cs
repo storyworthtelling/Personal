@@ -243,7 +243,7 @@ public partial class MainPage : FolioBinderPage
         // book's canon for the cross-book continuity read and returning-character look.
         buttons.Add(NextBookAction);
 
-        var isActive = status.Stage is not ("Completed" or "Failed" or "Cancelled");
+        var isActive = status.Stage is not ("Completed" or "Failed" or "Cancelled");  // not copy: a stage, id or wire word
         if (isActive)
         {
             buttons.Add(RetryAction);
@@ -481,7 +481,7 @@ public partial class MainPage : FolioBinderPage
     }
 
     private static bool Active(NovelStatus status) =>
-        status.Stage is not ("Completed" or "Failed" or "Cancelled");
+        status.Stage is not ("Completed" or "Failed" or "Cancelled");  // not copy: a stage, id or wire word
 
     // Tilts cycle so a stack of books looks laid down by hand rather than ruled.
     private static readonly double[] CoverTilts = [-1.6, 1.4, -0.9, 1.1];
@@ -769,15 +769,14 @@ public partial class MainPage : FolioBinderPage
 
             // Before the scene images render, say what the run is projected to cost.
             if (s.Estimate is { } estimate && estimate.Scenes > 0)
-                summary = $"{summary} · ~{estimate.Scenes:N0} scene images, about {Approximately(estimate.Duration)} " +
-                          $"at your {estimate.LimitingFactor} cap";
+                summary = $"{summary} · about {Storyworthtelling.Time.Quantities.Count(estimate.Scenes, "scene image")}, about {Approximately(estimate.Duration)}";
 
             // When a provider rate-limited us, say when queries resume — in local 12-hour time (DESIGN.md §11).
             if (s.RateLimitedUntilUtc is { } until)
             {
                 var local = until.ToLocalTime().DateTime;
                 var when = local.Date == DateTime.Now.Date ? TimeFormats.Clock12(local) : TimeFormats.Stamp(local);
-                summary = $"{summary} · rate-limited, resumes ~{when}";
+                summary = $"{summary} · paused by the service, resumes around {when}";
             }
 
             var chips = new List<PhaseChipRow>();

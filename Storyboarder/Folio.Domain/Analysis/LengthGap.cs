@@ -12,16 +12,16 @@ public static class LengthGap
         if (wordCount <= 0)
             return string.Empty;
 
-        var count = $"{wordCount:N0} words";
+        var count = $"{Storyworthtelling.Time.Quantities.Number((long)(wordCount))} words";
         var hasRange = targetLow > 0 && targetHigh >= targetLow;
         if (!hasRange)
             return count;
 
-        var range = $"{targetLow:N0}–{targetHigh:N0}";
+        var range = $"{Storyworthtelling.Time.Quantities.Number((long)(targetLow))}–{Storyworthtelling.Time.Quantities.Number((long)(targetHigh))}";
         if (wordCount < targetLow)
-            return $"{count} — ≈{Round(targetLow - wordCount):N0} words short of the {range} genre norm";
+            return $"{count} — ≈{Storyworthtelling.Time.Quantities.Number((long)(Round(targetLow - wordCount)))} words short of the {range} genre norm";
         if (wordCount > targetHigh)
-            return $"{count} — ≈{Round(wordCount - targetHigh):N0} words over the {range} genre norm";
+            return $"{count} — ≈{Storyworthtelling.Time.Quantities.Number((long)(Round(wordCount - targetHigh)))} words over the {range} genre norm";
         return $"{count} — within the {range} genre norm";
     }
 
@@ -35,14 +35,14 @@ public static class LengthGap
         if (wordCount <= 0)
             return string.Empty;
 
-        var count = $"{wordCount:N0} words";
+        var count = $"{Storyworthtelling.Time.Quantities.Number((long)(wordCount))} words";
         if (targetLow <= 0 || targetHigh < targetLow)
             return count;
 
         if (wordCount < targetLow)
-            return $"{count}, {Round(targetLow - wordCount):N0} short of the norm";
+            return $"{count}, {Storyworthtelling.Time.Quantities.Number((long)(Round(targetLow - wordCount)))} short of the norm";
         if (wordCount > targetHigh)
-            return $"{count}, {Round(wordCount - targetHigh):N0} over the norm";
+            return $"{count}, {Storyworthtelling.Time.Quantities.Number((long)(Round(wordCount - targetHigh)))} over the norm";
         return $"{count}, inside the genre norm";
     }
 

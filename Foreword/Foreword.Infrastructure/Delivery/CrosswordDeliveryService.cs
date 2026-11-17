@@ -19,7 +19,7 @@ public class CrosswordDeliveryService(
     IMorningVoice? voice = null)
 {
     // Returns a human-readable summary of what was delivered, e.g. "8 articles + puzzle"
-    // or "puzzle only — <reason>" so callers can surface it to the user.
+    // or "the crossword only — <reason>" (BriefStatus) so callers can surface it to the user.
     public async Task<string> DeliverDailyPuzzle(DateOnly date)
     {
         logger.LogInformation("Downloading daily crossword for {Date}", date);
@@ -92,11 +92,11 @@ public class CrosswordDeliveryService(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Top Stories API failed for {Date}", date);
-            return (crosswordBytes, $"puzzle only — news API error: {ex.Message}");
+            return (crosswordBytes, Foreword.Domain.Delivery.BriefStatus.CrosswordOnly(Foreword.Domain.Delivery.BriefShortfall.NewsUnreachable));
         }
 
         if (allStories.Count == 0)
-            return (crosswordBytes, "puzzle only — no stories returned by API");
+            return (crosswordBytes, Foreword.Domain.Delivery.BriefStatus.CrosswordOnly(Foreword.Domain.Delivery.BriefShortfall.NoStories));
 
         // Deduplicated and ordered before anything is fetched: a story that appears under Home and
         // again under its own section was being fetched twice AND printed twice, so the owner
@@ -144,7 +144,7 @@ public class CrosswordDeliveryService(
         }
 
         if (articles.Count == 0)
-            return (crosswordBytes, "puzzle only — all articles failed and abstracts were empty");
+            return (crosswordBytes, Foreword.Domain.Delivery.BriefStatus.CrosswordOnly(Foreword.Domain.Delivery.BriefShortfall.NoStoryFetched));
 
         try
         {
@@ -161,13 +161,12 @@ public class CrosswordDeliveryService(
             // The status sentence counts the ones that fell back, so a morning of failed fetches is
             // visible on the Settings screen rather than only in a log nobody opens.
             var stubs = articles.Count(article => article.AbstractOnly);
-            var note = stubs == 0 ? string.Empty : $" ({stubs} abstract-only)";
-            return (composed, $"{articles.Count} article(s){note} + puzzle");
+            return (composed, Foreword.Domain.Delivery.BriefStatus.Composed(articles.Count, stubs));
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "PDF composition failed for {Date}", date);
-            return (crosswordBytes, $"crossword only — PDF composition error: {ex.Message}");
+            return (crosswordBytes, Foreword.Domain.Delivery.BriefStatus.CrosswordOnly(Foreword.Domain.Delivery.BriefShortfall.LayoutFailed));
         }
     }
 

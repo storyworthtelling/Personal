@@ -97,15 +97,15 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
             ShowPasswordField(passwordState.IsWarning ? passwordState.StatusText : passwordHelper);
         }
 
-        var enableMessages = PaperUi.SecondaryButton(Host, "Enable message sync (notification access)", () =>
+        var enableMessages = PaperUi.SecondaryButton(Host, "Let Post read message notifications", () =>
             Host.StartActivity(new Intent(Android.Provider.Settings.ActionNotificationListenerSettings)));
         messages.AddView(enableMessages, Spaced(0, 0));
 
         var note = PaperUi.Secondary(Host,
-            "Message sync reads incoming texts from Google Messages notifications and " +
-            "voicemails (with transcription) from Google Phone notifications. Call and text " +
-            "history require the call-log and SMS permissions, which take effect after the " +
-            "device is locked down (or a whitelisted install).");
+            "Post reads incoming texts from Google Messages notifications and " +
+            "voicemails, with their transcripts, from Google Phone notifications. Call and text " +
+            "history need the call log and SMS permissions, which Flyleaf grants once the " +
+            "phone is locked down.");
         messages.AddView(note, Spaced(DesignTokens.Space.X4, 0));
 
         // On a locked-down phone there is no logcat, so surface captured crashes and
@@ -120,8 +120,8 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         var route = MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured);
         connections.AddView(PaperUi.Secondary(Host, route switch
         {
-            MailTransport.GmailApi => "Mail is going through the Gmail API. Deleting really trashes, and search runs on Gmail.",
-            MailTransport.AppPassword => "Mail is going through IMAP on the app password. Sign in with Google below to move to the Gmail API.",
+            MailTransport.GmailApi => "Mail comes through your Google sign-in. Deleting moves mail to Gmail’s trash, and Gmail runs the search.",
+            MailTransport.AppPassword => "Mail comes through the app password. Sign in with Google below so deleting really trashes and Gmail runs the search.",
             _ => "No mail account yet.",
         }), Spaced(DesignTokens.Space.X6, 0));
 
@@ -133,7 +133,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
                 : gmailRefused
                     ? $"Gmail refused {VoiceGoogleAccount.Email}, so mail is waiting. Sign in again to grant mail access."
                     : $"Signed in as {VoiceGoogleAccount.Email}."
-            : "Sign in with Google to move mail to the Gmail API and back up your credentials to your encrypted vault.");
+            : "Sign in with Google so mail comes through your account, and so your keys back up to the vault.");
         var voiceSignIn = PaperUi.SecondaryButton(Host, gmailRefused ? GoogleSignInHealth.SignInAgain : GoogleSignInHealth.ButtonLabel("Sign in with Google"), () => _ = SignInAsync(voiceStatus));
         connections.AddView(voiceSignIn, Spaced(DesignTokens.Space.X6, 0));
         connections.AddView(voiceStatus, Spaced(DesignTokens.Space.X2, 0));
@@ -145,7 +145,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         connections.AddView(PaperUi.Secondary(Host, TextsSetting.Describe(bridge.IsPaired, bridge.IsConnected)),
             Spaced(DesignTokens.Space.X6, 0));
         connections.AddView(PaperUi.SecondaryButton(Host,
-            bridge.IsPaired ? "Pair with Google Messages again" : "Connect to Google Messages",
+            bridge.IsPaired ? "Connect to Google Messages again" : "Connect to Google Messages",
             () => Host.StartActivity(new Intent(Host, typeof(MessagesPairingActivity)))),
             Spaced(DesignTokens.Space.X2, 0));
 
@@ -155,7 +155,7 @@ public sealed class SettingsArea(Activity host, VoiceGoogleAccount voiceAccount)
         passphrase = PaperUi.MonoField(Host, "Choose a passphrase");
         passphrase.Text = VaultPassphraseStore.Passphrase;
         PaperUi.CommitsAsTyped(passphrase, text => { VaultPassphraseStore.Passphrase = text; changed = true; }, Settle);
-        AddFieldGroup(vault, "Secrets vault passphrase", passphrase,
+        AddFieldGroup(vault, "Vault passphrase", passphrase,
             "Backs up your Gmail credentials to your Google Drive, encrypted. Restores after a reset. " +
             "Shown in the clear so you can copy it into your other apps.");
 

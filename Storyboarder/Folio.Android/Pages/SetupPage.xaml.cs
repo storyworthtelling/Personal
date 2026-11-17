@@ -140,7 +140,7 @@ public partial class SetupPage : FolioBinderPage
             var uri = await SafFilePicker.CreateDocumentAsync(activity, "application/zip", suggestedName);
             if (uri is null)
             {
-                BackupStatusLabel.Text = "Backup cancelled.";
+                BackupStatusLabel.Text = "Backup canceled.";
                 return;
             }
 
@@ -179,7 +179,7 @@ public partial class SetupPage : FolioBinderPage
             var uri = await SafFilePicker.OpenDocumentAsync(activity, "*/*");
             if (uri is null)
             {
-                BackupStatusLabel.Text = "Restore cancelled.";
+                BackupStatusLabel.Text = "Restore canceled.";
                 return;
             }
 
@@ -197,7 +197,7 @@ public partial class SetupPage : FolioBinderPage
             // The restored database may predate a schema change; bring it up to date, then resume.
             MainApplication.RunMigrations();
             PipelineWorker.RunNow(activity);
-            BackupStatusLabel.Text = "Restored. Your conversion will resume shortly.";
+            BackupStatusLabel.Text = "Restored. Your review picks up where it stopped.";
         }
         catch (Exception ex)
         {
@@ -344,7 +344,7 @@ public partial class SetupPage : FolioBinderPage
 
     private void UpdateGoogleStatus() =>
         GoogleStatusLabel.Text = SettingsStore.IsGoogleConfigured
-            ? $"Signed in as {SettingsStore.GoogleAccountEmail} ✓"
+            ? $"Signed in as {SettingsStore.GoogleAccountEmail}."
             : "Not signed in";
 
     private static string SigningInfoText() =>
@@ -527,7 +527,7 @@ public partial class SetupPage : FolioBinderPage
         {
             PairingTrail.Failed(pairing, ex);
             Say(RemarkableStatusLabel,
-                $"The reMarkable cloud didn’t accept that code ({(int?)ex.StatusCode}). Check it and pair again.", problem: true);
+                "The reMarkable didn’t accept that code. Get a fresh one and pair again.", problem: true);
         }
         catch (Exception ex)
         {
@@ -571,7 +571,7 @@ public partial class SetupPage : FolioBinderPage
             sending.Failed(result.Error ?? result.Refusal?.ToString() ?? "not uploaded");
         }
         DiagnosticsStatusLabel.Text = result.Succeeded
-            ? $"Logs sent: {result.Confirmed} of {result.Planned} batches confirmed in Drive."
-            : MauiLogLoop.Status ?? $"Logs not sent: {result.Error}";
+            ? $"Logs sent: {result.Confirmed} of {result.Planned} saved to Drive."
+            : MauiLogLoop.Status ?? "Logs not sent: " + Storyworthtelling.Diagnostics.PlainError.Describe(result.Error);
     }
 }

@@ -192,7 +192,7 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
     // simply not showing it.
     private void StartPhotoPass()
     {
-        ActionCard.Show(Host, Overlay, "Faces", $"{photos.WithoutPhoto} contacts have no photo",
+        ActionCard.Show(Host, Overlay, "Faces", (photos.WithoutPhoto == 1 ? "1 contact has" : $"{Storyworthtelling.Time.Quantities.Number(photos.WithoutPhoto)} contacts have") + " no photo",
             new CardAction(
                 "Ask Google for them",
                 SyncPhotosFromGoogle,

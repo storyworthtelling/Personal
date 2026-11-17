@@ -61,7 +61,7 @@ public static class ContinueRowText
         return string.IsNullOrWhiteSpace(name) ? Episode(next) : Episode(next) + Separator + name.Trim();
     }
 
-    /// <summary>"1h 12m left", "45m left", "2h left".</summary>
+    /// <summary>"1 hr 12 min left", "45 min left", "2 hr left".</summary>
     public static string Left(int minutes)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(minutes);
@@ -70,14 +70,7 @@ public static class ContinueRowText
             return "Under a minute left";
         }
 
-        var hours = minutes / 60;
-        var rest = minutes % 60;
-        return (hours, rest) switch
-        {
-            (0, _) => $"{rest}m left",
-            (_, 0) => $"{hours}h left",
-            _ => $"{hours}h {rest}m left",
-        };
+        return Storyworthtelling.Time.Quantities.Minutes(minutes) + " left";
     }
 
     /// <summary>"S1 · E3" — the episode as the row and the card's Play name it.</summary>

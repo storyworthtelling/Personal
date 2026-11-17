@@ -127,7 +127,7 @@ public partial class NewProjectPage : FolioBinderPage
             var token = await tokens.GetAccessToken();
             var entries = await lister.ListChildrenAsync(token, path[^1].Id, CancellationToken.None);
             DocsList.ItemsSource = entries;
-            Status(entries.Count == 0 ? "Empty folder." : $"{entries.Count} item(s).");
+            Status(entries.Count == 0 ? "Empty folder." : Storyworthtelling.Time.Quantities.Count(entries.Count, "item") + ".");
         }
         catch (Exception ex)
         {

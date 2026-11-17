@@ -15,17 +15,17 @@ public class HouseholdSyncAgoTests
 
         var line = HouseholdSyncText.Line(HouseholdSyncStatus.Synced(at), Now, Pacific);
 
-        Assert.Equal("Synced with Drive on Oct 2.", line);
+        Assert.Equal("Refreshed from Drive on Oct 2.", line);
     }
 
     [Fact]
     public void YesterdayAndTheWeekdayUseTheDomainsDayLabel()
     {
-        Assert.Equal("Synced with Drive yesterday.", HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddHours(-30)), Now, TimeZoneInfo.Utc));
-        Assert.Equal("Synced with Drive on Friday.", HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddDays(-3)), Now, TimeZoneInfo.Utc));
+        Assert.Equal("Refreshed from Drive yesterday.", HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddHours(-30)), Now, TimeZoneInfo.Utc));
+        Assert.Equal("Refreshed from Drive on Friday.", HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddDays(-3)), Now, TimeZoneInfo.Utc));
     }
 
     [Fact]
     public void ASyncStampedAheadOfThePhonesClockIsJustNow() =>
-        Assert.Equal("Synced with Drive just now.", HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddMinutes(5)), Now, TimeZoneInfo.Utc));
+        Assert.Equal("Refreshed from Drive just now.", HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddMinutes(5)), Now, TimeZoneInfo.Utc));
 }

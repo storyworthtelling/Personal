@@ -14,13 +14,13 @@ public class ConnectionFailureTests
     private const string Echo = "example-one-time-code-echo";
 
     [Fact]
-    public void ARefusedCodeNamesTheStatus()
+    public void ARefusedCodeSaysToGetAFreshOne()
     {
         var failure = new HttpRequestException(Echo, null, HttpStatusCode.BadRequest);
 
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, failure, callerCancelled: false);
 
-        Assert.Equal("The tablet didn’t accept that code (BadRequest).", sentence);
+        Assert.Equal("The reMarkable didn’t accept that code. Get a fresh one and try again.", sentence);
     }
 
     [Fact]
@@ -81,19 +81,20 @@ public class ConnectionFailureTests
     [Fact]
     public void ASignInThatDidNotCompleteKeepsItsOwnExplanation()
     {
-        // These come from the shared sign-in code ("Account selection was cancelled."), written for the person.
+        // These come from the shared sign-in code ("No account was picked."), written for the person.
         var sentence = ConnectionFailure.Sentence(
-            ConnectionAct.SignIn, new InvalidOperationException("Account selection was cancelled."), callerCancelled: false);
+            ConnectionAct.SignIn, new InvalidOperationException("No account was picked."), callerCancelled: false);
 
-        Assert.Equal("Sign-in didn’t complete. Account selection was cancelled.", sentence);
+        Assert.Equal("Sign-in didn’t complete. No account was picked.", sentence);
     }
 
     [Fact]
-    public void AnythingElseNamesOnlyItsType()
+    public void AnythingElseSaysToTryAgainAndNamesNothing()
     {
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, new ArithmeticException(Echo), callerCancelled: false);
 
-        Assert.Contains("ArithmeticException", sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("ArithmeticException", sentence, StringComparison.Ordinal);
+        Assert.Contains("Try again", sentence, StringComparison.Ordinal);
         Assert.DoesNotContain(Echo, sentence, StringComparison.Ordinal);
     }
 

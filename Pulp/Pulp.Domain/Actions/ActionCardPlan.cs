@@ -87,7 +87,7 @@ public sealed record CardPlan(string Title, string? Subtitle, IReadOnlyList<Card
 public static class ActionCardPlan
 {
     public const string AddToLabel = "Add to…";
-    public const string FavoriteLabel = "★ Favorite";
+    public const string FavoriteLabel = "Favorite";
 
     public static CardPlan For(CardItem item)
     {

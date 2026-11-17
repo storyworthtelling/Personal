@@ -71,7 +71,7 @@ public static class ChildFavorites
         ArgumentNullException.ThrowIfNull(nameOf);
         return card.Card.Source switch
         {
-            FavoriteSource.ChildStar => $"★ {nameOf(card.Child)}’s star",
+            FavoriteSource.ChildStar => $"{nameOf(card.Child)}’s star",
             FavoriteSource.ParentPick => card.Card.PickedBy is { } parent ? $"Picked by {nameOf(parent)}" : "Picked by a parent",
             FavoriteSource.WatchedMost => "Watched most",
             _ => throw new ArgumentOutOfRangeException(nameof(card), card.Card.Source, "A favorite from nowhere the page can name."),

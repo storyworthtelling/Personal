@@ -118,7 +118,7 @@ public sealed class GoogleCalendarWriter(
             var events = await request.ExecuteAsync(cancellationToken);
             foreach (var googleEvent in events.Items ?? [])
             {
-                if (string.Equals(googleEvent.Status, "cancelled", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(googleEvent.Status, "cancelled", StringComparison.OrdinalIgnoreCase))  // not copy: Google's own status word
                 {
                     continue;
                 }

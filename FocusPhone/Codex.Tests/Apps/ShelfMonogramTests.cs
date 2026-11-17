@@ -8,7 +8,7 @@ public class ShelfMonogramTests
     [Theory]
     [InlineData("Finance", "F")]              // one word → one initial
     [InlineData("media", "M")]                // lower-cased → upper
-    [InlineData("Smart Home", "SH")]          // two words → two initials
+    [InlineData("Smart home", "SH")]          // two words → two initials
     [InlineData("Reading & Reference", "RR")] // punctuation between words is skipped
     [InlineData("Health & Fitness & More", "HF")] // capped at the first two words
     [InlineData("  Travel  ", "T")]           // surrounding whitespace trimmed

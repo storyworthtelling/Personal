@@ -38,7 +38,7 @@ internal static class Attachments
 
     private static string Describe(AttachmentRef attachment)
     {
-        var size = attachment.SizeBytes > 0 ? $"{attachment.SizeBytes / 1024} KB · " : string.Empty;
+        var size = attachment.SizeBytes > 0 ? Storyworthtelling.Time.Quantities.Size(attachment.SizeBytes) + " · " : string.Empty;
         return AttachmentPlan.For(attachment) switch
         {
             AttachmentAction.OpenInPlate => $"{size}opens in Plate",

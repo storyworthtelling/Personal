@@ -53,7 +53,7 @@ public static class InkTargets
 
     public static InkTarget LargeTick(string id, float left, float top, string meaning)
     {
-        InkTarget.Require(id, meaning, "large tick");
+        InkTarget.Require(id, meaning, "large check box");
         return new InkTarget(id, InkTargetKind.LargeTick, new InkRect(left, top, LargeTickSize, LargeTickSize), meaning);
     }
 
@@ -64,7 +64,7 @@ public static class InkTargets
         for (var i = 0; i < meanings.Count; i++)
         {
             var id = $"{prefix}-{i + 1}";
-            InkTarget.Require(id, meanings[i], "tick");
+            InkTarget.Require(id, meanings[i], "check box");
             rows.Add(new InkTarget(
                 id, InkTargetKind.StandardTick,
                 new InkRect(left, top + i * TickRowPitch, StandardTickSize, StandardTickSize), meanings[i]));

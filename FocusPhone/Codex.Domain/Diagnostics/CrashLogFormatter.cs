@@ -12,7 +12,10 @@ namespace Codex.Domain.Diagnostics;
 /// </summary>
 public static class CrashLogFormatter
 {
-    private const string Header = "FocusPhone crash report";
+    private const string Header = "Crash report";
+
+    // What a report written before audit W11 opens with; still read, never written.
+    private const string OlderHeader = "FocusPhone crash report";  // not copy: only read back
     private const string MessageMarker = "--- Message ---";
     private const string StackMarker = "--- Stack trace ---";
 
@@ -37,7 +40,7 @@ public static class CrashLogFormatter
     public static bool TryParse(string text, out CrashReport? report)
     {
         report = null;
-        if (string.IsNullOrWhiteSpace(text) || !text.StartsWith(Header, StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(text) || (!text.StartsWith(Header, StringComparison.Ordinal) && !text.StartsWith(OlderHeader, StringComparison.Ordinal)))
         {
             return false;
         }

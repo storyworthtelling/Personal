@@ -49,11 +49,11 @@ public class RatingPageTests
     {
         var page = Page();
 
-        Assert.Equal("FIRST TIME · PLEASE CIRCLE", Item(page, "rate-4-first-time").Text);
+        Assert.Equal("First time · circle one", Item(page, "rate-4-first-time").Text);
         Assert.Equal(PrintedRole.Label, Item(page, "rate-4-first-time").Role);
         Assert.DoesNotContain(page.Printed, i => i.Name == "rate-4-underline");
-        Assert.Single(page.Printed, i => i.Text == "FIRST TIME · PLEASE CIRCLE");
-        Assert.DoesNotContain(Page(AllKnown()).Printed, i => i.Text == "FIRST TIME · PLEASE CIRCLE");
+        Assert.Single(page.Printed, i => i.Text == "First time · circle one");
+        Assert.DoesNotContain(Page(AllKnown()).Printed, i => i.Text == "First time · circle one");
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class RatingPageTests
         Assert.Equal(PageLeft, box.Bounds.Left);
         Assert.Equal("We didn’t cook this tonight", Item(page, "didnt-cook-label").Text);
         Assert.Equal(PrintedRole.Strong, Item(page, "didnt-cook-label").Role);
-        Assert.Equal("Tick it and the ratings are ignored; its fresh ingredients are written off.", Item(page, "didnt-cook-hint").Text);
+        Assert.Equal("Check it and the ratings are ignored; its fresh ingredients are written off.", Item(page, "didnt-cook-hint").Text);
         Assert.Equal(RecipeIds.DidntCook, Item(page, "didnt-cook-label").OwnerId);
     }
 
@@ -178,7 +178,7 @@ public class RatingPageTests
         var page = Page();
 
         Assert.Equal("Who liked it?", page.Title);
-        Assert.Equal("RECIPE · TONIGHT’S RATINGS · THE COOK RATES FOR EVERYONE", Item(page, "kicker").Text);
+        Assert.Equal("Recipe · tonight’s ratings · the cook rates for everyone", Item(page, "kicker").Text);
         Assert.Equal("Underlined is each person’s last rating of this dish.", Item(page, "intro-1").Text);
         Assert.Equal("Circle only if it’s new or has changed. No circle means unchanged.", Item(page, "intro-2").Text);
         Assert.Equal("Constitution · Recipe · Tue Nov 17 · Lee", Item(page, "footer").Text);
@@ -190,7 +190,7 @@ public class RatingPageTests
     {
         // The lanes run to 407; a 91 point margin cannot sit beside them. Growing one is a decision about the page, not a drift.
         Assert.DoesNotContain(Page().Map.Targets, t => t.Kind == InkTargetKind.NotesMargin);
-        Assert.DoesNotContain(Page().Printed, i => i.Text == "NOTES");
+        Assert.DoesNotContain(Page().Printed, i => i.Text == "Notes");
     }
 
     [Fact]
@@ -271,7 +271,7 @@ public class RatingPageTests
         Assert.Equal(1, document.NumberOfPages);
         Assert.Contains("Who liked it?", text);
         Assert.Contains("Never again", text);
-        Assert.Contains("FIRST TIME · PLEASE CIRCLE", text);
+        Assert.Contains("First time · circle one", text);
         Assert.Contains("We didn’t cook this tonight", text);
         Assert.Contains("4 of 4", text);
     }

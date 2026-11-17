@@ -69,7 +69,7 @@ internal static class SmsNotifications
     private static void EnsureChannel(NotificationManagerCompat manager)
     {
         var channel = new NotificationChannelCompat.Builder(ChannelId, NotificationManagerCompat.ImportanceHigh)
-            .SetName("Messages")!
+            .SetName("Texts")!
             .SetDescription("New texts arriving in the Mailbox")!
             .SetVibrationEnabled(true)!
             .Build();

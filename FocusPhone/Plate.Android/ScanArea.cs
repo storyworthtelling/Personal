@@ -717,7 +717,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
 
         public void OnError(ImageCaptureException? exception) =>
             area.Host.RunOnUiThread(() => area.ShowStatus(
-                $"Couldn’t take that frame: {exception?.Message}"));
+                "Couldn’t take that frame. Hold steady and try again."));
     }
 
     private sealed class QrResultListener(ScanArea area)

@@ -16,13 +16,13 @@ namespace Constitution.Domain.Documents;
 /// </summary>
 public static class MealSheetDocument
 {
-    public const string Kind = "WEEKLY MEAL SHEET";
-    public const string TickLine = "Tick YES to approve, or write after NO, BECAUSE.";
-    public const string YesWord = "YES";
+    public const string Kind = "Weekly meal sheet";
+    public const string TickLine = "Check Yes to approve, or write after it why not.";
+    public const string YesWord = "Yes";
     public const string NoBecauseWord = "No, because";
-    public const string SlowCookerWord = "SLOW COOKER";
-    public const string NewRecipeWord = "NEW RECIPE";
-    public const string EatingOutWord = "EATING OUT";
+    public const string SlowCookerWord = "Slow cooker";
+    public const string NewRecipeWord = "New recipe";
+    public const string EatingOutWord = "Eating out";
 
     /// <summary>The first row's top hairline; the rows run 58 points apart below it.</summary>
     private const float FirstRule = 156f;
@@ -87,7 +87,7 @@ public static class MealSheetDocument
         }
 
         var draft = new PageDraft("Dinners");
-        draft.Kicker($"{Kind} · 1 OF {model.Pages.ToString(CultureInfo.InvariantCulture)}");
+        draft.Kicker($"{Kind} · 1 of {model.Pages.ToString(CultureInfo.InvariantCulture)}");
         Header(draft, model);
 
         for (var index = 0; index < model.Week.Dinners.Count; index++)
@@ -157,7 +157,7 @@ public static class MealSheetDocument
             }
         }
 
-        draft.Line(PrintedRole.Small, PageDraft.Left, TickLineBaseline, PageDraft.FullWidth, TickLine, name: "tick-line");
+        draft.Line(PrintedRole.Small, PageDraft.Left, TickLineBaseline, PageDraft.FullWidth, TickLine, name: "tick-line");  // not copy: a region id the read-back names
         draft.Line(
             PrintedRole.Small, PageDraft.Left, DeadlineBaseline, PageDraft.FullWidth,
             $"Anything untouched is approved {DeadlineWords(model.Deadline)}.", name: "deadline-line");

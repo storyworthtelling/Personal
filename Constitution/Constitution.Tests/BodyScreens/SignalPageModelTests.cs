@@ -55,7 +55,7 @@ public class SignalPageModelTests
         var page = Sleep(BodyWindow.Quarter);
 
         Assert.Equal(BodyWindow.Quarter, page.Window);
-        Assert.Equal(("PERIOD", "QUARTER"), page.Head.Fields[2]);
+        Assert.Equal(("Period", "Quarter"), page.Head.Fields[2]);
     }
 
     [Fact]

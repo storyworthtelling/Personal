@@ -191,7 +191,7 @@ public class StepTimingTests
         var page = Steps();
 
         Assert.Equal("Steps", page.Title);
-        Assert.Contains("RECIPE · TIMED BACK FROM DINNER AT 6:15", Texts(page, PrintedRole.Label));
+        Assert.Contains("Recipe · timed back from dinner at 6:15", Texts(page, PrintedRole.Label));
         Assert.Equal("Constitution · Recipe · Tue Nov 17 · Lee", page.Printed.Single(i => i.Name == "footer").Text);
         Assert.Equal("2 of 4", page.Printed.Single(i => i.Name == "page-number").Text);
         Assert.Contains("Clock times tonight, from dinner back. Late? Every step moves together.", Texts(page, PrintedRole.Small));
@@ -275,7 +275,7 @@ public class StepTimingTests
         Assert.Equal(124f, notes.Bounds.Top);
         Assert.Empty(page.Violations());
         using var document = PdfReadBack.Open(ConstitutionDocumentRenderer.Render([page]));
-        Assert.Equal(140f, Baseline(document.GetPage(1), "NOTES"), 1.5f);
+        Assert.Equal(140f, Baseline(document.GetPage(1), "Notes"), 1.5f);
     }
 
     [Fact]
@@ -422,7 +422,7 @@ public class StepTimingTests
 
         Assert.Equal(3, pages.Count + 1);
         Assert.Equal("Black bean chili", page.Title);
-        Assert.Contains("RECIPE · SLOW COOKER · ARRIVES BEFORE THE MORNING BLOCK", Texts(page, PrintedRole.Label));
+        Assert.Contains("Recipe · slow cooker · arrives before the morning block", Texts(page, PrintedRole.Label));
         Assert.Contains("Started in the morning, ready at dinner. Morning steps first.", Texts(page, PrintedRole.Small));
         Assert.Equal(["7:30", "7:40", "5:50", "6:05", "6:15"], Texts(page, PrintedRole.Time));
         Assert.Equal("Constitution · Recipe · Wed Nov 18 · Sam", page.Printed.Single(i => i.Name == "footer").Text);
@@ -487,7 +487,7 @@ public class StepTimingTests
 
         Assert.True(stepPages.Count >= 2, $"{stepPages.Count} step pages");
         Assert.Equal(Enumerable.Range(2, stepPages.Count).Select(n => $"{n} of {pages.Count + 1}"), stepPages.Select(p => p.Printed.Single(i => i.Name == "page-number").Text));
-        Assert.Contains("RECIPE · TIMED BACK FROM DINNER AT 6:15 · CONTINUED", Texts(stepPages[1], PrintedRole.Label));
+        Assert.Contains("Recipe · timed back from dinner at 6:15 · continued", Texts(stepPages[1], PrintedRole.Label));
         Assert.All(stepPages, p => Assert.Equal("Steps", p.Title));
 
         var times = stepPages.SelectMany(p => Texts(p, PrintedRole.Time)).ToList();

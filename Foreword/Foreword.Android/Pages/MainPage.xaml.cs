@@ -191,7 +191,7 @@ public partial class MainPage : BinderPage
                 CredentialStore.IsGoogleConfigured
                     ? CredentialStore.GoogleAccountEmail
                     : "Your calendar and tasks — the day can’t be built without it"),
-            (!string.IsNullOrEmpty(CredentialStore.VaultPassphrase), "The vault",
+            (!string.IsNullOrEmpty(CredentialStore.VaultPassphrase), "Vault",
                 string.IsNullOrEmpty(CredentialStore.VaultPassphrase)
                     ? "One passphrase, and the rest of the keys restore themselves"
                     : "Restoring this phone’s keys from Drive"),
@@ -306,7 +306,7 @@ public partial class MainPage : BinderPage
         }
         else if (action == "Share")
         {
-            await Share.RequestAsync(new ShareFileRequest { Title = "Foreword Delivery Log", File = new ShareFile(DeliveryLogPath) });
+            await Share.RequestAsync(new ShareFileRequest { Title = "Foreword delivery log", File = new ShareFile(DeliveryLogPath) });
         }
     }
 
@@ -327,7 +327,7 @@ public partial class MainPage : BinderPage
         }
         else if (action == "Share")
         {
-            await Share.RequestAsync(new ShareFileRequest { Title = "Foreword Crash Log", File = new ShareFile(CrashLogPath) });
+            await Share.RequestAsync(new ShareFileRequest { Title = "Foreword crash log", File = new ShareFile(CrashLogPath) });
         }
         else if (action == "Clear")
         {

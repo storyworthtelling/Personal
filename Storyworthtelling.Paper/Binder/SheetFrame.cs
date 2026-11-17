@@ -74,7 +74,7 @@ public static class SheetFrame
 
     /// <summary>
     /// A cover's foot: the maker's mark, centred, and under it the line that says who set the paper
-    /// ("SET AND DELIVERED BY FOREWORD"). <paramref name="bottom"/> is the y the line ends at; returns the mark's top.
+    /// ("Set and delivered by foreword"). <paramref name="bottom"/> is the y the line ends at; returns the mark's top.
     /// </summary>
     public static float Colophon(SKCanvas canvas, TabletSheet sheet, SheetSignature signature, float bottom, float contentWidth)
     {
@@ -82,7 +82,7 @@ public static class SheetFrame
         Mark(canvas, Margin + (contentWidth - ColophonMarkSize) / 2f, top, ColophonMarkSize);
 
         var font = Sans(PaperTypeScale.Label, bold: true);
-        var line = $"SET AND DELIVERED BY {signature.Name.ToUpperInvariant()}";
+        var line = $"Set and delivered by {signature.Name}";
         using var paint = new SKPaint { Color = InkMuted, IsAntialias = true };
         font.GetFontMetrics(out var m);
         canvas.DrawText(line, Margin + (contentWidth - font.MeasureText(line)) / 2f, bottom - 12f - m.Ascent, font, paint);

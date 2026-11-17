@@ -87,7 +87,7 @@ public class GroceryExtraLineTests
         var other = page.Printed.Where(item => item.Name.StartsWith("list-extra-", StringComparison.Ordinal)).OrderBy(item => item.Bounds.Top).ToList();
         Assert.Equal(["Tuesday dinner", "Friday dinner"], other.Select(item => item.Text));
         var heading = page.Printed.Single(item => item.Name == "extra-heading");
-        Assert.Equal(GroceryList.ExtraHeading.ToUpperInvariant(), heading.Text);
+        Assert.Equal(GroceryList.ExtraHeading, heading.Text);
         var lastAisle = page.Printed.Where(item => item.Name.StartsWith("list-", StringComparison.Ordinal) && !item.Name.StartsWith("list-extra-", StringComparison.Ordinal) && item.Name != "list-heading" && item.Name != "list-note").Max(item => item.Bounds.Top);
         Assert.True(heading.Bounds.Top > lastAisle);
     }

@@ -40,17 +40,26 @@ public class CategoryCatalog
     public IReadOnlyList<Category> Categories => categories;
 
     /// <summary>A fresh catalog with the nine built-in shelves in their default order.</summary>
+    /// <summary>
+    /// The built-in shelves' names before audit W11 put them in sentence case. A stored built-in still carrying one of
+    /// these reads as its new name; one the owner renamed keeps theirs.
+    /// </summary>
+    public static string CurrentName(Category category) =>
+        category.Builtin && category.Name is "Travel & Transit" or "Food & Dining" or "Health & Fitness" or "Utilities & Tools" or "Smart Home"  // not copy: the old names, only read
+            ? Seed().Categories.FirstOrDefault(seeded => seeded.Id == category.Id)?.Name ?? category.Name
+            : category.Name;
+
     public static CategoryCatalog Seed() => new(
     [
         new(Finance, "Finance", "folder_finance", 0, Builtin: true),
-        new(Travel, "Travel & Transit", "folder_travel", 1, Builtin: true),
+        new(Travel, "Travel and transit", "folder_travel", 1, Builtin: true),
         new(Shopping, "Shopping", "folder_shopping", 2, Builtin: true),
-        new(Food, "Food & Dining", "folder_food", 3, Builtin: true),
-        new(Health, "Health & Fitness", "folder_health", 4, Builtin: true),
-        new(Utilities, "Utilities & Tools", "folder_utilities", 5, Builtin: true),
+        new(Food, "Food and dining", "folder_food", 3, Builtin: true),
+        new(Health, "Health and fitness", "folder_health", 4, Builtin: true),
+        new(Utilities, "Utilities and tools", "folder_utilities", 5, Builtin: true),
         new(Productivity, "Productivity", "folder_productivity", 6, Builtin: true),
         new(Media, "Media", "folder_media", 7, Builtin: true),
-        new(SmartHome, "Smart Home", "folder_smarthome", 8, Builtin: true),
+        new(SmartHome, "Smart home", "folder_smarthome", 8, Builtin: true),
     ]);
 
     public Category? ById(string id) => categories.FirstOrDefault(c => c.Id == id);

@@ -82,7 +82,7 @@ public class VaultOutcomesTests
     public void AnUnregisteredClientIsNamedAsSuchNotAsAFlakySignIn()
     {
         Assert.True(GoogleSignInFailure.IsUnregistered("android.accounts.AuthenticatorException: UnregisteredOnApiConsole"));
-        Assert.False(GoogleSignInFailure.IsUnregistered("Account selection was cancelled."));
+        Assert.False(GoogleSignInFailure.IsUnregistered("No account was picked."));
         Assert.False(GoogleSignInFailure.IsUnregistered(null));
     }
 
@@ -94,7 +94,7 @@ public class VaultOutcomesTests
         Assert.Equal(VaultOutcomes.SignInKey, notice.Key);
         Assert.Equal(NoticeRole.Problem, notice.Role);
         Assert.Contains(PulpIdentity.ApplicationId, notice.Detail, StringComparison.Ordinal);
-        Assert.Contains("SHA-1", notice.Detail, StringComparison.Ordinal);
+        Assert.Contains("signing fingerprint", notice.Detail, StringComparison.Ordinal);
         Assert.DoesNotContain("try signing in again", notice.Detail, StringComparison.OrdinalIgnoreCase);
     }
 

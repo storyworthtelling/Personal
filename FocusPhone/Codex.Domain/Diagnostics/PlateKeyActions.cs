@@ -20,7 +20,7 @@ public static class PlateKeyActions
     public const string Deliver = "plate.deliver";
 
     /// <summary>Faces: recognising the people in a photo.</summary>
-    public const string Recognise = "plate.recognise";
+    public const string Recognise = "plate.recognise";  // not copy: a stage, id or wire word
 
     /// <summary>Diagnostics: Send logs now.</summary>
     public const string SendLogsNow = "plate.send-logs-now";

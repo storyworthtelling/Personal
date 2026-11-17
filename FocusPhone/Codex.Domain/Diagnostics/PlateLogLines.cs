@@ -31,5 +31,5 @@ public static class PlateLogLines
     }
 
     public static string Errand(string action, bool returned) =>
-        returned ? $"ERRAND {action}: returned a result" : $"ERRAND {action}: cancelled";
+        returned ? $"ERRAND {action}: returned a result" : $"ERRAND {action}: cancelled";  // not copy: a stage, id or wire word
 }

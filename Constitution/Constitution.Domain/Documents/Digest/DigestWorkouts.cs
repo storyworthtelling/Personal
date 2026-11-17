@@ -49,7 +49,7 @@ public static class DigestWorkouts
     {
         ArgumentNullException.ThrowIfNull(summary);
         var draft = new PageDraft("Workouts");
-        draft.Kicker($"SATURDAY DIGEST · {number} OF {pages}");
+        draft.Kicker($"Saturday digest · {number} of {pages}");
         draft.Line(PrintedRole.Strong, PageDraft.Left, 96f, PageDraft.ColumnWidth, summary.Headline, name: "headline");
 
         var baseline = 140f;
@@ -61,7 +61,7 @@ public static class DigestWorkouts
             var name = day.Mark == DigestMark.Filled ? $"mark-filled-{++filled}" : $"mark-open-{++open}";
             var role = day.Mark == DigestMark.Filled ? PrintedRole.MarkFilled : PrintedRole.MarkOpen;
             draft.Add(new PrintedItem(name, role, new InkRect(PageDraft.Left, baseline - 11f, 12f, 12f), null, null));
-            draft.Line(PrintedRole.Label, PageDraft.Left + 20f, baseline, 40f, day.Day.ToString("ddd", CultureInfo.InvariantCulture).ToUpperInvariant());
+            draft.Line(PrintedRole.Label, PageDraft.Left + 20f, baseline, 40f, day.Day.ToString("ddd", CultureInfo.InvariantCulture));
             var text = $"{session.Name} · {session.PlannedMinutes} min" + (string.IsNullOrWhiteSpace(session.RatingSummary) ? "" : $" · {session.RatingSummary}");
             draft.Line(PrintedRole.Body, PageDraft.Left + 66f, baseline, PageDraft.ColumnWidth - 66f, text);
             baseline += 30f;
@@ -70,7 +70,7 @@ public static class DigestWorkouts
         if (summary.Moved.Count > 0)
         {
             baseline += 14f;
-            draft.Line(PrintedRole.Label, PageDraft.Left, baseline, PageDraft.ColumnWidth, "WHAT MOVED");
+            draft.Line(PrintedRole.Label, PageDraft.Left, baseline, PageDraft.ColumnWidth, "What moved");
             baseline += 20f;
             var moved = 0;
             foreach (var sentence in summary.Moved)

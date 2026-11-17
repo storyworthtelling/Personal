@@ -67,12 +67,12 @@ public class ShelfComposerTests
     [Fact]
     public void CategoryShelves_CarryTheirBookendGlyphAndName()
     {
-        var tray = new TrayModel([], [Folder(CategoryCatalog.Travel, "Travel & Transit", "folder_travel", "com.waze")], []);
+        var tray = new TrayModel([], [Folder(CategoryCatalog.Travel, "Travel and transit", "folder_travel", "com.waze")], []);
 
         var category = ShelfComposer.Compose(Home, tray, NoUsage)[4];
 
         Assert.Equal("folder_travel", category.BookendGlyph);
-        Assert.Equal("Travel & Transit", category.BookendName);
+        Assert.Equal("Travel and transit", category.BookendName);
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class ShelfComposerTests
         var replaced = Home.Replace(HomeFeatureSet.MapsPackage, "com.acme.newmail");
         var shelves = ShelfComposer.Compose(replaced, AppTrayLayout.Build(installed, overrides, catalog), NoUsage);
 
-        var travel = Assert.Single(shelves, s => s.BookendName == "Travel & Transit");
+        var travel = Assert.Single(shelves, s => s.BookendName == "Travel and transit");
         Assert.Equal(new[] { HomeFeatureSet.MapsPackage }, travel.Entries.Select(e => e.Key));
     }
 

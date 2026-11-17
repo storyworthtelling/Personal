@@ -28,7 +28,7 @@ public sealed record ReadingFrame(GenreFrame Genre, string SeriesCanon)
         if (!string.IsNullOrWhiteSpace(canon.PriorContinuitySummary))
             lines.Add("WHERE THE STORY STOOD AT THE END OF THAT BOOK:\n" + canon.PriorContinuitySummary);
         if (canon.OpenThreads.Count > 0)
-            lines.Add("THREADS IT LEFT OPEN:\n" + string.Join("\n", canon.OpenThreads.Select(thread => $"- {thread.Detail}")));
+            lines.Add("THREADS IT LEFT OPEN:\n" + string.Join("\n", canon.OpenThreads.Select(thread => $"- {thread.Detail}")));  // not copy: a prompt to the readers
         return string.Join("\n\n", lines);
     }
 }

@@ -14,14 +14,14 @@ public class FormHeadTests
     {
         var head = FormHead.For(BodySignal.Sleep, BodyWindow.Month);
 
-        Assert.Equal([("SIGNAL", "SLEEP"), ("UNITS", "HOURS"), ("PERIOD", "MONTH")], head.Fields);
+        Assert.Equal([("Signal", "Sleep"), ("Units", "hours"), ("Period", "Month")], head.Fields);
     }
 
     [Theory]
-    [InlineData(BodySignal.Weight, "WEIGHT", "LB")]
-    [InlineData(BodySignal.RestingHeartRate, "RESTING HEART RATE", "BPM")]
-    [InlineData(BodySignal.Steps, "STEPS", "A DAY")]
-    [InlineData(BodySignal.HeartRateVariability, "HEART RATE VARIABILITY", "MS")]
+    [InlineData(BodySignal.Weight, "Weight", "lb")]
+    [InlineData(BodySignal.RestingHeartRate, "Resting heart rate", "bpm")]
+    [InlineData(BodySignal.Steps, "Steps", "a day")]
+    [InlineData(BodySignal.HeartRateVariability, "Heart rate variability", "ms")]
     public void EverySignalIsHeadedInItsOwnWords(BodySignal signal, string name, string units)
     {
         var head = FormHead.For(signal, BodyWindow.Month);
@@ -31,12 +31,12 @@ public class FormHeadTests
     }
 
     [Theory]
-    [InlineData(BodyWindow.Month, "MONTH")]
-    [InlineData(BodyWindow.Quarter, "QUARTER")]
-    [InlineData(BodyWindow.Year, "YEAR")]
+    [InlineData(BodyWindow.Month, "Month")]
+    [InlineData(BodyWindow.Quarter, "Quarter")]
+    [InlineData(BodyWindow.Year, "Year")]
     public void ThePeriodIsTheWindowWord(BodyWindow window, string period)
     {
-        Assert.Equal(("PERIOD", period), FormHead.For(BodySignal.Sleep, window).Fields[2]);
+        Assert.Equal(("Period", period), FormHead.For(BodySignal.Sleep, window).Fields[2]);
     }
 
     [Fact]
@@ -44,6 +44,6 @@ public class FormHeadTests
     {
         var head = FormHead.For(BodySignal.HeartRateVariability, window: null);
 
-        Assert.Equal([("SIGNAL", "HEART RATE VARIABILITY"), ("UNITS", "MS")], head.Fields);
+        Assert.Equal([("Signal", "Heart rate variability"), ("Units", "ms")], head.Fields);
     }
 }

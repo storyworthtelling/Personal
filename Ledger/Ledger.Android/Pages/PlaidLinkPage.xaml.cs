@@ -410,7 +410,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             {
                 logger.LogWarning("Connect: Plaid returned no hosted_link_url; cannot open Link.");
                 Trail(t => t.LinkTokenFailed(DateTimeOffset.Now, "no hosted_link_url"));
-                ShowProblem("Couldn’t open Plaid Link. Check your credentials and environment in Settings.");
+                ShowProblem("Couldn’t open Plaid. Check the Plaid client id and secret in Settings.");
                 return false;
             }
 
@@ -422,7 +422,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
         {
             logger.LogError(ex, "Connect: failed to start Plaid Link.");
             Trail(t => t.LinkTokenFailed(DateTimeOffset.Now, ex.GetType().Name));
-            ShowProblem($"Couldn’t start Plaid Link: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Plaid")}");
+            ShowProblem($"Couldn’t open Plaid: {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Plaid")}");
             return false;
         }
     }

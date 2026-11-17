@@ -571,7 +571,7 @@ public partial class SetupPage : LedgerBinderPage
         var options = new List<string> { "Rename" };
         if (index > 0) options.Add("Move up");
         if (index < categoryRows.Count - 1) options.Add("Move down");
-        options.Add("Remove");
+        options.Add("Delete");
 
         var action = await PaperCards.Choose(this, categoryName, null, options);
         switch (action)
@@ -599,14 +599,14 @@ public partial class SetupPage : LedgerBinderPage
                 await ReloadCategoriesAsync();
                 break;
 
-            case "Remove":
+            case "Delete":
                 // Undo-first (DESIGN.md §7): the soft delete (D55) has already written through, so its past
                 // months keep their totals, and the dog-ear — fixed in the corner, wherever the list is
                 // scrolled to — holds the way back for the suite's one undo window.
                 await budgetService.SetCategoryActiveAsync(category.Id, isActive: false, CancellationToken.None);
                 await ReloadCategoriesAsync();
                 dogEarState.BeginUndo(
-                    $"Removed {categoryName}",
+                    $"Deleted {categoryName}",
                     reverse: () => _ = UndoRemoveCategoryAsync(category),
                     DateTimeOffset.Now,
                     Storyworthtelling.Maui.Views.DogEar.UndoWindow());
@@ -739,7 +739,7 @@ public partial class SetupPage : LedgerBinderPage
             sending.Failed(result.Error ?? result.Refusal?.ToString() ?? "not uploaded");
         }
         DiagnosticsStatusLabel.Text = result.Succeeded
-            ? $"Logs sent: {result.Confirmed} of {result.Planned} batches confirmed in Drive."
-            : MauiLogLoop.Status ?? $"Logs not sent: {result.Error}";
+            ? $"Logs sent: {result.Confirmed} of {result.Planned} saved to Drive."
+            : MauiLogLoop.Status ?? "Logs not sent: " + Storyworthtelling.Diagnostics.PlainError.Describe(result.Error);
     }
 }

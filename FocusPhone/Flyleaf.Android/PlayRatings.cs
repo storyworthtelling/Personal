@@ -84,7 +84,7 @@ public static class PlayRatings
             // Counts only, never package names: the log leaves the phone.
             var mature = book.MaturePackages();
             var line = $"Looked up {due.Count} Play ratings: " + string.Join(", ", tally.Select(t => $"{t.Value} {t.Key}"))
-                + $"; {mature.Count} installed app(s) rated M or above.";
+                + "; " + Storyworthtelling.Time.Quantities.Count(mature.Count, "installed app") + " rated M or above.";
             if (tally.ContainsKey(RatingLookupOutcome.Unreadable))
             {
                 HeadLog.Warn(Tag, line + " An unreadable listing may mean Play changed its page.");

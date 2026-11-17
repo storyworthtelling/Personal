@@ -77,7 +77,7 @@ public static class SportsScreenText
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
         return (channelLine is null ? string.Empty : channelLine + ". ")
-            + $"{serviceName.Trim()} carries it. Tick {serviceName.Trim()} in Settings, under Services, and Play will open it.";
+            + $"{serviceName.Trim()} carries it. Check {serviceName.Trim()} in Settings, under Services, and Play will open it.";
     }
 
     /// <summary>The chip on a game: only what is not ordinary. A championship game is "Final" as mockup 07 draws it.</summary>

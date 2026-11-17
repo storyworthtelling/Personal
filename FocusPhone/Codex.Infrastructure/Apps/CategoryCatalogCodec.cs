@@ -31,7 +31,9 @@ public static class CategoryCatalogCodec
         try
         {
             var categories = JsonSerializer.Deserialize<List<Category>>(json);
-            return categories is null ? CategoryCatalog.Seed() : new CategoryCatalog(categories);
+            return categories is null
+                ? CategoryCatalog.Seed()
+                : new CategoryCatalog(categories.Select(category => category with { Name = CategoryCatalog.CurrentName(category) }).ToList());
         }
         catch (JsonException)
         {

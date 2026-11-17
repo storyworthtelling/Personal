@@ -80,7 +80,7 @@ public class ManageSubscriptionsActivity : Activity
 
         BinderFrame.SetBar(framed, PaperUi.BottomBar(this,
             PaperUi.SecondaryButton(this, "Add feed", ShowAddFeedDialog),
-            PaperUi.QuietButton(this, "Import OPML", ImportOpml),
+            PaperUi.QuietButton(this, "Import a podcast list", ImportOpml),
             PaperUi.QuietButton(this, "Diagnostics",
                 () => StartActivity(new Intent(this, typeof(AudioDiagnosticsActivity))))));
         return root;
@@ -166,7 +166,7 @@ public class ManageSubscriptionsActivity : Activity
     private void ShowAddFeedDialog()
     {
         var field = ActionCard.AskText(this, undoHost, "Subscribe to podcast", null,
-            "RSS feed URL", null, "Add", text =>
+            "The feed’s web address", null, "Add", text =>
             {
                 var url = text.Trim();
                 if (!Uri.TryCreate(url, UriKind.Absolute, out _))
@@ -186,7 +186,7 @@ public class ManageSubscriptionsActivity : Activity
     {
         var intent = new Intent(Intent.ActionGetContent);
         intent.SetType("*/*");
-        StartActivityForResult(Intent.CreateChooser(intent, "Choose OPML file"), OpmlRequestCode);
+        StartActivityForResult(Intent.CreateChooser(intent, "Choose a podcast list file"), OpmlRequestCode);
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
@@ -206,7 +206,7 @@ public class ManageSubscriptionsActivity : Activity
             {
                 DogEar.SetNotice(this, undoHost, OpmlNoticeKey, new DogEar.Notice(
                     "No feeds in that file.",
-                    "It opened, but it lists no podcasts to follow. An export from another podcast app is an OPML file of feeds.",
+                    "It opened, but it lists no podcasts to follow. A podcast list exported from another podcast app is what this reads.",
                     DogEar.Hues.Caution));
                 return;
             }

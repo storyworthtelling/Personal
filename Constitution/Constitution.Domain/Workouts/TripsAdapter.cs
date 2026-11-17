@@ -23,7 +23,7 @@ public sealed record TravelChange(TravelAction Action, PlannedSession Original, 
     public IReadOnlyList<string> People => Original.Participants;
 }
 
-/// <summary>A line for one person's day on the Workouts tab ("Paused: family holiday").</summary>
+/// <summary>A line for one person's day on the Workouts tab ("Paused: family vacation").</summary>
 public sealed record DayNote(string Person, DateOnly Day, string Line);
 
 /// <summary>The week once travel has had its say.</summary>
@@ -32,14 +32,14 @@ public sealed record TravelAdaptation(HouseholdWorkoutPlan Plan, IReadOnlyList<T
 /// <summary>The words of the travel lines. Nothing from a calendar, a hotel or a lookup ever reaches a line.</summary>
 public static class TravelWords
 {
-    public const string Paused = "Paused: family holiday";
+    public const string Paused = "Paused: family vacation";
     public const string InTheRoom = "On the road: in the room";
     public const string Outdoors = "On the road: outdoors";
     public const string HotelGym = "On the road: hotel gym";
     public const string DroppedJoint = "Dropped: someone is away";
 
     /// <summary>What a person's plan says when a holiday took away every session it had, or all of its days.</summary>
-    public const string PausedWeek = "The plan is paused for the family holiday.";
+    public const string PausedWeek = "The plan is paused for the family vacation.";
 
     /// <summary>What a person's plan says when every session it had was a shared one on a day someone was away.</summary>
     public const string AwayWeek = "Every session this week fell on a day someone was away.";

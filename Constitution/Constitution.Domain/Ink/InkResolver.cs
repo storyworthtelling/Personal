@@ -25,8 +25,8 @@ public sealed class InkResolver
     public const double MinimumConfidence = 0.75;
 
     private const string Unchanged = "Unchanged";
-    private const string TickedChip = "Ticked";
-    private const string NotTickedChip = "Not ticked";
+    private const string TickedChip = "Checked";
+    private const string NotTickedChip = "Not checked";
     private const string KeepChip = "Keep it";
     private const string LeaveOutChip = "Leave it out";
     private const string StillSoreChip = "Still sore";

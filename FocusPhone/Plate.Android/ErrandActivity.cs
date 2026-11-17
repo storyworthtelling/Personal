@@ -608,7 +608,7 @@ public class ErrandActivity : AppCompatActivity
             host.RunOnUiThread(() =>
             {
                 host.DiscardFrame(file);
-                host.ShowStatus($"That one didn’t save: {exception?.Message}");
+                host.ShowStatus("That one didn’t save. Take it again.");
             });
     }
 
@@ -630,7 +630,7 @@ public class ErrandActivity : AppCompatActivity
             host.RunOnUiThread(() =>
             {
                 host.DiscardFrame(file);
-                host.ShowStatus($"Couldn’t take that frame: {exception?.Message}");
+                host.ShowStatus("Couldn’t take that frame. Hold steady and try again.");
             });
         }
     }

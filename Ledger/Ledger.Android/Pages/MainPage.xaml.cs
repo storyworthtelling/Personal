@@ -1450,7 +1450,7 @@ public partial class MainPage : LedgerBinderPage
         {
             transactionErrorsByPlaidAccountId[account.AccountId] = ex.Message.Contains("NOT_READY", StringComparison.OrdinalIgnoreCase)
                 ? "Transactions aren\u2019t ready yet — try again in a minute."
-                : "Couldn\u2019t load transactions.";
+                : "Couldn\u2019t load transactions. Refresh to try again.";
         }
         finally
         {

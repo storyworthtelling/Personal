@@ -53,10 +53,10 @@ public sealed record SecretsVaultPublishResult(SecretsVaultPublishStatus Status,
     {
         SecretsVaultPublishStatus.VaultUnreadable when Error == NewerAppError =>
             "Couldn’t back up to the vault: a newer version of one of the apps wrote it. " +
-            "Your settings are saved on this device; update this app to sync the backup.",
+            "Your settings are saved on this device; update this app to back it up.",
         SecretsVaultPublishStatus.VaultUnreadable =>
             "Couldn’t back up to the vault: the passphrase doesn’t match the vault already on Drive. " +
-            "Your settings are saved on this device; fix the passphrase to sync the backup.",
+            "Your settings are saved on this device; fix the passphrase to back it up.",
         SecretsVaultPublishStatus.WriteFailed =>
             $"Couldn’t back up to the vault: {Error} " +
             "Your settings are saved on this device. This usually means Drive access needs the full-access " +

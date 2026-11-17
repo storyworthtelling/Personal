@@ -22,7 +22,7 @@ public static class ConnectionFailure
     /// The sentence a row is left with. Never empty, never a stack trace, and never a raw message:
     /// messages come from the network stack and the Google client and are not ours to vouch for as free
     /// of a code or a token. The one exception is the shared sign-in's own explanations (an
-    /// <see cref="InvalidOperationException"/> such as "Account selection was cancelled."), which are
+    /// <see cref="InvalidOperationException"/> such as "No account was picked."), which are
     /// written for the person to read.
     /// </summary>
     /// <param name="act">What was interrupted.</param>
@@ -39,8 +39,8 @@ public static class ConnectionFailure
             case OperationCanceledException:
             case TimeoutException:
                 return $"{Gerund(act)} timed out. Try again.";
-            case HttpRequestException { StatusCode: { } status } when act == ConnectionAct.PairRemarkable:
-                return $"The tablet didn’t accept that code ({status}).";
+            case HttpRequestException { StatusCode: not null } when act == ConnectionAct.PairRemarkable:
+                return "The reMarkable didn’t accept that code. Get a fresh one and try again.";
             case HttpRequestException:
                 return $"{Gerund(act)} stopped: the network couldn’t be reached. Check the connection and try again.";
             case JsonException:
@@ -51,7 +51,7 @@ public static class ConnectionFailure
             case InvalidOperationException when act == ConnectionAct.SignIn:
                 return $"Sign-in didn’t complete. {failure.Message}";
             default:
-                return $"{Gerund(act)} stopped unexpectedly ({failure.GetType().Name}).";
+                return $"{Gerund(act)} stopped unexpectedly. Try again; Diagnostics has the details.";
         }
     }
 

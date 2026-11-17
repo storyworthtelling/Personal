@@ -123,7 +123,7 @@ internal sealed class CoverPageRenderer
     private static string DraftLine(ReportCover cover)
     {
         var draft = $"Draft {Ordinal(cover.DraftNumber)}";
-        return cover.WordCount > 0 ? $"{draft} · {cover.WordCount:N0} words" : draft;
+        return cover.WordCount > 0 ? $"{draft} · {Storyworthtelling.Time.Quantities.Number((long)(cover.WordCount))} words" : draft;
     }
 
     private static string Ordinal(int draft) => draft switch

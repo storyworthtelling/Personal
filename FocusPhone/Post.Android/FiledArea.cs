@@ -209,7 +209,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
                         return;
                     }
                     stage = results.Count > 0 ? Stage.Results : Stage.Asking;
-                    status = "Filed couldn’t be searched. The diagnostics log has the details.";
+                    status = "Filed couldn’t be searched. Try again in a moment; Diagnostics has the details.";
                     Invalidate();
                 });
             }
@@ -300,7 +300,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
             : outcome.WhyWords switch
             {
                 null => null,
-                "no Claude key" => "Matched by words only: Post has no Claude key.",
+                "no Claude key" => "Matched by words only. Add the Claude key in Folio’s settings for smarter matches.",
                 _ => "Matched by words only: Claude couldn’t be reached.",
             };
         Invalidate();

@@ -92,7 +92,7 @@ public class ActionCardPlanTests
         var plan = ActionCardPlan.For(new CardItem("Saltmarsh", place) { ChildView = true, NextUp = "S1 · E3" });
 
         Assert.Equal([CardActionKind.Play, CardActionKind.Favorite], plan.Entries.Select(entry => entry.Kind));
-        Assert.Equal("★ Favorite", plan.Entries[1].Label);
+        Assert.Equal("Favorite", plan.Entries[1].Label);
     }
 
     [Fact]

@@ -110,8 +110,8 @@ public sealed class MusicArea : ScoreArea
         var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         layout.AddView(PaperUi.Body(Host, "Stream your own music from Google Drive."));
         layout.AddView(PaperUi.Secondary(Host,
-            "First register this app as an Android OAuth client (Drive API enabled), then sign in:\n\n" +
-            $"Package: {AppSigningInfo.PackageName}\nSHA-1: {AppSigningInfo.Sha1Fingerprint()}"));
+            "Setup note: if Google sign-in fails, this build isn’t registered with Google yet. Register it in the Google Cloud project with:\n\n" +
+            $"Package: {AppSigningInfo.PackageName}\nSigning fingerprint: {AppSigningInfo.Sha1Fingerprint()}"));
 
         // The same setting Settings holds — both read and write VaultPassphraseStore,
         // so they cannot disagree. It is offered here too because this is the
@@ -119,7 +119,7 @@ public sealed class MusicArea : ScoreArea
         // come back on the first try instead of the next launch.
         // Shown in the clear (not a password field) so it can be read back and copied — it's the one secret
         // that isn't kept in the vault, so being able to see it is what lets the owner set the same one everywhere.
-        var passphrase = PaperUi.MonoField(Host, "Secrets vault passphrase (optional)");
+        var passphrase = PaperUi.MonoField(Host, "Vault passphrase (optional)");
         passphrase.Text = VaultPassphraseStore.Passphrase;
         layout.AddView(passphrase);
 
@@ -231,7 +231,7 @@ public sealed class MusicArea : ScoreArea
             case MusicView.Artists:
                 var artists = catalog.Artists();
                 return Browse(artists.Count,
-                    [.. artists.Select(artist => (new PaperListRow(artist.Name, $"{artist.Tracks.Count} tracks"), artist.Name))],
+                    [.. artists.Select(artist => (new PaperListRow(artist.Name, Storyworthtelling.Time.Quantities.Count(artist.Tracks.Count, "track")), artist.Name))],
                     name => Narrow(MusicView.Artists, name),
                     name => library.PlayShuffled(catalog.TracksByArtist(name)));
 
@@ -336,7 +336,7 @@ public sealed class MusicArea : ScoreArea
         if (library.Listening.Taste is null)
         {
             making.Failed("no shared Claude key");
-            generating = "Generating needs the shared Claude key — set it in Settings.";
+            generating = "Generating needs the Claude key. Add it in Folio’s settings.";
             Invalidate();
             return;
         }
@@ -366,7 +366,7 @@ public sealed class MusicArea : ScoreArea
     // §9 affordance the app has was spent on a shortcut.
     private void ShowAlbumActions(string name, IReadOnlyList<Track> tracks)
     {
-        ActionCard.Show(Host, Overlay, name, $"{tracks.Count} tracks",
+        ActionCard.Show(Host, Overlay, name, Storyworthtelling.Time.Quantities.Count(tracks.Count, "track"),
             new CardAction("Play", () => library.PlayTracks(tracks, 0), Lead: true),
             new CardAction("Shuffle", () => library.PlayShuffled(tracks)),
             new CardAction("Download", () => Download(name, tracks)));
@@ -412,7 +412,7 @@ public sealed class MusicArea : ScoreArea
         names.SetPadding(PaperTheme.Dp(Host, DesignTokens.Space.X4), 0, 0, 0);
         names.AddView(PaperUi.Heading(Host, album.Name));
         names.AddView(PaperUi.Secondary(Host, album.AlbumArtist));
-        names.AddView(PaperUi.Secondary(Host, $"{tracks.Count} tracks"));
+        names.AddView(PaperUi.Secondary(Host, Storyworthtelling.Time.Quantities.Count(tracks.Count, "track")));
         head.AddView(names, new LinearLayout.LayoutParams(
             0, ViewGroup.LayoutParams.WrapContent) { Weight = 1 });
 
@@ -457,7 +457,7 @@ public sealed class MusicArea : ScoreArea
     {
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         column.AddView(PaperUi.Heading(Host, name));
-        column.AddView(PaperUi.Secondary(Host, $"{tracks.Count} tracks"));
+        column.AddView(PaperUi.Secondary(Host, Storyworthtelling.Time.Quantities.Count(tracks.Count, "track")));
         column.AddView(PaperUi.List(Host,
             [.. tracks.Select(track => new PaperListRow(track.DisplayTitle, track.DisplayArtist, track.ArtRef))],
             position => library.PlayTracks(tracks, position),

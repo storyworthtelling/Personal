@@ -71,15 +71,15 @@ public class SyncAndRoleTests
         Assert.True(SyncRefresh.Needed(null, HouseholdSyncStatus.Synced(Now)));
 
     [Theory]
-    [InlineData(0, "Synced with Drive just now.")]
-    [InlineData(5, "Synced with Drive 5m ago.")]
-    [InlineData(180, "Synced with Drive 3h ago.")]
+    [InlineData(0, "Refreshed from Drive just now.")]
+    [InlineData(5, "Refreshed from Drive 5m ago.")]
+    [InlineData(180, "Refreshed from Drive 3h ago.")]
     public void ASyncedLineSaysHowLongAgo(int minutesAgo, string expected) =>
         Assert.Equal(expected, HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddMinutes(-minutesAgo)), Now));
 
     [Fact]
     public void AnOldSyncNamesTheDay() =>
-        Assert.Equal("Synced with Drive on Oct 2.", HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddDays(-10)), Now));
+        Assert.Equal("Refreshed from Drive on Oct 2.", HouseholdSyncText.Line(HouseholdSyncStatus.Synced(Now.AddDays(-10)), Now));
 
     [Fact]
     public void OfflineSaysTheChangesAreKept()

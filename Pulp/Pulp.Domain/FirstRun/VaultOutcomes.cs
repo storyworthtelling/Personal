@@ -96,9 +96,9 @@ public static class VaultOutcomes
     /// register: the package and the suite's signing SHA-1, as an Android OAuth client.
     /// </summary>
     public static WaitingNotice SignInNotRegistered(DateTimeOffset at) => new(
-        SignInKey, "Google doesn’t recognise this build yet",
-        $"Register the package {PulpIdentity.ApplicationId} with the suite’s signing SHA-1 as an Android OAuth client "
-            + "in the Google Cloud project, wait a few minutes, then sign in again.",
+        SignInKey, "Google doesn’t recognize this build yet",
+        $"Register {PulpIdentity.ApplicationId} with the suite’s signing fingerprint in the Google Cloud project, "
+            + "wait a few minutes, then sign in again.",
         NoticeRole.Problem, WaitingNotices.OpenVaultLabel, NoticeAction.OpenVault, at);
 
     private static WaitingNotice Problem(string headline, string detail, DateTimeOffset at) =>

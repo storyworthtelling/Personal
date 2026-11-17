@@ -121,7 +121,7 @@ public sealed class AnalysisDocumentRenderer
                 lengthText = lengthNote;
             else
             {
-                lengthText = analysis.WordCount > 0 ? $"{analysis.WordCount:N0} words" : string.Empty;
+                lengthText = analysis.WordCount > 0 ? $"{Storyworthtelling.Time.Quantities.Number((long)(analysis.WordCount))} words" : string.Empty;
                 if (!string.IsNullOrWhiteSpace(analysis.WordCountRange))
                     lengthText = string.IsNullOrEmpty(lengthText)
                         ? $"genre norm {analysis.WordCountRange}"
@@ -233,7 +233,7 @@ public sealed class AnalysisDocumentRenderer
             writer.Heading("The manuscript, marked", h2, Ink, ruled: true);
             writer.Paragraph(
                 "Your pages with the findings on them. A caret is something missing, a struck line is "
-                + "something doing no work, an underline is something unclear, and a ticked underline is "
+                + "something doing no work, an underline is something unclear, and an underline with a check is "
                 + "praise — and the note in the margin says why. Its rule says how much it matters: a solid "
                 + "rose rule must be fixed, a dashed ochre one should be, a dotted grey one is worth "
                 + "considering. A note that is about a chapter rather "
@@ -860,7 +860,7 @@ public sealed class AnalysisDocumentRenderer
     {
         using var small = ReportType.Small();
         var read = cover.ReadOn.ToLocalTime().ToString("d MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
-        var length = cover.WordCount > 0 ? $" · {cover.WordCount:N0} words" : string.Empty;
+        var length = cover.WordCount > 0 ? $" · {Storyworthtelling.Time.Quantities.Number((long)(cover.WordCount))} words" : string.Empty;
         writer.Footer(null, $"Read {read}{length} · draft {Spell(cover.DraftNumber)}", small, Muted);
 
         // Who it is for, set against the right margin on the same line — the closing half of a

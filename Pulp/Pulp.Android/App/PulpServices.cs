@@ -144,7 +144,7 @@ public sealed class PulpServices
 
         household = new LocalHouseholdStore(files, PulpIdentity.LocalHouseholdFileName);
         install = new LocalInstallStore(files);
-        cache = new CatalogueCache(Path.Combine(cacheRoot, "catalogue"));
+        cache = new CatalogueCache(Path.Combine(cacheRoot, "catalogue"));  // not copy: a folder on the phone
 
         // Sport (D208): MLB's own feed and ESPN's JSON over the one client, counted into Diagnostics only (D261).
         Sports = RoutedSportsSource.Shipped(http, counter);

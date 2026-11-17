@@ -5,7 +5,7 @@ public static class FirstRunText
 {
     public const string Skip = "Skip for now";
 
-    public const string VaultTitle = "The vault";
+    public const string VaultTitle = "Vault";
 
     public const string VaultLead =
         "Sign in and enter the vault passphrase your other apps use. Pulp’s keys come back by themselves.";

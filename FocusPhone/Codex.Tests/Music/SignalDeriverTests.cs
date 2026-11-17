@@ -125,9 +125,9 @@ public class SignalDeriverTests
     {
         var track = new Track("id2", "T", "", "A", "", 1, 1, "", TimeSpan.FromMinutes(3));
         var e = SignalDeriver.Derive(Play(track: track), learningEnabled: true)[0];
-        Assert.Equal("Unknown Genre", e.Genre);
-        Assert.Equal("Unknown Artist", e.ArtistName);
-        Assert.Equal("Unknown Artist", e.AlbumArtist); // album artist falls back to track artist
+        Assert.Equal("Unknown genre", e.Genre);
+        Assert.Equal("Unknown artist", e.ArtistName);
+        Assert.Equal("Unknown artist", e.AlbumArtist); // album artist falls back to track artist
     }
 
     [Fact]

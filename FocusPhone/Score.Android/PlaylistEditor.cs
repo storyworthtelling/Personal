@@ -186,8 +186,7 @@ public sealed class PlaylistEditor
         count.Text = selected switch
         {
             0 => "Nothing yet — fill in a value.",
-            1 => "1 track",
-            _ => $"{selected} tracks",
+            _ => Storyworthtelling.Time.Quantities.Count(selected, "track"),
         };
     }
 

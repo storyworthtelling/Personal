@@ -262,7 +262,7 @@ public sealed class DiscoverArea : ScoreArea
     {
         if (new TidalAccountStore(Host).Load() is null)
         {
-            return PaperUi.Secondary(Host, "Sign in to TIDAL in Settings to search the music catalogue.");
+            return PaperUi.Secondary(Host, "Sign in to TIDAL in Settings to search the music catalog.");
         }
 
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };

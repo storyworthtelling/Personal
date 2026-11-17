@@ -226,7 +226,7 @@ public class TravelTests
         Assert.NotEmpty(week.SamPlan.Sessions);
         Assert.NotEmpty(week.LeePlan.Sessions);
         Assert.Empty(week.Result.Plan.JointSessions.Where(session => DayIndex(session) is >= 2 and <= 4));
-        Assert.All(week.Result.Notes, note => Assert.Equal("Paused: family holiday", note.Line));
+        Assert.All(week.Result.Notes, note => Assert.Equal("Paused: family vacation", note.Line));
         Assert.Equal(6, week.Result.Notes.Count);
     }
 
@@ -240,7 +240,7 @@ public class TravelTests
             foreach (var day in new[] { 2, 3, 4 })
             {
                 var note = Assert.Single(week.Result.Notes, item => item.Person == person && item.Day == Day(day));
-                Assert.Equal("Paused: family holiday", note.Line);
+                Assert.Equal("Paused: family vacation", note.Line);
             }
         }
 
@@ -279,8 +279,8 @@ public class TravelTests
         var week = await TripsFixtures.RunAsync(calendars);
 
         Assert.Empty(week.SamPlan.Sessions);
-        Assert.Contains("holiday", week.SamPlan.NothingBecause, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("holiday", week.LeePlan.NothingBecause, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("vacation", week.SamPlan.NothingBecause, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("vacation", week.LeePlan.NothingBecause, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -293,7 +293,7 @@ public class TravelTests
         var week = await TripsFixtures.RunAsync(calendars);
 
         Assert.Empty(TripsFixtures.OnDays(week.SamPlan, 3));
-        Assert.Contains(week.Result.Notes, note => note.Person == Sam && note.Day == Day(3) && note.Line == "Paused: family holiday");
+        Assert.Contains(week.Result.Notes, note => note.Person == Sam && note.Day == Day(3) && note.Line == "Paused: family vacation");
     }
 
     // ---- the pipeline over generated trips ----
@@ -341,7 +341,7 @@ public class TravelTests
                 }
             }
 
-            paused += week.Result.Notes.Count(note => note.Line == "Paused: family holiday");
+            paused += week.Result.Notes.Count(note => note.Line == "Paused: family vacation");
         }
 
         Assert.True(onTheRoad > 10, $"Only {onTheRoad} sessions fell on the road; the test isn’t exercising the adapter.");

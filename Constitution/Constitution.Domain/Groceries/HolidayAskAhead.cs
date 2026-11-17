@@ -77,7 +77,7 @@ public static class HolidayAskAhead
         var day = chosen.Date.DayOfWeek.ToString();
         return new HolidayAsk(
             chosen,
-            name.Length <= MaxTitleChars ? name : "The holiday",
+            name.Length <= MaxTitleChars ? name : "The vacation",
             WhenLine(chosen),
             [
                 $"From the family calendar. Next week’s plan leaves {day}’s dinner off.",

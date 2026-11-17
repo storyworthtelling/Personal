@@ -278,7 +278,7 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         {
             shooting.Failed($"capture error {exception?.ImageCaptureError}: {exception?.Message}");
             area.Host.RunOnUiThread(() => area.ShowStatus(
-                $"That one didn’t save: {exception?.Message}"));
+                "That one didn’t save. Take it again."));
         }
     }
 }

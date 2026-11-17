@@ -111,7 +111,7 @@ public static class WaitingNotices
         return new WaitingNotice(
             "sports:" + id,
             $"The {name} schedule couldn’t be reached",
-            $"Games for {name} are shown as they were the last time the feed answered.",
+            $"Games for {name} are shown as they were when the schedule last loaded. Pulp tries again on its own.",
             NoticeRole.Reference, null, NoticeAction.None, at);
     }
 

@@ -202,7 +202,7 @@ public class TripAdapterTests
         {
             Assert.Equal(TravelAction.Paused, change.Action);
             Assert.Null(change.Replacement);
-            Assert.Equal("Paused: family holiday", change.Line);
+            Assert.Equal("Paused: family vacation", change.Line);
         });
     }
 
@@ -217,7 +217,7 @@ public class TripAdapterTests
         Assert.All(result.Notes, note =>
         {
             Assert.Equal(Sam, note.Person);
-            Assert.Equal("Paused: family holiday", note.Line);
+            Assert.Equal("Paused: family vacation", note.Line);
         });
     }
 
@@ -272,7 +272,7 @@ public class TripAdapterTests
 
         var reason = SamOf(result.Plan).NothingBecause;
         Assert.False(string.IsNullOrWhiteSpace(reason));
-        Assert.Contains("holiday", reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("vacation", reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

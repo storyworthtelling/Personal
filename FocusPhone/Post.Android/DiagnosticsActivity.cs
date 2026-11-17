@@ -153,7 +153,7 @@ public class DiagnosticsActivity : Activity
         if (GetSystemService(Context.ClipboardService) is ClipboardManager clipboard)
         {
             clipboard.PrimaryClip = ClipData.NewPlainText(
-                "FocusPhone diagnostics", PostDiagnostics.BuildExport(this));
+                "Post diagnostics", PostDiagnostics.BuildExport(this));
             // Success is the button saying so (§5), not a toast.
             copyButton!.Text = "Copied";
         }

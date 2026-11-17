@@ -10,7 +10,7 @@ namespace Constitution.Domain.Documents;
 /// </summary>
 internal static class MealSheetAskPage
 {
-    public const string KickerTail = "ONLY THE WEEK BEFORE A HOLIDAY";
+    public const string KickerTail = "only the week before a vacation";
 
     private const float NameBaseline = 104f;
     private const float WhenBaseline = 116f;
@@ -26,8 +26,8 @@ internal static class MealSheetAskPage
 
     public static InkPageLayout Build(MealSheetModel model, HolidayAsk ask, int sheetNumber)
     {
-        var draft = new PageDraft(ask.Title) { Section = "Holiday" };
-        draft.Kicker($"{MealSheetDocument.Kind} · {sheetNumber.ToString(CultureInfo.InvariantCulture)} OF {model.Pages.ToString(CultureInfo.InvariantCulture)} · {KickerTail}");
+        var draft = new PageDraft(ask.Title) { Section = "Vacation" };
+        draft.Kicker($"{MealSheetDocument.Kind} · {sheetNumber.ToString(CultureInfo.InvariantCulture)} of {model.Pages.ToString(CultureInfo.InvariantCulture)} · {KickerTail}");
 
         var baseline = WhenBaseline;
         if (ask.Title != ask.Event.Name.Trim())

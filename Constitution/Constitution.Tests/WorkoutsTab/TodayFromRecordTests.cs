@@ -30,7 +30,7 @@ public sealed class TodayFromRecordTests
 
         var clipping = Clip(plan)!;
         Assert.Equal("Workout · 5:30", clipping.Kicker);
-        Assert.Equal("Strength, 40 minutes", clipping.Headline);
+        Assert.Equal("Strength, 40 min", clipping.Headline);
         Assert.Equal("Score 132 bpm · Steady", clipping.ScoreLine);
     }
 
@@ -42,7 +42,7 @@ public sealed class TodayFromRecordTests
 
         var clipping = Clip(TodayPlanFromRecord.For(Held(today, sessions), Sam, Est(11, 3, 7), Eastern))!;
 
-        Assert.Equal("Outdoor walk, 30 minutes", clipping.Headline);
+        Assert.Equal("Outdoor walk, 30 min", clipping.Headline);
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class TodayFromRecordTests
         var clipping = Clip(TodayPlanFromRecord.For(Held(sessions: sessions), Sam, Est(11, 4, 9), Eastern))!;
 
         Assert.Equal("Workout · 6:00", clipping.Kicker);
-        Assert.Equal("Mobility, 20 minutes", clipping.Headline);
+        Assert.Equal("Mobility, 20 min", clipping.Headline);
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public sealed class TodayFromRecordTests
 
         var clipping = Clip(TodayPlanFromRecord.For(Held(today, sessions), Sam, Est(11, 3, 7), Eastern))!;
 
-        Assert.Equal("Family walk, 45 minutes", clipping.Headline);
+        Assert.Equal("Family walk, 45 min", clipping.Headline);
     }
 
     [Fact]

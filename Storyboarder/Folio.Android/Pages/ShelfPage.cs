@@ -165,7 +165,7 @@ public class ShelfPage : FolioBinderPage
                 Padding = 0,
                 Text = string.Empty,
             };
-            SemanticProperties.SetDescription(spine, $"{book.Title}, {book.WordCount:N0} words");
+            SemanticProperties.SetDescription(spine, $"{book.Title}, {Storyworthtelling.Time.Quantities.Number((long)(book.WordCount))} words");
             SemanticProperties.SetHint(spine, "Opens the book’s actions");
             spine.Clicked += (_, _) => ShowActions(book);
             AbsoluteLayout.SetLayoutBounds(spine, new Rect(span.LeftDp, 0, span.WidthDp, height));
@@ -210,7 +210,7 @@ public class ShelfPage : FolioBinderPage
             new(DeleteAction, Glyphs.Bin, ActionWeight.Quiet, () => _ = DeleteBook(book.Id, book.Title)),
         };
 
-        Present(ActionCard.Build(book.Title, $"{book.WordCount:N0} words", actions, Dismiss));
+        Present(ActionCard.Build(book.Title, $"{Storyworthtelling.Time.Quantities.Number((long)(book.WordCount))} words", actions, Dismiss));
     }
 
     private const string OpenAction = "Open book";

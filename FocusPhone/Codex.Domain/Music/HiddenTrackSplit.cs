@@ -11,7 +11,7 @@ public static class HiddenTrackSplit
     /// <summary>Shown when a hidden track was split off but Claude did not know (or
     /// was not confident of) its actual title — still findable and playable, just
     /// honestly unnamed rather than carrying a guess.</summary>
-    public const string UnnamedTitle = "Hidden Track";
+    public const string UnnamedTitle = "Hidden track";
 
     /// <summary>
     /// One row per segment, each sharing the original's file via

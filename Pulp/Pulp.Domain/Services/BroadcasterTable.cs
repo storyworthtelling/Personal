@@ -150,6 +150,6 @@ public sealed class BroadcasterTable
     public IReadOnlyList<string> AboutLines() =>
         Entries
             .GroupBy(entry => entry.Service)
-            .Select(group => $"{string.Join(", ", group.Select(entry => entry.Name).Order(StringComparer.OrdinalIgnoreCase))} open in {catalogue.ById(group.Key)!.Name}")
+            .Select(group => $"{string.Join(", ", group.Select(entry => entry.Name).Order(StringComparer.OrdinalIgnoreCase))} open in {catalogue.ById(group.Key)!.Name}")  // not copy: catalogue is the variable
             .ToList();
 }

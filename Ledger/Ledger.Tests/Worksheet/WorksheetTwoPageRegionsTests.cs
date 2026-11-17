@@ -135,9 +135,9 @@ public class WorksheetTwoPageRegionsTests
         var pageTwo = document.GetPage(2).Text;
 
         Assert.DoesNotContain("The rest of this month’s categories", pageTwo, StringComparison.Ordinal);
-        Assert.DoesNotContain("SEPTEMBER", pageTwo, StringComparison.Ordinal);
-        Assert.Contains("SET ASIDE", pageTwo, StringComparison.Ordinal);
-        Assert.Contains("ADD A CATEGORY", pageTwo, StringComparison.Ordinal);
+        Assert.DoesNotContain("September", pageTwo, StringComparison.Ordinal);
+        Assert.Contains("Set aside", pageTwo, StringComparison.Ordinal);
+        Assert.Contains("Add a category", pageTwo, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -149,6 +149,6 @@ public class WorksheetTwoPageRegionsTests
         var pageTwo = document.GetPage(2).Text;
 
         Assert.Contains("The rest of this month’s categories", pageTwo, StringComparison.Ordinal);
-        Assert.Contains("SEPTEMBER", pageTwo, StringComparison.Ordinal);
+        Assert.Contains("September", pageTwo, StringComparison.Ordinal);
     }
 }

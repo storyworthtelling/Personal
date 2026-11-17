@@ -68,11 +68,14 @@ public class CrashViewerActivity : Activity
         SetContentView(root);
     }
 
+    // "{App} crash report": the app as Android names it, never the repository’s codename.
+    private string Subject => $"{ApplicationInfo?.LoadLabel(PackageManager!)} crash report";
+
     private void CopyToClipboard()
     {
         if (GetSystemService(ClipboardService) is ClipboardManager clipboard)
         {
-            clipboard.PrimaryClip = ClipData.NewPlainText("FocusPhone crash report", detail);
+            clipboard.PrimaryClip = ClipData.NewPlainText(Subject, detail);
             // Success is the button saying so (§5), not a toast.
             copyButton!.Text = "Copied";
         }
@@ -82,7 +85,7 @@ public class CrashViewerActivity : Activity
     {
         var intent = new Intent(Intent.ActionSend);
         intent.SetType("text/plain");
-        intent.PutExtra(Intent.ExtraSubject, "FocusPhone crash report");
+        intent.PutExtra(Intent.ExtraSubject, Subject);
         intent.PutExtra(Intent.ExtraText, detail);
         StartActivity(Intent.CreateChooser(intent, "Share crash report"));
     }

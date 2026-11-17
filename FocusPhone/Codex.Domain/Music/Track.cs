@@ -64,16 +64,16 @@ public record Track(
     /// this is a hidden-track split segment sharing another track's file.</summary>
     public string ResolvedSourceId => SourceFileId ?? Id;
 
-    public string DisplayTitle => Blank(Title) ? "Unknown Title" : Title;
+    public string DisplayTitle => Blank(Title) ? "Unknown title" : Title;
 
-    public string DisplayArtist => Blank(ArtistName) ? "Unknown Artist" : ArtistName;
+    public string DisplayArtist => Blank(ArtistName) ? "Unknown artist" : ArtistName;
 
-    public string DisplayAlbum => Blank(AlbumName) ? "Unknown Album" : AlbumName;
+    public string DisplayAlbum => Blank(AlbumName) ? "Unknown album" : AlbumName;
 
     /// <summary>Album artist keeps compilations together; falls back to the track artist.</summary>
     public string DisplayAlbumArtist => Blank(AlbumArtist) ? DisplayArtist : AlbumArtist;
 
-    public string DisplayGenre => Blank(Genre) ? "Unknown Genre" : Genre;
+    public string DisplayGenre => Blank(Genre) ? "Unknown genre" : Genre;
 
     private static bool Blank(string? value) => string.IsNullOrWhiteSpace(value);
 }

@@ -14,9 +14,9 @@ public class ConnectCopyTests
     {
         Assert.Equal("Admin mode needed", ConnectCopy.NeededHeading);
         Assert.Equal(
-            "Your bank’s sign-in page opens in Chrome, and this phone only runs Chrome while Admin mode is open.",
+            "Your bank’s sign-in page opens in Chrome, and this phone only runs Chrome while admin mode is open.",
             ConnectCopy.NeededWhy);
-        Assert.Equal("Open Admin mode from Flyleaf’s settings, then come back here.", ConnectCopy.NeededWhere);
+        Assert.Equal("Open admin mode from Flyleaf’s settings, then come back here.", ConnectCopy.NeededWhere);
         Assert.Equal(
             "Balances don’t need it. Once a bank is connected they refresh every day without a browser.",
             ConnectCopy.NeededNotRequired);

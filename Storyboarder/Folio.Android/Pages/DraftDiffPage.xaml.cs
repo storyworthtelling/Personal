@@ -23,9 +23,9 @@ public partial class DraftDiffPage : FolioBinderPage
 
         Paragraph(
             $"{diff.ResolvedFindings.Count} resolved · {diff.NewFindings.Count} new · " +
-            $"{diff.RegressedFindings.Count} regressed · {diff.ChangedScenes.Count} scene(s) re-illustrated");
+            $"{diff.RegressedFindings.Count} regressed · " + Storyworthtelling.Time.Quantities.Count(diff.ChangedScenes.Count, "scene") + " painted again");
 
-        Findings("Findings resolved", "✓ ", diff.ResolvedFindings);
+        Findings("Findings resolved", "Fixed: ", diff.ResolvedFindings);
         Findings("New findings", "• ", diff.NewFindings);
         Findings("Regressed findings", "↩ ", diff.RegressedFindings);
 

@@ -272,8 +272,7 @@ public class EqualizerActivity : Activity
 
     private static string FrequencyLabel(int milliHz)
     {
-        var hz = milliHz / 1000;
-        return hz >= 1000 ? $"{hz / 1000} kHz" : $"{hz} Hz";
+        return Storyworthtelling.Time.Quantities.Frequency(milliHz / 1000);
     }
 
     private static LinearLayout.LayoutParams Fill() =>

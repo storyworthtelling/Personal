@@ -194,7 +194,7 @@ public static class BridgeEvents
     private static PairingFailure Reason(string? reason) => reason switch
     {
         "wrongEmoji" => PairingFailure.WrongEmoji,
-        "cancelled" => PairingFailure.Cancelled,
+        "cancelled" => PairingFailure.Cancelled,  // not copy: a stage, id or wire word
         "timeout" => PairingFailure.TimedOut,
         "noDevices" => PairingFailure.NoPhone,
         "phoneNotResponding" => PairingFailure.PhoneNotResponding,

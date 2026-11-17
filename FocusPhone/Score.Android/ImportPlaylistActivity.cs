@@ -108,7 +108,7 @@ public class ImportPlaylistActivity : Activity
         {
             // The page is read without an account and without anyone's blessing, so
             // it failing is an ordinary outcome and says so in a sentence.
-            Say($"Couldn’t reach Spotify: {e.Message}");
+            Say("Couldn’t reach Spotify: " + Storyworthtelling.Diagnostics.PlainError.Describe(e, "Spotify") + " Try again in a moment.");
             return;
         }
 

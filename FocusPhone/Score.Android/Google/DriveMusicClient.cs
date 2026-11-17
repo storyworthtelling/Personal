@@ -24,7 +24,7 @@ public sealed class DriveMusicClient
     private async Task<DriveService> CreateServiceAsync()
     {
         var token = await tokens.GetAccessToken();
-        return Storyworthtelling.Google.Android.GoogleDrive.Service(token, "FocusPhone Audio");
+        return Storyworthtelling.Google.Android.GoogleDrive.Service(token, "Score");
     }
 
     /// <summary>Sub-folders directly inside <paramref name="folderId"/> ("root" = My Drive), for the picker.</summary>

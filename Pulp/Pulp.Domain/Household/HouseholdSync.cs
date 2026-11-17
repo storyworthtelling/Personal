@@ -66,13 +66,13 @@ public static class HouseholdSyncText
         ArgumentNullException.ThrowIfNull(status);
         return status.State switch
         {
-            HouseholdSyncState.Synced when status.LastSynced is { } at => "Synced with Drive " + Ago(at, now, zone ?? TimeZoneInfo.Local) + ".",
-            HouseholdSyncState.Synced => "Synced with Drive.",
+            HouseholdSyncState.Synced when status.LastSynced is { } at => "Refreshed from Drive " + Ago(at, now, zone ?? TimeZoneInfo.Local) + ".",
+            HouseholdSyncState.Synced => "Refreshed from Drive.",
             HouseholdSyncState.Offline => "Drive couldn’t be reached. Changes are kept on this phone and go up when it can.",
             HouseholdSyncState.WaitingForShare => "Waiting for the owner to share the household with this account.",
             HouseholdSyncState.SignInNeeded => "Google turned this phone’s sign-in away. Changes are kept on this phone; sign in again in Settings.",
             HouseholdSyncState.Retrying when !string.IsNullOrWhiteSpace(status.Reason) => status.Reason,
-            HouseholdSyncState.Retrying => "The household didn’t sync this time. Changes are kept on this phone, and Pulp tries again later.",
+            HouseholdSyncState.Retrying => "The household didn’t refresh this time. Changes are kept on this phone, and Pulp tries again later.",
             _ => status.Reason,
         };
     }

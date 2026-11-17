@@ -111,11 +111,11 @@ public static class FollowUpPainter
         // ---- the actionable table (mockup's LINE / SEPT / WROTE / SUGGEST / FINAL): the number columns
         // are right-aligned against their cells, FINAL sits over its box ----
         var tableHeaderBaseline = FollowUpRegions.TableTop - FollowUpRegions.TableHeaderHeight + PaperTypeScale.Label;
-        canvas.DrawText("LINE", left, tableHeaderBaseline, labelFont, mutedPaint);
-        canvas.DrawText(WorksheetDates.PreviousMonthShort(plan.TargetYearMonth).ToUpperInvariant(), FollowUpRegions.PreviousRight, tableHeaderBaseline, SKTextAlign.Right, labelFont, mutedPaint);
-        canvas.DrawText("WROTE", FollowUpRegions.WroteRight, tableHeaderBaseline, SKTextAlign.Right, labelFont, mutedPaint);
-        canvas.DrawText("SUGGEST", FollowUpRegions.SuggestRight, tableHeaderBaseline, SKTextAlign.Right, labelFont, mutedPaint);
-        canvas.DrawText("FINAL", FollowUpRegions.FinalBoxLeft, tableHeaderBaseline, labelFont, mutedPaint);
+        canvas.DrawText("Line", left, tableHeaderBaseline, labelFont, mutedPaint);
+        canvas.DrawText(WorksheetDates.PreviousMonthShort(plan.TargetYearMonth), FollowUpRegions.PreviousRight, tableHeaderBaseline, SKTextAlign.Right, labelFont, mutedPaint);
+        canvas.DrawText("Wrote", FollowUpRegions.WroteRight, tableHeaderBaseline, SKTextAlign.Right, labelFont, mutedPaint);
+        canvas.DrawText("Suggest", FollowUpRegions.SuggestRight, tableHeaderBaseline, SKTextAlign.Right, labelFont, mutedPaint);
+        canvas.DrawText("Final", FollowUpRegions.FinalBoxLeft, tableHeaderBaseline, labelFont, mutedPaint);
         PageInk.Rule(canvas, ink.InkRule, left, right, FollowUpRegions.TableTop - PageInk.HeavyRule / 2);
 
         var boxes = FollowUpRegions.ActionableBoxes(plan.ActionableKeysInPrintedOrder);
@@ -193,7 +193,7 @@ public static class FollowUpPainter
         }
 
         // "Change another line" — label, then the boxes it labels, then the sentence under them
-        DrawSectionLabel(canvas, ink, "CHANGE ANOTHER LINE", layout.ChangeHeaderBaseline);
+        DrawSectionLabel(canvas, ink, "Change another line", layout.ChangeHeaderBaseline);
 
         var changeBoxes = FollowUpRegions.ChangeAnotherLineBoxes(plan.ActionableLines.Count, plan.ReferenceLines.Count);
         foreach (var (nameBox, amountBox) in changeBoxes)

@@ -33,10 +33,10 @@ public class TagMappingTests
     {
         var track = TagMapping.ToTrack("file1", null, null, null, null, 0, 0, null, TimeSpan.Zero);
 
-        Assert.Equal("Unknown Title", track.DisplayTitle);
-        Assert.Equal("Unknown Artist", track.DisplayArtist);
-        Assert.Equal("Unknown Album", track.DisplayAlbum);
-        Assert.Equal("Unknown Genre", track.DisplayGenre);
+        Assert.Equal("Unknown title", track.DisplayTitle);
+        Assert.Equal("Unknown artist", track.DisplayArtist);
+        Assert.Equal("Unknown album", track.DisplayAlbum);
+        Assert.Equal("Unknown genre", track.DisplayGenre);
     }
 
     [Fact]

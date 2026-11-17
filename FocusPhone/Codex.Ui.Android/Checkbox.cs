@@ -66,7 +66,7 @@ public sealed class Checkbox : View
     {
         if (OperatingSystem.IsAndroidVersionAtLeast(30))
         {
-            StateDescription = picked ? "Ticked" : "Not ticked";
+            StateDescription = picked ? "Checked" : "Not checked";
         }
     }
 

@@ -99,7 +99,7 @@ internal sealed class PageDraft
 
     public InkPageLayout ToLayout() => InkPageLayout.Create(Title, targets, printed, Section);
 
-    /// <summary>The small caps line above the title: "EXERCISE 2 OF 7 · STRENGTH".</summary>
+    /// <summary>The small caps line above the title: "Exercise 2 of 7 · Strength".</summary>
     public void Kicker(string text) => Line(PrintedRole.Label, Left, KickerBaseline, FullWidth, text, name: "kicker");
 
     /// <summary>"Constitution · Strength · Tue Oct 20" on the left and "3 of 8" on the right.</summary>
@@ -110,9 +110,9 @@ internal sealed class PageDraft
         Line(PrintedRole.Small, RightEdge - 100f, FooterBaseline, 100f, $"{page} of {pages}", PrintedAlign.Right, name: "page-number");
     }
 
-    /// <summary>"TUESDAY 5:30 PM": the day and the twelve-hour time, upper case for the kicker.</summary>
+    /// <summary>"Tuesday 5:30 pm": the day and the twelve-hour time, for the kicker.</summary>
     public static string DayAndTime(DateTime start) =>
-        (start.ToString("dddd", CultureInfo.InvariantCulture) + " " + TimeFormats.Clock12(start)).ToUpperInvariant();
+        start.ToString("dddd", CultureInfo.InvariantCulture) + " " + TimeFormats.Clock12(start);
 
     /// <summary>The 91 point ruled column on the right, with its edge, its label and its dotted lines (p.5).</summary>
     public void NotesColumn() => NotesColumn(NotesTop);
@@ -123,7 +123,7 @@ internal sealed class PageDraft
         var notes = InkTargets.NotesMargin(WorkoutIds.Notes, top, NotesBottom);
         Target(notes);
         Rule("notes-edge", notes.Bounds.Left, notes.Bounds.Top, 0f, notes.Bounds.Height, notes.Id);
-        Line(PrintedRole.Label, notes.Bounds.Left + 10f, top + 16f, notes.Bounds.Width - 10f, "NOTES", owner: notes.Id, name: "notes-label");
+        Line(PrintedRole.Label, notes.Bounds.Left + 10f, top + 16f, notes.Bounds.Width - 10f, "Notes", owner: notes.Id, name: "notes-label");
 
         var count = 0;
         for (var y = top + 40f; y <= NotesBottom - 18f; y += 22f)
@@ -140,13 +140,13 @@ internal sealed class PageDraft
         var done = InkTargets.LargeTick(WorkoutIds.Done, Left, DoneTop, "this page is finished");
         Target(done);
         Line(PrintedRole.Strong, Left + 38f, 538f, 120f, "Done", owner: done.Id, name: "done-label");
-        Line(PrintedRole.Small, Left + 38f, 551f, 160f, "tick when you finish", owner: done.Id, name: "done-hint");
+        Line(PrintedRole.Small, Left + 38f, 551f, 160f, "check when you finish", owner: done.Id, name: "done-hint");
     }
 
     /// <summary>Easy, right, hard: three 84 point lanes just above the tick. The planner learns which exercise was too much.</summary>
     public void Rating()
     {
-        Line(PrintedRole.Label, Left, RatingLabelBaseline, 252f, "HOW WAS IT? CIRCLE ONE", name: "feel-label");
+        Line(PrintedRole.Label, Left, RatingLabelBaseline, 252f, "How was it? Circle one", name: "feel-label");
         Lanes(WorkoutIds.Rating, RatingTop, WorkoutIds.RatingWords);
     }
 

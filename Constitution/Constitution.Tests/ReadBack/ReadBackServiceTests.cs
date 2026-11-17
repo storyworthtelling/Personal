@@ -209,9 +209,9 @@ public class ReadBackServiceTests
         Assert.Equal(1, settled.Questions);
         var notice = Assert.Single(rig.Notices.Board.Waiting());
         Assert.Equal(NoticeKind.LowConfidenceRead, notice.Kind);
-        Assert.Equal(LowConfidenceCause.Key("Goblet squat", "Ticked", "Not ticked"), notice.CauseKey);
+        Assert.Equal(LowConfidenceCause.Key("Goblet squat", "Checked", "Not checked"), notice.CauseKey);
         var row = Assert.Single(WaitingPageModel.From(rig.Notices.Board, Now(rig)).Items);
-        Assert.Equal(["Ticked", "Not ticked"], row.Chips.Select(chip => chip.Value));
+        Assert.Equal(["Checked", "Not checked"], row.Chips.Select(chip => chip.Value));
         Assert.Empty(rig.Ledger.Held.Records);
         Assert.Equal(0, rig.Ledger.Saves);
         Assert.Equal([$"id-{Name}"], rig.Tablet.Trashed);

@@ -106,7 +106,7 @@ public class SettingsRefreshSourceTests
     {
         var setup = Source(SetupCode);
         var tapped = NoDoubleLinkTests.ExtractMethod(setup, "private async void OnCategoryTapped(object? sender, EventArgs e)");
-        var remove = tapped[tapped.IndexOf("case \"Remove\":", StringComparison.Ordinal)..];
+        var remove = tapped[tapped.IndexOf("case \"Delete\":", StringComparison.Ordinal)..];
 
         Assert.Contains("dogEarState.BeginUndo(", remove, StringComparison.Ordinal);
         Assert.Contains("DogEar.UndoWindow()", remove, StringComparison.Ordinal);
@@ -143,7 +143,7 @@ public class SettingsRefreshSourceTests
 
         Assert.DoesNotContain("pendingCategoryRemoval", setup, StringComparison.Ordinal);
         Assert.DoesNotContain("UndoBar", xaml + setup, StringComparison.Ordinal);
-        Assert.Matches(@"dogEarState\.BeginUndo\(\s*\$""Removed \{categoryName\}""", setup);
+        Assert.Matches(@"dogEarState\.BeginUndo\(\s*\$""Deleted \{categoryName\}""", setup);
         Assert.Matches(@"dogEarState\.BeginUndo\(\s*\$""Removed \{row\.Name\}""", setup);
     }
 

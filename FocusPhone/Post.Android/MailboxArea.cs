@@ -295,7 +295,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         DogEar.SetNotice(Host, Overlay, NoticeKeys.MmsSend, new DogEar.Notice(
             "A group text didn’t go out.",
-            "Post holds the texting role but the last group send failed. It will need to be sent again.",
+            "Open the conversation and send it again.",
             PaperTheme.ProblemMark));
     }
 
@@ -887,7 +887,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             }
             catch (Exception e)
             {
-                failure = e.Message;
+                failure = Storyworthtelling.Diagnostics.PlainError.Describe(e);
                 Android.Util.Log.Warn("Post", $"Sync failed: {e}");
                 PostDiagnostics.LogWarning("Sync", "Sync failed", e);
             }
@@ -1749,8 +1749,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
 
         var when = offer.Event.StartsAt is { } time
-            ? $"{offer.Event.StartsOn:ddd d MMM} at {time:h:mm tt}"
-            : $"{offer.Event.StartsOn:ddd d MMM}, all day";
+            ? $"{offer.Event.StartsOn.ToString("ddd, MMM d", System.Globalization.CultureInfo.InvariantCulture)} at {TimeFormats.Clock12(offer.Event.StartsOn.ToDateTime(time))}"
+            : $"{offer.Event.StartsOn.ToString("ddd, MMM d", System.Globalization.CultureInfo.InvariantCulture)}, all day";
 
         var detail = offer.Clashed switch
         {
@@ -1992,7 +1992,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         {
             sending.Failed($"{e.GetType().Name}: {e.Message}");
             PostDiagnostics.LogWarning("Sms", "Sending a text failed", e);
-            NotSent("Google Messages couldn’t be reached and the phone refused the plain text too.");
+            NotSent("Google Messages couldn’t be reached, and the phone couldn’t send it as a plain text either. Try again in a moment.");
         }
     }
 
@@ -2051,7 +2051,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             DogEar.ShowNotices(Host, Overlay,
             [
                 new DogEar.Notice("That text didn’t go out.",
-                    "The send failed before it could even start.",
+                    "It stopped before it went anywhere. Try again.",
                     PaperTheme.ProblemMark),
             ]);
         }

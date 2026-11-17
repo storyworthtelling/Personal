@@ -34,7 +34,7 @@ public class KidsPageTests
         Assert.DoesNotContain(same, p => p.Title == "Buttered noodles");
         Assert.Equal(3, different.Count);
         Assert.Equal(2, same.Count);
-        Assert.DoesNotContain(same.SelectMany(p => p.Printed), i => i.Text is not null && i.Text.Contains("RECIPE · THE CHILDREN", StringComparison.Ordinal));
+        Assert.DoesNotContain(same.SelectMany(p => p.Printed), i => i.Text is not null && i.Text.Contains("Recipe · the children", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -55,11 +55,11 @@ public class KidsPageTests
         var page = Kids();
 
         Assert.Equal("Buttered noodles", page.Title);
-        Assert.Contains("RECIPE · THE CHILDREN’S DINNER TONIGHT", Texts(page, PrintedRole.Label));
+        Assert.Contains("Recipe · the children’s dinner tonight", Texts(page, PrintedRole.Label));
         Assert.Equal("Constitution · Recipe · Tue Nov 17 · Lee", page.Printed.Single(i => i.Name == "footer").Text);
         Assert.Equal("3 of 4", page.Printed.Single(i => i.Name == "page-number").Text);
         Assert.Equal("For Robin and Juniper", Texts(page, PrintedRole.Strong).Single());
-        Assert.Contains("INGREDIENTS", Texts(page, PrintedRole.Label));
+        Assert.Contains("Ingredients", Texts(page, PrintedRole.Label));
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class KidsPageTests
         var page = document.GetPage(1);
 
         Assert.Equal(112f, Baseline(page, "For"), 1.5f);
-        Assert.Equal(162f, Baseline(page, "INGREDIENTS"), 1.5f);
+        Assert.Equal(162f, Baseline(page, "Ingredients"), 1.5f);
         Assert.Equal(180f, Baseline(page, "pasta"), 1.5f);
         Assert.Equal(256f, Baseline(page, "carrot,"), 1.5f);
         Assert.Equal(299f, Baseline(page, "5:15"), 1.5f);
@@ -221,7 +221,7 @@ public class KidsPageTests
 
         Assert.True(kids.Count >= 2);
         Assert.All(kids, p => Assert.Equal("Buttered noodles", p.Title));
-        Assert.Contains("RECIPE · THE CHILDREN’S DINNER TONIGHT · CONTINUED", Texts(kids[1], PrintedRole.Label));
+        Assert.Contains("Recipe · the children’s dinner tonight · continued", Texts(kids[1], PrintedRole.Label));
         Assert.Equal(17, kids.SelectMany(p => Texts(p, PrintedRole.Time)).Count());
         Assert.All(pages, p => Assert.Empty(p.Violations()));
         Assert.Equal($"{pages.Count} of {pages.Count + 1}", pages[^1].Printed.Single(i => i.Name == "page-number").Text);

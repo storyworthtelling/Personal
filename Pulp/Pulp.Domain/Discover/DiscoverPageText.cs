@@ -31,7 +31,7 @@ public static class DiscoverPageText
 
     public const string StackUnreachable = "This week’s stack couldn’t be dealt just now.";
 
-    public const string SearchUnreachable = "The catalogue couldn’t be reached just now.";
+    public const string SearchUnreachable = "The catalog couldn’t be reached just now. Try again in a moment.";
 
     public const string MoodPrompt = "Press Done to ask for this mood.";
 

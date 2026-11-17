@@ -19,7 +19,7 @@ public static class HandOffNotice
             StartRefusal.NotAHome => $"This title isn’t on {service}, so it wasn’t opened. Pick one of the services it is on.",
             StartRefusal.ServiceBlocked => $"{service} is blocked for a child watching, so it wasn’t opened.",
             StartRefusal.ServiceNotAttested =>
-                $"{service} is for adults until its adult profiles are PIN-locked. Lock them in {service}, then tick it in Settings.",
+                $"{service} is for adults until its adult profiles are PIN-locked. Lock them in {service}, then check it in Settings.",
             StartRefusal.UnknownService => $"Pulp doesn’t know how to open {service}, so nothing was opened.",
             _ => throw new ArgumentException(
                 $"'{refusal}' isn’t a refusal; a hand-off that may start has no notice.", nameof(refusal)),
@@ -42,7 +42,7 @@ public static class HandOffNotice
     public static string LandedElsewhere(string serviceName)
     {
         var service = RequireName(serviceName);
-        return $"{service} opened, but not on this title. Look for it in {service}, or mark it watched here.";
+        return $"{service} opened, but not on this title. Find it there, or open the title and make another service its home.";
     }
 
     private static string RequireName(string serviceName) =>

@@ -37,7 +37,7 @@ public sealed class FileResolutionStoreTests : IDisposable
         new InkResolution.Circled("feel", "right"),
         new InkResolution.Written("result", "12"),
         new InkResolution.PageDone("done", "easy"),
-        new InkResolution.NeedsAsking("done", "Goblet squat", "Ticked", "Not ticked", "read:Goblet squat:Ticked|Not ticked"),
+        new InkResolution.NeedsAsking("done", "Goblet squat", "Checked", "Not checked", "read:Goblet squat:Checked|Not checked"),
         new InkResolution.Undecided("dinner-1"),
         new InkResolution.NotRead("done", "The read didn’t report 'done'."),
     };
@@ -134,7 +134,7 @@ public sealed class FileResolutionStoreTests : IDisposable
     // ---- questions waiting ----
 
     private static InkResolution.NeedsAsking Question(string subject) =>
-        new("done", subject, "Ticked", "Not ticked", LowConfidenceCause.Key(subject, "Ticked", "Not ticked"));
+        new("done", subject, "Checked", "Not checked", LowConfidenceCause.Key(subject, "Checked", "Not checked"));
 
     [Fact]
     public void AQuestionIsPendingUntilItIsAnswered()

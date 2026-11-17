@@ -35,7 +35,7 @@ internal static class ForewordPage
 
         layout.MoveTo(SkiaPageLayout.Margin * 1.5);
 
-        layout.DrawText("THE MORNING BRIEF", kickerFont, SkiaPageLayout.Margin, layout.Y,
+        layout.DrawText("The morning brief", kickerFont, SkiaPageLayout.Margin, layout.Y,
             layout.ContentWidth, 12, TextAlign.TopCenter, SkiaPageLayout.InkMuted);
         layout.Advance(16);
 

@@ -150,7 +150,7 @@ public class WaitingPageModelTests
         Assert.Equal(FoldRole.Reference, item.Role);
         Assert.Null(item.Button);
         Assert.Empty(item.Chips);
-        Assert.Equal("The bed hasn’t reported for a few days. Nothing is wrong on your side that we can see.", item.Body);
+        Assert.Equal("The bed hasn’t reported for a few days. Nothing looks wrong on this phone; Constitution keeps checking.", item.Body);
         Assert.DoesNotContain("refused", item.Body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("sign-in", item.Body, StringComparison.OrdinalIgnoreCase);
     }
@@ -177,7 +177,7 @@ public class WaitingPageModelTests
 
         Assert.Equal("The reMarkable didn’t take this morning’s workout", item.Title);
         Assert.Equal(
-            "Its sign-in was refused. Pair the tablet again; the new token goes to the vault and Constitution resends.",
+            "Its sign-in was refused. Pair the reMarkable again; the new pairing is saved to the vault and Constitution resends.",
             item.Body);
     }
 

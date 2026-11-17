@@ -64,7 +64,7 @@ public class SkipLedgerTests
     {
         InkResolution[] asked =
         [
-            new InkResolution.NeedsAsking("done-1", "push-ups", "Ticked", "Not ticked", "cause"),
+            new InkResolution.NeedsAsking("done-1", "push-ups", "Checked", "Not checked", "cause"),
             new InkResolution.Skipped("workout-box"),
             new InkResolution.Skipped("done-2"),
         ];

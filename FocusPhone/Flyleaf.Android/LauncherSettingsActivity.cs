@@ -128,7 +128,7 @@ public class LauncherSettingsActivity : Activity
             }
             catch (Exception e)
             {
-                inlineStatus = $"Couldn’t restart: {e.Message}";
+                inlineStatus = "Couldn’t restart: " + Storyworthtelling.Diagnostics.PlainError.Describe(e);
             }
         }
 
@@ -212,7 +212,7 @@ public class LauncherSettingsActivity : Activity
             }
             if (!ok)
             {
-                inlineStatus = "Couldn’t change Wi-Fi. This needs the device-owner lockdown.";
+                inlineStatus = "Couldn’t change Wi-Fi from here. Use Choose a network… below.";
                 HeadLog.Warn("Connectivity", inlineStatus);
                 Render();
             }
@@ -362,7 +362,7 @@ public class LauncherSettingsActivity : Activity
         }
         catch (Exception e)
         {
-            inlineStatus = $"Couldn’t close {label}: {e.Message}";
+            inlineStatus = $"Couldn’t close {label}: " + Storyworthtelling.Diagnostics.PlainError.Describe(e);
             Render();
             return;
         }
@@ -475,7 +475,7 @@ public class LauncherSettingsActivity : Activity
         }
         catch (Exception e)
         {
-            inlineStatus = $"GitHub install failed: {e.Message}";
+            inlineStatus = "Couldn’t install from GitHub: " + Storyworthtelling.Diagnostics.PlainError.Describe(e, "GitHub") + " Tap Install from GitHub now to try again.";
             installing.Failed($"{e.GetType().Name}: {e.Message}");
         }
         checkingGitHub = false;

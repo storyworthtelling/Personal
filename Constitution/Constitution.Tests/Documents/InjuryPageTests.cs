@@ -114,7 +114,7 @@ public class InjuryPageTests
         var page = WorkoutDocument.Build(WorkoutSamples.InjuryDay())[1];
 
         Assert.Contains("In place of reverse lunges: no load through the knee.", PageText(page));
-        Assert.Contains("WORKING AROUND YOUR LEFT KNEE", PageText(page));
+        Assert.Contains("working around your left knee", PageText(page));
     }
 
     [Fact]

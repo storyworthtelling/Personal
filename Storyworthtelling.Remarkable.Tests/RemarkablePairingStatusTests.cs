@@ -34,13 +34,13 @@ public class RemarkablePairingStatusTests
     }
 
     [Fact]
-    public void AWorkingPairingIsTicked()
+    public void AWorkingPairingSaysPaired()
     {
         var working = CredentialHealthReport.Empty.MarkOk(RemarkableCredentialId.Value, At).Get(RemarkableCredentialId.Value);
 
         var status = RemarkablePairingStatus.Describe(paired: true, working, "Not paired yet.");
 
-        Assert.Equal("Paired ✓", status.Line);
+        Assert.Equal("Paired", status.Line);
         Assert.Equal("Re-pair", status.Button);
         Assert.False(status.NeedsPairing);
     }

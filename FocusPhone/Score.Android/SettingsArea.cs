@@ -96,8 +96,7 @@ public sealed class SettingsArea : ScoreArea
         sections.Add(new(SettingsAnatomy.Diagnostics, null, body =>
         {
             body.AddView(PaperUi.Secondary(Host,
-                "There is no adb after the cutover, so failures are written here instead of to a log " +
-                "nobody can reach."));
+                "Score keeps its recent failures here, so they can be read and shared."));
             body.AddView(PaperUi.SecondaryButton(Host, "Recent failures",
                 () => Host.StartActivity(new Android.Content.Intent(Host, typeof(AudioDiagnosticsActivity)))));
 

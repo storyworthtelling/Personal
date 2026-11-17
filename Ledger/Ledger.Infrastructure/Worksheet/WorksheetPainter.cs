@@ -179,9 +179,9 @@ public static class WorksheetPainter
     {
         var left = WorksheetRegions.MarginLeft;
         var right = left + WorksheetRegions.BodyWidth;
-        canvas.DrawText("CATEGORY", left, labelBaseline, ink.Label, ink.Muted);
-        canvas.DrawText(WorksheetDates.PreviousMonthWord(yearMonth).ToUpperInvariant(), WorksheetRegions.LastMonthColumnRight, labelBaseline, SKTextAlign.Right, ink.Label, ink.Muted);
-        canvas.DrawText($"{WorksheetDates.MonthWord(yearMonth).ToUpperInvariant()} LIMIT", right, labelBaseline, SKTextAlign.Right, ink.Label, ink.Muted);
+        canvas.DrawText("Category", left, labelBaseline, ink.Label, ink.Muted);
+        canvas.DrawText(WorksheetDates.PreviousMonthWord(yearMonth), WorksheetRegions.LastMonthColumnRight, labelBaseline, SKTextAlign.Right, ink.Label, ink.Muted);
+        canvas.DrawText($"{WorksheetDates.MonthWord(yearMonth)} limit", right, labelBaseline, SKTextAlign.Right, ink.Label, ink.Muted);
         PageInk.Rule(canvas, ink.InkRule, left, right, ruleY);
     }
 
@@ -226,7 +226,7 @@ public static class WorksheetPainter
 
         if (setAsideLines.Count > 0)
         {
-            DrawSectionHeader(canvas, ink, "SET ASIDE", layout.SetAsideHeaderTop);
+            DrawSectionHeader(canvas, ink, "Set aside", layout.SetAsideHeaderTop);
 
             for (var i = 0; i < setAsideLines.Count; i++)
             {
@@ -244,7 +244,7 @@ public static class WorksheetPainter
             }
         }
 
-        DrawSectionHeader(canvas, ink, "ADD A CATEGORY", layout.AddCategoryHeaderTop);
+        DrawSectionHeader(canvas, ink, "Add a category", layout.AddCategoryHeaderTop);
 
         foreach (var (nameBox, limitBox) in layout.NewCategories)
         {

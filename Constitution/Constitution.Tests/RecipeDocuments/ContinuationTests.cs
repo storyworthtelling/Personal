@@ -66,9 +66,9 @@ public class ContinuationTests
     {
         var pages = RecipeDocument.Build(RecipeSamples.Chicken(ingredients: Enumerable.Range(1, 24).Select(i => new RecipeIngredient("Everything", "1 tsp", $"spice number {i}")).ToList()));
 
-        Assert.Contains("EVERYTHING", Texts(pages[0], PrintedRole.Label));
-        Assert.Contains("EVERYTHING (CONTINUED)", Texts(pages[1], PrintedRole.Label));
-        Assert.Contains("RECIPE · INGREDIENTS, CONTINUED", Texts(pages[1], PrintedRole.Label));
+        Assert.Contains("Everything", Texts(pages[0], PrintedRole.Label));
+        Assert.Contains("Everything (continued)", Texts(pages[1], PrintedRole.Label));
+        Assert.Contains("Recipe · ingredients, continued", Texts(pages[1], PrintedRole.Label));
     }
 
     [Fact]

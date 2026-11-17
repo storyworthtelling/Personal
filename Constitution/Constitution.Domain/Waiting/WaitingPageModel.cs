@@ -78,7 +78,7 @@ public sealed class WaitingPageModel
         {
             NoticeKind.ReMarkableDelivery => (
                 "The reMarkable didn’t take this morning’s workout",
-                "Its sign-in was refused. Pair the tablet again; the new token goes to the vault and Constitution resends.",
+                "Its sign-in was refused. Pair the reMarkable again; the new pairing is saved to the vault and Constitution resends.",
                 new WaitingButton("Pair again", WaitingActionId.PairAgain),
                 NoChips),
             NoticeKind.HealthConnectRevoked => (
@@ -93,7 +93,7 @@ public sealed class WaitingPageModel
                 NoChips),
             NoticeKind.BedSilent => (
                 "The bed hasn’t reported",
-                "The bed hasn’t reported for a few days. Nothing is wrong on your side that we can see.",
+                "The bed hasn’t reported for a few days. Nothing looks wrong on this phone; Constitution keeps checking.",
                 null,
                 NoChips),
             NoticeKind.LowConfidenceRead => LowConfidence(notice),
@@ -103,7 +103,7 @@ public sealed class WaitingPageModel
                 new WaitingButton("Check it", WaitingActionId.CheckCard),
                 NoChips),
             NoticeKind.BoxUnderTen => (
-                "The recipe box is under ten",
+                "The recipe box needs more cards",
                 "Weekly meal sheets start after the tenth card.",
                 new WaitingButton("Scan a card", WaitingActionId.ScanCard),
                 NoChips),

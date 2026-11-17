@@ -18,7 +18,7 @@ public static class ChildViewText
     public const string DiscoverStatus = "Look for something by its name, or by how you feel.";
     public const string TitleNotHere = "This one isn’t on the shelf in this view.";
     public const string TitleNotHereHeader = "Not here";
-    public const string StarLabel = "★ Favorite";
+    public const string StarLabel = "Favorite";
     public const string UnstarLabel = "Remove from Favorites";
     public const string NothingFound = "Nothing here for this viewer.";
 

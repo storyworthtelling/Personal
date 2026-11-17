@@ -198,7 +198,7 @@ public class PdfComposer : IPdfComposer
         var ledeFont = SkiaPageLayout.Serif(PaperTypeScale.Heading);
         var bodyFont = SkiaPageLayout.Sans(PaperTypeScale.Body);
 
-        layout.DrawWrapped(article.Section.ToUpperInvariant(), kickerFont);
+        layout.DrawWrapped(article.Section, kickerFont);
         layout.Advance(4);
 
         layout.DrawWrapped(article.Title, headlineFont, lineSpacing: 1.15);

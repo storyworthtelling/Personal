@@ -38,7 +38,7 @@ public class WorksheetPainterSetAsideTests
         Assert.Equal(1, document.NumberOfPages); // mockup 13(a)'s own realistic example stays on one sheet
 
         var text = document.GetPage(1).Text;
-        Assert.Contains("SET ASIDE", text, StringComparison.Ordinal);
+        Assert.Contains("Set aside", text, StringComparison.Ordinal);
         Assert.Contains("Extra debt payment", text, StringComparison.Ordinal);
         Assert.Contains("to Meridian Card", text, StringComparison.Ordinal);
         Assert.Contains("Savings", text, StringComparison.Ordinal);
@@ -46,7 +46,7 @@ public class WorksheetPainterSetAsideTests
         Assert.Contains("Summer trip", text, StringComparison.Ordinal);
         // D100/D155's own target: income ($9,350) less Snowball payments ($6,250) = $3,100.
         Assert.Contains("$3,100", text, StringComparison.Ordinal);
-        Assert.Contains("ADD A CATEGORY", text, StringComparison.Ordinal);
+        Assert.Contains("Add a category", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -84,8 +84,8 @@ public class WorksheetPainterSetAsideTests
         Assert.Contains("Category 1", page1Text, StringComparison.Ordinal);
         Assert.Contains("Continued on the next sheet", page1Text, StringComparison.Ordinal);
         Assert.Contains("Category 30", page2Text, StringComparison.Ordinal);
-        Assert.Contains("SET ASIDE", page2Text, StringComparison.Ordinal); // the set-aside section moved as one unit
-        Assert.Contains("ADD A CATEGORY", page2Text, StringComparison.Ordinal);
+        Assert.Contains("Set aside", page2Text, StringComparison.Ordinal); // the set-aside section moved as one unit
+        Assert.Contains("Add a category", page2Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public class WorksheetPainterSetAsideTests
             .Where(w => w.Letters.All(l => Math.Abs(l.EndBaseLine.Y - l.StartBaseLine.Y) < 0.01))
             .Select(w => w.Text));
 
-        Assert.DoesNotContain("SET ASIDE", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Set aside", text, StringComparison.Ordinal);
         Assert.True(words.Contains("Add a category on a blank line at the foot", StringComparison.Ordinal), words);
     }
 }

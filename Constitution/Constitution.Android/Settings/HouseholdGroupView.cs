@@ -152,7 +152,7 @@ public static class HouseholdGroupView
         foreach (var row in model.Calendars)
         {
             body.AddView(PaperUi.Body(context, row.Label), gap(DesignTokens.Space.X2));
-            var field = PaperUi.MonoField(context, "Calendar id");
+            var field = PaperUi.MonoField(context, "Calendar address");
             field.Text = row.Id ?? string.Empty;
             body.AddView(field, gap(DesignTokens.Space.X1));
             var key = row.Key;

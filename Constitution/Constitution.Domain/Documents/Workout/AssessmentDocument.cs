@@ -38,7 +38,7 @@ public static class AssessmentDocument
     private static InkPageLayout Cover(AssessmentDocumentModel model, int pages)
     {
         var draft = new PageDraft(CoverTitle) { Section = "Assessment" };
-        draft.Kicker($"ASSESSMENT WEEK · DAY {model.Day} OF {model.OfDays} · {PageDraft.DayAndTime(model.Start)}");
+        draft.Kicker($"Assessment week · day {model.Day} of {model.OfDays} · {PageDraft.DayAndTime(model.Start)}");
         draft.Footer(Name, model.Start, 1, pages);
 
         var sessions = model.OfDays == 1 ? "One short session" : $"{PageText.Capitalise(PageText.Word(model.OfDays))} short sessions";
@@ -80,7 +80,7 @@ public static class AssessmentDocument
     {
         var test = model.Tests[index];
         var draft = new PageDraft(test.Name) { Section = "Tests" };
-        draft.Kicker($"ASSESSMENT · TEST {index + 1} OF {model.Tests.Count}");
+        draft.Kicker($"Assessment · test {index + 1} of {model.Tests.Count}");
         draft.Footer(Name, model.Start, PageOfTest(index), pages);
         draft.NotesColumn();
 
@@ -117,7 +117,7 @@ public static class AssessmentDocument
             var boxTop = y + (test.ShowFigure ? 46f : 30f);
             var box = InkTargets.NumberBox(WorkoutIds.Result, PageDraft.Left, boxTop, test.Name, test.Unit);
             draft.Target(box);
-            draft.Line(PrintedRole.Label, PageDraft.Left, boxTop - 12f, PageDraft.ColumnWidth, "WRITE THE NUMBER", owner: box.Id, name: "result-label");
+            draft.Line(PrintedRole.Label, PageDraft.Left, boxTop - 12f, PageDraft.ColumnWidth, "Write the number", owner: box.Id, name: "result-label");
             draft.Add(new PrintedItem("result-unit", PrintedRole.Body, InkTargets.UnitLabelBounds(box, 80f), test.Unit, box.Id));
             end = draft.Voice(test.Encouragement, box.Bounds.Bottom + 46f, box.Bounds.Bottom);
         }
