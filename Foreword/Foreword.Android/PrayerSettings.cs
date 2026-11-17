@@ -52,9 +52,9 @@ public sealed class PrayerSettings(IPrayerArchive archive)
     public string Sentence() => Status switch
     {
         PrayerArchiveStatus.WrongPassphrase =>
-            "The archive would not open with the passphrase in Settings. Nothing was changed.",
+            "The archive wouldn’t open with the passphrase in Settings. Nothing was changed.",
         PrayerArchiveStatus.Corrupt =>
-            "The archive in Drive could not be read. Nothing was changed — it is the only copy.",
+            "The archive in Drive couldn’t be read. Nothing was changed — it is the only copy.",
         PrayerArchiveStatus.Empty when string.IsNullOrEmpty(CredentialStore.VaultPassphrase) =>
             "Enter your vault passphrase in Settings, and the lists you keep here will be saved with it.",
         PrayerArchiveStatus.Empty => "Nothing kept yet.",

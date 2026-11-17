@@ -119,7 +119,7 @@ public class WeekPlanHouseholdTests
     public async Task AFileThatWillNotOpenIsNeverWrittenOver()
     {
         using var owner = await OwnerAsync();
-        owner.Drive.Content = "this is not a sealed file";
+        owner.Drive.Content = "this isn’t a sealed file";
         await owner.Service.SyncAsync(CancellationToken.None);
         var drive = owner.Drive.Content;
         var writes = owner.Drive.Writes;

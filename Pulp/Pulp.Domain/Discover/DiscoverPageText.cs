@@ -8,7 +8,7 @@ namespace Pulp.Domain.Discover;
 public static class DiscoverPageText
 {
     /// <summary>Above the piles, as mockup 03 draws it: the stack turns over at Friday 6 am (D110).</summary>
-    public const string StackStatus = "This week's stack · until Friday";
+    public const string StackStatus = "This week’s stack · until Friday";
 
     public const string SwipeHint = "Swipe for the next";
 
@@ -18,7 +18,7 @@ public static class DiscoverPageText
 
     public const string ShowsHeading = "Shows";
 
-    public const string Dealing = "Dealing this week's stack…";
+    public const string Dealing = "Dealing this week’s stack…";
 
     /// <summary>No roster yet: the household is set up at first run (Release D).</summary>
     public const string NoHousehold = "The stack is dealt once the household is set up.";
@@ -29,9 +29,9 @@ public static class DiscoverPageText
     /// <summary>The household has named no services yet, so there is nothing to deal from (Settings, Release D).</summary>
     public const string NoServices = "The stack is dealt from your services, once Settings names them.";
 
-    public const string StackUnreachable = "This week's stack could not be dealt just now.";
+    public const string StackUnreachable = "This week’s stack couldn’t be dealt just now.";
 
-    public const string SearchUnreachable = "The catalogue could not be reached just now.";
+    public const string SearchUnreachable = "The catalogue couldn’t be reached just now.";
 
     public const string MoodPrompt = "Press Done to ask for this mood.";
 

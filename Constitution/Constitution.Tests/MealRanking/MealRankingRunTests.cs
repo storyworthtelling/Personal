@@ -101,7 +101,7 @@ public class MealRankingRunTests
     [Fact]
     public async Task AnUnreadableAnswerFileFallsBackToThePlan()
     {
-        var rig = Rig(r => r.SetAnswers(new FakeAnswers(new MealAnswersRead.Unreadable("The household file cannot be read."))));
+        var rig = Rig(r => r.SetAnswers(new FakeAnswers(new MealAnswersRead.Unreadable("The household file can’t be read."))));
 
         Assert.False(await CurryIsCooked(rig));
     }

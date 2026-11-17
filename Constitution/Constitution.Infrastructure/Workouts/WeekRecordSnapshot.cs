@@ -26,7 +26,7 @@ public sealed record WeekReadInputs(
 /// </summary>
 public static class WeekRecordSnapshot
 {
-    public const string SessionUnreadable = "The saved week has a session that could not be read.";
+    public const string SessionUnreadable = "The saved week has a session that couldn’t be read.";
 
     public static WorkoutsRead From(StoredWorkoutWeek week, WeekReadInputs inputs)
     {

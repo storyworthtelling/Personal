@@ -113,7 +113,7 @@ public class CoverTests : IDisposable
         Assert.NotEqual(theirs, now);
         Assert.True(
             File.Exists(theirs!),
-            "The owner's jacket was overwritten, so the undo behind a repaint would be a lie.");
+            "The owner’s jacket was overwritten, so the undo behind a repaint would be a lie.");
     }
 
     [Fact]

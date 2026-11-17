@@ -91,7 +91,7 @@ public class PlanLinksTests
         var earliest = LandingOf(Render(Item([.. both])));
 
         Assert.Equal(alone.Page, earliest.Page);
-        Assert.True(earliest.Top > alone.Top, "The link should land on chapter one's list, above chapter two's line.");
+        Assert.True(earliest.Top > alone.Top, "The link should land on chapter one’s list, above chapter two’s line.");
     }
 
     /// <summary>

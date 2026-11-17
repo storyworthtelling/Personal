@@ -87,7 +87,7 @@ public sealed class SecretsVaultService
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // A vault Drive could not be read is not an empty one; nothing is written.
-                return (SecretsVaultPublishResult.WriteFailed($"Drive could not be read ({ex.GetType().Name}: {ex.Message})."), ex);
+                return (SecretsVaultPublishResult.WriteFailed($"Drive couldn’t be read ({ex.GetType().Name}: {ex.Message})."), ex);
             }
 
             if (result.IsNewerFormat)

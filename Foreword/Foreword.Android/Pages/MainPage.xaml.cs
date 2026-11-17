@@ -130,7 +130,7 @@ public partial class MainPage : BinderPage
         var delivering = MauiTapWatch.Action(ForewordKeyActions.DeliverNow, TimeSpan.FromMinutes(10));
         deliverNow.IsEnabled = false;
         // Loading is words (DESIGN.md §5).
-        StatusLabel.Text = "Delivering — fetching today's brief…";
+        StatusLabel.Text = "Delivering — fetching today’s brief…";
 
         try
         {
@@ -190,11 +190,11 @@ public partial class MainPage : BinderPage
             (CredentialStore.IsGoogleConfigured, "Google",
                 CredentialStore.IsGoogleConfigured
                     ? CredentialStore.GoogleAccountEmail
-                    : "Your calendar and tasks — the day cannot be built without it"),
+                    : "Your calendar and tasks — the day can’t be built without it"),
             (!string.IsNullOrEmpty(CredentialStore.VaultPassphrase), "The vault",
                 string.IsNullOrEmpty(CredentialStore.VaultPassphrase)
                     ? "One passphrase, and the rest of the keys restore themselves"
-                    : "Restoring this phone's keys from Drive"),
+                    : "Restoring this phone’s keys from Drive"),
             (!string.IsNullOrEmpty(CredentialStore.RemarkableDeviceToken), "Your reMarkable",
                 string.IsNullOrEmpty(CredentialStore.RemarkableDeviceToken)
                     ? "Not paired — documents are built and held until it is"

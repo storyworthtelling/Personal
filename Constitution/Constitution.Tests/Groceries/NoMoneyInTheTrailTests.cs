@@ -61,7 +61,7 @@ public class NoMoneyInTheTrailTests
     {
         var types = DiagnosticTypes().ToList();
 
-        Assert.True(types.Count >= 10, $"The guard found only {types.Count} diagnostics types; it is not reading the real namespace.");
+        Assert.True(types.Count >= 10, $"The guard found only {types.Count} diagnostics types; it isn’t reading the real namespace.");
         Assert.Empty(MoneyMembers(types));
     }
 

@@ -16,7 +16,7 @@ public sealed record SignalChange
     {
         if (!Enum.IsDefined(signal))
         {
-            throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body's signals.");
+            throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body’s signals.");
         }
 
         if (!double.IsFinite(current) || !double.IsFinite(previous))

@@ -130,7 +130,7 @@ public class MealWeekRunTemplatesTests
     public async Task TheLibraryIsKeptEvenWhenThePaperStops()
     {
         var rigs = Make();
-        rigs.Docs.Roster.Answer = new MealRosterRead.Unavailable("The roster does not open.");
+        rigs.Docs.Roster.Answer = new MealRosterRead.Unavailable("The roster doesn’t open.");
 
         var report = await rigs.PlannedAsync();
 

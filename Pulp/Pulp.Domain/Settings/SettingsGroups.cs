@@ -37,7 +37,7 @@ public static class SettingsGroups
         var keys = keysNeedingEntry.ToList();
         if (keys.Count == 0)
         {
-            throw new ArgumentException("The vault line is about Pulp's keys; it was given none to ask about.", nameof(keysNeedingEntry));
+            throw new ArgumentException("The vault line is about Pulp’s keys; it was given none to ask about.", nameof(keysNeedingEntry));
         }
 
         var needed = keys.Count(needs => needs);

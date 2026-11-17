@@ -43,7 +43,7 @@ public class VoiceSampleTests
         foreach (var window in sample.Split(VoiceSample.Separator))
         {
             var at = text.IndexOf(window, StringComparison.Ordinal);
-            Assert.True(at >= 0, "a window is not a run of the text");
+            Assert.True(at >= 0, "a window isn’t a run of the text");
             Assert.True(at == 0 || char.IsWhiteSpace(text[at - 1]), "a window began mid-word");
             var end = at + window.Length;
             Assert.True(end == text.Length || char.IsWhiteSpace(text[end]), "a window ended mid-word");

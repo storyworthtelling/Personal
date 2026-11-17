@@ -93,7 +93,7 @@ public sealed class ChildPlay
             }
             catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
-                services.Diagnostics.Warn("child", "A child's Play could not reach the hand-off door.", exception);
+                services.Diagnostics.Warn("child", "A child’s Play could not reach the hand-off door.", exception);
             }
         });
     }
@@ -136,7 +136,7 @@ public sealed class ChildPlay
         foreach (var child in audience.Watching)
         {
             var sitting = new WatchedSitting(child, new WatchEvent(title.Id, kind, pending.Evidence.At, pending.Service, episode, WatchSource.HandOff));
-            writes.Enqueue("record the child's hand-off", token => services.PutAsync(HouseholdMaps.Watched, sitting, token));
+            writes.Enqueue("record the child’s hand-off", token => services.PutAsync(HouseholdMaps.Watched, sitting, token));
         }
     }
 

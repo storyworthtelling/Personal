@@ -14,7 +14,7 @@ public class TidalSignInFailureTests
     {
         var said = TidalSignInFailure.Describe(
             "TIDAL device_authorization refused the request with 400 BadRequest: " +
-            "invalid_request — Client is not a Limited Input Device client");
+            "invalid_request — Client isn’t a Limited Input Device client");
 
         // The point is that it names TIDAL's refusal rather than the network, and does
         // not offer a retry. The exact wording moved once already and may again.
@@ -30,7 +30,7 @@ public class TidalSignInFailureTests
     [Fact]
     public void Describe_DoesNotSendYouHuntingForASettingThatDoesNotExist()
     {
-        var said = TidalSignInFailure.Describe("invalid_request — Client is not a Limited Input Device client");
+        var said = TidalSignInFailure.Describe("invalid_request — Client isn’t a Limited Input Device client");
 
         Assert.DoesNotContain("portal", said, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("own apps", said, StringComparison.OrdinalIgnoreCase);
@@ -85,7 +85,7 @@ public class TidalSignInFailureTests
     [Fact]
     public void IsCredentialRejection_FalseForEverythingElse()
     {
-        Assert.False(TidalSignInFailure.IsCredentialRejection("invalid_request — Client is not a Limited Input Device client"));
+        Assert.False(TidalSignInFailure.IsCredentialRejection("invalid_request — Client isn’t a Limited Input Device client"));
         Assert.False(TidalSignInFailure.IsCredentialRejection("400 BadRequest: invalid_scope — w_sub not permitted"));
         Assert.False(TidalSignInFailure.IsCredentialRejection("No such host is known (auth.tidal.com:443)"));
         Assert.False(TidalSignInFailure.IsCredentialRejection(null));
@@ -98,7 +98,7 @@ public class TidalSignInFailureTests
     {
         foreach (var message in new[]
         {
-            "invalid_request — Client is not a Limited Input Device client",
+            "invalid_request — Client isn’t a Limited Input Device client",
             "invalid_client — client authentication failed",
             "invalid_scope — nope",
             "No such host is known",

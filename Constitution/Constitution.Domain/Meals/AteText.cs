@@ -10,22 +10,22 @@ public static class AteText
 {
     public const string ResultLead = "You had something else · about ";
 
-    public const string NoKeySentence = "Estimating needs the Claude key from the vault, which is not on this phone yet, so nothing was recorded.";
+    public const string NoKeySentence = "Estimating needs the Claude key from the vault, which isn’t on this phone yet, so nothing was recorded.";
 
-    public const string UnreachableSentence = "The estimate could not be reached just now, so nothing was recorded.";
+    public const string UnreachableSentence = "The estimate couldn’t be reached just now, so nothing was recorded.";
 
     public const string NoMealSentence = "No meal could be seen in that photo, so nothing was recorded.";
 
-    public const string UnreadableSentence = "That photo could not be turned into an estimate, so nothing was recorded.";
+    public const string UnreadableSentence = "That photo couldn’t be turned into an estimate, so nothing was recorded.";
 
-    public const string CaptureFailedSentence = "The camera did not give back a photo, so nothing was recorded.";
+    public const string CaptureFailedSentence = "The camera didn’t give back a photo, so nothing was recorded.";
 
     public const string AskingSentence =
         "Asking to use the camera, only to take one photo of your meal. The photo is deleted straight after the estimate.";
 
-    public const string DeniedSentence = "The camera was not allowed, so a meal can't be photographed.";
+    public const string DeniedSentence = "The camera wasn’t allowed, so a meal can’t be photographed.";
 
-    public const string NoCameraSentence = "This phone has no camera, so a meal can't be photographed.";
+    public const string NoCameraSentence = "This phone has no camera, so a meal can’t be photographed.";
 
     public static string Estimating(AteMeal meal) => $"Estimating your {AteMeals.Word(meal)}…";
 

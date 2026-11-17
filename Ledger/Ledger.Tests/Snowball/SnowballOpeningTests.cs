@@ -114,7 +114,7 @@ public class SnowballOpeningTests
             repaint: () => Task.CompletedTask,
             new RecordingLogger<SnowballOpeningTests>(), CancellationToken.None);
 
-        Assert.True(snapshotsAtPaint > 0, "this week's snapshot must exist by the time the page paints");
+        Assert.True(snapshotsAtPaint > 0, "this week’s snapshot must exist by the time the page paints");
         held.Release();
         await background.WaitAsync(Patience);
     }

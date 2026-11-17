@@ -63,7 +63,7 @@ public sealed record Ingredient
 
         if (Quantity is { Length: > MaxPartLength } || Unit is { Length: > MaxPartLength })
         {
-            throw new ArgumentException("An ingredient's quantity and unit are at most " + MaxPartLength + " characters each.", nameof(Quantity));
+            throw new ArgumentException("An ingredient’s quantity and unit are at most " + MaxPartLength + " characters each.", nameof(Quantity));
         }
     }
 
@@ -103,7 +103,7 @@ public sealed record RecipeStep
 
         if (Minutes is { } minutes && (minutes < 1 || minutes > MaxMinutes))
         {
-            throw new ArgumentException("A step's minutes are 1 to " + MaxMinutes + ", or left out.", nameof(Minutes));
+            throw new ArgumentException("A step’s minutes are 1 to " + MaxMinutes + ", or left out.", nameof(Minutes));
         }
     }
 }

@@ -36,7 +36,7 @@
                 </Border>
                 <Label x:Name="FeedsCaption" Style="{StaticResource CardCaption}" />
 
-                <Label Text="xkcd prints whatever you have not seen. Nothing else is capped overall — only per feed."
+                <Label Text="xkcd prints whatever you haven’t seen. Nothing else is capped overall — only per feed."
                        Style="{StaticResource CardCaption}" />
 
             </VerticalStackLayout>

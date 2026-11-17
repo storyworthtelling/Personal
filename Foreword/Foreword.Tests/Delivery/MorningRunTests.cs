@@ -51,7 +51,7 @@ public class MorningRunTests
 
         var first = await Run().Deliver(Today, Steps());
         Assert.True(first.Failed(MorningDocument.Day));
-        Assert.Contains("The Day did not arrive (no network)", first.Summary(), StringComparison.Ordinal);
+        Assert.Contains("The Day didn’t arrive (no network)", first.Summary(), StringComparison.Ordinal);
 
         dayFails = false;
         var retry = await Run().Deliver(Today, Steps());
@@ -79,6 +79,6 @@ public class MorningRunTests
                 Storyworthtelling.Remarkable.RemarkableRefusal.TooLarge, 173_000_000)),
         ]);
 
-        Assert.Contains("over the tablet's 100 MB limit", outcome.Summary(), StringComparison.Ordinal);
+        Assert.Contains("over the tablet’s 100 MB limit", outcome.Summary(), StringComparison.Ordinal);
     }
 }

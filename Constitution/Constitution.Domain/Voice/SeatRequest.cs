@@ -17,7 +17,7 @@ public sealed partial class SeatRequest
         if (!Enum.IsDefined(seat))
         {
             throw new ArgumentOutOfRangeException(nameof(seat), seat,
-                "This seat is not on Constitution's closed list of six voiced seats.");
+                "This seat isn’t on Constitution’s closed list of six voiced seats.");
         }
 
         ArgumentNullException.ThrowIfNull(facts);

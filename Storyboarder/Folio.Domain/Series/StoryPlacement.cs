@@ -40,7 +40,7 @@ public sealed record StoryPlacement(PlacementKind Kind, string Book, string Othe
 
     /// <summary>The line the book page shows: "Takes place after “The Salt Road”", and whose word it is.</summary>
     [JsonIgnore]
-    public string Line => $"Takes place {Where}" + (Confirmed ? string.Empty : " · Folio's guess");
+    public string Line => $"Takes place {Where}" + (Confirmed ? string.Empty : " · Folio’s guess");
 
     /// <summary>
     /// What a continuity finding says while the placement is a guess, and nothing once it is confirmed.
@@ -48,7 +48,7 @@ public sealed record StoryPlacement(PlacementKind Kind, string Book, string Othe
     [JsonIgnore]
     public string Assumption => Confirmed
         ? string.Empty
-        : $"This assumes the book takes place {Where}, which has not been confirmed.";
+        : $"This assumes the book takes place {Where}, which hasn’t been confirmed.";
 
     public StoryPlacement Confirm() => this with { Confirmed = true };
 

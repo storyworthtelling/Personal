@@ -62,7 +62,7 @@ public static class DigestServices
 
         var seams = WorkoutWeekDeliverySeams.Create(appContext);
         var root = appContext.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep the digest's stamp in.");
+            ?? throw new InvalidOperationException("The app has no private files folder to keep the digest’s stamp in.");
         var folder = WorkoutWeekPaths.Folder(root);
         var sources = new LiveDigestSources(
             new FileWorkoutWeekReports(Path.Combine(folder, WorkoutWeekFiles.ReportFile)),

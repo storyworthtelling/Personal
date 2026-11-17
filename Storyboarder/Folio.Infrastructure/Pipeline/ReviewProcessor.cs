@@ -951,7 +951,7 @@ public sealed class ReviewProcessor : IPipelineStep
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex,
-                    "Could not carry forward the reference image for '{Name}' (manuscript {NovelId}); will render fresh",
+                    "Couldn’t carry forward the reference image for '{Name}' (manuscript {NovelId}); will render fresh",
                     entity.Name, novel.Id);
             }
         }
@@ -1634,7 +1634,7 @@ public sealed class ReviewProcessor : IPipelineStep
             // Reuses the manuscript-level attempt counter, as the report consolidations do, since archiving
             // is also a once-per-manuscript step with no per-unit row to hang a budget off. Past the budget
             // the review finishes anyway with the reason recorded — the report is safe on disk regardless.
-            novel.LastError = $"Could not archive to Drive: {ex.Message}";
+            novel.LastError = $"Couldn’t archive to Drive: {ex.Message}";
             if (NetworkFailure.IsOffline(ex))
                 return await WaitForNetwork(db, novel, ex, "Archiving to Drive", cancellationToken);
 
@@ -1730,7 +1730,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 "not sending it to the tablet (the report remains available elsewhere)",
                 novel.Id, size / 1_000_000.0, RemarkableLimits.MaxBytes / 1_000_000.0);
             return await SettleWithoutTablet(db, novel, analysis,
-                $"It did not reach the reMarkable: {tooLarge.Sentence}.", cancellationToken);
+                $"It didn’t reach the reMarkable: {tooLarge.Sentence}.", cancellationToken);
         }
 
         try
@@ -1759,11 +1759,11 @@ public sealed class ReviewProcessor : IPipelineStep
                 "Manuscript {NovelId}: the reMarkable delivery was refused ({Reason}); not repeating it with the " +
                 "same file ({SizeMb:0} MB)", novel.Id, refused.Reason, size / 1_000_000.0);
             return await SettleWithoutTablet(db, novel, analysis,
-                $"It did not reach the reMarkable: {refused.Sentence}.", cancellationToken);
+                $"It didn’t reach the reMarkable: {refused.Sentence}.", cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            novel.LastError = $"Could not deliver to reMarkable: {ex.Message}";
+            novel.LastError = $"Couldn’t deliver to reMarkable: {ex.Message}";
             if (NetworkFailure.IsOffline(ex))
                 return await WaitForNetwork(db, novel, ex, "Delivering to the reMarkable", cancellationToken);
 
@@ -1779,7 +1779,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 var attempts = novel.StageAttempts;
                 var cause = Storyworthtelling.Diagnostics.PlainError.Describe(ex.Message, "reMarkable");
                 return await SettleWithoutTablet(db, novel, analysis,
-                    $"It did not reach the reMarkable after {attempts} tries" +
+                    $"It didn’t reach the reMarkable after {attempts} tries" +
                     (cause.Length == 0 ? "." : $": {cause}."), cancellationToken);
             }
 
@@ -1865,7 +1865,7 @@ public sealed class ReviewProcessor : IPipelineStep
         var delay = TimeSpan.FromSeconds(rateLimits.OfflineRetrySeconds);
         novel.RetryNotBeforeUtc = clock.UtcNow + delay;
         logger.LogWarning(exception,
-            "{Step} could not reach the network for manuscript {NovelId}: the phone is offline; this does not " +
+            "{Step} couldn’t reach the network for manuscript {NovelId}: the phone is offline; this doesn’t " +
             "count as an attempt; next check after {NextAttempt:u}: {Error}",
             step, novel.Id, novel.RetryNotBeforeUtc, ErrorText.Describe(exception));
         await db.SaveChangesAsync(cancellationToken);
@@ -1897,7 +1897,7 @@ public sealed class ReviewProcessor : IPipelineStep
             delay = TimeSpan.FromSeconds(rateLimits.OfflineRetrySeconds);
             novel.RetryNotBeforeUtc = clock.UtcNow + delay;
             logger.LogWarning(exception,
-                "{Call} could not reach the network for manuscript {NovelId}: the phone is offline; this does " +
+                "{Call} couldn’t reach the network for manuscript {NovelId}: the phone is offline; this does " +
                 "not count as an attempt; next check after {NextAttempt:u}: {Error}",
                 call, novel.Id, novel.RetryNotBeforeUtc, cause);
             await db.SaveChangesAsync(cancellationToken);
@@ -1936,7 +1936,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 : string.Empty;
             logger.LogWarning(exception,
                 "{Call} failed for manuscript {NovelId} on attempt {Attempt}/{Max}; giving up and parking it " +
-                "until Retry is tapped, so the book is not sent again unattended{Reason}: {Error}",
+                "until Retry is tapped, so the book isn’t sent again unattended{Reason}: {Error}",
                 call, novel.Id, attemptsMade, rateLimits.MaxAttempts, reason, cause);
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.Idle;
@@ -2064,7 +2064,7 @@ public sealed class ReviewProcessor : IPipelineStep
             unit.NextAttemptAtUtc = clock.UtcNow + TimeSpan.FromSeconds(rateLimits.OfflineRetrySeconds);
             novel.RetryNotBeforeUtc = unit.NextAttemptAtUtc;
             logger.LogWarning(exception,
-                "{Unit} could not reach the network: the phone is offline; this does not count as an attempt " +
+                "{Unit} couldn’t reach the network: the phone is offline; this doesn’t count as an attempt " +
                 "({Attempts}/{Max} used); next check {NextAttempt:u}: {Error}",
                 unit.GetType().Name, unit.Attempts, rateLimits.MaxAttempts, unit.NextAttemptAtUtc,
                 ErrorText.Describe(exception));
@@ -2236,7 +2236,7 @@ public sealed class ReviewProcessor : IPipelineStep
         if (!readable)
         {
             logger.LogWarning(
-                "The series bible of manuscript {NovelId} could not be read; leaving it as it is and finishing " +
+                "The series bible of manuscript {NovelId} couldn’t be read; leaving it as it is and finishing " +
                 "the review without reading this book into it", novel.Id);
             analysis.SeriesBibleUpdated = true;
             await db.SaveChangesAsync(cancellationToken);
@@ -2724,7 +2724,7 @@ public sealed class ReviewProcessor : IPipelineStep
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(
-                "Could not submit the {Kind} batch for manuscript {NovelId}; going one call at a time: {Error}",
+                "Couldn’t submit the {Kind} batch for manuscript {NovelId}; going one call at a time: {Error}",
                 kind, novel.Id, ErrorText.Describe(ex));
         }
 

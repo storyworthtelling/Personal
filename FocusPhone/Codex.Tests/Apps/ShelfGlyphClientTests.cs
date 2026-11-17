@@ -31,7 +31,7 @@ public class ShelfGlyphClientTests
     public async Task GenerateAsync_ReturnsNull_WhenTheReplyIsNotAPath()
     {
         var handler = new FakeHttpMessageHandler();
-        handler.Respond(Url, Reply("I can't draw that."));
+        handler.Respond(Url, Reply("I can’t draw that."));
 
         Assert.Null(await Client(handler).GenerateAsync("Reading", CancellationToken.None));
     }

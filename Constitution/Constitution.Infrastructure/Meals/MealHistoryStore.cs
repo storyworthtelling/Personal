@@ -11,7 +11,7 @@ namespace Constitution.Infrastructure.Meals;
 /// </summary>
 public sealed class MealHistoryStore : IMealHistoryStore
 {
-    public const string UnopenableReason = "The saved dinner history could not be opened.";
+    public const string UnopenableReason = "The saved dinner history couldn’t be opened.";
 
     private static readonly object FileLock = new();
 

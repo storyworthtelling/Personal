@@ -122,7 +122,7 @@ public class CoverFitTests
                 var below = cover.Printed.Single(item => item.Name == "list-row-1").Bounds.Top;
                 foreach (var cell in ListCells(cover).Where(item => item.Bounds.Top < below))
                 {
-                    Assert.True(cell.Bounds.Top >= above && cell.Bounds.Bottom <= below, $"'{cell.Text}' (cover of {name}) is not inside its row.");
+                    Assert.True(cell.Bounds.Top >= above && cell.Bounds.Bottom <= below, $"'{cell.Text}' (cover of {name}) isn’t inside its row.");
                 }
             }
         }

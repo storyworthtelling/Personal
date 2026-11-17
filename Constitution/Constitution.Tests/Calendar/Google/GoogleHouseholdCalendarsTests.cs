@@ -87,19 +87,19 @@ public class GoogleHouseholdCalendarsTests
     {
         Answer(new Dictionary<string, string>
         {
-            ["sam@example.com"] = Page(Event("1", "Sam's dentist", "2026-11-03T09:00:00-05:00", "2026-11-03T10:00:00-05:00")),
-            ["lee@example.com"] = Page(Event("2", "Lee's meeting", "2026-11-03T13:00:00-05:00", "2026-11-03T14:00:00-05:00")),
+            ["sam@example.com"] = Page(Event("1", "Sam’s dentist", "2026-11-03T09:00:00-05:00", "2026-11-03T10:00:00-05:00")),
+            ["lee@example.com"] = Page(Event("2", "Lee’s meeting", "2026-11-03T13:00:00-05:00", "2026-11-03T14:00:00-05:00")),
             ["family@example.com"] = Page(Event("3", "Piano lesson", "2026-11-04T16:00:00-05:00", "2026-11-04T17:00:00-05:00")),
-            ["robin@example.com"] = Page(Event("4", "Robin's practice", "2026-11-05T15:00:00-05:00", "2026-11-05T16:00:00-05:00")),
-            ["juniper@example.com"] = Page(Event("5", "Juniper's party", "2026-11-06T11:00:00-05:00", "2026-11-06T12:00:00-05:00")),
+            ["robin@example.com"] = Page(Event("4", "Robin’s practice", "2026-11-05T15:00:00-05:00", "2026-11-05T16:00:00-05:00")),
+            ["juniper@example.com"] = Page(Event("5", "Juniper’s party", "2026-11-06T11:00:00-05:00", "2026-11-06T12:00:00-05:00")),
         });
 
         var snapshot = await ReadAsync();
 
-        Assert.Equal(["Sam's dentist"], snapshot.OwnCalendar(Sam, From, To).Entries.Select(entry => entry.Title));
-        Assert.Equal(["Lee's meeting"], snapshot.OwnCalendar(Lee, From, To).Entries.Select(entry => entry.Title));
+        Assert.Equal(["Sam’s dentist"], snapshot.OwnCalendar(Sam, From, To).Entries.Select(entry => entry.Title));
+        Assert.Equal(["Lee’s meeting"], snapshot.OwnCalendar(Lee, From, To).Entries.Select(entry => entry.Title));
         Assert.Equal(["Piano lesson"], snapshot.FamilyCalendar(From, To).Entries.Select(entry => entry.Title));
-        Assert.Equal(["Robin's practice", "Juniper's party"], snapshot.ChildrensCalendars(From, To).Entries.Select(entry => entry.Title));
+        Assert.Equal(["Robin’s practice", "Juniper’s party"], snapshot.ChildrensCalendars(From, To).Entries.Select(entry => entry.Title));
     }
 
     [Fact]
@@ -126,9 +126,9 @@ public class GoogleHouseholdCalendarsTests
 
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, "Google refused access to a calendar; it may not be shared.")]
-    [InlineData(HttpStatusCode.NotFound, "A calendar was not found; it may not be shared.")]
-    [InlineData(HttpStatusCode.Unauthorized, "Google did not accept the sign-in for a calendar.")]
-    [InlineData(HttpStatusCode.ServiceUnavailable, "Google could not answer.")]
+    [InlineData(HttpStatusCode.NotFound, "A calendar wasn’t found; it may not be shared.")]
+    [InlineData(HttpStatusCode.Unauthorized, "Google didn’t accept the sign-in for a calendar.")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "Google couldn’t answer.")]
     public async Task ACalendarGoogleWillNotGiveIsUnreadableNotEmpty(HttpStatusCode status, string reason)
     {
         Answer(new Dictionary<string, string>(), otherwise: null);
@@ -149,14 +149,14 @@ public class GoogleHouseholdCalendarsTests
     [Fact]
     public async Task ACalendarThatCannotBeReachedIsUnreadable()
     {
-        http.Throws = new HttpRequestException("The platform's text, which may name a host.");
+        http.Throws = new HttpRequestException("The platform’s text, which may name a host.");
 
         var snapshot = await ReadAsync();
 
         Assert.All(new[] { Sam, Lee }, person =>
         {
             var read = snapshot.OwnCalendar(person, From, To);
-            Assert.Equal("A calendar could not be reached.", read.UnreadableBecause);
+            Assert.Equal("A calendar couldn’t be reached.", read.UnreadableBecause);
         });
         Assert.False(snapshot.FamilyCalendar(From, To).IsReadable);
         Assert.False(snapshot.ChildrensCalendars(From, To).IsReadable);
@@ -167,7 +167,7 @@ public class GoogleHouseholdCalendarsTests
     {
         http.Reply = request => Uri.UnescapeDataString(request.Path).Contains("juniper@example.com", StringComparison.Ordinal)
             ? FakeCalendarHttp.Error(HttpStatusCode.Forbidden)
-            : FakeCalendarHttp.Json(Page(Event("r", "Robin's practice", "2026-11-05T15:00:00-05:00", "2026-11-05T16:00:00-05:00")));
+            : FakeCalendarHttp.Json(Page(Event("r", "Robin’s practice", "2026-11-05T15:00:00-05:00", "2026-11-05T16:00:00-05:00")));
 
         var children = (await ReadAsync()).ChildrensCalendars(From, To);
 
@@ -183,7 +183,7 @@ public class GoogleHouseholdCalendarsTests
         var sam = (await ReadAsync()).OwnCalendar(Sam, From, To);
 
         Assert.False(sam.IsReadable);
-        Assert.Equal("An event on a calendar could not be understood.", sam.UnreadableBecause);
+        Assert.Equal("An event on a calendar couldn’t be understood.", sam.UnreadableBecause);
     }
 
     [Fact]
@@ -231,7 +231,7 @@ public class GoogleHouseholdCalendarsTests
 
         var snapshot = await ReadAsync();
 
-        Assert.Equal("This person's calendar is not set.", snapshot.OwnCalendar(Lee, From, To).UnreadableBecause);
+        Assert.Equal("This person’s calendar isn’t set.", snapshot.OwnCalendar(Lee, From, To).UnreadableBecause);
         Assert.True(snapshot.OwnCalendar(Sam, From, To).IsReadable);
         Assert.DoesNotContain(http.Requests, request => Uri.UnescapeDataString(request.Path).Contains("/calendars//", StringComparison.Ordinal));
     }
@@ -246,7 +246,7 @@ public class GoogleHouseholdCalendarsTests
         setup = new HouseholdSetupRead.Configured(notSet with { NoFamilyCalendar = true });
         var none = await ReadAsync();
 
-        Assert.Equal("The family calendar is not set.", unset.FamilyCalendar(From, To).UnreadableBecause);
+        Assert.Equal("The family calendar isn’t set.", unset.FamilyCalendar(From, To).UnreadableBecause);
         Assert.True(none.FamilyCalendar(From, To).IsReadable);
         Assert.Empty(none.FamilyCalendar(From, To).Entries);
     }
@@ -261,7 +261,7 @@ public class GoogleHouseholdCalendarsTests
         setup = new HouseholdSetupRead.Configured(notSet with { NoChildren = true });
         var none = await ReadAsync();
 
-        Assert.Equal("The children's calendars are not set.", unset.ChildrensCalendars(From, To).UnreadableBecause);
+        Assert.Equal("The children’s calendars aren’t set.", unset.ChildrensCalendars(From, To).UnreadableBecause);
         Assert.True(none.ChildrensCalendars(From, To).IsReadable);
         Assert.Empty(none.ChildrensCalendars(From, To).Entries);
     }

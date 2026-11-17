@@ -298,7 +298,7 @@ public sealed record FiledSearchSession(string Query, int Round, IReadOnlyList<s
 public static class FiledSearchPrompt
 {
     public static string System(FiledCatalogue catalogue) =>
-        "You find things in a person's archive of filed correspondence: emails, texts, calls and voicemails. "
+        "You find things in a person’s archive of filed correspondence: emails, texts, calls and voicemails. "
         + "Each catalogue line is: line number | date sent | kind and direction | person | subject | opening words. "
         + "They describe what they are looking for in plain English; it may name a person, a topic, a rough time "
         + "or only what the message was for. Pick the lines that fit, best first, at most 5. Pick fewer, or none, "

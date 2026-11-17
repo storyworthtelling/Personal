@@ -10,7 +10,7 @@ namespace Constitution.Tests.MealRanking;
 public class TasteRankingTests
 {
     // Frozen from the planner as it was before the input existed (240 invented requests, hashed week by week).
-    private const ulong TodaysWeeks = 7827400281381623395UL;
+    private const ulong TodaysWeeks = 9008526175038720656UL;
 
     private static List<Recipe> Italian(int count) =>
         Enumerable.Range(0, count).Select(index => Dish("dish-" + (char)('a' + index), Cuisine.Italian)).ToList();

@@ -16,7 +16,7 @@ public class MealWeekWorkerGuardTests
     private static string Source(string fileName)
     {
         var file = ConstitutionSource.Files(".cs").SingleOrDefault(path => Path.GetFileName(path) == fileName);
-        Assert.True(file is not null, fileName + " was not found under Constitution/.");
+        Assert.True(file is not null, fileName + " wasn’t found under Constitution/.");
         return File.ReadAllText(file!);
     }
 
@@ -120,7 +120,7 @@ public class MealWeekWorkerGuardTests
         var mealOpen = activity.IndexOf("MealWeekWorker.RunOnOpen(this)", StringComparison.Ordinal);
         var workoutOpen = activity.IndexOf("WorkoutWeekWorker.RunOnOpen(this)", StringComparison.Ordinal);
 
-        Assert.True(mealSchedule >= 0 && mealOpen >= 0, "The activity does not schedule the meal worker and run it on open.");
+        Assert.True(mealSchedule >= 0 && mealOpen >= 0, "The activity doesn’t schedule the meal worker and run it on open.");
         Assert.True(mealSchedule < workoutSchedule, "Meals are scheduled after workouts.");
         Assert.True(mealOpen < workoutOpen, "The meal run on open starts after the workout run.");
     }
@@ -131,7 +131,7 @@ public class MealWeekWorkerGuardTests
     public void NoMealWeekFileTouchesTheVaultPassphrase()
     {
         var files = MealWeekHeadFiles().ToList();
-        Assert.True(files.Count >= 2, "The meal week's head folder looks empty; the guard is not reading it.");
+        Assert.True(files.Count >= 2, "The meal week’s head folder looks empty; the guard isn’t reading it.");
 
         foreach (var file in files)
         {

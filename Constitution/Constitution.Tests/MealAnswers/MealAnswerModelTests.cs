@@ -77,7 +77,7 @@ public class MealAnswerModelTests
     public void AQuestionOrAnUnreadLineIsNoAnswer()
     {
         // Never silence and never a default: a line the read could not settle says nothing at all.
-        Assert.Null(MealAnswerInk.From(new InkResolution.NeedsAsking(Tuesday, "Tuesday's dinner", "Keep", "Leave out", "read:x"), Sam, Week, Before(30)));
+        Assert.Null(MealAnswerInk.From(new InkResolution.NeedsAsking(Tuesday, "Tuesday’s dinner", "Keep", "Leave out", "read:x"), Sam, Week, Before(30)));
         Assert.Null(MealAnswerInk.From(new InkResolution.NotRead(Tuesday, "page not read"), Sam, Week, Before(30)));
         Assert.Null(MealAnswerInk.From(new InkResolution.Skipped(Tuesday), Sam, Week, Before(30)));
     }

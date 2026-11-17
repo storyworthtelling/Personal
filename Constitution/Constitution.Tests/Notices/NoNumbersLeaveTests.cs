@@ -19,7 +19,7 @@ public class NoNumbersLeaveTests
     private static string PosterSource()
     {
         var path = Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "Waiting", "NoticePoster.cs");
-        Assert.True(File.Exists(path), "Constitution.Android/Waiting/NoticePoster.cs was not found.");
+        Assert.True(File.Exists(path), "Constitution.Android/Waiting/NoticePoster.cs wasn’t found.");
         return File.ReadAllText(path);
     }
 

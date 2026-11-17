@@ -24,7 +24,7 @@ public abstract record MealDeadlineChoice
 public static class MealDeadlineTarget
 {
     public const string NoWeekSentence = "No planned week is kept, so there is no sheet to decide.";
-    public const string BeforeSentence = "The sheet's deadline has not passed yet.";
+    public const string BeforeSentence = "The sheet’s deadline hasn’t passed yet.";
     public const string DecidedSentence = "Every week whose deadline has passed is already decided.";
 
     public static MealDeadlineChoice Choose(MealWeekRecord kept, MealDecisionRecord decided, DateTimeOffset now, TimeZoneInfo zone)

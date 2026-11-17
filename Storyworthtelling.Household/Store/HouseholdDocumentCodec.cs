@@ -133,7 +133,7 @@ public static class HouseholdDocumentCodec
         var where = $"record {index}";
         if (element.ValueKind != JsonValueKind.Object)
         {
-            throw new HouseholdFormatException($"The household file's {where} is not an object.");
+            throw new HouseholdFormatException($"The household file’s {where} is not an object.");
         }
 
         try
@@ -151,7 +151,7 @@ public static class HouseholdDocumentCodec
 
             if (!element.TryGetProperty("fields", out var fieldsElement) || fieldsElement.ValueKind != JsonValueKind.Object)
             {
-                throw new HouseholdFormatException($"The household file's {where} has no fields object.");
+                throw new HouseholdFormatException($"The household file’s {where} has no fields object.");
             }
 
             var fields = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -159,7 +159,7 @@ public static class HouseholdDocumentCodec
             {
                 if (field.Value.ValueKind != JsonValueKind.String)
                 {
-                    throw new HouseholdFormatException($"The household file's {where} has field '{field.Name}' as a {field.Value.ValueKind}; fields are strings.");
+                    throw new HouseholdFormatException($"The household file’s {where} has field '{field.Name}' as a {field.Value.ValueKind}; fields are strings.");
                 }
 
                 fields[field.Name] = field.Value.GetString()!;
@@ -170,23 +170,23 @@ public static class HouseholdDocumentCodec
         catch (ArgumentException exception)
         {
             // Domain refused a value (a negative stamp, a blank writer, a schema below one).
-            throw new HouseholdFormatException($"The household file's {where} is not a valid record: {exception.Message}", exception);
+            throw new HouseholdFormatException($"The household file’s {where} is not a valid record: {exception.Message}", exception);
         }
     }
 
     private static string Text(JsonElement element, string name, string where) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()!
-            : throw new HouseholdFormatException($"The household file's {where} has no '{name}'.");
+            : throw new HouseholdFormatException($"The household file’s {where} has no '{name}'.");
 
     /// <summary>A whole number that fits an int; one past it is damage, refused rather than wrapped by a cast.</summary>
     private static int WholeInt(JsonElement element, string name, string where) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number)
             ? number
-            : throw new HouseholdFormatException($"The household file's {where} has no '{name}' that is a whole number within the int range.");
+            : throw new HouseholdFormatException($"The household file’s {where} has no '{name}' that is a whole number within the int range.");
 
     private static long Number(JsonElement element, string name, string where) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number)
             ? number
-            : throw new HouseholdFormatException($"The household file's {where} has no whole-number '{name}'.");
+            : throw new HouseholdFormatException($"The household file’s {where} has no whole-number '{name}'.");
 }

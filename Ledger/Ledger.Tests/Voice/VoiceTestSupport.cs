@@ -64,7 +64,7 @@ internal sealed class RecordingVoiceClient : IVoiceClient
 {
     public List<MessageRequest> Requests { get; } = [];
 
-    public string Reply { get; set; } = "Twelve percent down since last November's peak.";
+    public string Reply { get; set; } = "Twelve percent down since last November’s peak.";
 
     public Exception? Failure { get; set; }
 

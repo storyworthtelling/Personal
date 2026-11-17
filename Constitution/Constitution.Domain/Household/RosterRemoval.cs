@@ -74,7 +74,7 @@ public static class RosterRemoval
     public const string NotOnTheRosterSentence = "That person is no longer on the household roster.";
 
     public static string LastAdultSentence(string name) =>
-        $"{name} is the only adult on the household roster, so they cannot be removed. Add another adult first.";
+        $"{name} is the only adult on the household roster, so they can’t be removed. Add another adult first.";
 
     public static PersonRemovalResult Remove(RosterEditor editor, HouseholdDocument document, PersonId id, HlcTimestamp stamp, string writer)
     {

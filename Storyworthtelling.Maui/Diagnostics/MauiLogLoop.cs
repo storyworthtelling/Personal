@@ -118,7 +118,7 @@ public static class MauiLogLoop
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                log.Write("LogUpload", LogLevel.Warning, $"Could not tell which phone this is ({e.GetType().Name}); uploading as unknown.", null);
+                log.Write("LogUpload", LogLevel.Warning, $"Couldn’t tell which phone this is ({e.GetType().Name}); uploading as unknown.", null);
                 phone = LogPhone.Unknown;
             }
             var folder = new DriveLogFolder(setup.Drive, mayCreateFolder: LogPhoneRole.MayCreateFolder(phone));

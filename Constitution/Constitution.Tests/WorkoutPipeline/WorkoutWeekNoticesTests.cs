@@ -108,7 +108,7 @@ public class WorkoutWeekNoticesTests
 
         Assert.Equal("This week couldn’t be planned", item.Title);
         Assert.Equal(
-            "Constitution couldn’t read a calendar or record it needs, so it has not planned the week, written to a calendar or sent a page. It looks again at the next run.",
+            "Constitution couldn’t read a calendar or record it needs, so it hasn’t planned the week, written to a calendar or sent a page. It looks again at the next run.",
             item.Body);
         Assert.Null(item.Button);
         Assert.Empty(item.Chips);

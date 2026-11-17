@@ -74,7 +74,7 @@ public sealed class PulpServices
     private readonly HouseholdSyncLoop syncLoop;
     private readonly SemaphoreSlim passGate = new(1, 1);
     private RememberedRole? rememberedRole;
-    private HouseholdSyncStatus syncStatus = HouseholdSyncStatus.LocalOnly("The household has not been compared with Drive yet.");
+    private HouseholdSyncStatus syncStatus = HouseholdSyncStatus.LocalOnly("The household hasn’t been compared with Drive yet.");
     private readonly LocalInstallStore install;
     private readonly CatalogueCache cache;
     private readonly StreamingAvailabilityClient availability;
@@ -492,7 +492,7 @@ public sealed class PulpServices
         ArgumentNullException.ThrowIfNull(draft);
         if (!Rights.CanAddOrRemoveViewers)
         {
-            throw new InvalidOperationException("Adding people is the owner's, on their phone; this phone has the household shared to it.");
+            throw new InvalidOperationException("Adding people is the owner’s, on their phone; this phone has the household shared to it.");
         }
 
         DraftCommit? made = null;
@@ -648,7 +648,7 @@ public sealed class PulpServices
                 HouseholdPublishOutcome.NotYetShared => HouseholdSyncStatus.WaitingForShare(
                     SyncStatus.LastSynced,
                     $"No household file is shared with this account yet. The owner shares '{PulpIdentity.HouseholdFileName}' from their Drive; until then this phone keeps its household to itself."),
-                _ => SyncStatus.PassFailed("The other phone was saving at the same moment; this phone's changes are kept and go up on the next pass."),
+                _ => SyncStatus.PassFailed("The other phone was saving at the same moment; this phone’s changes are kept and go up on the next pass."),
             };
 
             // A screen re-reads when records came home (SyncRefresh), so the pass says whether any did.
@@ -662,7 +662,7 @@ public sealed class PulpServices
         catch (HouseholdFormatException exception)
         {
             // This phone's own file is damaged: nothing it holds can be merged up without guessing.
-            Diagnostics.Warn("household", "This phone's household file could not be read, so it was not synced: " + exception.Message, exception);
+            Diagnostics.Warn("household", "This phone’s household file could not be read, so it was not synced: " + exception.Message, exception);
             Block(HouseholdSyncStatus.Unreadable(HouseholdUnreadableReason.Damaged, exception.Message, SyncStatus.LastSynced));
         }
         catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
@@ -727,7 +727,7 @@ public sealed class PulpServices
         catch (Exception exception)
         {
             // A screen's handler failing must not stop the sync loop that raised it.
-            Diagnostics.Warn("household", "A screen's handler for the household sync status failed.", exception);
+            Diagnostics.Warn("household", "A screen’s handler for the household sync status failed.", exception);
         }
     }
 
@@ -801,7 +801,7 @@ public sealed class PulpServices
         }
         catch (CatalogueLookupException exception)
         {
-            CatalogueFailure($"refresh:{exception.Failure}", $"A title could not be refreshed ({exception.Failure}); the cached copy stands.", exception);
+            CatalogueFailure($"refresh:{exception.Failure}", $"A title couldn’t be refreshed ({exception.Failure}); the cached copy stands.", exception);
             return cached?.Title;
         }
 
@@ -977,7 +977,7 @@ public sealed class PulpServices
         // Following is an adult's act: a child's follow would reach the shared calendar and name the child.
         if (CalendarFollows.RefusesFollow((await HouseholdAsync(cancellationToken)).Roster, viewer))
         {
-            throw new InvalidOperationException($"'{viewer}' is a child on this household's roster, and only an adult follows a team.");
+            throw new InvalidOperationException($"'{viewer}' is a child on this household’s roster, and only an adult follows a team.");
         }
 
         await PutAsync(HouseholdMaps.SportsFollow, new SportsFollow(viewer, team), cancellationToken);

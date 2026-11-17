@@ -181,7 +181,7 @@ public sealed record FieldNotes(
             {
                 true => " (clashed)",
                 false => " (day was clear)",
-                null => " (day not checked — Post cannot read the calendar yet)",
+                null => " (day not checked — Post can’t read the calendar yet)",
             };
             text.AppendLine(Invariant($"  {sample.StartsOn:yyyy-MM-dd}  {sample.Title}{clash}"));
         }

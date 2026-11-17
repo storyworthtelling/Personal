@@ -85,13 +85,13 @@ public sealed record TasteNote
     {
         if (string.IsNullOrWhiteSpace(Subject) || Subject.Length > MaxSubjectLength)
         {
-            throw new ArgumentException("A taste note's subject is 1 to " + MaxSubjectLength + " characters.", nameof(Subject));
+            throw new ArgumentException("A taste note’s subject is 1 to " + MaxSubjectLength + " characters.", nameof(Subject));
         }
 
         switch (Kind)
         {
             case TasteSubjectKind.Cuisine when !Cuisines.Words.TryValue(Subject, out _):
-                throw new ArgumentException("A cuisine note names one of the box's cuisines.", nameof(Subject));
+                throw new ArgumentException("A cuisine note names one of the box’s cuisines.", nameof(Subject));
             case TasteSubjectKind.Ingredient when TasteTokens.Of(Subject).Count == 0:
                 throw new ArgumentException("An ingredient note needs a food word.", nameof(Subject));
             case TasteSubjectKind.Dish when !IsCardId(Subject):

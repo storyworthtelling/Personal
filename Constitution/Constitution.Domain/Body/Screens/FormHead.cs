@@ -24,6 +24,6 @@ public sealed record FormHead(string Signal, string Units, string? Period)
         BodyWindow.Month => "MONTH",
         BodyWindow.Quarter => "QUARTER",
         BodyWindow.Year => "YEAR",
-        _ => throw new ArgumentOutOfRangeException(nameof(window), window, "That is not one of Body's windows."),
+        _ => throw new ArgumentOutOfRangeException(nameof(window), window, "That is not one of Body’s windows."),
     };
 }

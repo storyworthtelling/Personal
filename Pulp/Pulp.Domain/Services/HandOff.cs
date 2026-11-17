@@ -49,7 +49,7 @@ public static class HandOff
         if (!title.Service.Equals(service.Id))
         {
             throw new ArgumentException(
-                $"A link for '{title.Service}' cannot be handed to '{service.Id}'; it would open the wrong app or nothing.",
+                $"A link for '{title.Service}' can’t be handed to '{service.Id}'; it would open the wrong app or nothing.",
                 nameof(title));
         }
 
@@ -67,7 +67,7 @@ public static class HandOff
         if (!link.IsAbsoluteUri || link.Scheme != Uri.UriSchemeHttps)
         {
             throw new ArgumentException(
-                $"The {which} '{link}' is not an https link; a hand-off only sends the service's own https links.",
+                $"The {which} '{link}' isn’t an https link; a hand-off only sends the service’s own https links.",
                 which);
         }
     }

@@ -21,7 +21,7 @@ public sealed class RecipePhotoLoop
     /// <summary>The most pages one recipe may take. Past it the loop stops offering Add a page.</summary>
     public const int MaxPages = 8;
 
-    public const string EmptyPhotoSentence = "That photo could not be used, so the page was not added.";
+    public const string EmptyPhotoSentence = "That photo couldn’t be used, so the page wasn’t added.";
 
     private readonly List<byte[]> pages = [];
     private bool lastEmpty;
@@ -72,13 +72,13 @@ public sealed class RecipePhotoLoop
 /// <summary>The words of the photo route, written once. None of them quotes the card.</summary>
 public static class RecipePhotoText
 {
-    public const string NoKeySentence = "Recipes are read with Claude, and there is no Claude key on this phone yet, so the photos were not read.";
+    public const string NoKeySentence = "Recipes are read with Claude, and there is no Claude key on this phone yet, so the photos weren’t read.";
 
     public const string NoRecipeSentence = "No recipe could be found in those photos, so nothing was filled in.";
 
-    public const string UnreadableSentence = "The recipe in those photos could not be read, so nothing was filled in.";
+    public const string UnreadableSentence = "The recipe in those photos couldn’t be read, so nothing was filled in.";
 
-    public const string PageUnreadableSentence = "One of the photos could not be used, so nothing was read. Take the pages again.";
+    public const string PageUnreadableSentence = "One of the photos couldn’t be used, so nothing was read. Take the pages again.";
 
     public const string TooLongSentence = "That recipe was too long to read in one go, so nothing was filled in.";
 
@@ -93,7 +93,7 @@ public static class RecipeScanText
     public const string CancelledSentence = "The camera closed before a page was taken, so nothing was read.";
 
     /// <summary>Leads the plain reason a read failed (no network, a refused key), which follows it.</summary>
-    public const string NotReadPrefix = "The recipe was not read: ";
+    public const string NotReadPrefix = "The recipe wasn’t read: ";
 }
 
 /// <summary>What reading the photographs came to.</summary>
@@ -134,7 +134,7 @@ public static class RecipePhotoPrompt
     public const string System =
         "You read a recipe from photographs of a cookbook page, a recipe card or a printout. There is one photograph per page, "
         + "in order, and the recipe may run on from one page to the next. "
-        + "Keep exactly three things: the recipe's title, its ingredients and its steps. "
+        + "Keep exactly three things: the recipe’s title, its ingredients and its steps. "
         + "Copy their words as they are printed, joining any line or word the page breaks, and correcting only plain misreadings. "
         + "Leave out everything else: the story or introduction before the recipe, headnotes, tips, notes, variations, "
         + "substitutions, make-ahead and storage advice, nutrition, servings and times, serving suggestions, page numbers, "

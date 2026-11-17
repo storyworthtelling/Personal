@@ -36,8 +36,8 @@ public class ChapterNotesListTests
         var note = text.IndexOf("Nobody asks where she has been.", StringComparison.Ordinal);
         var prose = text.IndexOf("She walked the sea wall", StringComparison.Ordinal);
 
-        Assert.True(title >= 0 && title < list, "The list should follow the chapter's title.");
-        Assert.True(list < note && note < prose, "The note should be in the list, before the chapter's prose.");
+        Assert.True(title >= 0 && title < list, "The list should follow the chapter’s title.");
+        Assert.True(list < note && note < prose, "The note should be in the list, before the chapter’s prose.");
     }
 
     /// <summary>A book whose only notes are chapter notes still prints its manuscript, or they are lost.</summary>

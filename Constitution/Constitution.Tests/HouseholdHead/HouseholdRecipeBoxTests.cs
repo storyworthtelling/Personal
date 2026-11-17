@@ -60,7 +60,7 @@ public class HouseholdRecipeBoxTests
 
         var none = Assert.IsType<RecipeBoxRead.NoHouseholdFile>(rig.Box.Read());
 
-        Assert.Contains("not been compared", none.Sentence, StringComparison.Ordinal);
+        Assert.Contains("hasn’t been compared", none.Sentence, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class HouseholdRecipeBoxTests
         var refused = rig.Keeper.Keep(RecipeData.Chili());
 
         Assert.Contains("passphrase", unavailable.Reason, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("does not open", unavailable.Reason, StringComparison.Ordinal);
+        Assert.Contains("doesn’t open", unavailable.Reason, StringComparison.Ordinal);
         Assert.False(refused.IsKept);
         Assert.Equal(unavailable.Reason, refused.Refusal);
         Assert.Equal(before, rig.Drive.Content);

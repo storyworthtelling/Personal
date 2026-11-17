@@ -179,7 +179,7 @@ public static class RecipeRatingPage
 
         var tick = new InkTarget(
             RecipeIds.DidntCook, InkTargetKind.StandardTick,
-            new InkRect(PageDraft.Left, last + TickDrop, InkTargets.StandardTickSize, InkTargets.StandardTickSize), "we did not cook this dinner tonight");
+            new InkRect(PageDraft.Left, last + TickDrop, InkTargets.StandardTickSize, InkTargets.StandardTickSize), "we didn’t cook this dinner tonight");
         draft.Target(tick);
         draft.Line(PrintedRole.Strong, TickLabelLeft, last + TickLabelDrop, 220f, DidntCookWords, owner: tick.Id, name: "didnt-cook-label");
         draft.Line(PrintedRole.Small, TickLabelLeft, last + TickHintDrop, PageDraft.RightEdge - TickLabelLeft, DidntCookHint, owner: tick.Id, name: "didnt-cook-hint");
@@ -212,7 +212,7 @@ public static class RecipeRatingPage
         ArgumentNullException.ThrowIfNull(model);
         if (string.IsNullOrWhiteSpace(model.Cook))
         {
-            throw new ArgumentException("The rating page needs the cook's name for its footer.", nameof(model));
+            throw new ArgumentException("The rating page needs the cook’s name for its footer.", nameof(model));
         }
 
         if (model.Rows.Count is < 1 or > MostEaters)
@@ -229,7 +229,7 @@ public static class RecipeRatingPage
         {
             if (string.IsNullOrWhiteSpace(row.Name) || row.Name.Trim().Length > NameChars)
             {
-                throw new ArgumentException($"The name '{row.Name}' does not fit the rating row's name column; it takes one to {NameChars} characters.", nameof(model));
+                throw new ArgumentException($"The name '{row.Name}' does not fit the rating row’s name column; it takes one to {NameChars} characters.", nameof(model));
             }
 
             if (string.IsNullOrWhiteSpace(row.Dish))

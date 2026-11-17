@@ -188,7 +188,7 @@ public partial class SourcesPage : BinderPage
         var url = await PaperCards.AskText(this, "Add a feed", null, "https://…", null, "Add",
             text => Uri.TryCreate(text, UriKind.Absolute, out var parsed) && parsed.Scheme is "http" or "https"
                 ? null
-                : "That is not a web address. A feed's address starts with https://.",
+                : "That isn’t a web address. A feed’s address starts with https://.",
             keyboard: Keyboard.Url);
 
         if (url is null)

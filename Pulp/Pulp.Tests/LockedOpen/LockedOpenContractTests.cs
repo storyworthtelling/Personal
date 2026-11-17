@@ -37,7 +37,7 @@ public class LockedOpenContractTests
     {
         var text = File.ReadAllText(Path.Combine(PulpSource.Root(), "..", FlyleafContract));
         var match = Regex.Match(text, $@"public const int {Regex.Escape(flyleafName)}\s*=\s*(-?\d+)\s*;");
-        Assert.True(match.Success, $"Could not find LockedOpenHandoff.{flyleafName}.");
+        Assert.True(match.Success, $"Couldn’t find LockedOpenHandoff.{flyleafName}.");
 
         Assert.Equal(int.Parse(match.Groups[1].Value), (int)typeof(LockedOpenHandOff).GetField(ourName)!.GetValue(null)!);
     }
@@ -48,7 +48,7 @@ public class LockedOpenContractTests
     {
         var text = File.ReadAllText(Path.Combine(PulpSource.Root(), "..", FlyleafContract));
         var start = text.IndexOf("LinkDomains { get; }", StringComparison.Ordinal);
-        Assert.True(start >= 0, "Could not find LockedOpenCatalogue.LinkDomains.");
+        Assert.True(start >= 0, "Couldn’t find LockedOpenCatalogue.LinkDomains.");
         var block = text[start..text.IndexOf("};", start, StringComparison.Ordinal)];
         var flyleaf = Regex.Matches(block, @"\[""([^""]+)""\]\s*=\s*\[([^\]]*)\]").ToDictionary(
             match => match.Groups[1].Value,
@@ -83,7 +83,7 @@ public class LockedOpenContractTests
         var text = File.ReadAllText(Path.Combine(PulpSource.Root(), "..", FlyleafContract));
         var match = Regex.Match(text, @"public const int MaxLinkLength\s*=\s*(\d+)\s*;");
 
-        Assert.True(match.Success, "Could not find LockedOpenHandoff.MaxLinkLength.");
+        Assert.True(match.Success, "Couldn’t find LockedOpenHandoff.MaxLinkLength.");
         Assert.Equal(int.Parse(match.Groups[1].Value), LockedOpenHandOff.MaxLinkLength);
     }
 
@@ -150,7 +150,7 @@ public class LockedOpenContractTests
     public void PulpCanSeeFlyleaf()
     {
         var path = Path.Combine(PulpSource.Root(), "Pulp.Android", "Properties", "AndroidManifest.xml");
-        Assert.True(File.Exists(path), "Pulp.Android/Properties/AndroidManifest.xml was not found.");
+        Assert.True(File.Exists(path), "Pulp.Android/Properties/AndroidManifest.xml wasn’t found.");
 
         Assert.Contains($"<package android:name=\"{LockedOpenHandOff.Package}\"", File.ReadAllText(path), StringComparison.Ordinal);
     }
@@ -158,7 +158,7 @@ public class LockedOpenContractTests
     private static string CourierSource()
     {
         var path = Path.Combine(PulpSource.Root(), CourierPath);
-        Assert.True(File.Exists(path), $"{CourierPath} was not found.");
+        Assert.True(File.Exists(path), $"{CourierPath} wasn’t found.");
         return File.ReadAllText(path);
     }
 
@@ -168,7 +168,7 @@ public class LockedOpenContractTests
         Assert.True(File.Exists(path), $"{FlyleafContract} not found at {path}; is FocusPhone checked out?");
         var match = Regex.Match(
             File.ReadAllText(path), $@"public const string {Regex.Escape(name)}\s*=\s*""([^""]*)""\s*;");
-        Assert.True(match.Success, $"Could not find LockedOpenHandoff.{name} in {FlyleafContract}.");
+        Assert.True(match.Success, $"Couldn’t find LockedOpenHandoff.{name} in {FlyleafContract}.");
         return match.Groups[1].Value;
     }
 
@@ -176,7 +176,7 @@ public class LockedOpenContractTests
     {
         var text = File.ReadAllText(Path.Combine(PulpSource.Root(), "..", FlyleafContract));
         var start = text.IndexOf("public static IReadOnlySet<string> Packages", StringComparison.Ordinal);
-        Assert.True(start >= 0, "Could not find LockedOpenCatalogue.Packages.");
+        Assert.True(start >= 0, "Couldn’t find LockedOpenCatalogue.Packages.");
         var block = text[start..text.IndexOf("};", start, StringComparison.Ordinal)];
         return Regex.Matches(block, @"""([A-Za-z0-9_.]+)""").Select(match => match.Groups[1].Value).ToList();
     }

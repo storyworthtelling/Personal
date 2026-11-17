@@ -21,12 +21,12 @@ public class MealWeekRunTests
     [Fact]
     public async Task TheLeaseSaysNoSoNothingIsPlanned()
     {
-        var rig = new MealWeekRig { MayPlan = false, LeaseSentence = "The other phone holds this week's planning." };
+        var rig = new MealWeekRig { MayPlan = false, LeaseSentence = "The other phone holds this week’s planning." };
 
         var outcome = await rig.RunAsync();
 
         var stopped = rig.StoppedWith(MealNotPlannedBecause.NotThePlanner, outcome);
-        Assert.Equal("The other phone holds this week's planning.", stopped.Sentence);
+        Assert.Equal("The other phone holds this week’s planning.", stopped.Sentence);
         Assert.Equal(["lease"], rig.Calls);
         rig.AssertNothingWritten();
     }
@@ -72,11 +72,11 @@ public class MealWeekRunTests
     public async Task ABoxThatCannotBeReadIsNotAnEmptyOne()
     {
         var rig = new MealWeekRig();
-        rig.Box.Answer = new Constitution.Domain.Recipes.Screens.RecipeBoxRead.Unavailable("The household file cannot be read.");
+        rig.Box.Answer = new Constitution.Domain.Recipes.Screens.RecipeBoxRead.Unavailable("The household file can’t be read.");
 
         var stopped = rig.StoppedWith(MealNotPlannedBecause.RecipesUnavailable, await rig.RunAsync());
 
-        Assert.Equal("The household file cannot be read.", stopped.Sentence);
+        Assert.Equal("The household file can’t be read.", stopped.Sentence);
         Assert.Equal(0, rig.Calendars.Reads);
         rig.AssertNothingWritten();
     }
@@ -85,7 +85,7 @@ public class MealWeekRunTests
     public async Task AnUnreadableHistoryPlansNothing()
     {
         var rig = new MealWeekRig();
-        rig.History.Json = "this is not a history";
+        rig.History.Json = "this isn’t a history";
 
         var stopped = rig.StoppedWith(MealNotPlannedBecause.HistoryUnreadable, await rig.RunAsync());
 
@@ -98,7 +98,7 @@ public class MealWeekRunTests
     public async Task AnUnreadableTasteProfilePlansNothing()
     {
         var rig = new MealWeekRig();
-        rig.Taste.Answer = new MealTasteRead.Unreadable("The saved taste profile is not valid JSON.");
+        rig.Taste.Answer = new MealTasteRead.Unreadable("The saved taste profile isn’t valid JSON.");
 
         rig.StoppedWith(MealNotPlannedBecause.TasteUnreadable, await rig.RunAsync());
 
@@ -110,11 +110,11 @@ public class MealWeekRunTests
     public async Task AnUnreadableCalendarFailsClosed()
     {
         var rig = new MealWeekRig();
-        rig.Calendars.Snapshot = CalendarsWith(lee: CalendarRead.Unreadable("Lee has not shared a calendar yet."));
+        rig.Calendars.Snapshot = CalendarsWith(lee: CalendarRead.Unreadable("Lee hasn’t shared a calendar yet."));
 
         var stopped = rig.StoppedWith(MealNotPlannedBecause.CalendarsUnreadable, await rig.RunAsync());
 
-        Assert.Equal("A calendar could not be read for the whole week, so no dinners are planned.", stopped.Sentence);
+        Assert.Equal("A calendar couldn’t be read for the whole week, so no dinners are planned.", stopped.Sentence);
         rig.AssertNothingWritten();
         Assert.Empty(rig.Writer.All);
     }
@@ -284,7 +284,7 @@ public class MealWeekRunTests
         await rig.PlannedAsync();
         var kept = rig.Records.Json;
         var saves = rig.Records.Saves;
-        rig.Calendars.Snapshot = CalendarsWith(sam: CalendarRead.Unreadable("Sam has not shared a calendar yet."));
+        rig.Calendars.Snapshot = CalendarsWith(sam: CalendarRead.Unreadable("Sam hasn’t shared a calendar yet."));
 
         rig.StoppedWith(MealNotPlannedBecause.CalendarsUnreadable, await rig.RunAsync());
 

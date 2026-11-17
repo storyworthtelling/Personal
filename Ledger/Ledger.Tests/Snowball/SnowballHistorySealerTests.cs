@@ -80,7 +80,7 @@ public class SnowballHistorySealerTests
         Assert.Equal(SnowballHistoryStatus.Unreadable, SnowballHistorySealer.Open(content, Passphrase).Status);
 
     [Theory]
-    [InlineData("this is not an envelope")]
+    [InlineData("this isn’t an envelope")]
     [InlineData("{\"Ciphertext\":\"\"}")]
     [InlineData("{\"Version\":1,\"Ciphertext\":\"%%%\",\"Nonce\":\"%%%\",\"Salt\":\"%%%\",\"Tag\":\"%%%\"}")]
     public void ADamagedEnvelopeIsUnreadableNotAnException(string content)

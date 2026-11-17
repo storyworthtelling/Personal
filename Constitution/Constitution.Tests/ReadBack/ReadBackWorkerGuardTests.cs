@@ -14,7 +14,7 @@ public class ReadBackWorkerGuardTests
     private static string Source(string fileName)
     {
         var file = ConstitutionSource.Files(".cs").SingleOrDefault(path => Path.GetFileName(path) == fileName);
-        Assert.True(file is not null, fileName + " was not found under Constitution/.");
+        Assert.True(file is not null, fileName + " wasn’t found under Constitution/.");
         return File.ReadAllText(file!);
     }
 
@@ -92,7 +92,7 @@ public class ReadBackWorkerGuardTests
     {
         var folder = Path.Combine("Constitution.Android", "ReadBack");
         var files = ConstitutionSource.Files(".cs").Where(path => ConstitutionSource.Relative(path).Contains(folder.Replace('\\', '/'), StringComparison.Ordinal)).ToList();
-        Assert.True(files.Count >= 3, "The read-back's head folder looks empty; the guard is not reading it.");
+        Assert.True(files.Count >= 3, "The read-back’s head folder looks empty; the guard isn’t reading it.");
 
         foreach (var file in files)
         {

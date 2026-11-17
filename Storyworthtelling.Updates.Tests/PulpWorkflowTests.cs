@@ -69,7 +69,7 @@ public class PulpWorkflowTests
         foreach (var font in fonts)
         {
             Assert.True(step.Contains(font!, StringComparison.Ordinal),
-                $"build-pulp.yml's FONT CHECK does not name {font}.ttf.");
+                $"build-pulp.yml’s FONT CHECK doesn’t name {font}.ttf.");
         }
     }
 
@@ -87,7 +87,7 @@ public class PulpWorkflowTests
     private static string Workflow()
     {
         var path = RepoFile(".github/workflows/build-pulp.yml");
-        Assert.True(File.Exists(path), "build-pulp.yml does not exist, so Pulp is built and checked by nothing.");
+        Assert.True(File.Exists(path), "build-pulp.yml doesn’t exist, so Pulp is built and checked by nothing.");
         return File.ReadAllText(path);
     }
 

@@ -23,7 +23,7 @@ public class HouseholdTrailTests
         rig.Drive.Failure = null;
         rig.Drive.Content = theirs.SealedFile(RecipeData.Document([RecipeData.Chili()]), "some-other-passphrase");
         await rig.Service.SyncAsync(CancellationToken.None);
-        rig.Drive.Content = "this is not an envelope";
+        rig.Drive.Content = "this isn’t an envelope";
         await rig.Service.SyncAsync(CancellationToken.None);
         rig.HeldPassphrase = string.Empty;
         await rig.Service.SyncAsync(CancellationToken.None);

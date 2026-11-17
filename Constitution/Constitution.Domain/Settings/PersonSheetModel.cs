@@ -78,8 +78,8 @@ public sealed record PersonSheetModel(
     {
         PersonProblem.NameMissing => "Give them a name.",
         PersonProblem.NameTooLong => $"A name can be at most {RosterPerson.MaxNameLength} characters.",
-        PersonProblem.ChildOnPickup => "A child is never on pickup; pickup is an adult's.",
-        PersonProblem.AddressShape => "That is not an address: it needs one @ with something on each side and no spaces.",
+        PersonProblem.ChildOnPickup => "A child is never on pickup; pickup is an adult’s.",
+        PersonProblem.AddressShape => "That isn’t an address: it needs one @ with something on each side and no spaces.",
         PersonProblem.NotOnTheRoster => RosterRemoval.NotOnTheRosterSentence,
         _ => throw new ArgumentOutOfRangeException(nameof(problem), problem, "That problem has no words yet."),
     };

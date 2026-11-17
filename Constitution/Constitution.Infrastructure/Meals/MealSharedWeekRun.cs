@@ -30,9 +30,9 @@ public sealed record MealSharedSeams(IWeekPlanSource Plans, IRecipeBoxSource Rec
 /// </summary>
 public static class MealSharedWeekRun
 {
-    public const string FileSentence = "The household file cannot be read, so no week from the other phone was used.";
-    public const string BoxSentence = "The recipe box cannot be read now, so nothing from the other phone's week was sent.";
-    public const string TasteSentence = "The taste profile is there and cannot be read, so nothing from the other phone's week was sent.";
+    public const string FileSentence = "The household file can’t be read, so no week from the other phone was used.";
+    public const string BoxSentence = "The recipe box can’t be read now, so nothing from the other phone’s week was sent.";
+    public const string TasteSentence = "The taste profile is there and can’t be read, so nothing from the other phone’s week was sent.";
 
     public static async Task<MealRecipesOutcome> RunAsync(MealWeekRequestInputs inputs, MealSharedSeams seams, CancellationToken cancellation)
     {

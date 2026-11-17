@@ -133,18 +133,18 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
         }
         catch (ActivityNotFoundException)
         {
-            PostDiagnostics.LogInfo("Rolodex", "Card read refused: Plate's reading screen is not installed");
+            PostDiagnostics.LogInfo("Rolodex", "Card read refused: Plate’s reading screen is not installed");
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
-                "Plate is not on this phone yet.",
-                "Reading a business card is Plate's job, and Post does not have a camera of its own.",
+                "Plate isn’t on this phone yet.",
+                "Reading a business card is Plate’s job, and Post doesn’t have a camera of its own.",
                 PaperTheme.CautionMark));
         }
         catch (Java.Lang.SecurityException)
         {
-            PostDiagnostics.LogInfo("Rolodex", "Card read refused: Post does not hold Plate's reading permission");
+            PostDiagnostics.LogInfo("Rolodex", "Card read refused: Post does not hold Plate’s reading permission");
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
-                "Plate would not read a card for Post.",
-                "Post is missing Plate's reading permission. Updating both apps puts it back.",
+                "Plate wouldn’t read a card for Post.",
+                "Post is missing Plate’s reading permission. Updating both apps puts it back.",
                 PaperTheme.ProblemMark));
         }
     }
@@ -180,8 +180,8 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
         {
             PostDiagnostics.LogWarning("Rolodex", "Could not save the card Plate read as a contact", e);
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Rolodex, new DogEar.Notice(
-                "Couldn't save that card.",
-                "Plate read it, but the phone would not add the contact.",
+                "Couldn’t save that card.",
+                "Plate read it, but the phone wouldn’t add the contact.",
                 PaperTheme.ProblemMark));
         }
     }
@@ -201,7 +201,7 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
             new CardAction(
                 "Take them in Plate",
                 OpenPlateForPhotos,
-                Detail: "For the ones Google does not have."),
+                Detail: "For the ones Google doesn’t have."),
             new CardAction(
                 "Not now",
                 () => { },
@@ -222,8 +222,8 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
         {
             PostDiagnostics.LogWarning("Rolodex", "Could not open the account sync settings", e);
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Photos, new DogEar.Notice(
-                "Post could not open your account settings.",
-                "Contact photos come down with your Google account. The phone would not open "
+                "Post couldn’t open your account settings.",
+                "Contact photos come down with your Google account. The phone wouldn’t open "
                 + "the screen that starts that sync.",
                 PaperTheme.ProblemMark));
         }
@@ -238,9 +238,9 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
         if (plate is null)
         {
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Photos, new DogEar.Notice(
-                "Plate is not on this phone yet.",
-                "Taking a face for a contact is Plate's job, and Post does not have a camera "
-                + "of its own. Google's copies are the other route.",
+                "Plate isn’t on this phone yet.",
+                "Taking a face for a contact is Plate’s job, and Post doesn’t have a camera "
+                + "of its own. Google’s copies are the other route.",
                 PaperTheme.CautionMark));
             return;
         }
@@ -293,7 +293,7 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
             actions.Add(new CardAction(
                 "Take their photo in Plate",
                 () => TakePhotoFor(person),
-                Detail: "Sets what Plate takes as this contact's photo."));
+                Detail: "Sets what Plate takes as this contact’s photo."));
         }
 
         if (actions.Count == 0)
@@ -330,9 +330,9 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
             is null)
         {
             DogEar.SetNotice(Host, Overlay, NoticeKeys.Photos, new DogEar.Notice(
-                "Plate is not on this phone yet.",
-                "Taking a face for a contact is Plate's job, and Post does not have a camera "
-                + "of its own. Google's copies are the other route.",
+                "Plate isn’t on this phone yet.",
+                "Taking a face for a contact is Plate’s job, and Post doesn’t have a camera "
+                + "of its own. Google’s copies are the other route.",
                 PaperTheme.CautionMark));
             return;
         }
@@ -379,8 +379,8 @@ public sealed class RolodexArea(Activity host) : PostArea(host)
             else
             {
                 DogEar.SetNotice(Host, Overlay, NoticeKeys.Photos, new DogEar.Notice(
-                    "Couldn't set that as their photo.",
-                    "The picture came back from Plate but Post could not write it to the contact.",
+                    "Couldn’t set that as their photo.",
+                    "The picture came back from Plate but Post couldn’t write it to the contact.",
                     PaperTheme.ProblemMark));
             }
         }

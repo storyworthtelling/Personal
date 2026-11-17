@@ -169,7 +169,7 @@ public class VoicedLineServiceTests : IDisposable
 
         Assert.NotNull(sent);
         Assert.Contains("NOT finished", sent!.Context);
-        Assert.Contains("Do not say or imply", sent.Context);
+        Assert.Contains("Don’t say or imply", sent.Context);
     }
 
     [Fact]

@@ -319,7 +319,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             {
                 // The type only, never the message; the failure rides in the report with its stack.
                 prepared = new KeepSharePrepared.Settled(new KeepShareReport(
-                    KeepShareOutcome.ListNotBuilt, "The list could not be built just now (" + e.GetType().Name + "), so it was not sent.") { Failure = e });
+                    KeepShareOutcome.ListNotBuilt, "The list couldn’t be built just now (" + e.GetType().Name + "), so it wasn’t sent.") { Failure = e });
             }
 
             Host.RunOnUiThread(() => ShareDone(prepared));
@@ -386,7 +386,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
             {
                 // The type only, never the message: the page keeps what it had, or says the box cannot be read.
-                result = read ?? new RecipeBoxRead.Unavailable("The recipe box could not be read just now (" + e.GetType().Name + ").");
+                result = read ?? new RecipeBoxRead.Unavailable("The recipe box couldn’t be read just now (" + e.GetType().Name + ").");
             }
 
             Host.RunOnUiThread(() => Adopt(result, week, number));
@@ -402,7 +402,7 @@ public sealed class MealsArea : ConstitutionAreaBase, IUndoableArea
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             // The type only, never the message: the page keeps the week it had, or says it cannot be read.
-            return weekRead ?? new MealWeekScreenRead.Unavailable("The week could not be read just now (" + e.GetType().Name + ").");
+            return weekRead ?? new MealWeekScreenRead.Unavailable("The week couldn’t be read just now (" + e.GetType().Name + ").");
         }
     }
 

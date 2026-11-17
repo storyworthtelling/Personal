@@ -19,7 +19,7 @@ public class DogEarStateTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 6, 7, 30, 0, TimeSpan.Zero);
 
-    private static DogEarNotice Notice(string headline = "Mail didn't send") =>
+    private static DogEarNotice Notice(string headline = "Mail didn’t send") =>
         new(headline, "Gmail refused the message", DogEarHue.Problem);
 
     [Fact]
@@ -37,7 +37,7 @@ public class DogEarStateTests
         var fold = state.Fold(Now);
 
         Assert.NotNull(fold);
-        Assert.Equal("Mail didn't send", fold!.Headline);
+        Assert.Equal("Mail didn’t send", fold!.Headline);
         Assert.False(fold.ShowsBackArrow);
         Assert.Null(fold.Expires);
     }
@@ -51,7 +51,7 @@ public class DogEarStateTests
     public void OneOwnerWithdrawingItsNoticeLeavesEveryoneElsesAlone()
     {
         var state = new DogEarState();
-        state.SetNotice("mail", Notice("Mail didn't send"));
+        state.SetNotice("mail", Notice("Mail didn’t send"));
         state.SetNotice("sync", Notice("Calendar is out of date"));
 
         state.SetNotice("mail", null);
@@ -67,7 +67,7 @@ public class DogEarStateTests
     public void TheCornerNamesTheNewestNoticeAndNeverCountsThem()
     {
         var state = new DogEarState();
-        state.SetNotice("mail", Notice("Mail didn't send"));
+        state.SetNotice("mail", Notice("Mail didn’t send"));
         state.SetNotice("sync", Notice("Calendar is out of date"));
 
         var fold = state.Fold(Now)!;
@@ -101,7 +101,7 @@ public class DogEarStateTests
 
         var after = state.Fold(Now + TimeSpan.FromSeconds(9))!;
 
-        Assert.Equal("Mail didn't send", after.Headline);
+        Assert.Equal("Mail didn’t send", after.Headline);
         Assert.False(after.ShowsBackArrow);
     }
 
@@ -142,7 +142,7 @@ public class DogEarStateTests
         state.SetNotice("mail", Notice());
 
         Assert.False(state.Turn(Now));
-        Assert.Equal("Mail didn't send", state.Fold(Now)!.Headline);
+        Assert.Equal("Mail didn’t send", state.Fold(Now)!.Headline);
     }
 
     /// <summary>A new act replaces a fold still showing: one at a time.</summary>

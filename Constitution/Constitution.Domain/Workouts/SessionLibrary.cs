@@ -64,7 +64,7 @@ internal static class SessionLibrary
     private static readonly Exercise[] MobilityOnMat =
     [
         new("Cat and cow", EquipmentCatalogue.MatId),
-        new("Child's pose", EquipmentCatalogue.MatId),
+        new("Child’s pose", EquipmentCatalogue.MatId),
         new("Hip flexor stretch", EquipmentCatalogue.MatId),
         new("Seated hamstring stretch", EquipmentCatalogue.MatId),
         new("Lying spine twist", EquipmentCatalogue.MatId),

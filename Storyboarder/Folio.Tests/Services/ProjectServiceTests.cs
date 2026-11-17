@@ -287,7 +287,7 @@ public class ProjectServiceTests : IDisposable
     {
         var story = BookAnalysisResult.Empty with
         {
-            Logline = "A hero's tale",
+            Logline = "A hero’s tale",
             PlotHoles = [new ReportFinding("Chapter 1", "The gate opens unexplained")]
         };
         var craft = new CraftReport([new LineEdit("Chapter 1", "He felt cold.", "The cold came.", "Filtered.")], [], [], []);
@@ -297,7 +297,7 @@ public class ProjectServiceTests : IDisposable
         var report = await NewService().GetReportAsync(novelId, CancellationToken.None);
 
         Assert.NotNull(report);
-        Assert.Equal("A hero's tale", report!.Logline);
+        Assert.Equal("A hero’s tale", report!.Logline);
         Assert.Single(report.PlotHoles);
         Assert.Single(report.LineEdits);   // craft half folded in
     }

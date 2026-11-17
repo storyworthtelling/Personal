@@ -294,7 +294,7 @@ public class MealDocumentsStepTests
     public async Task AnUnreadableRosterStopsBeforeAnythingIsTouched()
     {
         var rig = new DocsRig();
-        rig.Roster.Answer = new MealRosterRead.Unavailable("The household file cannot be opened.");
+        rig.Roster.Answer = new MealRosterRead.Unavailable("The household file can’t be opened.");
 
         var result = await MealDocumentsStep.RunAsync(rig.Request(), rig.Seams, CancellationToken.None);
 
@@ -308,7 +308,7 @@ public class MealDocumentsStepTests
     public async Task AnUnreadablePantryStopsBeforeAnythingIsTouched()
     {
         var rig = new DocsRig();
-        rig.Pantry.Answer = new MealPantryRead.Unreadable("The pantry cannot be read.");
+        rig.Pantry.Answer = new MealPantryRead.Unreadable("The pantry can’t be read.");
 
         var result = await MealDocumentsStep.RunAsync(rig.Request(), rig.Seams, CancellationToken.None);
 

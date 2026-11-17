@@ -90,7 +90,7 @@ public class MarkSourceTests
     public void ACurlyApostropheOnThePageMatchesAStraightOneInTheExcerpt()
     {
         const string typed = "It was her brother\u2019s coat, and she knew it.";
-        var analysis = With(lineEdits: [new LineEdit("Ch. 1", "her brother's coat", "x", "y")]);
+        var analysis = With(lineEdits: [new LineEdit("Ch. 1", "her brother’s coat", "x", "y")]);
 
         Assert.Single(MarkSource.From(typed, analysis));
     }
@@ -246,7 +246,7 @@ public class MarkSourceTests
     {
         var analysis = With(
             lineEdits: [new LineEdit("Ch. 1", "Ruth came back to Saltings in the spring.", "x", "y")],
-            plan: [new RevisionItem("Must", "Ch. 1-3", "The opening does not commit", "x")]);
+            plan: [new RevisionItem("Must", "Ch. 1-3", "The opening doesn’t commit", "x")]);
 
         Assert.Equal(ReadinessTier.Must, Assert.Single(MarkSource.From(Manuscript, analysis)).Severity);
     }

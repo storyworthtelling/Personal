@@ -36,7 +36,7 @@ namespace Pulp.Library;
 public class RecentlyWatchedActivity : Activity
 {
     private const string PageTitle = "Recently watched";
-    private const string Loading = "Reading what you've watched…";
+    private const string Loading = "Reading what you’ve watched…";
 
     private readonly CancellationTokenSource lifetime = new();
     private PulpServices services = null!;
@@ -111,7 +111,7 @@ public class RecentlyWatchedActivity : Activity
             catch (Exception exception)
             {
                 services.Diagnostics.Warn("recently-watched", "Recently watched could not be read.", exception);
-                RunOnUiThread(() => ShowStatus("Recently watched couldn't be read just now."));
+                RunOnUiThread(() => ShowStatus("Recently watched couldn’t be read just now."));
             }
         }, token);
     }

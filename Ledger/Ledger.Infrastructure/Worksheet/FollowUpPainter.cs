@@ -57,8 +57,8 @@ public static class FollowUpPainter
             var count = plan.ResendLines.Count;
             canvas.DrawText(
                 count == 1
-                    ? "A limit on the worksheet couldn't be read, so it's asked again here."
-                    : $"{count} limits on the worksheet couldn't be read, so they're asked again here.",
+                    ? "A limit on the worksheet couldn’t be read, so it’s asked again here."
+                    : $"{count} limits on the worksheet couldn’t be read, so they’re asked again here.",
                 left, introY, bodyFont, softPaint);
             canvas.DrawText(
                 count == 1 ? "Write it again in its box below." : "Write each one again in its box below.",
@@ -68,10 +68,10 @@ public static class FollowUpPainter
         else if (plan.IsOver)
         {
             canvas.DrawText(
-                $"What we wrote comes to {PlanMoney.Whole(plan.WrittenTotalWholeDollars)}, and there's {PlanMoney.Whole(plan.TargetWholeDollars)} to give a job.",
+                $"What we wrote comes to {PlanMoney.Whole(plan.WrittenTotalWholeDollars)}, and there’s {PlanMoney.Whole(plan.TargetWholeDollars)} to give a job.",
                 left, introY, bodyFont, softPaint);
             canvas.DrawText(
-                $"These are the lines furthest above {previousMonth}'s spending, brought back until it balances.",
+                $"These are the lines furthest above {previousMonth}’s spending, brought back until it balances.",
                 left, introY + 15f, bodyFont, softPaint);
             canvas.DrawText(
                 plan.HasResend
@@ -82,10 +82,10 @@ public static class FollowUpPainter
         else if (plan.RemainderGoesToExtraPayment)
         {
             canvas.DrawText(
-                $"What we wrote comes to {PlanMoney.Whole(plan.WrittenTotalWholeDollars)}, and there's {PlanMoney.Whole(plan.TargetWholeDollars)} to give a job,",
+                $"What we wrote comes to {PlanMoney.Whole(plan.WrittenTotalWholeDollars)}, and there’s {PlanMoney.Whole(plan.TargetWholeDollars)} to give a job,",
                 left, introY, bodyFont, softPaint);
             canvas.DrawText(
-                $"so {PlanMoney.Whole(plan.DifferenceWholeDollars)} has none yet. It's suggested for the Snowball's focus.",
+                $"so {PlanMoney.Whole(plan.DifferenceWholeDollars)} has none yet. It’s suggested for the Snowball’s focus.",
                 left, introY + 15f, bodyFont, softPaint);
             canvas.DrawText(
                 plan.HasResend
@@ -98,10 +98,10 @@ public static class FollowUpPainter
             // No Snowball loan, so no extra payment line to suggest the remainder for (D156 names no
             // other home for it): say so plainly rather than promising a suggestion the page does not make.
             canvas.DrawText(
-                $"What we wrote comes to {PlanMoney.Whole(plan.WrittenTotalWholeDollars)}, and there's {PlanMoney.Whole(plan.TargetWholeDollars)} to give a job,",
+                $"What we wrote comes to {PlanMoney.Whole(plan.WrittenTotalWholeDollars)}, and there’s {PlanMoney.Whole(plan.TargetWholeDollars)} to give a job,",
                 left, introY, bodyFont, softPaint);
             canvas.DrawText(
-                $"so {PlanMoney.Whole(plan.DifferenceWholeDollars)} has none yet. There's no suggestion for it:",
+                $"so {PlanMoney.Whole(plan.DifferenceWholeDollars)} has none yet. There’s no suggestion for it:",
                 left, introY + 15f, bodyFont, softPaint);
             canvas.DrawText(
                 "put it on a line below, or on one of the rows above.",
@@ -205,10 +205,10 @@ public static class FollowUpPainter
         }
 
         var footerSentence = plan.IsResendOnly
-            ? "If a limit still can't be read, another page like this comes tomorrow."
+            ? "If a limit still can’t be read, another page like this comes tomorrow."
             : plan.HasResend
-                ? $"If the final figures still don't come to {PlanMoney.Whole(plan.TargetWholeDollars)}, or a limit can't be read, another page like this comes tomorrow."
-                : $"If the final figures still don't come to {PlanMoney.Whole(plan.TargetWholeDollars)}, another page like this comes tomorrow.";
+                ? $"If the final figures still don’t come to {PlanMoney.Whole(plan.TargetWholeDollars)}, or a limit can’t be read, another page like this comes tomorrow."
+                : $"If the final figures still don’t come to {PlanMoney.Whole(plan.TargetWholeDollars)}, another page like this comes tomorrow.";
         canvas.DrawText(footerSentence, left, layout.FooterSentenceBaseline, secondaryFont, softPaint);
 
     }

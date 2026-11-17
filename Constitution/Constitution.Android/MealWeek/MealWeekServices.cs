@@ -349,6 +349,6 @@ public static class MealWeekServices
 
     private static string NoBackupRoot(Context context) =>
         context.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly meal run's records in.");
+            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly meal run’s records in.");
 
 }

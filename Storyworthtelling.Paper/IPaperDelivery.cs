@@ -112,5 +112,5 @@ public sealed class PaperDelivery : IPaperDelivery
 
     private static T Require<T>(T? transport) where T : class =>
         transport ?? throw new InvalidOperationException(
-            $"{typeof(T).Name} is not wired on this head; guard with the capability flag before calling.");
+            $"{typeof(T).Name} isn’t wired on this head; guard with the capability flag before calling.");
 }

@@ -32,7 +32,7 @@ public class DogEarNativeTests
         {
             Assert.True(
                 Regex.IsMatch(native, $@"public static Color {name}\s*=>"),
-                $"The kit's DogEarHue.{name} has no DogEar.Hues.{name} natively.");
+                $"The kit’s DogEarHue.{name} has no DogEar.Hues.{name} natively.");
         }
     }
 

@@ -29,7 +29,7 @@ public class DogEarGeometryTests
     {
         // <path d="M0 0 L40 40 L6 34 Z"> — the tip is NOT the foot of the fold (0,40): it lifts off.
         var flap = Regex.Match(Ear(), @"d=""M0 0 L40 40 L(?<x>[\d.]+) (?<y>[\d.]+) Z""");
-        Assert.True(flap.Success, "The mockup's flap path is no longer 'M0 0 L40 40 L<x> <y> Z'.");
+        Assert.True(flap.Success, "The mockup’s flap path is no longer 'M0 0 L40 40 L<x> <y> Z'.");
 
         Assert.Equal(Number(flap.Groups["x"]), DogEarGeometry.FlapTip.X, Tolerance);
         Assert.Equal(Number(flap.Groups["y"]), DogEarGeometry.FlapTip.Y, Tolerance);
@@ -41,7 +41,7 @@ public class DogEarGeometryTests
         // d="M35.5 13.5a5.2 5.2 0 1 1-2.2-6.9": start, radius, large-arc 1, sweep 1, relative end.
         var arc = Regex.Match(
             Ear(), @"d=""M(?<x>[\d.]+) (?<y>[\d.]+)a(?<r>[\d.]+) [\d.]+ 0 1 1(?<dx>-?[\d.]+)(?<dy>-?[\d.]+)""");
-        Assert.True(arc.Success, "The mockup's arrow arc is no longer 'M<x> <y>a<r> <r> 0 1 1<dx><dy>'.");
+        Assert.True(arc.Success, "The mockup’s arrow arc is no longer 'M<x> <y>a<r> <r> 0 1 1<dx><dy>'.");
         var start = (X: Number(arc.Groups["x"]), Y: Number(arc.Groups["y"]));
         var end = (X: start.X + Number(arc.Groups["dx"]), Y: start.Y + Number(arc.Groups["dy"]));
         var radius = Number(arc.Groups["r"]);
@@ -70,8 +70,8 @@ public class DogEarGeometryTests
         // large-arc-flag 1: more than half a turn; sweep-flag 1: clockwise on a y-down screen, so the
         // arc passes the bottom and the left of its circle and opens at the upper right.
         Assert.InRange(DogEarGeometry.ArrowSweepDegrees, 180.0, 359.0);
-        Assert.True(points.Min(p => p.X) < center.X - DogEarGeometry.ArrowRadius + 0.05, "The arc never reaches the circle's left.");
-        Assert.True(points.Max(p => p.Y) > center.Y + DogEarGeometry.ArrowRadius - 0.05, "The arc never reaches the circle's bottom.");
+        Assert.True(points.Min(p => p.X) < center.X - DogEarGeometry.ArrowRadius + 0.05, "The arc never reaches the circle’s left.");
+        Assert.True(points.Max(p => p.Y) > center.Y + DogEarGeometry.ArrowRadius - 0.05, "The arc never reaches the circle’s bottom.");
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class DogEarGeometryTests
         // d="M31 4.2l2.6 2.4-2.9 2": a start and two relative steps.
         var head = Regex.Match(
             Ear(), @"d=""M(?<x>[\d.]+) (?<y>[\d.]+)l(?<a>[\d.]+) (?<b>[\d.]+)(?<c>-?[\d.]+) (?<d>-?[\d.]+)""");
-        Assert.True(head.Success, "The mockup's arrow head is no longer 'M<x> <y>l<a> <b><c> <d>'.");
+        Assert.True(head.Success, "The mockup’s arrow head is no longer 'M<x> <y>l<a> <b><c> <d>'.");
         var p0 = (X: Number(head.Groups["x"]), Y: Number(head.Groups["y"]));
         var p1 = (X: p0.X + Number(head.Groups["a"]), Y: p0.Y + Number(head.Groups["b"]));
         var p2 = (X: p1.X + Number(head.Groups["c"]), Y: p1.Y + Number(head.Groups["d"]));

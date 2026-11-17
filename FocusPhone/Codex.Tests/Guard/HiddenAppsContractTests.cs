@@ -32,7 +32,7 @@ public class HiddenAppsContractTests
         Assert.Equal("com.storyworthtelling.pulp", PolicyContext.PulpPackage);
         var identity = File.ReadAllText(Path.Combine(RepoRoot(), "Pulp", "Pulp.Domain", "PulpIdentity.cs"));
         var declared = Regex.Match(identity, @"public const string ApplicationId = ""([^""]*)""");
-        Assert.True(declared.Success, "PulpIdentity.ApplicationId was not found.");
+        Assert.True(declared.Success, "PulpIdentity.ApplicationId wasn’t found.");
         Assert.Equal(declared.Groups[1].Value, PolicyContext.PulpPackage);
     }
 

@@ -14,12 +14,12 @@ public static class CalendarErrors
     /// <summary>The sentence for a status Google answered with.</summary>
     public static string Reason(HttpStatusCode status) => status switch
     {
-        HttpStatusCode.Unauthorized => "Google did not accept the sign-in for a calendar.",
+        HttpStatusCode.Unauthorized => "Google didn’t accept the sign-in for a calendar.",
         HttpStatusCode.Forbidden => "Google refused access to a calendar; it may not be shared.",
-        HttpStatusCode.NotFound => "A calendar was not found; it may not be shared.",
+        HttpStatusCode.NotFound => "A calendar wasn’t found; it may not be shared.",
         HttpStatusCode.Gone => "A calendar or event is gone.",
         HttpStatusCode.TooManyRequests => "Google asked Constitution to slow down.",
-        >= HttpStatusCode.InternalServerError => "Google could not answer.",
+        >= HttpStatusCode.InternalServerError => "Google couldn’t answer.",
         _ => "Google answered with an error.",
     };
 
@@ -51,11 +51,11 @@ public static class CalendarErrors
                     : Reason(google.HttpStatusCode);
                 return true;
             case HttpRequestException:
-                reason = "A calendar could not be reached.";
+                reason = "A calendar couldn’t be reached.";
                 return true;
             case TaskCanceledException when !cancellation.IsCancellationRequested:
                 // Not cancelled by the caller: the client's own timeout fired.
-                reason = "A calendar did not answer in time.";
+                reason = "A calendar didn’t answer in time.";
                 return true;
             default:
                 reason = string.Empty;

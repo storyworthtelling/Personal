@@ -31,7 +31,7 @@ public class MorningOutcomeTests
             .Delivered(MorningDocument.Prayer);
 
         Assert.True(outcome.AnyFailed);
-        Assert.Equal("The Day did not arrive (no network). Delivered: the brief (puzzle only), prayer", outcome.Summary());
+        Assert.Equal("The Day didn’t arrive (no network). Delivered: the brief (puzzle only), prayer", outcome.Summary());
     }
 
     [Fact]

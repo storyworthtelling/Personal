@@ -20,7 +20,7 @@ public class ConnectionFailureTests
 
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, failure, callerCancelled: false);
 
-        Assert.Equal("The tablet did not accept that code (BadRequest).", sentence);
+        Assert.Equal("The tablet didn’t accept that code (BadRequest).", sentence);
     }
 
     [Fact]
@@ -30,8 +30,8 @@ public class ConnectionFailureTests
 
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, failure, callerCancelled: false);
 
-        Assert.Contains("could not be reached", sentence, StringComparison.Ordinal);
-        Assert.DoesNotContain("did not accept", sentence, StringComparison.Ordinal);
+        Assert.Contains("couldn’t be reached", sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("didn’t accept", sentence, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -67,7 +67,7 @@ public class ConnectionFailureTests
 
         var sentence = ConnectionFailure.Sentence(ConnectionAct.PairRemarkable, failure, callerCancelled: false);
 
-        Assert.Contains("could not read", sentence, StringComparison.Ordinal);
+        Assert.Contains("couldn’t read", sentence, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class ConnectionFailureTests
         var sentence = ConnectionFailure.Sentence(
             ConnectionAct.SignIn, new InvalidOperationException("Account selection was cancelled."), callerCancelled: false);
 
-        Assert.Equal("Sign-in did not complete. Account selection was cancelled.", sentence);
+        Assert.Equal("Sign-in didn’t complete. Account selection was cancelled.", sentence);
     }
 
     [Fact]

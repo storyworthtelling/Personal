@@ -92,7 +92,7 @@ public class HouseholdGateSourceTests
     private static void AssertGateComesFirst(string source, string method, string firstRealWork)
     {
         var start = source.IndexOf(method, StringComparison.Ordinal);
-        Assert.True(start >= 0, $"{method} was not found.");
+        Assert.True(start >= 0, $"{method} wasn’t found.");
         var gate = source.IndexOf("InstallRoleGate.MayRunPlaidWork(roles.Current)", start, StringComparison.Ordinal);
         var work = source.IndexOf(firstRealWork, start, StringComparison.Ordinal);
         Assert.True(gate >= 0 && gate < work, $"{method} does real work before asking whether this install may.");
@@ -107,7 +107,7 @@ public class HouseholdGateSourceTests
 
         var gate = worker.IndexOf("InstallRoleGate.MayRunPlaidWork(", StringComparison.Ordinal);
         var configured = worker.IndexOf("SettingsStore.IsConfigured", StringComparison.Ordinal);
-        Assert.True(gate >= 0, $"{path} does not consult the role before doing Plaid work.");
+        Assert.True(gate >= 0, $"{path} doesn’t consult the role before doing Plaid work.");
         Assert.True(gate < configured, $"{path} checks the role only after it has started on the credentials.");
     }
 

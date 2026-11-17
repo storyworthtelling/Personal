@@ -41,13 +41,13 @@ public class VoiceClientTests
     public async Task ComposeAsync_WritesTheMessage_UsingTheFastModelAndTheKey()
     {
         var handler = new FakeHttpMessageHandler().EnqueueOk(
-            MessageResponse("At last — the gate is open. Let's begin."));
+            MessageResponse("At last — the gate is open. Let’s begin."));
 
         var message = await Client(handler).ComposeAsync(
             Learned("Wry and warm.", "At last, the gate."),
             new MessageRequest("welcome", "returning user"), CancellationToken.None);
 
-        Assert.Equal("At last — the gate is open. Let's begin.", message);
+        Assert.Equal("At last — the gate is open. Let’s begin.", message);
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal("https://api.anthropic.com/v1/messages", request.RequestUri!.ToString());
@@ -80,7 +80,7 @@ public class VoiceClientTests
 
         var book = Guid.NewGuid();
         var updated = await Client(handler).RefineAsync(
-            VoiceProfile.Empty, "A sample of the owner's writing.", book, CancellationToken.None);
+            VoiceProfile.Empty, "A sample of the owner’s writing.", book, CancellationToken.None);
 
         Assert.Equal("Wry, warm, economical.", updated.Register);
         Assert.Equal(["wry", "warm"], updated.Traits);
@@ -168,7 +168,7 @@ public class VoiceClientTests
     {
         // A garbled reply must never corrupt a good profile — the safe outcome is "no change".
         var existing = Learned("Wry and warm.", "At last.") with { DocumentsAnalyzed = 3 };
-        var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse("sorry, I can't do that"));
+        var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse("sorry, I can’t do that"));
 
         var updated = await Client(handler).RefineAsync(existing, "doc", Guid.NewGuid(), CancellationToken.None);
 

@@ -26,9 +26,9 @@ public static class ScanSendWords
     public static string NotSent(ScanSendProblem problem, string? reason) => problem switch
     {
         ScanSendProblem.NoNetwork =>
-            "Saved to Documents. There's no network, so it hasn't gone to the reMarkable — send it again once you're back online.",
-        ScanSendProblem.TooLarge => $"Saved to Documents. It can't go to the reMarkable: {reason}.",
-        ScanSendProblem.TabletRefused => $"Saved to Documents. The reMarkable didn't take it: {reason}.",
-        _ => "Saved to Documents. It didn't reach the reMarkable — send it again to try once more.",
+            "Saved to Documents. There’s no network, so it hasn’t gone to the reMarkable — send it again once you’re back online.",
+        ScanSendProblem.TooLarge => $"Saved to Documents. It can’t go to the reMarkable: {reason}.",
+        ScanSendProblem.TabletRefused => $"Saved to Documents. The reMarkable didn’t take it: {reason}.",
+        _ => "Saved to Documents. It didn’t reach the reMarkable — send it again to try once more.",
     };
 }

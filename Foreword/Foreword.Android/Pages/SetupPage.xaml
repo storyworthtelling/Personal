@@ -73,7 +73,7 @@
             <kit:SettingsGroup Title="Vault">
                 <VerticalStackLayout Padding="16,12,16,16" Spacing="8">
                     <Label Text="Vault passphrase" Style="{StaticResource CardRowTitle}" />
-                    <Label Text="The one secret that is not in the vault — set the same passphrase in every app and each restores its own keys. Shown in the clear on purpose, so it can be read back and copied."
+                    <Label Text="The one secret that isn’t in the vault — set the same passphrase in every app and each restores its own keys. Shown in the clear on purpose, so it can be read back and copied."
                            Style="{StaticResource CardRowDescription}" />
                     <!-- Shown in the clear, never a password field: it has to be read back into the
                          other apps, and Android blocks clipboard copy on a password-typed entry. -->
@@ -211,7 +211,7 @@
                         <Entry x:Name="HomePointEntry" Placeholder="Latitude, longitude" IsVisible="False"
                                TextChanged="OnHomePointChanged" Style="{StaticResource MonoEntry}" />
                         <Label x:Name="HomePointHint" IsVisible="False"
-                               Text="Google could not place that address, and the forecast needs a point."
+                               Text="Google couldn’t place that address, and the forecast needs a point."
                                Style="{StaticResource CardRowDescription}" />
                     </VerticalStackLayout>
                 </VerticalStackLayout>

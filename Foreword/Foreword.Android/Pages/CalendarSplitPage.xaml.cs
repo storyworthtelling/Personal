@@ -183,7 +183,7 @@ public partial class CalendarSplitPage : BinderPage
     private async Task RenderPreview()
     {
         Preview.Clear();
-        PreviewCaption.Text = "Reading today's events…";
+        PreviewCaption.Text = "Reading today’s events…";
 
         List<CalendarEvent> events;
         try
@@ -195,7 +195,7 @@ public partial class CalendarSplitPage : BinderPage
         }
         catch (Exception ex)
         {
-            PreviewCaption.Text = $"Could not read today's events — {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Calendar")}";
+            PreviewCaption.Text = $"Couldn’t read today’s events — {Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Calendar")}";
             return;
         }
 

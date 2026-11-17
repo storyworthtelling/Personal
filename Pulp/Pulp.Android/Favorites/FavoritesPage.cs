@@ -122,7 +122,7 @@ public sealed class FavoritesPage(Activity host, Func<FrameLayout> overlay, Chil
             }
             catch (Exception exception)
             {
-                services.Diagnostics.Warn("child", "A child's Favorites could not be read.", exception);
+                services.Diagnostics.Warn("child", "A child’s Favorites could not be read.", exception);
                 host.RunOnUiThread(() =>
                 {
                     unreadable = cells is null;

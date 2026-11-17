@@ -47,8 +47,8 @@ public class ReportIsReachableTests
             .ToList();
 
         Assert.True(openers.Count > 0,
-            "Nothing constructs BookPage, so the screen carrying the open-the-report action cannot "
-            + "be reached. A screen that no tap ends at is not a screen.");
+            "Nothing constructs BookPage, so the screen carrying the open-the-report action can’t "
+            + "be reached. A screen that no tap ends at isn’t a screen.");
     }
 
     /// <summary>The bar carries an open-the-report action, and it is wired to something.</summary>

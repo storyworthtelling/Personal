@@ -34,7 +34,7 @@ public sealed record ChildViewSession
         ArgumentNullException.ThrowIfNull(children);
         if (children.Count == 0)
         {
-            throw new ArgumentException("A child's view needs a child; with nobody picked there is nobody to be strict for.", nameof(children));
+            throw new ArgumentException("A child’s view needs a child; with nobody picked there is nobody to be strict for.", nameof(children));
         }
 
         if (!Enum.IsDefined(returnTo))

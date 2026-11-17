@@ -57,7 +57,7 @@ public class NoFaithContentTests
     [Theory]
     [InlineData("lentil soup tonight")]
     [InlineData("Strength at 5:30. Lentil soup tonight.")]
-    [InlineData("Soup weather is here. Friday is somebody else's kitchen.")]
+    [InlineData("Soup weather is here. Friday is somebody else’s kitchen.")]
     [InlineData("Sunday walk, then a rest day")]
     public void TheGuardLeavesPlainWordsAlone(string text)
     {

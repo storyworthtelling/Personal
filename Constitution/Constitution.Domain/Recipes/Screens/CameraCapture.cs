@@ -114,17 +114,17 @@ public enum CameraStep
 public static class CameraAccess
 {
     public const string AskingSentence =
-        "Asking to use the camera, only to photograph a recipe's pages. The photos are read for their words and are not kept.";
+        "Asking to use the camera, only to photograph a recipe’s pages. The photos are read for their words and aren’t kept.";
 
     public const string DeniedSentence =
-        "The camera was not allowed, so a card can't be photographed. You can still use " + RecipePickerText.TypeInTitle + ".";
+        "The camera wasn’t allowed, so a card can’t be photographed. You can still use " + RecipePickerText.TypeInTitle + ".";
 
     public const string NoCameraSentence =
-        "This phone has no camera, so a card can't be photographed. You can still use " + RecipePickerText.TypeInTitle + ".";
+        "This phone has no camera, so a card can’t be photographed. You can still use " + RecipePickerText.TypeInTitle + ".";
 
-    public const string CaptureFailedSentence = "The camera did not give back a photo, so the page was not added.";
+    public const string CaptureFailedSentence = "The camera didn’t give back a photo, so the page wasn’t added.";
 
-    public const string ReadFailedSentence = "That page could not be read on this phone, so it was not added.";
+    public const string ReadFailedSentence = "That page couldn’t be read on this phone, so it wasn’t added.";
 
     /// <summary>The step for a phone that has or lacks a camera and has or lacks the permission.</summary>
     public static CameraStep Decide(bool hasCamera, bool granted)

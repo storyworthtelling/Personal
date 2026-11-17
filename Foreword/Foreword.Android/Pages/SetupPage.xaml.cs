@@ -130,7 +130,7 @@ public partial class SetupPage : BinderPage
             .GetRequiredService<CalendarColumnMapper>().Owner;
         var email = CredentialStore.GoogleAccountEmail;
 
-        OwnerLabel.Text = $"{owner}'s";
+        OwnerLabel.Text = $"{owner}’s";
 
         InstallCaption.Text = string.IsNullOrEmpty(email)
             ? "Sign in to Google and this fills itself in."
@@ -500,7 +500,7 @@ public partial class SetupPage : BinderPage
         }
 
         // Said under the passphrase, where the backup is set up, not in an alert (audit W8.2b).
-        VaultProblemLabel.Text = result.NeedsAttention ? "The vault backup did not finish: " + result.Message : string.Empty;
+        VaultProblemLabel.Text = result.NeedsAttention ? "The vault backup didn’t finish: " + result.Message : string.Empty;
         VaultProblemLabel.IsVisible = result.NeedsAttention;
     }
 
@@ -565,7 +565,7 @@ public partial class SetupPage : BinderPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            GoogleStatusLabel.Text = "Could not start sign-in — no active window.";
+            GoogleStatusLabel.Text = "Couldn’t start sign-in — no active window.";
             return;
         }
 

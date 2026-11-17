@@ -55,7 +55,7 @@ public class InkReplyTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    [InlineData("I could not make out the page.")]
+    [InlineData("I couldn’t make out the page.")]
     [InlineData("{\"penStrokes\":\"seen\",\"targets\":")]
     [InlineData("[1,2,3]")]
     [InlineData("{\"penStrokes\":\"seen\"}")]

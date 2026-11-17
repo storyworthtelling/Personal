@@ -210,7 +210,7 @@ public partial class RotationEditPage : BinderPage
         }
         catch (Exception failure)
         {
-            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write("Foreword.Android.Pages.RotationEditPage", Microsoft.Extensions.Logging.LogLevel.Warning, "The list could not be deleted", failure);
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write("Foreword.Android.Pages.RotationEditPage", Microsoft.Extensions.Logging.LogLevel.Warning, "The list couldn’t be deleted", failure);
         }
     }
 

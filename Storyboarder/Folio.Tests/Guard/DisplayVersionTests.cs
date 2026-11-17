@@ -19,7 +19,7 @@ public class DisplayVersionTests
     private static string Workflow()
     {
         var path = Path.Combine(FolioInvariantsTests.RepoRoot(), ".github", "workflows", "build-storyboarder.yml");
-        Assert.True(File.Exists(path), $"The head's workflow is missing: {FolioInvariantsTests.Relative(path)}");
+        Assert.True(File.Exists(path), $"The head’s workflow is missing: {FolioInvariantsTests.Relative(path)}");
         return File.ReadAllText(path);
     }
 

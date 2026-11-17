@@ -15,7 +15,7 @@ public class PublicSuffixList
         const string resourceName = "Codex.Domain.Resources.public_suffix_list.dat";
         using var stream = assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException(
-                $"Embedded resource '{resourceName}' is missing from {assembly.GetName().Name}; the Public Suffix List snapshot was not packed into the build.");
+                $"Embedded resource '{resourceName}' is missing from {assembly.GetName().Name}; the Public Suffix List snapshot wasn’t packed into the build.");
         using var reader = new StreamReader(stream);
         return Parse(reader.ReadToEnd());
     });

@@ -59,7 +59,7 @@ public static class VoiceFactBuilder
         var lines = new List<string>
         {
             $"The title is {titleName}.",
-            "It was chosen from the owner's own taste.",
+            "It was chosen from the owner’s own taste.",
         };
 
         if (standing == ViewerStanding.DeviceOwner)
@@ -136,7 +136,7 @@ public static class VoiceFactBuilder
 
         var when = days == 1 ? "tomorrow" : $"in {NumberWords.Of(days)} days";
         return new VoiceFacts(VoiceSeat.StackUsedUp,
-            ["Everything in this week's stack has been seen.", $"The next stack arrives on Friday, {when}."], null);
+            ["Everything in this week’s stack has been seen.", $"The next stack arrives on Friday, {when}."], null);
     }
 
     internal static string PartOfDay(DateTimeOffset localNow) => localNow.Hour switch
@@ -153,8 +153,8 @@ public static class VoiceFactBuilder
         if (arrivedFriday > 0)
         {
             lines.Add(arrivedFriday == 1
-                ? "Friday's stack brought one new title."
-                : $"Friday's stack brought {NumberWords.Of(arrivedFriday)} new titles.");
+                ? "Friday’s stack brought one new title."
+                : $"Friday’s stack brought {NumberWords.Of(arrivedFriday)} new titles.");
         }
     }
 }

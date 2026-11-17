@@ -243,7 +243,7 @@ public partial class SetupPage : LedgerBinderPage
         catch (Exception ex)
         {
             // Drive being unreachable just means "can't tell right now", so the row stays hidden.
-            logger.LogWarning(ex, "Could not read the shared Claude key's presence from the vault.");
+            logger.LogWarning(ex, "Could not read the shared Claude key’s presence from the vault.");
             sharedKeyPresent = null;
         }
 
@@ -417,7 +417,7 @@ public partial class SetupPage : LedgerBinderPage
         if (result.NeedsAttention)
         {
             // Behind the fold, not an alert (audit W8.2b): settings still saved here, so this is a thing to know.
-            dogEarState.SetNotice(VaultBackupNotice, new DogEarNotice("The vault backup did not finish.", result.Message, DogEarHue.Problem));
+            dogEarState.SetNotice(VaultBackupNotice, new DogEarNotice("The vault backup didn’t finish.", result.Message, DogEarHue.Problem));
             dogEar.Refresh();
         }
     }
@@ -642,7 +642,7 @@ public partial class SetupPage : LedgerBinderPage
             var options = await voiceOptions.RefreshAsync(CancellationToken.None);
             claudeSet = !string.IsNullOrEmpty(options.ApiKey);
         }
-        catch { /* best-effort: Drive being unreachable just means "can't tell right now" */ }
+        catch { /* best-effort: Drive being unreachable just means "can’t tell right now" */ }
         sb.AppendLine($"  Claude (voice, set in Folio): {(claudeSet ? "Working" : "Not set.")}");
         sb.AppendLine();
 

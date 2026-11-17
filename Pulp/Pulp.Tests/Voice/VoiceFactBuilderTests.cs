@@ -41,15 +41,15 @@ public class VoiceFactBuilderTests
     {
         var facts = VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights", fromTheStack: true,
         [
-            new PastTitle(Ash, "Ash's Secret Show", Evening.AddDays(-1)),
-            new PastTitle(Pip, "Pip's Cartoon", Evening.AddHours(-2)),
+            new PastTitle(Ash, "Ash’s Secret Show", Evening.AddDays(-1)),
+            new PastTitle(Pip, "Pip’s Cartoon", Evening.AddHours(-2)),
             new PastTitle(Rowan, "Saltmarsh", Evening.AddDays(-12)),
         ]);
 
         var text = string.Join(" ", facts.Lines);
         Assert.Contains("Saltmarsh", text);
-        Assert.DoesNotContain("Ash's Secret Show", text);
-        Assert.DoesNotContain("Pip's Cartoon", text);
+        Assert.DoesNotContain("Ash’s Secret Show", text);
+        Assert.DoesNotContain("Pip’s Cartoon", text);
     }
 
     [Fact]
@@ -80,14 +80,14 @@ public class VoiceFactBuilderTests
     {
         var facts = VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights", fromTheStack: true, []);
 
-        Assert.Contains("It was chosen from the owner's own taste.", facts.Lines);
+        Assert.Contains("It was chosen from the owner’s own taste.", facts.Lines);
     }
 
     [Fact]
     public void WhyThisForAChildHasNoFactsSoTheLineIsHidden()
     {
         var facts = VoiceFactBuilder.WhyThis(Pip, ViewerStanding.Child, "Harbour Lights", fromTheStack: true,
-            [new PastTitle(Pip, "Pip's Cartoon", Evening.AddDays(-1))]);
+            [new PastTitle(Pip, "Pip’s Cartoon", Evening.AddDays(-1))]);
 
         Assert.False(facts.HasFacts);
         Assert.Equal(VoiceLineAction.Hide, VoiceLinePlan.Decide(facts, voiceReady: true, remembered: null, Evening, Today));
@@ -215,7 +215,7 @@ public class VoiceFactBuilderTests
             {
                 Assert.True(allowed.Contains(parameter.ParameterType),
                     $"ChildVoiceFacts.{method.Name} takes {parameter.ParameterType.Name} {parameter.Name}, "
-                    + "which a child's seat must never be told (D23, D41, D195).");
+                    + "which a child’s seat must never be told (D23, D41, D195).");
             }
         }
     }

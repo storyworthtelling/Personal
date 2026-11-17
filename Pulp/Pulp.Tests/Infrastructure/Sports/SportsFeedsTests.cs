@@ -165,7 +165,7 @@ public sealed class SportsFeedsTests : IDisposable
         var feeds = await Feeds().FollowedAsync([Follows(Gulls.Id)], refresh: true, CancellationToken.None);
 
         Assert.Equal([Coastal], feeds.Select(feed => feed.League.Id));
-        Assert.Contains(warnings, message => message.Contains("could not be read"));
+        Assert.Contains(warnings, message => message.Contains("couldn’t be read"));
         Assert.Contains("schedule:cfl-invented", source.Calls);
     }
 
@@ -191,7 +191,7 @@ public sealed class SportsFeedsTests : IDisposable
 
             Assert.Equal([Coastal], found.Select(feed => feed.League.Id));
             Assert.NotEmpty(browsed);
-            Assert.Contains(warnings, message => message.Contains("could not be saved"));
+            Assert.Contains(warnings, message => message.Contains("couldn’t be saved"));
         }
         finally
         {

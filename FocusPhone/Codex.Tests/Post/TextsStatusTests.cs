@@ -34,7 +34,7 @@ public class TextsStatusTests
         var text = Healthy().Render();
 
         Assert.Contains("RCS", text);
-        Assert.Contains("not the default SMS app", text);
+        Assert.Contains("isn’t the default SMS app", text);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class TextsStatusTests
         var text = (Healthy() with { BridgePaired = false, BridgeConnected = false, ListenerEnabled = false }).Render();
 
         Assert.Contains("Notification capture: off", text);
-        Assert.Contains("RCS messages cannot reach Post at all", text);
+        Assert.Contains("RCS messages can’t reach Post at all", text);
     }
 
     [Fact]
@@ -69,6 +69,6 @@ public class TextsStatusTests
         var text = (Healthy() with { HoldsSmsRole = false }).Render();
 
         Assert.Contains("Default SMS app: not Post", text);
-        Assert.DoesNotContain("not the default SMS app", text);
+        Assert.DoesNotContain("isn’t the default SMS app", text);
     }
 }

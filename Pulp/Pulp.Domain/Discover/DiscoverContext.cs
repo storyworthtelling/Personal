@@ -68,7 +68,7 @@ public sealed record DiscoverContext
             if (!roster.IsChild(child.Child))
             {
                 throw new ArgumentException(
-                    $"'{child.Child}' has a child's rules but the roster does not name them a child.", nameof(viewer));
+                    $"'{child.Child}' has a child’s rules but the roster doesn’t name them a child.", nameof(viewer));
             }
         }
 

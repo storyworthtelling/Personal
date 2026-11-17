@@ -142,7 +142,7 @@ public static class BodyBackupCodec
 
             if (group.Value.ValueKind != JsonValueKind.Array)
             {
-                throw Wrong("a signal's readings are not a list");
+                throw Wrong("a signal’s readings are not a list");
             }
 
             foreach (var entry in group.Value.EnumerateArray())
@@ -165,7 +165,7 @@ public static class BodyBackupCodec
                     throw Wrong("a reading has no usable value");
                 }
 
-                readings.Add(new BodyReading(signal, ReadDay(entryDay, "a reading's day"), value));
+                readings.Add(new BodyReading(signal, ReadDay(entryDay, "a reading’s day"), value));
             }
         }
 

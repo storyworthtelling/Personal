@@ -43,7 +43,7 @@ public class AteReplyTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    [InlineData("I'm not able to help with that.")]
+    [InlineData("I’m not able to help with that.")]
     [InlineData("{not json")]
     [InlineData("[1,2,3]")]
     [InlineData("{}")]

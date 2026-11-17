@@ -145,7 +145,7 @@ public class IndexHandoffContractTests
 
         var match = Regex.Match(
             source, $@"public const string {Regex.Escape(name)}\s*=\s*""([^""]*)""\s*;");
-        Assert.True(match.Success, $"Could not find IndexHandoff.{name}'s literal value in MoneyMail.cs.");
+        Assert.True(match.Success, $"Couldn’t find IndexHandoff.{name}’s literal value in MoneyMail.cs.");
         return match.Groups[1].Value;
     }
 

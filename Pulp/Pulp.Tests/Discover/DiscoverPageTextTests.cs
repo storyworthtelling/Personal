@@ -12,7 +12,7 @@ public class DiscoverPageTextTests
 {
     [Fact]
     public void TheStackLineIsMockupThrees() =>
-        Assert.Equal("This week's stack · until Friday", DiscoverPageText.StackStatus);
+        Assert.Equal("This week’s stack · until Friday", DiscoverPageText.StackStatus);
 
     [Fact]
     public void EveryKindOfNoIdeaReadsAsTheSameQuietSentence()

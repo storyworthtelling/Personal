@@ -100,9 +100,9 @@ public sealed class WorkoutWeekRunTests : IDisposable
     public async Task NoCalendarReadMeansNothingIsPlanned()
     {
         rig.Calendars.Snapshot = CalendarsWith(
-            sam: CalendarRead.Unreadable("Google would not answer."),
-            lee: CalendarRead.Unreadable("Google would not answer."),
-            family: CalendarRead.Unreadable("Google would not answer."));
+            sam: CalendarRead.Unreadable("Google wouldn’t answer."),
+            lee: CalendarRead.Unreadable("Google wouldn’t answer."),
+            family: CalendarRead.Unreadable("Google wouldn’t answer."));
 
         var outcome = await rig.Run.RunAsync(rig.Request(), CancellationToken.None);
 
@@ -120,7 +120,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
     [Fact]
     public async Task AFamilyCalendarThatCannotBeReadStopsEveryone()
     {
-        rig.Calendars.Snapshot = CalendarsWith(family: CalendarRead.Unreadable("The family calendar is not shared."));
+        rig.Calendars.Snapshot = CalendarsWith(family: CalendarRead.Unreadable("The family calendar isn’t shared."));
 
         var outcome = await rig.Run.RunAsync(rig.Request(), CancellationToken.None);
 
@@ -132,7 +132,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
     [Fact]
     public async Task OneAdultsCalendarUnreadablePlansTheOther()
     {
-        rig.Calendars.Snapshot = CalendarsWith(lee: CalendarRead.Unreadable("Lee has not shared a calendar."));
+        rig.Calendars.Snapshot = CalendarsWith(lee: CalendarRead.Unreadable("Lee hasn’t shared a calendar."));
 
         var report = await rig.PlannedAsync();
 
@@ -146,7 +146,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
     [Fact]
     public async Task AnUnreadableLedgerPlansNothing()
     {
-        rig.Learning.Held = WorkoutLearning.Nothing with { UnreadableBecause = "The skip record could not be read." };
+        rig.Learning.Held = WorkoutLearning.Nothing with { UnreadableBecause = "The skip record couldn’t be read." };
 
         var outcome = await rig.Run.RunAsync(rig.Request(), CancellationToken.None);
 
@@ -342,7 +342,7 @@ public sealed class WorkoutWeekRunTests : IDisposable
     {
         rig.BothAreEstablished();
         rig.AuthorWith(_ => WeekRig.PlanOfSessions(rig.Session(Sam, 0, 16, Cardio)));
-        rig.Conditions.Read = ConditionsRead.Unavailable("The forecast did not answer.");
+        rig.Conditions.Read = ConditionsRead.Unavailable("The forecast didn’t answer.");
 
         var report = await rig.PlannedAsync();
 

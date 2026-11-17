@@ -83,7 +83,7 @@ public static class WorkoutWeekCalendarSeams
     private static string FolderOf(Context appContext)
     {
         var root = appContext.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly run's records in.");
+            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly run’s records in.");
         return Path.Combine(root, FolderName);
     }
 

@@ -32,7 +32,7 @@ public class PaperPaletteTests
         var values = order.Select(r =>
         {
             var c = PaperPalette.Resolve(r, DeviceColorProfile.Rm2);
-            Assert.True(c.Red == c.Green && c.Green == c.Blue, $"{r} is not a true grey under rM2.");
+            Assert.True(c.Red == c.Green && c.Green == c.Blue, $"{r} isn’t a true grey under rM2.");
             return c.Red;
         }).ToList();
 

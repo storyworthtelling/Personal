@@ -301,7 +301,7 @@ public static class RoundTablePlan
     }
 
     private static string TopicAsk(AgendaItem item) =>
-        $"What did you make of the book's {item.Topic.ToLowerInvariant()}?"
+        $"What did you make of the book’s {item.Topic.ToLowerInvariant()}?"
         + (item.Why.Length > 0 ? $" The reads said: {item.Why}" : string.Empty);
 
     /// <summary>The table after the cued reader has spoken.</summary>

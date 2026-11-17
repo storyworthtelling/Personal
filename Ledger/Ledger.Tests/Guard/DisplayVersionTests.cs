@@ -14,7 +14,7 @@ public class DisplayVersionTests
     private static string Workflow()
     {
         var path = Path.Combine(DesignTestHelpers.LedgerRoot(), "..", ".github", "workflows", "build-index.yml");
-        Assert.True(File.Exists(path), "The head's workflow is missing: .github/workflows/build-index.yml");
+        Assert.True(File.Exists(path), "The head’s workflow is missing: .github/workflows/build-index.yml");
         return File.ReadAllText(path);
     }
 

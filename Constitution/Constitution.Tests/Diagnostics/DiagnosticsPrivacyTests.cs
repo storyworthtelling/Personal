@@ -173,7 +173,7 @@ public class DiagnosticsPrivacyTests
                 Assert.False(
                     System.Text.RegularExpressions.Regex.IsMatch(
                         export, $"(?i)(?<![A-Za-z0-9]){System.Text.RegularExpressions.Regex.Escape(part)}(?![A-Za-z0-9])"),
-                    "A piece of a notice's cause key reached the export.");
+                    "A piece of a notice’s cause key reached the export.");
             }
         }
     }

@@ -8,7 +8,7 @@ namespace Storyworthtelling.Maui.Tests;
 /// </summary>
 public class CarriedNoticesTests
 {
-    private static readonly DogEarNotice Backup = new("The vault backup did not finish.", "Drive refused it.", DogEarHue.Problem);
+    private static readonly DogEarNotice Backup = new("The vault backup didn’t finish.", "Drive refused it.", DogEarHue.Problem);
 
     [Fact]
     public void ANoticeCarriedIsTakenOnceByTheNextPage()

@@ -287,7 +287,7 @@ public sealed class InkResolver
             return page.WhyNotRead;
         }
 
-        return page.For(targetId) is null ? $"The read did not report '{targetId}'." : null;
+        return page.For(targetId) is null ? $"The read didn’t report '{targetId}'." : null;
     }
 
     private static bool Doubtful(InkTargetRead read) => read.Confidence < MinimumConfidence;

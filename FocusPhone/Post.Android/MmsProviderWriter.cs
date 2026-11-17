@@ -176,7 +176,7 @@ internal static class OwnNumbers
             if (!refusalLogged)
             {
                 refusalLogged = true;
-                PostDiagnostics.LogWarning("Mms", "Could not read this phone's number; group members will include it", e);
+                PostDiagnostics.LogWarning("Mms", "Could not read this phone’s number; group members will include it", e);
             }
             return numbers;
         }

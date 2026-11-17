@@ -38,7 +38,7 @@ namespace Constitution.Infrastructure.Meals;
 public static class MealDocumentsStep
 {
     public const string NoTabletSentence = "This phone has no adult whose tablet it delivers to, so no meal document was sent.";
-    public const string NotAnAdultSentence = "The adult this phone delivers for is not one of the household's adults, so no meal document was sent.";
+    public const string NotAnAdultSentence = "The adult this phone delivers for isn’t one of the household’s adults, so no meal document was sent.";
 
     public static async Task<MealDocumentsResult> RunAsync(MealDocumentRequest request, MealDocumentSeams seams, CancellationToken cancellation)
     {
@@ -192,7 +192,7 @@ public static class MealDocumentsStep
         try
         {
             var card = request.Cards.FirstOrDefault(item => item.Id == dinner.Recipe)
-                ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}'s dinner names a card that is not in the box, so its recipe cannot be printed.", nameof(request));
+                ?? throw new ArgumentException($"{dinner.Day.DayOfWeek}’s dinner names a card that is not in the box, so its recipe cannot be printed.", nameof(request));
             page = RecipePagesBuilder.Build(dinner, card, people, request.Rules.Zone, request.Ratings, request.KidsMeals.GetValueOrDefault(dinner.Day));
             plan = RecipeDelivery.Plan(cook, request.Rules.Adults.Select(adult => adult.Name).ToList(), page.Model, request.Rules.Zone, request.Now);
         }

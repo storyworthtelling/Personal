@@ -36,7 +36,7 @@ internal sealed class FakeCalendar : ICalendarWriter
     public void OwnerMoves(PlacementKey key, string person, DateTimeOffset start, DateTimeOffset end)
     {
         var index = events.FindIndex(item => item.Key == key && SamePerson(item.Person, person));
-        Assert.True(index >= 0, "The owner tried to move an event that is not on the calendar.");
+        Assert.True(index >= 0, "The owner tried to move an event that isn’t on the calendar.");
         events[index] = events[index] with { Start = start, End = end };
     }
 
@@ -44,7 +44,7 @@ internal sealed class FakeCalendar : ICalendarWriter
     public void Rekey(string id, PlacementKey key, DateTimeOffset start, DateTimeOffset end)
     {
         var index = events.FindIndex(item => item.Id == id);
-        Assert.True(index >= 0, "The tab tried to edit an event that is not on the calendar.");
+        Assert.True(index >= 0, "The tab tried to edit an event that isn’t on the calendar.");
         events[index] = events[index] with { Key = key, Start = start, End = end };
     }
 
@@ -53,7 +53,7 @@ internal sealed class FakeCalendar : ICalendarWriter
     public void OwnerDeletes(PlacementKey key, string person)
     {
         var removed = events.RemoveAll(item => item.Key == key && SamePerson(item.Person, person));
-        Assert.True(removed > 0, "The owner tried to delete an event that is not on the calendar.");
+        Assert.True(removed > 0, "The owner tried to delete an event that isn’t on the calendar.");
     }
 
     public Task<CalendarLookup> FindAsync(string person, IReadOnlyList<PlacementKey> keys, CancellationToken cancellationToken)
@@ -62,7 +62,7 @@ internal sealed class FakeCalendar : ICalendarWriter
         FindCalls++;
         if (UnavailablePeople.Contains(person))
         {
-            return Task.FromResult(CalendarLookup.Unavailable($"{person} has not shared a calendar yet."));
+            return Task.FromResult(CalendarLookup.Unavailable($"{person} hasn’t shared a calendar yet."));
         }
 
         var wanted = keys.ToHashSet();
@@ -78,7 +78,7 @@ internal sealed class FakeCalendar : ICalendarWriter
         CreateCalls++;
         if (FailingPeople.Contains(placed.Person))
         {
-            return Task.FromResult(CalendarCreate.Failed($"{placed.Person}'s calendar refused the write."));
+            return Task.FromResult(CalendarCreate.Failed($"{placed.Person}’s calendar refused the write."));
         }
 
         var id = $"event-{nextId++}";

@@ -47,7 +47,7 @@ public class AccordionPicker : LinearLayout
             throw new ArgumentOutOfRangeException(
                 nameof(selected),
                 selected,
-                $"The \"{prefix}\" picker has {choices.Count} choices, so {selected} is not one of them.");
+                $"The \"{prefix}\" picker has {choices.Count} choices, so {selected} isn’t one of them.");
         }
 
         selectedIndex = selected;

@@ -130,7 +130,7 @@ public class SettingsRefreshSourceTests
         Assert.True(
             setup.IndexOf("SetCorner(dogEar, dogEarState)", StringComparison.Ordinal) is var corner and >= 0
             && corner > setup.IndexOf("Wrap(LedgerArea.Settings", StringComparison.Ordinal),
-            "The dog-ear has to be given to the frame's corner after Wrap has built it.");
+            "The dog-ear has to be given to the frame’s corner after Wrap has built it.");
     }
 
     [Fact]
@@ -156,8 +156,8 @@ public class SettingsRefreshSourceTests
         var setup = Source(SetupCode);
 
         Assert.DoesNotContain("Shown here so a quiet greeting", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("so there's no Replace", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("so there's no Replace", setup, StringComparison.Ordinal);
+        Assert.DoesNotContain("so there’s no Replace", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("so there’s no Replace", setup, StringComparison.Ordinal);
     }
 
     [Fact]

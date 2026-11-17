@@ -127,7 +127,7 @@ public class ClaudeInkVisionTests
     public async Task AReplyThatIsNotAnAnswerIsPagesNotRead()
     {
         var document = Workout();
-        var (vision, _, _) = Make((_, _) => Reply("I am sorry, I cannot see these pages."));
+        var (vision, _, _) = Make((_, _) => Reply("I am sorry, I can’t see these pages."));
 
         var read = await vision.Read(document, Pdf, CancellationToken.None);
 

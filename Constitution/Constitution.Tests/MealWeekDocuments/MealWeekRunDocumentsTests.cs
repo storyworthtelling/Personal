@@ -107,7 +107,7 @@ public class MealWeekRunDocumentsTests
     public async Task AStoppedDocumentsStepStillKeepsTheWeek()
     {
         var (rig, docs) = Rigs();
-        docs.Roster.Answer = new MealRosterRead.Unavailable("The household file cannot be opened.");
+        docs.Roster.Answer = new MealRosterRead.Unavailable("The household file can’t be opened.");
 
         var report = await PlannedAsync(rig, docs);
 

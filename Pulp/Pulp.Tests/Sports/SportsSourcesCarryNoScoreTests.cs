@@ -149,7 +149,7 @@ public class SportsSourcesCarryNoScoreTests
 
         if (type.Assembly != typeof(ISportsSource).Assembly && type.Assembly != typeof(GameId).Assembly)
         {
-            offences.Add($"{path}: {type.FullName} comes from outside Pulp's Domain and cannot be walked");
+            offences.Add($"{path}: {type.FullName} comes from outside Pulp’s Domain and can’t be walked");
             return;
         }
 
@@ -233,9 +233,9 @@ public class SportsSourcesCarryNoScoreTests
             var source = File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Infrastructure", "Sports", file));
             var reads = Reads.Matches(source).Select(match => match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value).ToList();
 
-            Assert.True(reads.Count >= 20, $"{file}: only {reads.Count} wire reads found; the guard is not looking at the adapter.");
+            Assert.True(reads.Count >= 20, $"{file}: only {reads.Count} wire reads found; the guard isn’t looking at the adapter.");
             var stray = reads.Distinct().Except(AllowedReads[file]).ToList();
-            Assert.True(stray.Count == 0, $"{file} reads {string.Join(", ", stray)} off the wire, which the allowed list does not name.");
+            Assert.True(stray.Count == 0, $"{file} reads {string.Join(", ", stray)} off the wire, which the allowed list doesn’t name.");
         }
     }
 
@@ -273,7 +273,7 @@ public class SportsSourcesCarryNoScoreTests
     {
         var espn = File.ReadAllText(Path.Combine(PulpSource.Root(), "Pulp.Infrastructure", "Sports", "EspnSource.cs"));
         var start = espn.IndexOf("private static double RankOf", StringComparison.Ordinal);
-        Assert.True(start > 0, "EspnSource.RankOf is not where the guard expects it.");
+        Assert.True(start > 0, "EspnSource.RankOf isn’t where the guard expects it.");
         var end = espn.IndexOf("private async Task<IReadOnlyList<Team>> ReadTeamsAsync", start, StringComparison.Ordinal);
         Assert.True(end > start);
 
@@ -307,7 +307,7 @@ public class SportsSourcesCarryNoScoreTests
             .Where(name => !AllowedReads.ContainsKey(name!) && !CalendarFiles.Contains(name!))
             .ToList();
 
-        Assert.True(unguarded.Count == 0, $"{string.Join(", ", unguarded)} reads a source the score guard does not look at.");
+        Assert.True(unguarded.Count == 0, $"{string.Join(", ", unguarded)} reads a source the score guard doesn’t look at.");
     }
 
     [Fact]
@@ -316,7 +316,7 @@ public class SportsSourcesCarryNoScoreTests
         foreach (var file in CalendarFiles)
         {
             var path = Path.Combine(PulpSource.Root(), "Pulp.Infrastructure", "Sports", file);
-            Assert.True(File.Exists(path), $"{file} is not where the guard expects it.");
+            Assert.True(File.Exists(path), $"{file} isn’t where the guard expects it.");
             var literals = new List<string>();
             var code = Literal.Replace(File.ReadAllText(path), match =>
             {
@@ -329,7 +329,7 @@ public class SportsSourcesCarryNoScoreTests
             Assert.Contains("SUMMARY", tokens);
             Assert.Contains("DTSTART", tokens);
             var stray = tokens.Except(AllowedCalendarTokens).ToList();
-            Assert.True(stray.Count == 0, $"{file} names the calendar field(s) {string.Join(", ", stray)}, which the allowed list does not.");
+            Assert.True(stray.Count == 0, $"{file} names the calendar field(s) {string.Join(", ", stray)}, which the allowed list doesn’t.");
 
             var offences = Regex.Matches(code, "[A-Za-z_][A-Za-z0-9_]*").Select(match => match.Value).Distinct()
                 .Where(name => name != "record" && Names(name).Any(ResultWords.Contains)).ToList();

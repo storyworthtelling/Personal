@@ -77,7 +77,7 @@ internal sealed class ProviderHttp
         catch (HttpRequestException exception)
         {
             throw new CatalogueLookupException(source, LookupFailure.Unavailable, null,
-                $"{source} could not be reached for {what}: {exception.Message}", exception);
+                $"{source} couldn’t be reached for {what}: {exception.Message}", exception);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -85,7 +85,7 @@ internal sealed class ProviderHttp
             // source did not answer in time, which is it being unavailable. A cancellation the
             // caller did ask for is not caught and propagates as one.
             throw new CatalogueLookupException(source, LookupFailure.Unavailable, null,
-                $"{source} did not answer {what} within {httpClient.Timeout.TotalSeconds:0} s: {exception.Message}", exception);
+                $"{source} didn’t answer {what} within {httpClient.Timeout.TotalSeconds:0} s: {exception.Message}", exception);
         }
 
         if (response.Code is >= 200 and < 300)
@@ -118,7 +118,7 @@ internal sealed class ProviderHttp
     }
 
     public CatalogueLookupException Malformed(string what, string detail, Exception? inner = null) =>
-        new(source, LookupFailure.Malformed, null, $"{source} answered {what} with a body that is not the documented shape: {detail}", inner);
+        new(source, LookupFailure.Malformed, null, $"{source} answered {what} with a body that isn’t the documented shape: {detail}", inner);
 
     private CatalogueLookupException Classify(ProviderResponse response, string what)
     {

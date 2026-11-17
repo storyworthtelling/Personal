@@ -156,8 +156,8 @@ public class FollowUpPageDriftTests
 
         Assert.Contains("SEPT", text, StringComparison.Ordinal);
         Assert.DoesNotContain("LAST MONTH", text, StringComparison.Ordinal);
-        Assert.Contains("furthest above September's spending", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("above last month's", text, StringComparison.Ordinal);
+        Assert.Contains("furthest above September’s spending", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("above last month’s", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public class FollowUpPageDriftTests
         using var document = Open(plan);
         var text = document.GetPage(1).Text;
 
-        Assert.Contains("furthest above December's spending", text, StringComparison.Ordinal);
+        Assert.Contains("furthest above December’s spending", text, StringComparison.Ordinal);
         Assert.Contains("DEC", text, StringComparison.Ordinal);
     }
 

@@ -232,7 +232,7 @@ public class ConstitutionInvariantsTests
     {
         var identity = ConstitutionSource.Files(".cs")
             .SingleOrDefault(file => ConstitutionSource.IsGuard(file, "ConstitutionIdentity.cs"));
-        Assert.True(identity is not null, "ConstitutionIdentity.cs was not found under Constitution/.");
+        Assert.True(identity is not null, "ConstitutionIdentity.cs wasn’t found under Constitution/.");
 
         var code = Regex.Replace(File.ReadAllText(identity!), @"///.*|//.*", string.Empty);
         Assert.DoesNotContain("nameof(", code, StringComparison.Ordinal);
@@ -270,7 +270,7 @@ public class ConstitutionInvariantsTests
             .Where(file => Path.GetFileName(file) == fileName)
             .Where(file => ConstitutionSource.Relative(file).StartsWith("Constitution.Android/", StringComparison.Ordinal))
             .SingleOrDefault();
-        Assert.True(head is not null, $"{fileName} was not found under Constitution/Constitution.Android/.");
+        Assert.True(head is not null, $"{fileName} wasn’t found under Constitution/Constitution.Android/.");
         return head!;
     }
 }

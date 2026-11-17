@@ -97,7 +97,7 @@ public sealed class WeekRecordSnapshotTests
         var (_, record) = await Planned();
         var edited = record with
         {
-            Reasons = [new StoredReason(Sam, new DateOnly(2026, 11, 4), "Rain is due, so the walk moves indoors."), new StoredReason(Lee, new DateOnly(2026, 11, 2), "Not Sam's.")],
+            Reasons = [new StoredReason(Sam, new DateOnly(2026, 11, 4), "Rain is due, so the walk moves indoors."), new StoredReason(Lee, new DateOnly(2026, 11, 2), "Not Sam’s.")],
         };
 
         var snapshot = Ready(WeekRecordSnapshot.From(edited, Inputs(Monday)));

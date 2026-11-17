@@ -156,7 +156,7 @@ public class ArchiveBackupTests
     private static readonly string[] Middles =
     [
         "I know things have been a little up in the air, but I think if we lock in an evening " +
-        "that should work around everyone else's plans.",
+        "that should work around everyone else’s plans.",
         "If it is easier for you we can also just push it to the following week instead.",
         "Either way works for me, just let me know what is easiest on your end.",
         "I already checked with the rest of the family and nobody has anything else going on.",

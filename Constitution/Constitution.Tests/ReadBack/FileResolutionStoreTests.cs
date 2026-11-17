@@ -39,7 +39,7 @@ public sealed class FileResolutionStoreTests : IDisposable
         new InkResolution.PageDone("done", "easy"),
         new InkResolution.NeedsAsking("done", "Goblet squat", "Ticked", "Not ticked", "read:Goblet squat:Ticked|Not ticked"),
         new InkResolution.Undecided("dinner-1"),
-        new InkResolution.NotRead("done", "The read did not report 'done'."),
+        new InkResolution.NotRead("done", "The read didn’t report 'done'."),
     };
 
     private static DocumentResult ResultOf(string name, params InkResolution[] page2) => new(

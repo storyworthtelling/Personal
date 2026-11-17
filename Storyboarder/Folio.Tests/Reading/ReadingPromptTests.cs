@@ -77,7 +77,7 @@ public class ReadingPromptTests
     {
         var instruction = ReadingPrompt.Instruction(PersonaCatalogue.ById("agent"), NovelWords, GenreFrame.Unknown);
 
-        Assert.Contains("Nobody else's notes", instruction, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Nobody else’s notes", instruction, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -304,7 +304,7 @@ public class ReadingPromptTests
         Assert.Equal(purposes.Count, purposes.Distinct().Count());
 
         Assert.Contains("plot thread", PersonaCatalogue.ById("developmental-editor").NovelPurpose!, StringComparison.Ordinal);
-        Assert.Contains("character's arc", PersonaCatalogue.ById("literature-professor").NovelPurpose!, StringComparison.Ordinal);
+        Assert.Contains("character’s arc", PersonaCatalogue.ById("literature-professor").NovelPurpose!, StringComparison.Ordinal);
 
         foreach (var persona in PersonaCatalogue.Readers)
         {
@@ -357,7 +357,7 @@ public class ReadingPromptTests
     {
         var instruction = ReadingPrompt.Instruction(PersonaCatalogue.ById("genre-fan"), NovelWords, GenreFrame.Unknown);
 
-        Assert.Contains("this book's own genre", instruction, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("this book’s own genre", instruction, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("not science fiction, fantasy or horror", instruction, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -393,7 +393,7 @@ public class ReadingPromptTests
     [Fact]
     public void ASeriesBooksCanonIsCachedAfterTheManuscriptAndSharedByEveryPass()
     {
-        var frame = new ReadingFrame(GenreFrame.Unknown, "SERIES CANON: Elin's father kept the light for forty years.");
+        var frame = new ReadingFrame(GenreFrame.Unknown, "SERIES CANON: Elin’s father kept the light for forty years.");
         var prefixes = PersonaCatalogue.All
             .Select(persona => string.Concat(ReadingPrompt.System(Manuscript, persona, frame)
                 .TakeWhile(block => block.Cached).Select(block => block.Text)))

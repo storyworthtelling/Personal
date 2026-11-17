@@ -28,7 +28,7 @@ public static class WorkoutsTabServices
 
         var appContext = context.ApplicationContext ?? context;
         var root = appContext.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly run's records in.");
+            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly run’s records in.");
         var folder = WorkoutWeekPaths.Folder(root);
         var calendarSide = WorkoutWeekCalendarSeams.Create(appContext);
         var owner = calendarSide.Standing.Owner;
@@ -54,7 +54,7 @@ public static class WorkoutsTabServices
         ArgumentNullException.ThrowIfNull(context);
         var appContext = context.ApplicationContext ?? context;
         var root = appContext.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly run's records in.");
+            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly run’s records in.");
         var folder = WorkoutWeekPaths.Folder(root);
         var workScheduleJson = new ConstitutionConnections(appContext).WorkScheduleJson;
         var setup = PlanningSetupFile.Read(Path.Combine(folder, WorkoutWeekCalendarSeams.SetupFile));

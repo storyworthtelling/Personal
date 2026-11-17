@@ -52,7 +52,7 @@ public sealed class SettingsAccordion
         if (!SettingsAnatomy.IsInOrder(titles))
         {
             throw new ArgumentException(
-                "Settings groups must run Connections, Vault, the app's own, Diagnostics; these ran " + string.Join(", ", titles) + ".",
+                "Settings groups must run Connections, Vault, the app’s own, Diagnostics; these ran " + string.Join(", ", titles) + ".",
                 nameof(sections));
         }
 

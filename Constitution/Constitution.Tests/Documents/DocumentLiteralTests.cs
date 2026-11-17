@@ -77,7 +77,7 @@ public class DocumentLiteralTests
     public void NoDocumentNamesItsOwnSizeOrColour()
     {
         var files = DocumentFiles();
-        Assert.True(files.Count >= 8, $"The guard found only {files.Count} document files; it is not reading the real folders.");
+        Assert.True(files.Count >= 8, $"The guard found only {files.Count} document files; it isn’t reading the real folders.");
 
         var offenders = files
             .SelectMany(file => Offences(File.ReadAllText(file)).Select(kind => $"{ConstitutionSource.Relative(file)}: {kind}"))

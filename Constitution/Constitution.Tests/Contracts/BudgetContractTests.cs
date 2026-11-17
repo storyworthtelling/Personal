@@ -23,7 +23,7 @@ public class BudgetContractTests
     private static List<(string Path, string Text)> IndexFiles(params string[] extensions)
     {
         var root = LedgerRoot();
-        Assert.True(Directory.Exists(root), "Ledger/ was not found beside Constitution/.");
+        Assert.True(Directory.Exists(root), "Ledger/ wasn’t found beside Constitution/.");
         return IndexProjects
             .Select(project => Path.Combine(root, project))
             .Where(Directory.Exists)
@@ -102,9 +102,9 @@ public class BudgetContractTests
     {
         var sender = SenderFiles();
 
-        Assert.True(sender.Count > 0, "No Index source names the BudgetReceiver yet: Index's sending side has not landed.");
-        Assert.True(Spells(sender, ".BudgetReceiver"), "Index does not spell Constitution's receiver name.");
-        Assert.True(Spells(sender, ".action.BUDGET"), "Index does not send under Constitution's budget action.");
+        Assert.True(sender.Count > 0, "No Index source names the BudgetReceiver yet: Index’s sending side hasn’t landed.");
+        Assert.True(Spells(sender, ".BudgetReceiver"), "Index doesn’t spell Constitution’s receiver name.");
+        Assert.True(Spells(sender, ".action.BUDGET"), "Index doesn’t send under Constitution’s budget action.");
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class BudgetContractTests
     {
         var sender = SenderFiles();
         Assert.True(sender.Count > 0, "No Index source names the BudgetReceiver yet.");
-        Assert.True(Spells(sender, ".RECEIVE_BUDGET"), "Index does not spell Constitution's RECEIVE_BUDGET permission.");
+        Assert.True(Spells(sender, ".RECEIVE_BUDGET"), "Index doesn’t spell Constitution’s RECEIVE_BUDGET permission.");
 
         // Index must hold the permission (a uses-permission) for a protected receiver to take its broadcast, and must
         // pass it as the receiver permission when sending, or the broadcast is refused or reaches anyone.
@@ -134,7 +134,7 @@ public class BudgetContractTests
             Regex.IsMatch(file.Text, @"<uses-permission[^>]*constitution\.RECEIVE_BUDGET", RegexOptions.None, TimeSpan.FromSeconds(2))
             || Regex.IsMatch(file.Text, @"UsesPermission\(\s*(?:Name\s*=\s*)?[^)]*RECEIVE_BUDGET", RegexOptions.None, TimeSpan.FromSeconds(2))
             || names.Any(name => Regex.IsMatch(file.Text, @"UsesPermission\(\s*(?:Name\s*=\s*)?[^)]*\b" + Regex.Escape(name) + @"\b", RegexOptions.None, TimeSpan.FromSeconds(2))));
-        Assert.True(uses, "Index does not declare a uses-permission for Constitution's RECEIVE_BUDGET.");
+        Assert.True(uses, "Index doesn’t declare a uses-permission for Constitution’s RECEIVE_BUDGET.");
 
         Assert.Contains(android.Where(file => SenderFiles().Any(s => s.Path == file.Path)),
             file => file.Text.Contains("SendBroadcast(", StringComparison.Ordinal)
@@ -150,7 +150,7 @@ public class BudgetContractTests
         var text = string.Join('\n', sender.Select(file => file.Text));
         foreach (var extra in BudgetContract.Extras)
         {
-            Assert.True(text.Contains("\"" + extra + "\"", StringComparison.Ordinal), $"Index's sender never writes the \"{extra}\" extra.");
+            Assert.True(text.Contains("\"" + extra + "\"", StringComparison.Ordinal), $"Index’s sender never writes the \"{extra}\" extra.");
         }
     }
 }

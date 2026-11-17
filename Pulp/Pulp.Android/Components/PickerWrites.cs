@@ -87,7 +87,7 @@ internal sealed class PickerWrites
         // A parent's pick allow-lists its title for the child (D255), so Add and AddAndAllowList write the same record.
         var child = new ViewerId(row.Key);
         var pick = new ParentPick(title, viewer, DateTimeOffset.UtcNow);
-        enqueue($"add {title} to {child}'s Favorites", token => services.AddParentPickAsync(child, pick, token));
+        enqueue($"add {title} to {child}’s Favorites", token => services.AddParentPickAsync(child, pick, token));
     }
 
     private Action Remove(PickerRow row)
@@ -102,9 +102,9 @@ internal sealed class PickerWrites
 
         var child = new ViewerId(row.Key);
         var taken = new ParentPickRemoval(child, title);
-        enqueue($"take {title} off {child}'s Favorites", token => services.RemoveParentPickAsync(taken, token));
+        enqueue($"take {title} off {child}’s Favorites", token => services.RemoveParentPickAsync(taken, token));
         return () => enqueue(
-            $"put {title} back on {child}'s Favorites",
+            $"put {title} back on {child}’s Favorites",
             token => services.PutBackParentPickAsync(taken, new ParentPick(title, viewer, DateTimeOffset.UtcNow), token));
     }
 }

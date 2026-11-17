@@ -92,7 +92,7 @@ public class IdentityLadderTests
             var separation = Oklch.HueSeparation(hue, siblingHue);
 
             Assert.True(separation >= MinimumSeparation,
-                $"{tier} sits {separation:F1}° from {app}'s {sibling} (minimum {MinimumSeparation}) — "
+                $"{tier} sits {separation:F1}° from {app}’s {sibling} (minimum {MinimumSeparation}) — "
                 + "two apps on one hue are two tabs that look like each other on one shelf.");
         }
     }

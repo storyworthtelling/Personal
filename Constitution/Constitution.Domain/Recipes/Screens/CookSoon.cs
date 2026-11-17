@@ -21,8 +21,8 @@ public static class CookSoon
 {
     public const string OfferWords = "Cook this soon";
     public const string PlannedWords = "Planned for next week";
-    public const string NotKeptWords = "Next week's plan could not be changed, so nothing was placed.";
-    public const string UnavailableWords = "Planning is not set up yet, so nothing was placed.";
+    public const string NotKeptWords = "Next week’s plan couldn’t be changed, so nothing was placed.";
+    public const string UnavailableWords = "Planning isn’t set up yet, so nothing was placed.";
 
     public static string Words(CookSoonState state) => state switch
     {

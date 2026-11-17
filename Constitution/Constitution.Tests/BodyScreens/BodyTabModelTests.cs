@@ -274,7 +274,7 @@ public class BodyTabModelTests
             .Distinct()
             .ToList();
 
-        Assert.True(names.Count >= 40, $"The guard found only {names.Count} names; it is not reading the real model.");
+        Assert.True(names.Count >= 40, $"The guard found only {names.Count} names; it isn’t reading the real model.");
         var offenders = names.Where(HonestChartTests.IsJudgement).ToList();
         Assert.True(offenders.Count == 0, "Screen names that read as a judgement: " + string.Join(", ", offenders));
     }

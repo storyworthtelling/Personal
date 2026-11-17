@@ -161,7 +161,7 @@ public class GoogleCalendarWriterTests
         var lookup = await Writer().FindAsync("Sam", [Strength], CancellationToken.None);
 
         Assert.False(lookup.IsAvailable);
-        Assert.Equal("The calendar's answer could not be trusted.", lookup.UnavailableBecause);
+        Assert.Equal("The calendar’s answer couldn’t be trusted.", lookup.UnavailableBecause);
         Assert.Empty(lookup.Held);
     }
 
@@ -184,13 +184,13 @@ public class GoogleCalendarWriterTests
         var lookup = await Writer().FindAsync("Sam", [Strength], CancellationToken.None);
 
         Assert.False(lookup.IsAvailable);
-        Assert.Equal("The calendar's answer could not be trusted.", lookup.UnavailableBecause);
+        Assert.Equal("The calendar’s answer couldn’t be trusted.", lookup.UnavailableBecause);
     }
 
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, "Google refused access to a calendar; it may not be shared.")]
-    [InlineData(HttpStatusCode.NotFound, "A calendar was not found; it may not be shared.")]
-    [InlineData(HttpStatusCode.ServiceUnavailable, "Google could not answer.")]
+    [InlineData(HttpStatusCode.NotFound, "A calendar wasn’t found; it may not be shared.")]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "Google couldn’t answer.")]
     public async Task ACalendarThatWillNotAnswerIsUnavailableNeverEmpty(HttpStatusCode status, string reason)
     {
         http.Reply = _ => FakeCalendarHttp.Error(status);
@@ -237,7 +237,7 @@ public class GoogleCalendarWriterTests
         var lookup = await Writer().FindAsync("Sam", [Strength], CancellationToken.None);
 
         Assert.False(lookup.IsAvailable);
-        Assert.Equal("This person's calendar is not set.", lookup.UnavailableBecause);
+        Assert.Equal("This person’s calendar isn’t set.", lookup.UnavailableBecause);
         Assert.Empty(http.Requests);
     }
 
@@ -246,7 +246,7 @@ public class GoogleCalendarWriterTests
     {
         var lookup = await Writer().FindAsync("Robin", [Strength], CancellationToken.None);
 
-        Assert.Equal("This person's calendar is not set.", lookup.UnavailableBecause);
+        Assert.Equal("This person’s calendar isn’t set.", lookup.UnavailableBecause);
         Assert.Empty(http.Requests);
     }
 
@@ -350,7 +350,7 @@ public class GoogleCalendarWriterTests
 
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, "Google refused access to a calendar; it may not be shared.")]
-    [InlineData(HttpStatusCode.NotFound, "A calendar was not found; it may not be shared.")]
+    [InlineData(HttpStatusCode.NotFound, "A calendar wasn’t found; it may not be shared.")]
     [InlineData(HttpStatusCode.TooManyRequests, "Google asked Constitution to slow down.")]
     public async Task AnEventGoogleWillNotTakeIsAFailureWithItsReason(HttpStatusCode status, string reason)
     {
@@ -365,12 +365,12 @@ public class GoogleCalendarWriterTests
     [Fact]
     public async Task ANetworkFailureOnCreateIsAFailureToRetry()
     {
-        http.Throws = new HttpRequestException("The platform's text.");
+        http.Throws = new HttpRequestException("The platform’s text.");
 
         var made = await Writer().CreateAsync(ToCreate(), CancellationToken.None);
 
         Assert.False(made.Succeeded);
-        Assert.Equal("A calendar could not be reached.", made.FailedBecause);
+        Assert.Equal("A calendar couldn’t be reached.", made.FailedBecause);
     }
 
     [Fact]
@@ -391,7 +391,7 @@ public class GoogleCalendarWriterTests
 
         var made = await Writer().CreateAsync(ToCreate(), CancellationToken.None);
 
-        Assert.Equal("This person's calendar is not set.", made.FailedBecause);
+        Assert.Equal("This person’s calendar isn’t set.", made.FailedBecause);
         Assert.Empty(http.Requests);
     }
 

@@ -46,7 +46,7 @@ public class GoogleWorkoutEventEditorTests
     }
 
     [Theory]
-    [InlineData(HttpStatusCode.NotFound, "A calendar was not found; it may not be shared.")]
+    [InlineData(HttpStatusCode.NotFound, "A calendar wasn’t found; it may not be shared.")]
     [InlineData(HttpStatusCode.Forbidden, "Google refused access to a calendar; it may not be shared.")]
     public async Task AMoveGoogleRefusesIsAFailure(HttpStatusCode status, string reason)
     {
@@ -105,7 +105,7 @@ public class GoogleWorkoutEventEditorTests
         Assert.All(edits, edit =>
         {
             Assert.False(edit.Succeeded);
-            Assert.Equal("This person's calendar is not set.", edit.FailedBecause);
+            Assert.Equal("This person’s calendar isn’t set.", edit.FailedBecause);
         });
         Assert.Empty(http.Requests);
     }

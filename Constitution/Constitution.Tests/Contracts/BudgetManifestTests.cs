@@ -15,7 +15,7 @@ public class BudgetManifestTests
     private static string ReceiverSource()
     {
         var path = Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "Budgets", "BudgetReceiver.cs");
-        Assert.True(File.Exists(path), "Constitution.Android/Budgets/BudgetReceiver.cs was not found.");
+        Assert.True(File.Exists(path), "Constitution.Android/Budgets/BudgetReceiver.cs wasn’t found.");
         return File.ReadAllText(path);
     }
 
@@ -85,7 +85,7 @@ public class BudgetManifestTests
 
         var permission = merged.Descendants("permission")
             .SingleOrDefault(element => (string?)element.Attribute(Android + "name") == ConstitutionIdentity.BudgetPermission);
-        Assert.True(permission is not null, "The merged Release manifest does not declare the budget permission.");
+        Assert.True(permission is not null, "The merged Release manifest doesn’t declare the budget permission.");
         Assert.Equal("signature", (string?)permission!.Attribute(Android + "protectionLevel"));
 
         Assert.Contains(merged.Descendants("uses-permission"),

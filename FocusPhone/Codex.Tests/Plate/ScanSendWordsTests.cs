@@ -24,9 +24,9 @@ public class ScanSendWordsTests
     [Fact]
     public void ATooLargeScanGivesTheTabletsOwnReasonAndNoRetry()
     {
-        var words = ScanSendWords.NotSent(ScanSendProblem.TooLarge, "the PDF is 173 MB, over the tablet's 100 MB limit");
+        var words = ScanSendWords.NotSent(ScanSendProblem.TooLarge, "the PDF is 173 MB, over the tablet’s 100 MB limit");
 
-        Assert.Contains("the PDF is 173 MB, over the tablet's 100 MB limit", words, StringComparison.Ordinal);
+        Assert.Contains("the PDF is 173 MB, over the tablet’s 100 MB limit", words, StringComparison.Ordinal);
         Assert.DoesNotContain("send it again", words, StringComparison.Ordinal);
     }
 
@@ -35,7 +35,7 @@ public class ScanSendWordsTests
     {
         var words = ScanSendWords.NotSent(ScanSendProblem.Failed, null);
 
-        Assert.Contains("didn't reach the reMarkable", words, StringComparison.Ordinal);
+        Assert.Contains("didn’t reach the reMarkable", words, StringComparison.Ordinal);
         Assert.Contains("send it again", words, StringComparison.Ordinal);
         Assert.DoesNotContain("Exception", words, StringComparison.Ordinal);
     }

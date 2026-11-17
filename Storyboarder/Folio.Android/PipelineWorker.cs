@@ -161,7 +161,7 @@ public class PipelineWorker : Worker
         catch (Exception ex)
         {
             logger.LogWarning(ex,
-                "Could not run this cycle in the foreground; it will run under the ten-minute cap "
+                "Couldn’t run this cycle in the foreground; it will run under the ten-minute cap "
                 + "and the read will resume on the next cycle.");
         }
     }

@@ -170,12 +170,12 @@ public class BookPage : FolioBinderPage
     {
         var opening = MauiTapWatch.Action(FolioKeyActions.OpenReport, TimeSpan.FromSeconds(15));
         var opened = await ReportFile.OpenAsync(selectedDraft, record.Title);
-        if (opened) opening.Succeeded(); else opening.Failed("the report is not on this phone");
+        if (opened) opening.Succeeded(); else opening.Failed("the report isn’t on this phone");
         if (!opened)
         {
             // Said on the page, not in a dialog: the report has been delivered and cleared off the
             // device, or has not been rendered yet. Either way there is nothing here to open.
-            Note("The report is not on this phone. It is in the Drive folder beside the manuscript.");
+            Note("The report isn’t on this phone. It is in the Drive folder beside the manuscript.");
         }
     }
 

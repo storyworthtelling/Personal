@@ -78,7 +78,7 @@ internal sealed class TemplateMap : RecordMap<MealTemplate>
             throw new HouseholdRecordException(record.Key, exception.Message);
         }
 
-        return TemplateKeys.KeyOf(value) == record.Key ? value : throw record.Fail("id", "does not belong to this record's key");
+        return TemplateKeys.KeyOf(value) == record.Key ? value : throw record.Fail("id", "does not belong to this record’s key");
     }
 }
 
@@ -102,7 +102,7 @@ internal sealed class TemplatePrintMap : RecordMap<TemplatePrint>
             record.OptionalDate("week") ?? throw record.Fail("week", "is missing"),
             record.Text("item"),
             record.Text("template"));
-        return TemplateKeys.KeyOf(value) == record.Key ? value : throw record.Fail("item", "does not belong to this record's key");
+        return TemplateKeys.KeyOf(value) == record.Key ? value : throw record.Fail("item", "does not belong to this record’s key");
     }
 }
 

@@ -29,7 +29,7 @@ public sealed class PlaylistEditor
 
     private static readonly PickerOption[] Operators =
     [
-        new("is"), new("contains"), new("is not"),
+        new("is"), new("contains"), new("isn’t"),
     ];
 
     private static readonly PickerOption[] Matches =

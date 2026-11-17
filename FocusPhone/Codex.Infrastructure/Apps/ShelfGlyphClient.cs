@@ -19,11 +19,11 @@ namespace Codex.Infrastructure.Apps;
 public sealed class ShelfGlyphClient
 {
     private const string Instruction =
-        "You design tiny solid bronze statues for a bookshelf's category labels — a small figure that " +
+        "You design tiny solid bronze statues for a bookshelf’s category labels — a small figure that " +
         "stands on the shelf as the bookend itself. Given a shelf name, respond with ONLY the SVG path " +
         "data (the value of a single \"d\" attribute) for one simple, iconic SILHOUETTE representing " +
         "that name: a single CLOSED, FILLABLE shape (end with Z), not a line drawing or open strokes — " +
-        "it will be rendered solid-filled, so an outline that doesn't enclose a real area will render " +
+        "it will be rendered solid-filled, so an outline that doesn’t enclose a real area will render " +
         "as a blob or nothing. Authored inside a 0 0 100 100 viewBox. No <svg> wrapper, no attributes, " +
         "no code fence, no words — just the path data beginning with M. Keep the silhouette simple and " +
         "legible at small size.";

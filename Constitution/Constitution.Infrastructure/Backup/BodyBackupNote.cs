@@ -34,11 +34,11 @@ public static class BodyBackupNote
             case BodyRestoreOutcome.NoBackup:
                 return "There is no Body backup yet. One is made once Body has read.";
             case BodyRestoreOutcome.WrongPassphrase:
-                return "The vault passphrase does not open the Body backup. It was left as it is; check the passphrase.";
+                return "The vault passphrase doesn’t open the Body backup. It was left as it is; check the passphrase.";
             case BodyRestoreOutcome.Corrupt:
-                return "The Body backup file cannot be read, so it was left as it is.";
+                return "The Body backup file can’t be read, so it was left as it is.";
             case BodyRestoreOutcome.Unreachable:
-                return $"Drive could not be reached, so the Body backup was not checked{Named(result.Detail)}. It is tried again next time.";
+                return $"Drive couldn’t be reached, so the Body backup wasn’t checked{Named(result.Detail)}. It is tried again next time.";
             case BodyRestoreOutcome.NoPassphrase:
                 return "Add the vault passphrase to bring Body history back from the backup.";
             default:
@@ -64,13 +64,13 @@ public static class BodyBackupNote
             case BodyBackupOutcome.NoPassphrase:
                 return "Add the vault passphrase to back up Body history.";
             case BodyBackupOutcome.RefusedUnreadable:
-                return "The Body backup was left alone: the passphrase does not open it, or the file is damaged.";
+                return "The Body backup was left alone: the passphrase doesn’t open it, or the file is damaged.";
             case BodyBackupOutcome.RefusedNewerFormat:
                 return "The Body backup comes from a newer version of Constitution, so it was left alone. Update the app to keep backing up.";
             case BodyBackupOutcome.Unreachable:
-                return $"Drive could not be reached, so Body was not backed up{Named(result.Detail)}. It is tried again by itself.";
+                return $"Drive couldn’t be reached, so Body wasn’t backed up{Named(result.Detail)}. It is tried again by itself.";
             case BodyBackupOutcome.Failed:
-                return $"Drive did not take the Body backup{Named(result.Detail)}. It is tried again by itself.";
+                return $"Drive didn’t take the Body backup{Named(result.Detail)}. It is tried again by itself.";
             default:
                 throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Not a backup outcome this wording knows.");
         }
@@ -101,11 +101,11 @@ public static class BodyBackupNote
             case BodyBackupRunStatus.NotDue:
                 return "No Body backup is due yet.";
             case BodyBackupRunStatus.SyncDidNotRun:
-                return "Body has not read yet, so there is nothing new to back up.";
+                return "Body hasn’t read yet, so there is nothing new to back up.";
             case BodyBackupRunStatus.AlreadyRestored:
                 return "The Body backup was already checked when the app opened.";
             case BodyBackupRunStatus.Failed:
-                return $"The Body backup could not run{Named(result.Detail)}.";
+                return $"The Body backup couldn’t run{Named(result.Detail)}.";
             default:
                 throw new ArgumentOutOfRangeException(nameof(result), result.Status, "Not a run status this wording knows.");
         }

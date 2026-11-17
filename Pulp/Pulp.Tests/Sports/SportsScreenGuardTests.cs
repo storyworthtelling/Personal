@@ -28,9 +28,9 @@ public class SportsScreenGuardTests
 
         Assert.Contains(files, file => file.Path == "Pulp.Android/Shell/SportsArea.cs");
         Assert.True(files.Count(file => file.Path.StartsWith("Pulp.Android/Sports/", StringComparison.Ordinal)) >= 3,
-            "The Sports screen's files under Pulp.Android/Sports/ were not found.");
+            "The Sports screen’s files under Pulp.Android/Sports/ weren’t found.");
         Assert.True(files.Count(file => file.Path.StartsWith("Pulp.Domain/Sports/SportsScreen", StringComparison.Ordinal)) >= 5,
-            "The Sports screen's pure files were not found.");
+            "The Sports screen’s pure files weren’t found.");
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class SportsScreenGuardTests
             .Select(file => file.Path)
             .ToList();
 
-        Assert.True(offenders.Count == 0, "The Sports screen reads a video's own words:\n" + string.Join("\n", offenders));
+        Assert.True(offenders.Count == 0, "The Sports screen reads a video’s own words:\n" + string.Join("\n", offenders));
         Assert.Contains(head, file => file.Text.Contains("HighlightsOffer.For(", StringComparison.Ordinal));
         Assert.Contains(head, file => file.Text.Contains("game.HighlightsLabel", StringComparison.Ordinal));
     }

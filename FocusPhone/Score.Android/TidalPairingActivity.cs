@@ -164,7 +164,7 @@ public class TidalPairingActivity : Activity
         }
 
         body.AddView(PaperUi.Secondary(this,
-            "Signing in opens TIDAL's own page in a browser. It is the only sign-in TIDAL " +
+            "Signing in opens TIDAL’s own page in a browser. It is the only sign-in TIDAL " +
             "offers an app like this one."));
         body.AddView(PaperUi.PrimaryButton(this, "Sign in to TIDAL", () => _ = StartSignInAsync()));
 
@@ -199,7 +199,7 @@ public class TidalPairingActivity : Activity
         {
             health.MarkFailing(CredentialIds.Tidal, "Vault has no TIDAL client id/secret.");
             signingIn?.Failed("the vault has no TIDAL client id/secret");
-            status = "TIDAL app credentials aren't set up yet.";
+            status = "TIDAL app credentials aren’t set up yet.";
             Render();
             return;
         }
@@ -235,7 +235,7 @@ public class TidalPairingActivity : Activity
             trail = trail.NoBrowser(DateTimeOffset.Now, $"{e.GetType().Name}: {e.Message}");
             EndTrail(succeeded: false, "no browser to sign in with");
             Forget();
-            status = "There's no browser on this phone to sign in with.";
+            status = "There’s no browser on this phone to sign in with.";
         }
 
         // The client secret is not held across the round trip — it is re-read from the
@@ -272,7 +272,7 @@ public class TidalPairingActivity : Activity
             status = result.Status switch
             {
                 OAuthRedirectStatus.Declined => "Sign-in was cancelled.",
-                OAuthRedirectStatus.StateMismatch => "That sign-in didn't match the one this screen started.",
+                OAuthRedirectStatus.StateMismatch => "That sign-in didn’t match the one this screen started.",
                 _ => "Something went wrong signing in to TIDAL. Try again.",
             };
             Render();
@@ -289,7 +289,7 @@ public class TidalPairingActivity : Activity
             trail = trail?.ExchangeFailed(DateTimeOffset.Now, 0, "the vault has no TIDAL client id/secret");
             EndTrail(succeeded: false, "the vault has no TIDAL client id/secret");
             Forget();
-            status = "TIDAL app credentials aren't set up yet.";
+            status = "TIDAL app credentials aren’t set up yet.";
             Render();
             return;
         }
@@ -343,8 +343,8 @@ public class TidalPairingActivity : Activity
             "TidalPairingActivity", $"TIDAL refused the code exchange: {exchanged.Status}." +
                 (string.IsNullOrEmpty(exchanged.Detail) ? "" : $" {exchanged.Detail}"));
         status = string.IsNullOrEmpty(exchanged.Detail)
-            ? "TIDAL wouldn't complete the sign-in. Try again."
-            : $"TIDAL wouldn't complete the sign-in: {exchanged.Detail}";
+            ? "TIDAL wouldn’t complete the sign-in. Try again."
+            : $"TIDAL wouldn’t complete the sign-in: {exchanged.Detail}";
         if (TidalSignInFailure.IsCredentialRejection(exchanged.Detail))
         {
             health.MarkFailing(CredentialIds.Tidal, status);

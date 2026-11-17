@@ -41,7 +41,7 @@ public class LiveDigestSourcesTests
         new(person, Sunday.AddDays(offset), new DateTimeOffset(2026, 3, 8 + offset, 17, 0, 0, TimeSpan.Zero), kind, minutes, false, [person], "None", [], null);
 
     private static StoredWorkoutWeek Week(params StoredSession[] sessions) =>
-        new(Sunday, new DateTimeOffset(2026, 3, 8, 6, 0, 0, TimeSpan.Zero), sessions, [new StoredReason("Sam", Sunday.AddDays(3), "Wednesday's walk moved to Thursday for the forecast.")], [], []);
+        new(Sunday, new DateTimeOffset(2026, 3, 8, 6, 0, 0, TimeSpan.Zero), sessions, [new StoredReason("Sam", Sunday.AddDays(3), "Wednesday’s walk moved to Thursday for the forecast.")], [], []);
 
     // Settled the way the read-back settles: a tick is a done day, a struck-out box is a skip.
     private static SkipLedger LedgerWith(params SessionRecord[] records) =>
@@ -70,7 +70,7 @@ public class LiveDigestSourcesTests
         Assert.Equal(SessionOutcome.Done, held.Value.Sessions[0].Outcome);
         Assert.Equal(30, held.Value.Sessions[0].PlannedMinutes);
         Assert.Equal(SessionOutcome.Skipped, held.Value.Sessions[1].Outcome);
-        Assert.Equal(["Wednesday's walk moved to Thursday for the forecast."], held.Value.Moved);
+        Assert.Equal(["Wednesday’s walk moved to Thursday for the forecast."], held.Value.Moved);
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public class LiveDigestSourcesTests
     [Fact]
     public void AnUnreadableMealRecordStopsIt()
     {
-        var stopped = Assert.IsType<DigestRead<DigestMealsWeek>.Unavailable>(Make(meals: new MealWeekRecordRead.Unreadable("The saved meal weeks could not be opened.")).Meals(Sunday));
-        Assert.Equal("The saved meal weeks could not be opened.", stopped.Reason);
+        var stopped = Assert.IsType<DigestRead<DigestMealsWeek>.Unavailable>(Make(meals: new MealWeekRecordRead.Unreadable("The saved meal weeks couldn’t be opened.")).Meals(Sunday));
+        Assert.Equal("The saved meal weeks couldn’t be opened.", stopped.Reason);
     }
 }

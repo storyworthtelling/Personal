@@ -252,7 +252,7 @@ public class ErrandActivity : AppCompatActivity
     {
         if (camera.Capture is not { } capture)
         {
-            ShowStatus("The camera is not ready yet.");
+            ShowStatus("The camera isn’t ready yet.");
             return;
         }
 
@@ -293,7 +293,7 @@ public class ErrandActivity : AppCompatActivity
             var target = ContentResolver!.Insert(collection, values);
             if (target is null)
             {
-                ShowStatus("Could not make a place to save that.");
+                ShowStatus("Couldn’t make a place to save that.");
                 return;
             }
 
@@ -309,7 +309,7 @@ public class ErrandActivity : AppCompatActivity
         {
             // The caller is blocked, so it hears either a picture or a plain cancel — never
             // a half-written file it would then try to read.
-            ShowStatus($"That one did not save: {Storyworthtelling.Diagnostics.PlainError.Describe(e)}");
+            ShowStatus($"That one didn’t save: {Storyworthtelling.Diagnostics.PlainError.Describe(e)}");
         }
         finally
         {
@@ -332,7 +332,7 @@ public class ErrandActivity : AppCompatActivity
     {
         if (camera.Video is not { } video)
         {
-            ShowStatus("The camera is not ready yet.");
+            ShowStatus("The camera isn’t ready yet.");
             return;
         }
 
@@ -386,7 +386,7 @@ public class ErrandActivity : AppCompatActivity
             DiscardFrame(file);
             ShowStatus(end == VideoRecordingEnd.NothingRecorded
                 ? "Nothing was recorded. Try again."
-                : "That recording did not save. Try again.");
+                : "That recording didn’t save. Try again.");
             return;
         }
 
@@ -432,7 +432,7 @@ public class ErrandActivity : AppCompatActivity
     {
         if (camera.Capture is not { } capture)
         {
-            ShowStatus("The camera is not ready yet.");
+            ShowStatus("The camera isn’t ready yet.");
             return;
         }
 
@@ -608,7 +608,7 @@ public class ErrandActivity : AppCompatActivity
             host.RunOnUiThread(() =>
             {
                 host.DiscardFrame(file);
-                host.ShowStatus($"That one did not save: {exception?.Message}");
+                host.ShowStatus($"That one didn’t save: {exception?.Message}");
             });
     }
 
@@ -630,7 +630,7 @@ public class ErrandActivity : AppCompatActivity
             host.RunOnUiThread(() =>
             {
                 host.DiscardFrame(file);
-                host.ShowStatus($"Could not take that frame: {exception?.Message}");
+                host.ShowStatus($"Couldn’t take that frame: {exception?.Message}");
             });
         }
     }
@@ -656,7 +656,7 @@ public class ErrandActivity : AppCompatActivity
             host.RunOnUiThread(() =>
             {
                 host.DiscardFrame(file);
-                host.ShowStatus($"Could not read that: {Storyworthtelling.Diagnostics.PlainError.Describe(e)}");
+                host.ShowStatus($"Couldn’t read that: {Storyworthtelling.Diagnostics.PlainError.Describe(e)}");
             });
     }
 }

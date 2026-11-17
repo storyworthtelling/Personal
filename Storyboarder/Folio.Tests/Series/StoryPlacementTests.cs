@@ -22,8 +22,8 @@ public class StoryPlacementTests
     {
         var guess = StoryPlacement.After("The Salt Road");
 
-        Assert.Equal("Takes place after “The Salt Road” · Folio's guess", guess.Line);
-        Assert.Contains("has not been confirmed", guess.Assumption);
+        Assert.Equal("Takes place after “The Salt Road” · Folio’s guess", guess.Line);
+        Assert.Contains("hasn’t been confirmed", guess.Assumption);
         Assert.Equal("Takes place after “The Salt Road”", guess.Confirm().Line);
         Assert.Equal(string.Empty, guess.Confirm().Assumption);
     }

@@ -16,7 +16,7 @@ public class BinderTabLayoutTests
         Assert.Equal(Six, tabs.Count);
         for (var i = 1; i < tabs.Count; i++)
         {
-            Assert.True(tabs[i].TopDp > tabs[i - 1].TopDp, $"Tab {i} does not follow tab {i - 1}");
+            Assert.True(tabs[i].TopDp > tabs[i - 1].TopDp, $"Tab {i} doesn’t follow tab {i - 1}");
         }
     }
 

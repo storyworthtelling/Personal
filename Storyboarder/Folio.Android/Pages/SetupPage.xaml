@@ -73,12 +73,12 @@
 
             <kit:SettingsGroup Title="Vault">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app's keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
+                    <Label Text="A passphrase encrypts one shared file in your Google Drive that holds every app’s keys. Set the same passphrase in each app: your keys are then backed up, and after a factory reset or reinstall they restore automatically — you re-enter only this passphrase."
                            Style="{StaticResource SecondaryLabel}" />
                     <Label Text="Vault passphrase" Style="{StaticResource FieldLabel}" />
                     <Entry x:Name="VaultPassphraseEntry" TextChanged="OnFieldChanged" Unfocused="OnFieldSettled" Placeholder="Choose a passphrase"
                            Style="{StaticResource MonoEntry}" />
-                    <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it's the one thing not stored in the vault."
+                    <Label Text="Shown in the clear so you can read it back and copy it into your other apps — it’s the one thing not stored in the vault."
                            Style="{StaticResource SecondaryLabel}" />
                     <Label x:Name="VaultStatusLabel" Style="{StaticResource StatusLine}" />
                 </VerticalStackLayout>
@@ -86,7 +86,7 @@
 
             <kit:SettingsGroup Title="Delivery">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="When a book finishes, copy its volume PDFs and revision report into a folder beside the manuscript in your Google Drive. Needs the Drive permission — sign in again after turning this on, and if Google doesn't ask for it, the app's OAuth client still needs the drive.file scope added."
+                    <Label Text="When a book finishes, copy its volume PDFs and revision report into a folder beside the manuscript in your Google Drive. Needs the Drive permission — sign in again after turning this on, and if Google doesn’t ask for it, the app’s OAuth client still needs the drive.file scope added."
                            Style="{StaticResource SecondaryLabel}" />
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0" Text="Archive finished books" VerticalOptions="Center" />
@@ -109,7 +109,7 @@
 
             <kit:SettingsGroup Title="Reports">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="Rewrite the reports of the books already reviewed in the current form: scenes from your own breaks, the seven readers, the round table, the series bible. Each book's latest draft is read again and its report in Drive is replaced; nothing is sent to the reMarkable."
+                    <Label Text="Rewrite the reports of the books already reviewed in the current form: scenes from your own breaks, the seven readers, the round table, the series bible. Each book’s latest draft is read again and its report in Drive is replaced; nothing is sent to the reMarkable."
                            Style="{StaticResource SecondaryLabel}" />
                     <Button x:Name="RegenerateButton" Text="Regenerate reviewed books"
                             Clicked="OnRegenerateClicked" Style="{StaticResource SecondaryButton}" />
@@ -133,7 +133,7 @@
 
             <kit:SettingsGroup Title="Diagnostics">
                 <VerticalStackLayout Spacing="16">
-                    <Label Text="See what each project is doing and what's gone wrong. Status snapshot is the quickest read; Export bundles the snapshot and both logs into one file to share."
+                    <Label Text="See what each project is doing and what’s gone wrong. Status snapshot is the quickest read; Export bundles the snapshot and both logs into one file to share."
                            Style="{StaticResource SecondaryLabel}" />
                     <Button x:Name="StatusSnapshotButton" Text="Status snapshot"
                             Clicked="OnStatusSnapshotClicked" Style="{StaticResource SecondaryButton}" />

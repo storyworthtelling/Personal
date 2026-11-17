@@ -22,7 +22,7 @@ public class OneSourceTests
     {
         var hits = Sources(project).Where(file => pattern.IsMatch(file.Text)).Select(file => file.Path).ToList();
 
-        Assert.True(hits.Any(allowed), $"The one place that {what} was not found; the guard has nothing to protect.");
+        Assert.True(hits.Any(allowed), $"The one place that {what} wasn’t found; the guard has nothing to protect.");
         var strays = hits.Where(path => !allowed(path)).ToList();
         Assert.True(strays.Count == 0, $"Only one place {what}; also found in: {string.Join(", ", strays)}");
     }
@@ -70,7 +70,7 @@ public class OneSourceTests
             .Select(file => file.Path)
             .ToList();
 
-        Assert.True(found.Count == 0, "A screen's own viewer resolver: " + string.Join(", ", found));
+        Assert.True(found.Count == 0, "A screen’s own viewer resolver: " + string.Join(", ", found));
         Assert.Contains(Sources("Pulp.Domain"), file => file.Path == "Pulp.Domain/People/ThisPhone.cs");
     }
 }

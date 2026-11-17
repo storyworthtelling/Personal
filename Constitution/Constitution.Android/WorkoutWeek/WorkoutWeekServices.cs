@@ -61,7 +61,7 @@ public static class WorkoutWeekServices
         var appContext = context.ApplicationContext ?? context;
         var folder = WorkoutWeekPaths.Folder(
             appContext.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly run's records in."));
+            ?? throw new InvalidOperationException("The app has no private files folder to keep the weekly run’s records in."));
         var workScheduleJson = new ConstitutionConnections(appContext).WorkScheduleJson;
 
         var prepared = WorkoutWeekJoin.Prepare(

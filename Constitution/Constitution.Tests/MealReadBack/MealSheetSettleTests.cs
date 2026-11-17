@@ -111,7 +111,7 @@ public class MealSheetSettleTests
             After,
             day => (int)day % 2 == 0
                 ? new InkResolution.NeedsAsking(Yes(day), "dinner", "Keep it", "Leave it out", "cause-" + day)
-                : new InkResolution.NotRead(Yes(day), "The page was not read."));
+                : new InkResolution.NotRead(Yes(day), "The page wasn’t read."));
 
         rig.Hook.Settled(document, result);
 
@@ -221,7 +221,7 @@ public class MealSheetSettleTests
         using var rig = new MealRig();
         var document = Sheet();
 
-        rig.Hook.Settled(document, SheetResult(document, Before, Marks(DayOfWeek.Monday, DayOfWeek.Tuesday, "Robin will not eat lentils")));
+        rig.Hook.Settled(document, SheetResult(document, Before, Marks(DayOfWeek.Monday, DayOfWeek.Tuesday, "Robin won’t eat lentils")));
 
         Assert.Equal(["person", "recipe", "week-plan"], rig.Kinds());
     }

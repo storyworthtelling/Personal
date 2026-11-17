@@ -78,7 +78,7 @@ public static class PlanOverridesCodec
         }
         catch (Exception e) when (e is JsonException or InvalidOperationException or KeyNotFoundException or ArgumentException)
         {
-            throw new FormatException("The record could not be read as the owner's moves on the Workouts tab.", e);
+            throw new FormatException("The record could not be read as the owner’s moves on the Workouts tab.", e);
         }
     }
 

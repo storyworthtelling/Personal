@@ -232,7 +232,7 @@ public partial class MainPage : LedgerBinderPage
     private void ShowLaunchFault(Exception ex)
     {
         var report = LaunchFaults.Record("Accounts page, OnAppearing", ex);
-        statusLabel.Text = "Accounts could not open. The full report is below.";
+        statusLabel.Text = "Accounts couldn’t open. The full report is below.";
         voiceLabel.IsVisible = false;
         bodyHost.Content = LaunchFaultPage.ReportView(report);
     }
@@ -456,7 +456,7 @@ public partial class MainPage : LedgerBinderPage
         // offer Add, except the restoring one, which has no button at all (below).
         var vaultHasUnreadBanks = screen != FirstRunScreen.Restoring && !FirstRunPlan.OffersAdd(screen);
 
-        voiceLabel.IsVisible = false; // "with no balances there's nothing for it to be about"
+        voiceLabel.IsVisible = false; // "with no balances there’s nothing for it to be about"
 
         switch (screen)
         {
@@ -1145,7 +1145,7 @@ public partial class MainPage : LedgerBinderPage
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Saved an edit to {AccountId} but could not refresh the Waiting page's notices.", account.Id);
+                logger.LogError(ex, "Saved an edit to {AccountId} but could not refresh the Waiting page’s notices.", account.Id);
             }
 
             return true;
@@ -1367,7 +1367,7 @@ public partial class MainPage : LedgerBinderPage
     }
 
     private async void RemoveManualAccount(Account account) =>
-        await Guarded("remove-account", $"Could not remove {account.Name}", () => RemoveManualAccountAsync(account));
+        await Guarded("remove-account", $"Couldn’t remove {account.Name}", () => RemoveManualAccountAsync(account));
 
     private async Task RemoveManualAccountAsync(Account account)
     {
@@ -1443,7 +1443,7 @@ public partial class MainPage : LedgerBinderPage
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Could not look up the owner's categories for {AccountId}'s transactions; showing none.", account.Id);
+                logger.LogWarning(ex, "Could not look up the owner’s categories for {AccountId}’s transactions; showing none.", account.Id);
             }
         }
         catch (Exception ex)
@@ -1490,7 +1490,7 @@ public partial class MainPage : LedgerBinderPage
     private void DismissOverlay() => HideOverlay();
 
     private async void MoveInstitution(Guid institutionId, Func<Guid, CancellationToken, Task> move) =>
-        await Guarded("move-institution", "Could not move the bank", async () =>
+        await Guarded("move-institution", "Couldn’t move the bank", async () =>
         {
             await move(institutionId, CancellationToken.None);
             await ReloadAsync();
@@ -1503,7 +1503,7 @@ public partial class MainPage : LedgerBinderPage
     // credentials to restore from) and a Plaid bank's Savings override, order, colour and history all come
     // back (Guard R-G11).
     private async void DisconnectInstitution(Institution institution) =>
-        await Guarded("disconnect", $"Could not disconnect {institution.Name}", () => DisconnectInstitutionAsync(institution));
+        await Guarded("disconnect", $"Couldn’t disconnect {institution.Name}", () => DisconnectInstitutionAsync(institution));
 
     private async Task DisconnectInstitutionAsync(Institution institution)
     {

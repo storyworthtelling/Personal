@@ -95,7 +95,7 @@ public sealed class Tombstones
             ? "A filed message is still in Gmail."
             : $"{stuck} filed messages are still in Gmail.";
         return new FilingFold(title,
-            "Gmail has not accepted the delete. They stay filed here, and Post asks again on every sync.");
+            "Gmail hasn’t accepted the delete. They stay filed here, and Post asks again on every sync.");
     }
 
     /// <summary>

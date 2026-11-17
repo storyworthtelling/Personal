@@ -45,7 +45,7 @@ public static class ChildPicker
             }
             catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
-                services.Diagnostics.Warn("child", "The household's children could not be read for Watch as a child.", exception);
+                services.Diagnostics.Warn("child", "The household’s children could not be read for Watch as a child.", exception);
             }
         });
     }

@@ -166,7 +166,7 @@ public static class PlayerEmbed
         if (!IsVideoId(videoId))
         {
             throw new ArgumentException(
-                $"\"{videoId}\" is not a YouTube video id (eleven characters of A-Z, a-z, 0-9, '-' or '_').",
+                $"\"{videoId}\" isn’t a YouTube video id (eleven characters of A-Z, a-z, 0-9, '-' or '_').",
                 nameof(videoId));
         }
 
@@ -235,7 +235,7 @@ public static class PlayerEmbed
         if (!valid)
         {
             throw new ArgumentException(
-                $"\"{applicationId}\" is not a lower-case package name, so it cannot name the player's origin.",
+                $"\"{applicationId}\" isn’t a lower-case package name, so it can’t name the player’s origin.",
                 nameof(applicationId));
         }
 

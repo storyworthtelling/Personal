@@ -132,7 +132,7 @@ public class SnowballHistorySourceTests
     {
         var page = Source(Page);
 
-        Assert.DoesNotContain("Each panel runs from $0 to that loan's own peak.", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Each panel runs from $0 to that loan’s own peak.", page, StringComparison.Ordinal);
         Assert.Contains("SnowballHistoryCopy.Footnote(", page, StringComparison.Ordinal);
     }
 
@@ -201,7 +201,7 @@ public class SnowballHistorySourceTests
     private static string MethodBody(string source, string signature)
     {
         var start = source.IndexOf(signature, StringComparison.Ordinal);
-        Assert.True(start >= 0, $"Could not find `{signature}`.");
+        Assert.True(start >= 0, $"Couldn’t find `{signature}`.");
 
         var open = source.IndexOf('{', source.IndexOf(')', start));
         var depth = 0;

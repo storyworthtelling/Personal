@@ -214,7 +214,7 @@ public class PrayerIsolationTests
         }
 
         Assert.True(offenders.Count == 0,
-            "These read prayer content and are not one of the declared readers:\n"
+            "These read prayer content and aren’t one of the declared readers:\n"
             + string.Join("\n", offenders));
     }
 

@@ -50,7 +50,7 @@ public class LedgerBinderShellTests
 
             if (!source.Contains(": LedgerBinderPage", StringComparison.Ordinal))
             {
-                wrong.Add($"{name} does not derive from LedgerBinderPage.");
+                wrong.Add($"{name} doesn’t derive from LedgerBinderPage.");
             }
             else if (!source.Contains("Wrap(LedgerArea.", StringComparison.Ordinal))
             {
@@ -74,7 +74,7 @@ public class LedgerBinderShellTests
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "These draw a Display label of their own; the header already carries the screen's name: "
+            "These draw a Display label of their own; the header already carries the screen’s name: "
             + string.Join(", ", offenders));
     }
 

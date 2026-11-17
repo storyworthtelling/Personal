@@ -53,7 +53,7 @@ public class OneRemarkableDoorTests
             .Select(Relative)
             .ToList();
 
-        Assert.True(found.Count == 0, "Give the tablet's HttpClient RemarkableLimits.Timeout:\n" + string.Join("\n", found));
+        Assert.True(found.Count == 0, "Give the tablet’s HttpClient RemarkableLimits.Timeout:\n" + string.Join("\n", found));
     }
 
     [Fact]

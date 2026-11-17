@@ -109,7 +109,7 @@ public class MealPassPlanTests
     [Fact]
     public void AnUnreadableStampCostsOneRun()
     {
-        var work = Look(Edt(10, 26, 7, 5), new MealPassStampRead.Unreadable("could not be opened"));
+        var work = Look(Edt(10, 26, 7, 5), new MealPassStampRead.Unreadable("couldn’t be opened"));
 
         Assert.True(work.PlanWeek);
     }

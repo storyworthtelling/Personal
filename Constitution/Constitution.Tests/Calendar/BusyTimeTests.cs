@@ -68,7 +68,7 @@ public class BusyTimeTests
     {
         // Blocking is broad on purpose: a name in a title is a heuristic, and "Dinner with Lee's
         // parents" is Sam's evening too. Only freeing time is narrow (the off-day tests).
-        var calendars = Calendars(family: [OnMonday("Lee's parents visit", 15, 16)]);
+        var calendars = Calendars(family: [OnMonday("Lee’s parents visit", 15, 16)]);
 
         Assert.Equal([Family(15, 16)], ForSam(calendars).Busy);
     }
@@ -186,7 +186,7 @@ public class BusyTimeTests
 
     [Theory]
     [InlineData("Samba class")]
-    [InlineData("Samuel's party")]
+    [InlineData("Samuel’s party")]
     [InlineData("Sam-Lee wedding")]
     [InlineData("Robin at the Leeds museum")]
     public void ANameInsideAWordNamesNobody(string title)
@@ -200,7 +200,7 @@ public class BusyTimeTests
     }
 
     [Theory]
-    [InlineData("Sam's turn to drive")]
+    [InlineData("Sam’s turn to drive")]
     [InlineData("SAM drives")]
     [InlineData("Robin, Sam")]
     [InlineData("(Sam)")]

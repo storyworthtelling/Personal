@@ -152,7 +152,7 @@ public class FrozenInvariantsTests
             .ToList();
 
         Assert.True(missing.Count == 0,
-            "These Settings screens do not show the app version, so an update that changes nothing "
+            "These Settings screens don’t show the app version, so an update that changes nothing "
             + $"visible is indistinguishable from no update at all:\n{string.Join("\n", missing)}");
     }
 
@@ -475,7 +475,7 @@ public class FrozenInvariantsTests
 
         Assert.True(missing.Count == 0,
             "These components are what qualify Post for the SMS role; without every one of them, filter " +
-            "included, the phone will not offer it the role and nothing will say so: " + string.Join(", ", missing));
+            "included, the phone won’t offer it the role and nothing will say so: " + string.Join(", ", missing));
     }
 
     // Declaring the four components is necessary and NOT sufficient. Android decides
@@ -607,13 +607,13 @@ public class FrozenInvariantsTests
                 var name = match.Groups["name"].Value;
                 if (!Directory.EnumerateDirectories(RepoRoot(), name, SearchOption.AllDirectories).Any())
                 {
-                    missing.Add($"{Path.GetFileName(workflow)} names {name}, which does not exist");
+                    missing.Add($"{Path.GetFileName(workflow)} names {name}, which doesn’t exist");
                 }
             }
         }
 
         Assert.True(missing.Count == 0,
-            "A workflow builds or publishes a head that is not on disk:\n" + string.Join("\n", missing));
+            "A workflow builds or publishes a head that isn’t on disk:\n" + string.Join("\n", missing));
     }
 
     /// <summary>
@@ -685,7 +685,7 @@ public class FrozenInvariantsTests
             .ToList();
 
         Assert.True(unchecked_.Count == 0,
-            "build-plate.yml's FONT CHECK does not name every font in /Fonts, so a misfiled one "
+            "build-plate.yml’s FONT CHECK doesn’t name every font in /Fonts, so a misfiled one "
             + $"would ship broken:\n{string.Join("\n", unchecked_)}");
     }
 
@@ -728,7 +728,7 @@ public class FrozenInvariantsTests
         var identity = File.ReadAllText(
             Path.Combine(RepoRoot(), "Constitution", "Constitution.Domain", "ConstitutionIdentity.cs"));
         var declared = Regex.Match(identity, @"public const string ApplicationId = ""([^""]*)""");
-        Assert.True(declared.Success, "ConstitutionIdentity.ApplicationId was not found.");
+        Assert.True(declared.Success, "ConstitutionIdentity.ApplicationId wasn’t found.");
         Assert.False(string.IsNullOrWhiteSpace(PolicyContext.ConstitutionPackage));
         Assert.Equal(declared.Groups[1].Value, PolicyContext.ConstitutionPackage);
         Assert.StartsWith(PolicyContext.OwnerPackagePrefix, PolicyContext.ConstitutionPackage, StringComparison.Ordinal);
@@ -863,7 +863,7 @@ public class FrozenInvariantsTests
 
         var declared = Regex.Match(tokens, $@"{hexName}\s*=\s*""(#[0-9A-Fa-f]{{6}})""");
         Assert.True(declared.Success,
-            $"IconStudio/Tokens.cs declares no {hexName}, so {app}'s icon cannot stand on its "
+            $"IconStudio/Tokens.cs declares no {hexName}, so {app}’s icon can’t stand on its "
             + "identity ground and silently falls back to plain paper.");
 
         Assert.Equal(DomainTier(app, tier), declared.Groups[1].Value, ignoreCase: true);

@@ -85,7 +85,7 @@ public class KitUsingsTests
         }
 
         Assert.True(offenders.Count == 0,
-            "These will not compile, and the only thing that would have said so is a six-minute "
+            "These won’t compile, and the only thing that would have said so is a six-minute "
             + "Android build:\n" + string.Join("\n", offenders.Distinct()));
     }
 

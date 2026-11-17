@@ -179,7 +179,7 @@ public class PastoralComposerTests
     public async Task AReplyThatRunsOnIsCutToItsFirstLine()
     {
         var composer = Composer(_ => Reply(
-            "A short list this morning.\n\nAlso, here is some more commentary you did not ask for."));
+            "A short list this morning.\n\nAlso, here is some more commentary you didn’t ask for."));
 
         var line = await composer.Compose(Brief(), CancellationToken.None);
 

@@ -23,7 +23,7 @@ public class ReportSizeTests
         // The document is more than the picture (fonts, 100 pages of type), so the bound is on the
         // picture alone: the whole PDF must come in under what a lossless copy of it would have cost.
         Assert.True(pdf.Length < picture.Length,
-            $"the PDF ({pdf.Length:N0} bytes) was no smaller than one illustration's PNG ({picture.Length:N0}); " +
+            $"the PDF ({pdf.Length:N0} bytes) was no smaller than one illustration’s PNG ({picture.Length:N0}); " +
             "pictures are being written losslessly again");
     }
 }

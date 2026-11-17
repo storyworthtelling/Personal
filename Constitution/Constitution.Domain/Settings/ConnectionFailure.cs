@@ -40,16 +40,16 @@ public static class ConnectionFailure
             case TimeoutException:
                 return $"{Gerund(act)} timed out. Try again.";
             case HttpRequestException { StatusCode: { } status } when act == ConnectionAct.PairRemarkable:
-                return $"The tablet did not accept that code ({status}).";
+                return $"The tablet didn’t accept that code ({status}).";
             case HttpRequestException:
-                return $"{Gerund(act)} stopped: the network could not be reached. Check the connection and try again.";
+                return $"{Gerund(act)} stopped: the network couldn’t be reached. Check the connection and try again.";
             case JsonException:
             case FormatException:
-                return $"{Gerund(act)} stopped: the reply was something Constitution could not read. Try again.";
+                return $"{Gerund(act)} stopped: the reply was something Constitution couldn’t read. Try again.";
             case IOException:
                 return $"{Gerund(act)} stopped: the connection dropped. Try again.";
             case InvalidOperationException when act == ConnectionAct.SignIn:
-                return $"Sign-in did not complete. {failure.Message}";
+                return $"Sign-in didn’t complete. {failure.Message}";
             default:
                 return $"{Gerund(act)} stopped unexpectedly ({failure.GetType().Name}).";
         }

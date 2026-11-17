@@ -41,7 +41,7 @@ public class SpikeSmsReceiver : BroadcastReceiver
         }
         catch (Exception e)
         {
-            SpikeLog.Note(context, $"A text arrived but could not be stored: {e.GetType().Name}.");
+            SpikeLog.Note(context, $"A text arrived but couldn’t be stored: {e.GetType().Name}.");
         }
     }
 }
@@ -54,7 +54,7 @@ public class SpikeMmsReceiver : BroadcastReceiver
     {
         if (context is not null)
         {
-            SpikeLog.Note(context, "An MMS notice arrived (picture or group text). The spike does not download it.");
+            SpikeLog.Note(context, "An MMS notice arrived (picture or group text). The spike doesn’t download it.");
         }
     }
 }

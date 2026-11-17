@@ -52,7 +52,7 @@ internal static class DocsData
             Cooked(2, "sheet-pan-chicken", Lee, kids: true),
             Cooked(3, "black-bean-chili", Sam),
             Cooked(4, "miso-salmon", Lee),
-            DinnerChoice.EatOut(Sunday.AddDays(5), "Friday is somebody else's kitchen."),
+            DinnerChoice.EatOut(Sunday.AddDays(5), "Friday is somebody else’s kitchen."),
             Cooked(6, "turkey-meatballs", Sam),
         ]);
 

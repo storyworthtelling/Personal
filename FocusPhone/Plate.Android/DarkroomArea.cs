@@ -186,7 +186,7 @@ public sealed class DarkroomArea(PlateActivity host) : PlateArea(host)
                 Invalidate();
             }),
             new CardAction("Write the caption", () => WriteCaption(item),
-                Detail: "The model will not name anyone in a picture."));
+                Detail: "The model won’t name anyone in a picture."));
     }
 
     // The owner's own words. Where a name belongs, this is how it gets there — and it is the

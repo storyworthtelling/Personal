@@ -50,7 +50,7 @@ public class WaitingPageAdoptedTests
             @"public static void Show\(Context context, FrameLayout host, string undoHint, Action onUndo\)\s*\{(?<body>.*?)\n    \}",
             RegexOptions.Singleline);
 
-        Assert.True(showMethod.Success, "Could not find DogEar.Show(...) (the undo fold) — has it moved or been renamed?");
+        Assert.True(showMethod.Success, "Couldn’t find DogEar.Show(...) (the undo fold) — has it moved or been renamed?");
         Assert.DoesNotContain("WaitingActivity", showMethod.Groups["body"].Value, StringComparison.Ordinal);
     }
 
@@ -63,7 +63,7 @@ public class WaitingPageAdoptedTests
             @"private static void OpenNotices\(Context context, FrameLayout host\)\s*\{(?<body>.*?)\n    \}",
             RegexOptions.Singleline);
 
-        Assert.True(match.Success, "Could not find OpenNotices(...)'s body in DogEar.cs.");
+        Assert.True(match.Success, "Couldn’t find OpenNotices(...)'s body in DogEar.cs.");
         return match.Groups["body"].Value;
     }
 

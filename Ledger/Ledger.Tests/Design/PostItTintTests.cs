@@ -88,7 +88,7 @@ public class PostItTintTests
         var (edgeL, _, edgeHue) = Oklch.FromHex(edge);
 
         Assert.True(edgeL < tintL, $"{label}: edge ({edgeL}) should be darker than the tint ({tintL}).");
-        Assert.True(Math.Abs(edgeHue - tintHue) < 5, $"{label}: edge hue drifted from the tint's hue.");
+        Assert.True(Math.Abs(edgeHue - tintHue) < 5, $"{label}: edge hue drifted from the tint’s hue.");
     }
 
     [Fact]

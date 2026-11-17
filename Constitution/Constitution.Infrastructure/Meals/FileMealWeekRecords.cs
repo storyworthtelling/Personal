@@ -11,7 +11,7 @@ namespace Constitution.Infrastructure.Meals;
 /// </summary>
 public sealed class FileMealWeekRecords : IMealWeekRecords
 {
-    public const string UnopenableReason = "The saved meal weeks could not be opened.";
+    public const string UnopenableReason = "The saved meal weeks couldn’t be opened.";
 
     private static readonly object FileLock = new();
 

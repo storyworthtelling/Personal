@@ -16,7 +16,7 @@ public static class HouseholdText
         ArgumentNullException.ThrowIfNull(nameOf);
         return answer switch
         {
-            { Status: ThisPhoneStatus.Known, Viewer: { } viewer } => $"This phone is {nameOf(viewer)}'s.",
+            { Status: ThisPhoneStatus.Known, Viewer: { } viewer } => $"This phone is {nameOf(viewer)}’s.",
             { Status: ThisPhoneStatus.NoRoster } => NoRoster,
             _ => People.ThisPhone.UnmatchedSentence,
         };

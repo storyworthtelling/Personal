@@ -108,7 +108,7 @@ public class HouseholdHeadSourceTests
 
                 Assert.True(
                     Regex.IsMatch(argument, "^\"[^\"{}]*\"$|^\\$\"[0-9a-z ,]*\\{(?:count|unreadable)\\}[a-z ,]*\"$|^phrase$|^HouseholdSentences\\.UnreadableTrail\\(exception\\.Reason\\)$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2)),
-                    relative + ": a trail call is not a plain sentence: " + argument);
+                    relative + ": a trail call isn’t a plain sentence: " + argument);
             }
         }
     }

@@ -17,9 +17,9 @@ namespace Storyworthtelling.Voice;
 public sealed class VoiceClient : IVoiceClient
 {
     private const string RefineInstruction =
-        "You are a voice analyst distilling one author's writing voice so short app messages can later be " +
+        "You are a voice analyst distilling one author’s writing voice so short app messages can later be " +
         "written to sound like them. You are given the CURRENT PROFILE (possibly empty) and a NEW WRITING " +
-        "SAMPLE. Update the profile to reflect the sample, folding it into what's already there rather " +
+        "SAMPLE. Update the profile to reflect the sample, folding it into what’s already there rather " +
         "than replacing it. Capture how the person actually writes — tone, register, attitude, cadence — " +
         "not the subject matter. Respond with ONLY a JSON object: " +
         "{\"register\":string,\"traits\":[string],\"examples\":[string],\"avoid\":[string]," +
@@ -27,7 +27,7 @@ public sealed class VoiceClient : IVoiceClient
         "register = how this person sounds, in a few words rather than a paragraph (\"wry, warm, " +
         "economical\"). traits = a few short descriptors (\"plain-spoken\", \"unhurried\", \"dry\"). " +
         "examples = 2 or 3 characteristic phrasings drawn from THIS sample, quoted closely, to anchor the " +
-        "voice concretely — supply only fresh ones from this sample; do NOT repeat the profile's existing " +
+        "voice concretely — supply only fresh ones from this sample; do NOT repeat the profile’s existing " +
         "examples, as the app preserves those itself. cadence = the shapes their sentences take (\"short " +
         "declarative openers\", \"lists of three\", \"a long sentence then a very short one\"). " +
         "punctuation = their marks and how they use them (\"em-dash asides\", \"semicolons, rarely\", " +
@@ -41,7 +41,7 @@ public sealed class VoiceClient : IVoiceClient
         "that follows. The message is UI copy shown for a specific occasion — write it to sound like the person " +
         "the profile describes, honoring their traits, writing in their cadence and punctuation, drawing " +
         "on their " +
-        "example phrasings, and avoiding what they'd avoid. PURPOSE names the occasion; CONTEXT gives the " +
+        "example phrasings, and avoiding what they’d avoid. PURPOSE names the occasion; CONTEXT gives the " +
         "specifics to reflect. Keep it within the word limit, plain text, no markup, no quotes, no " +
         "preamble — just the message itself.";
 

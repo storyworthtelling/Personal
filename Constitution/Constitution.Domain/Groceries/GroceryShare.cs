@@ -25,7 +25,7 @@ public static class GroceryShare
     public const string KeepPackage = "com.google.android.keep";
 
     /// <summary>What the phone is told when Keep is not there; also what a refused start finds out (D112).</summary>
-    public const string KeepNotInstalledSentence = "Keep is not on this phone, so the list was not sent.";
+    public const string KeepNotInstalledSentence = "Keep isn’t on this phone, so the list wasn’t sent.";
 
     /// <summary>
     /// Decides the share. The package is always Keep's: under the lockdown a chooser would offer only whatever survived it,

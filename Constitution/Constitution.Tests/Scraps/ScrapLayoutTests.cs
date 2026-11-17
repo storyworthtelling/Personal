@@ -169,7 +169,7 @@ public class ScrapLayoutTests
                 foreach (var corner in ScrapOracle.Tape(scrap.TapeAnchor))
                 {
                     Assert.InRange(corner.X, 0, wellWidth);
-                    Assert.True(corner.Y >= 0, $"{scrap.Id}'s tape starts above the page ({corner.Y}).");
+                    Assert.True(corner.Y >= 0, $"{scrap.Id}’s tape starts above the page ({corner.Y}).");
                 }
 
                 checkedScraps++;
@@ -226,7 +226,7 @@ public class ScrapLayoutTests
                 {
                     var tape = ScrapOracle.Tape(placed[i].TapeAnchor);
                     Assert.True(ScrapOracle.Touch(tape, ScrapOracle.Body(placed[i])),
-                        $"{placed[i].Id}'s tape does not reach its own scrap.");
+                        $"{placed[i].Id}’s tape doesn’t reach its own scrap.");
                     holds++;
 
                     for (var j = 0; j < placed.Count; j++)
@@ -234,9 +234,9 @@ public class ScrapLayoutTests
                         if (j != i)
                         {
                             Assert.False(ScrapOracle.Touch(tape, ScrapOracle.Body(placed[j])),
-                                $"{placed[i].Id}'s tape touches {placed[j].Id}.");
+                                $"{placed[i].Id}’s tape touches {placed[j].Id}.");
                             Assert.False(ScrapOracle.Touch(tape, ScrapOracle.Tape(placed[j].TapeAnchor)) && j > i,
-                                $"{placed[i].Id}'s tape touches {placed[j].Id}'s tape.");
+                                $"{placed[i].Id}’s tape touches {placed[j].Id}’s tape.");
                         }
                     }
                 }

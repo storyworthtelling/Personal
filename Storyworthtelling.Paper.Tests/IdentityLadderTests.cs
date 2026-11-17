@@ -48,8 +48,8 @@ public class IdentityLadderTests
         {
             var separation = Oklch.HueSeparation(hue, Oklch.FromHex(roleHex).HueDegrees);
             Assert.True(separation >= RequiredSeparation,
-                $"Folio's {tier} ({hex}) is {separation:F1}° from {role} ({roleHex}) — under the {RequiredSeparation}° "
-                + "DESIGN.md §3 binds an identity to. The window Folio fits is 105–109; there is not another one.");
+                $"Folio’s {tier} ({hex}) is {separation:F1}° from {role} ({roleHex}) — under the {RequiredSeparation}° "
+                + "DESIGN.md §3 binds an identity to. The window Folio fits is 105–109; there isn’t another one.");
         }
     }
 
@@ -61,7 +61,7 @@ public class IdentityLadderTests
     {
         var separation = Oklch.HueSeparation(Oklch.FromHex(hex).HueDegrees, CommittedHue);
         Assert.True(separation <= 2.5,
-            $"Folio's {tier} ({hex}) is {separation:F1}° off the committed {CommittedHue}°. The ladder is one hue.");
+            $"Folio’s {tier} ({hex}) is {separation:F1}° off the committed {CommittedHue}°. The ladder is one hue.");
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class IdentityLadderTests
         for (var i = 1; i < lightness.Count; i++)
         {
             Assert.True(lightness[i] < lightness[i - 1],
-                $"The ladder stops descending at tier {i}: {lightness[i]:F3} is not below {lightness[i - 1]:F3}.");
+                $"The ladder stops descending at tier {i}: {lightness[i]:F3} isn’t below {lightness[i - 1]:F3}.");
         }
     }
 
@@ -92,8 +92,8 @@ public class IdentityLadderTests
             Oklch.FromHex(AppIdentityTokens.FolioClothHex).HueDegrees, CommittedHue);
 
         Assert.True(separation > RequiredSeparation,
-            "Folio's cloth has drifted onto its identity hue. The binding is not required to match it "
-            + "(§12), and this one deliberately does not: it is a red, and the identity is an olive.");
+            "Folio’s cloth has drifted onto its identity hue. The binding isn’t required to match it "
+            + "(§12), and this one deliberately doesn’t: it is a red, and the identity is an olive.");
     }
 
     private static IEnumerable<(string Role, string Hex)> ChromaticRoles() =>

@@ -78,7 +78,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
     {
         var column = new LinearLayout(Host) { Orientation = Orientation.Vertical };
 
-        var field = PaperUi.Field(Host, "Describe what you're looking for");
+        var field = PaperUi.Field(Host, "Describe what you’re looking for");
         field.Text = draft;
         field.SetSelection(field.Text?.Length ?? 0);
         field.SetSingleLine(true);
@@ -209,7 +209,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
                         return;
                     }
                     stage = results.Count > 0 ? Stage.Results : Stage.Asking;
-                    status = "Filed could not be searched. The diagnostics log has the details.";
+                    status = "Filed couldn’t be searched. The diagnostics log has the details.";
                     Invalidate();
                 });
             }
@@ -248,7 +248,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
                 {
                     whyWords = $"reply unreadable, stop {reply.StopReason ?? "unknown"}";
                     PostDiagnostics.LogWarning("FiledSearch",
-                        $"Claude's Filed search reply could not be read (stop {reply.StopReason}, request {reply.RequestId})");
+                        $"Claude’s Filed search reply couldn’t be read (stop {reply.StopReason}, request {reply.RequestId})");
                 }
             }
             catch (Exception e)
@@ -301,7 +301,7 @@ public sealed class FiledArea(Activity host) : PostArea(host)
             {
                 null => null,
                 "no Claude key" => "Matched by words only: Post has no Claude key.",
-                _ => "Matched by words only: Claude could not be reached.",
+                _ => "Matched by words only: Claude couldn’t be reached.",
             };
         Invalidate();
     }

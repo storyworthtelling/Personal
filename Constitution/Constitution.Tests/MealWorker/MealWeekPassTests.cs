@@ -237,8 +237,8 @@ public class MealWeekPassTests
     {
         var rig = new PassRig
         {
-            StampRead = new MealPassStampRead.Unreadable("could not be opened"),
-            Weeks = new MealWeekRecordRead.Unreadable("could not be opened"),
+            StampRead = new MealPassStampRead.Unreadable("couldn’t be opened"),
+            Weeks = new MealWeekRecordRead.Unreadable("couldn’t be opened"),
         };
 
         var result = await rig.RunAsync(Morning);

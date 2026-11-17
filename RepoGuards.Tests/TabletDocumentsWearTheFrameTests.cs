@@ -50,7 +50,7 @@ public class TabletDocumentsWearTheFrameTests
             .Select(Relative)
             .ToList();
 
-        Assert.True(unframed.Count == 0, "Draw the page through SheetFrame (or Foreword's PageFurniture):\n" + string.Join("\n", unframed));
+        Assert.True(unframed.Count == 0, "Draw the page through SheetFrame (or Foreword’s PageFurniture):\n" + string.Join("\n", unframed));
     }
 
     [Fact]

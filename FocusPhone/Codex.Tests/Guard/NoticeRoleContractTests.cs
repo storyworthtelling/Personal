@@ -64,7 +64,7 @@ public class NoticeRoleContractTests
     private static string Literal(string source, string name)
     {
         var match = Regex.Match(source, @"public const string " + name + @" = ""([^""]*)"";");
-        Assert.True(match.Success, name + " was not found as a literal.");
+        Assert.True(match.Success, name + " wasn’t found as a literal.");
         return match.Groups[1].Value;
     }
 

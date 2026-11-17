@@ -115,6 +115,6 @@ public sealed class ReadBackServices
     {
         var appContext = context.ApplicationContext ?? context;
         return appContext.NoBackupFilesDir?.AbsolutePath
-            ?? throw new InvalidOperationException("The app has no private files folder to keep the read-back's files in.");
+            ?? throw new InvalidOperationException("The app has no private files folder to keep the read-back’s files in.");
     }
 }

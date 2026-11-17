@@ -19,7 +19,7 @@ public static class AttestationText
     /// <summary>What the owner attested, read on the phone that may not change it (D166).</summary>
     public static string ReadOnly(string serviceName, bool attested) => attested
         ? $"Adult profiles on {Name(serviceName)} are marked PIN-locked, so children can start titles there."
-        : $"Adult profiles on {Name(serviceName)} are not marked PIN-locked, so nothing starts there while a child is watching.";
+        : $"Adult profiles on {Name(serviceName)} aren’t marked PIN-locked, so nothing starts there while a child is watching.";
 
     private static string Name(string serviceName) =>
         string.IsNullOrWhiteSpace(serviceName)

@@ -90,7 +90,7 @@ public sealed class SeatComposer : ISeatComposer
             context.Append("\n- ").Append(fact);
         }
 
-        context.Append("\nSay only what these facts say, in a single sentence. Add no figure, name or advice that is not stated.");
+        context.Append("\nSay only what these facts say, in a single sentence. Add no figure, name or advice that isn’t stated.");
         return context.ToString();
     }
 }

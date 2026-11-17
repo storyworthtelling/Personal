@@ -32,7 +32,7 @@ public class CaptureFormatTests
         {
             var window = CaptureFormat.Window(ratio);
             Assert.True(window.Width > 0 && window.Height > window.Width,
-                $"{ratio} is not a portrait window.");
+                $"{ratio} isn’t a portrait window.");
         }
     }
 

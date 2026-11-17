@@ -38,7 +38,7 @@ public class OldShapeProfileTests
         var loaded = await Load(AsWrittenBeforeTheRefit);
 
         Assert.True(loaded.NeedsRelearn,
-            "The profile already on the owner's Drive read as 'nothing learned yet', so every app "
+            "The profile already on the owner’s Drive read as 'nothing learned yet', so every app "
             + "silently fell back to neutral copy with nothing to explain why.");
     }
 
@@ -68,7 +68,7 @@ public class OldShapeProfileTests
     [Fact]
     public async Task AGarbledFileIsNotARelearn()
     {
-        var loaded = await Load("{ this is not json");
+        var loaded = await Load("{ this isn’t json");
 
         Assert.True(loaded.IsEmpty);
         Assert.False(loaded.NeedsRelearn);

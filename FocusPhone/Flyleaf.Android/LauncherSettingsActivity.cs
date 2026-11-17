@@ -128,7 +128,7 @@ public class LauncherSettingsActivity : Activity
             }
             catch (Exception e)
             {
-                inlineStatus = $"Couldn't restart: {e.Message}";
+                inlineStatus = $"Couldn’t restart: {e.Message}";
             }
         }
 
@@ -212,7 +212,7 @@ public class LauncherSettingsActivity : Activity
             }
             if (!ok)
             {
-                inlineStatus = "Couldn't change Wi-Fi. This needs the device-owner lockdown.";
+                inlineStatus = "Couldn’t change Wi-Fi. This needs the device-owner lockdown.";
                 HeadLog.Warn("Connectivity", inlineStatus);
                 Render();
             }
@@ -258,7 +258,7 @@ public class LauncherSettingsActivity : Activity
             }
             if (!ok)
             {
-                inlineStatus = "Couldn't change mobile data on this device. Try Choose a network for the mobile-data panel.";
+                inlineStatus = "Couldn’t change mobile data on this device. Try Choose a network for the mobile-data panel.";
                 HeadLog.Warn("Connectivity", inlineStatus);
                 Render();
             }
@@ -285,7 +285,7 @@ public class LauncherSettingsActivity : Activity
             }
             if (!ok)
             {
-                inlineStatus = "Couldn't change Bluetooth on this device.";
+                inlineStatus = "Couldn’t change Bluetooth on this device.";
                 HeadLog.Warn("Connectivity", inlineStatus);
                 Render();
             }
@@ -315,7 +315,7 @@ public class LauncherSettingsActivity : Activity
                 try { StartActivity(new Intent(fallback).AddFlags(ActivityFlags.NewTask)); return; }
                 catch (Exception) { /* fall through to the status */ }
             }
-            inlineStatus = $"Couldn't open {label} on this device.";
+            inlineStatus = $"Couldn’t open {label} on this device.";
             Render();
         }
     }
@@ -325,7 +325,7 @@ public class LauncherSettingsActivity : Activity
     private void RenderApps()
     {
         var card = StartGroup();
-        AddNavRow(card, "Force-close an app", "Stop one that's misbehaving", ShowForceClosePicker);
+        AddNavRow(card, "Force-close an app", "Stop one that’s misbehaving", ShowForceClosePicker);
     }
 
     private void ShowForceClosePicker()
@@ -362,7 +362,7 @@ public class LauncherSettingsActivity : Activity
         }
         catch (Exception e)
         {
-            inlineStatus = $"Couldn't close {label}: {e.Message}";
+            inlineStatus = $"Couldn’t close {label}: {e.Message}";
             Render();
             return;
         }
@@ -446,7 +446,7 @@ public class LauncherSettingsActivity : Activity
         }
         else
         {
-            AddCardCaption("The channel checks every 6 hours. It hasn't run yet on this phone.");
+            AddCardCaption("The channel checks every 6 hours. It hasn’t run yet on this phone.");
         }
     }
 
@@ -536,7 +536,7 @@ public class LauncherSettingsActivity : Activity
         block.AddView(passphraseField, fieldParams);
 
         var helper = PaperUi.Secondary(this,
-            "Encrypts the shared Drive backup of this phone's keys so a reset can restore them. " +
+            "Encrypts the shared Drive backup of this phone’s keys so a reset can restore them. " +
             "Shown in the clear so you can copy it into your other apps.");
         helper.TextSize = DesignTokens.TypeSp.Label;
         var helperParams = MatchWrap();
@@ -597,7 +597,7 @@ public class LauncherSettingsActivity : Activity
         AddShelfAddRow(card);
 
         AddCardCaption("The category shelves your apps sort onto. New shelves get an engraved glyph — " +
-            "AI-drawn from the name when you're signed in with Google, a pencil monogram otherwise.");
+            "AI-drawn from the name when you’re signed in with Google, a pencil monogram otherwise.");
 
         // The AI glyph reads the shared Claude key from the encrypted vault on Drive, which needs a Google
         // sign-in. Without it there was no path to sign in, so the glyph stayed a monogram (P5-27).
@@ -647,7 +647,7 @@ public class LauncherSettingsActivity : Activity
     // whole shelf just to get a fresh draw.
     private void RegenerateShelfGlyph(string id, string name)
     {
-        inlineStatus = $"Redrawing {name}'s glyph…";
+        inlineStatus = $"Redrawing {name}’s glyph…";
         Render();
         UpgradeShelfGlyphAsync(id, name);
     }
@@ -715,7 +715,7 @@ public class LauncherSettingsActivity : Activity
             // Reachable both from silent creation-time upgrade and from an explicit Redraw tap; say
             // something either way, rather than leaving a "Redrawing…" status stuck on screen forever.
             inlineStatus = VoiceGoogleAccount.IsSignedIn
-                ? $"Couldn't draw a new glyph for {name}. Kept the current one."
+                ? $"Couldn’t draw a new glyph for {name}. Kept the current one."
                 : $"Sign in with Google to draw an AI glyph for {name}.";
             Render();
             return;

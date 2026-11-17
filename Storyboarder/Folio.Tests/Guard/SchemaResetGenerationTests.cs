@@ -26,8 +26,8 @@ public class SchemaResetGenerationTests
         // brand on purpose — it is asserted separately, below, because a device is recognised by it.
         var key = Regex.Match(store, @"const string SchemaResetGeneration\s*=\s*""(?<key>[^""]+)""");
         Assert.True(key.Success,
-            "The schema reset's key must be declared as a string literal constant named "
-            + "SchemaResetGeneration, so a property rename cannot move the key.");
+            "The schema reset’s key must be declared as a string literal constant named "
+            + "SchemaResetGeneration, so a property rename can’t move the key.");
 
         Assert.DoesNotContain("nameof", key.Value, StringComparison.Ordinal);
 
@@ -50,7 +50,7 @@ public class SchemaResetGenerationTests
             + "number rather than another preference key.");
 
         Assert.True(int.Parse(current.Groups["n"].Value) >= 2,
-            "The pivot's reset was generation 1. P10's fresh start has to be a later generation, or "
+            "The pivot’s reset was generation 1. P10's fresh start has to be a later generation, or "
             + "the drop never runs on a device that already did the first one.");
     }
 

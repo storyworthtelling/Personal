@@ -220,7 +220,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             // The read itself failed (not "no such package"). Claiming Admin mode is open would send the
             // owner to a browser that may be blocked, so the cautious answer is the one that names the
             // way out; the failure is in the log for whoever diagnoses it.
-            logger.LogWarning(ex, "Connect: could not read Chrome's state; treating Admin mode as needed.");
+            logger.LogWarning(ex, "Connect: could not read Chrome’s state; treating Admin mode as needed.");
             return AdminModeState.Needed;
         }
     }
@@ -539,7 +539,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             // (audit W8.2b: it was an alert in front of a connection that had already worked).
             if (backup.NeedsAttention)
                 CarriedNotices.Shared.Carry("vault-backup", new DogEarNotice(
-                    "The new bank’s backup did not finish.", backup.Message, DogEarHue.Problem));
+                    "The new bank’s backup didn’t finish.", backup.Message, DogEarHue.Problem));
 
             // Kick an immediate refresh so balances appear without waiting for the daily cycle, then
             // turn to Accounts, where the new bank's cards appear (no toast: the cards are the news).

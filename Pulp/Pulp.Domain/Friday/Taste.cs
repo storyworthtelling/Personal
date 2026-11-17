@@ -118,7 +118,7 @@ public static class TasteLearner
         if (vetoes.Viewer != viewer)
         {
             throw new ArgumentException(
-                $"The vetoes are {vetoes.Viewer}'s, not {viewer}'s; one viewer's vetoes never shape another's taste.",
+                $"The vetoes are {vetoes.Viewer}’s, not {viewer}’s; one viewer’s vetoes never shape another’s taste.",
                 nameof(vetoes));
         }
 

@@ -50,7 +50,7 @@ public class VoicedOccasionTests
 
         var unapproved = declared.Where(seat => !Approved.ContainsKey(seat)).ToList();
         Assert.True(unapproved.Count == 0,
-            "These seats are not on Pulp's approved list (D38): " + string.Join(", ", unapproved)
+            "These seats aren’t on Pulp’s approved list (D38): " + string.Join(", ", unapproved)
             + ". A voiced seat is a decision — add it to the approved list here with its D-number.");
 
         var retired = Approved.Keys.Where(seat => !declared.Contains(seat)).ToList();
@@ -83,7 +83,7 @@ public class VoicedOccasionTests
                 var offending = Trouble.FirstOrDefault(word => text.Contains(word, StringComparison.OrdinalIgnoreCase));
                 Assert.True(offending is null,
                     $"The seat {occasion.Seat} reads as trouble (\"{offending}\" in \"{text}\"). Errors, notices "
-                    + "and the dog-ear are told in plain copy, never in the owner's voice (DESIGN.md §14).");
+                    + "and the dog-ear are told in plain copy, never in the owner’s voice (DESIGN.md §14).");
                 checkedCount++;
             }
         }

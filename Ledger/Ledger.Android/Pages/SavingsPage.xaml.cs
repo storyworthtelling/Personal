@@ -634,7 +634,7 @@ public partial class SavingsPage : LedgerBinderPage
     private async void RemoveGoal(Guid accountId, string accountName)
     {
         await Storyworthtelling.Maui.State.GuardedWork.Run(
-            dogEarState, "remove-goal", $"Could not remove the goal for {accountName}",
+            dogEarState, "remove-goal", $"Couldn’t remove the goal for {accountName}",
             () => RemoveGoalAsync(accountId, accountName),
             failure => logger.LogError(failure, "Could not remove the savings goal for account {AccountId}.", accountId));
         dogEar.Refresh();

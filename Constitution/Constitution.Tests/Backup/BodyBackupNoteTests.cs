@@ -125,9 +125,9 @@ public class BodyBackupNoteTests
     {
         var note = BodyBackupNote.For(new BodyBackupResult(
             BodyBackupOutcome.Failed,
-            "The file written could not be read back; the previous file was put back."));
+            "The file written couldn’t be read back; the previous file was put back."));
 
-        Assert.DoesNotContain("could not be read back", note, StringComparison.Ordinal);
+        Assert.DoesNotContain("couldn’t be read back", note, StringComparison.Ordinal);
         Assert.DoesNotContain("(", note, StringComparison.Ordinal);
     }
 

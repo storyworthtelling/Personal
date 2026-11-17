@@ -29,7 +29,7 @@ public sealed class WorkoutWeekEndToEndTests : IDisposable
         var lift = new Session(
             SessionKind.Strength, TimeSpan.FromMinutes(40), false,
             [new Exercise("Squat holding a weight at your chest", EquipmentCatalogue.DumbbellsId), new Exercise("Band row", EquipmentCatalogue.BandsId), new Exercise("Wall angels")]);
-        var mobility = new Session(SessionKind.Mobility, TimeSpan.FromMinutes(20), false, [new("Cat and cow", EquipmentCatalogue.MatId), new("Child's pose", EquipmentCatalogue.MatId)]);
+        var mobility = new Session(SessionKind.Mobility, TimeSpan.FromMinutes(20), false, [new("Cat and cow", EquipmentCatalogue.MatId), new("Child’s pose", EquipmentCatalogue.MatId)]);
         var walk = new Session(SessionKind.OutdoorCardio, TimeSpan.FromMinutes(35), true, [new("Warm-up walk"), new("Brisk walk"), new("Cool-down walk")]);
         rig.AuthorWith(_ => WeekRig.PlanOfSessions(
             rig.Session(Sam, 0, 16, lift), rig.Session(Sam, 2, 16, mobility), rig.Session(Sam, 4, 16, lift),

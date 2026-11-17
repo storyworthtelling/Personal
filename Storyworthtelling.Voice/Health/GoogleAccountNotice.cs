@@ -19,7 +19,7 @@ public static class GoogleAccountNotice
         ShowsSignInAgain(report)
             ? new SignInNotice(
                 "Sign in to Google again",
-                "Google turned this phone's sign-in away, so Drive is waiting: the vault, backups and log uploads. Open Settings and choose Sign in again.")
+                "Google turned this phone’s sign-in away, so Drive is waiting: the vault, backups and log uploads. Open Settings and choose Sign in again.")
             : null;
 
     /// <summary>Whether Settings shows the "Sign in again" row: only while the last word from Google was a refusal.</summary>

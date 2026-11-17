@@ -21,7 +21,7 @@ public static class CallSheet
         // ── Score ───────────────────────────────────────────────────────────────────────────────────
         new("Score", "welcome", "welcome", 40, VoiceTier.Strong, VoiceFallback.Hide),
         new("Score", "crate-note",
-            "a one-line note about a record in this week's crate, as the person who picked it out — "
+            "a one-line note about a record in this week’s crate, as the person who picked it out — "
             + "vary how it opens from one pick to the next (lead with an image, a memory, a detail "
             + "about the record itself, whatever fits) rather than starting with \"Picked this "
             + "because\" or any other fixed opening every time",
@@ -70,10 +70,10 @@ public static class CallSheet
         new("Pulp", "playlist-line", "one line about a playlist", 40, VoiceTier.Strong, VoiceFallback.Hide),
         new("Pulp", "child-greeting", "a gentle greeting for a child", 40, VoiceTier.Strong, VoiceFallback.Hide,
             VoiceAudience.Child),
-        new("Pulp", "child-favorites", "one gentle line above a child's favorites", 40, VoiceTier.Strong,
+        new("Pulp", "child-favorites", "one gentle line above a child’s favorites", 40, VoiceTier.Strong,
             VoiceFallback.Hide, VoiceAudience.Child),
         new("Pulp", "empty-continue-watching", "an invitation on a home page with nothing started yet", 40,
-            VoiceTier.Strong, VoiceFallback.Neutral, Neutral: "Nothing started yet. Discover has this week's stack."),
+            VoiceTier.Strong, VoiceFallback.Neutral, Neutral: "Nothing started yet. Discover has this week’s stack."),
         new("Pulp", "empty-playlists", "an invitation to make a first playlist", 40, VoiceTier.Strong,
             VoiceFallback.Neutral, Neutral: "No playlists yet."),
         new("Pulp", "empty-playlist", "an invitation to put something on a new playlist", 40, VoiceTier.Strong,
@@ -91,31 +91,31 @@ public static class CallSheet
         new("Pulp", "empty-sports", "an invitation to follow a first team", 40, VoiceTier.Strong,
             VoiceFallback.Neutral, Neutral: "No teams followed yet."),
         new("Pulp", "stack-used-up",
-            "a line for a week's stack that has all been seen, until the next one on Friday", 40, VoiceTier.Strong,
-            VoiceFallback.Neutral, Neutral: "That's the week. More on Friday."),
+            "a line for a week’s stack that has all been seen, until the next one on Friday", 40, VoiceTier.Strong,
+            VoiceFallback.Neutral, Neutral: "That’s the week. More on Friday."),
 
         // ── Constitution (hides like every other app: owner's ruling, W10) ─────────────────────────
         new("Constitution", "today-top-line",
-            "one line at the top of Today about the day's workout and tonight's dinner", 25, VoiceTier.Strong,
+            "one line at the top of Today about the day’s workout and tonight’s dinner", 25, VoiceTier.Strong,
             VoiceFallback.Hide),
         new("Constitution", "rest-day-line",
-            "one line at the top of Today on a rest day, about the rest and tonight's dinner", 25, VoiceTier.Strong,
+            "one line at the top of Today on a rest day, about the rest and tonight’s dinner", 25, VoiceTier.Strong,
             VoiceFallback.Hide),
         new("Constitution", "body-monthly",
-            "one sentence on Body about how the month's signals moved against last month", 35, VoiceTier.Strong,
+            "one sentence on Body about how the month’s signals moved against last month", 35, VoiceTier.Strong,
             VoiceFallback.Hide),
         new("Constitution", "signal-sentence",
-            "one sentence on a signal's page setting its latest reading against the owner's own past", 30,
+            "one sentence on a signal’s page setting its latest reading against the owner’s own past", 30,
             VoiceTier.Strong, VoiceFallback.Hide),
         new("Constitution", "workout-encouragement",
             "one line of encouragement on a workout page, about progress since last time", 20, VoiceTier.Strong,
             VoiceFallback.Hide),
         new("Constitution", "meal-sheet-intro",
-            "one line opening the week's dinner sheet, about the week ahead", 30, VoiceTier.Strong,
+            "one line opening the week’s dinner sheet, about the week ahead", 30, VoiceTier.Strong,
             VoiceFallback.Hide),
 
         // ── Index ───────────────────────────────────────────────────────────────────────────────────
-        new("Index", "accounts", "a line above the accounts about how the household's debt has been moving", 24,
+        new("Index", "accounts", "a line above the accounts about how the household’s debt has been moving", 24,
             VoiceTier.Strong, VoiceFallback.Hide, Guidance: IndexCommon + IndexNoAmounts),
         new("Index", "snowball", "a line above the debt-free date about how far the debt has come down", 24,
             VoiceTier.Strong, VoiceFallback.Hide, Guidance: IndexCommon + IndexNoAmounts),
@@ -133,11 +133,11 @@ public static class CallSheet
 
         // ── Foreword ────────────────────────────────────────────────────────────────────────────────
         new("Foreword", "welcome", "welcome", 40, VoiceTier.Strong, VoiceFallback.Hide),
-        new("Foreword", "brief-opening", "one line opening the morning brief, before the day's stories", 25,
+        new("Foreword", "brief-opening", "one line opening the morning brief, before the day’s stories", 25,
             VoiceTier.Strong, VoiceFallback.Hide),
-        new("Foreword", "day-narrator", "one line at the top of the day's calendar page, about the shape of the day", 25,
+        new("Foreword", "day-narrator", "one line at the top of the day’s calendar page, about the shape of the day", 25,
             VoiceTier.Strong, VoiceFallback.Hide),
-        new("Foreword", "checklist-coach", "one line at the top of the day's checklist, about the tasks ahead", 25,
+        new("Foreword", "checklist-coach", "one line at the top of the day’s checklist, about the tasks ahead", 25,
             VoiceTier.Strong, VoiceFallback.Hide),
         new("Foreword", "prayer-line", "one short line at the top of a private prayer page", 25, VoiceTier.Strong,
             VoiceFallback.Hide,
@@ -150,7 +150,7 @@ public static class CallSheet
     ];
 
     private const string IndexCommon =
-        "Write one short sentence in the owner's voice, as a line of copy at the top of a screen in a "
+        "Write one short sentence in the owner’s voice, as a line of copy at the top of a screen in a "
         + "personal finance notebook. Build it ONLY from the FACTS below: use no number the FACTS do not "
         + "give, and do not invent one. Say numbers in words, and percentages in words as in \"about one "
         + "percent\". No advice, no instruction, no judgement, no exclamation marks, no emoji, no quotation "

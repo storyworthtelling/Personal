@@ -32,9 +32,9 @@ public sealed record MealRecipeSeams(IKeptWeeks Weeks, IRecipeBoxSource Recipes,
 /// </summary>
 public static class MealRecipeHourRun
 {
-    public const string WeeksSentence = "The kept weeks are there and cannot be read, so no recipe was sent.";
-    public const string BoxSentence = "The recipe box cannot be read now, so no recipe was sent.";
-    public const string TasteSentence = "The taste profile is there and cannot be read, so no recipe was sent.";
+    public const string WeeksSentence = "The kept weeks are there and can’t be read, so no recipe was sent.";
+    public const string BoxSentence = "The recipe box can’t be read now, so no recipe was sent.";
+    public const string TasteSentence = "The taste profile is there and can’t be read, so no recipe was sent.";
 
     public static async Task<MealRecipesOutcome> RunAsync(MealWeekRequestInputs inputs, MealRecipeSeams seams, CancellationToken cancellation)
     {

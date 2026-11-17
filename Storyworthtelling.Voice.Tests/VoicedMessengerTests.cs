@@ -25,12 +25,12 @@ public class VoicedMessengerTests
     {
         store.Setup(s => s.LoadAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Learned);
         client.Setup(c => c.ComposeAsync(Learned, It.IsAny<MessageRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync("  Welcome back — let's make something.  ");
+            .ReturnsAsync("  Welcome back — let’s make something.  ");
 
         var message = await Messenger().ComposeAsync(
             new MessageRequest("welcome"), fallback: "Welcome.", CancellationToken.None);
 
-        Assert.Equal("Welcome back — let's make something.", message); // trimmed
+        Assert.Equal("Welcome back — let’s make something.", message); // trimmed
     }
 
     [Fact]

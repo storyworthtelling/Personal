@@ -44,7 +44,7 @@ public class GlyphPathTests
     [Fact]
     public void Extract_PullsThePathOutOfProse()
     {
-        var reply = "Here's a simple house glyph: M10 50 L50 10 90 50 L90 90 10 90 Z — hope that works!";
+        var reply = "Here’s a simple house glyph: M10 50 L50 10 90 50 L90 90 10 90 Z — hope that works!";
         var path = GlyphPath.Extract(reply);
         Assert.NotNull(path);
         Assert.True(GlyphPath.IsValid(path));
@@ -54,6 +54,6 @@ public class GlyphPathTests
     [Fact]
     public void Extract_ReturnsNull_WhenNothingValidIsPresent()
     {
-        Assert.Null(GlyphPath.Extract("I couldn't generate a glyph for that."));
+        Assert.Null(GlyphPath.Extract("I couldn’t generate a glyph for that."));
     }
 }

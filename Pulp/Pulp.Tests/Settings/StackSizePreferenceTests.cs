@@ -21,7 +21,7 @@ public class StackSizePreferenceTests
     public void TheStoreUsesTheFrozenNamesAndStaysOnThisPhone()
     {
         var store = PulpSource.Files(".cs").SingleOrDefault(file => PulpSource.Relative(file) == "Pulp.Android/Settings/StackSizeStore.cs");
-        Assert.True(store is not null, "Pulp.Android/Settings/StackSizeStore.cs was not found.");
+        Assert.True(store is not null, "Pulp.Android/Settings/StackSizeStore.cs wasn’t found.");
 
         var source = File.ReadAllText(store!);
         Assert.Contains("GetSharedPreferences(StackSizePreference.FileName", source, StringComparison.Ordinal);

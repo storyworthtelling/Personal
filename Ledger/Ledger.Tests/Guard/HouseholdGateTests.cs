@@ -205,7 +205,7 @@ public class HouseholdGateTests
     {
         using var db = new TestDatabase();
         var (publisher, _, file) = CreatePublisher(db);
-        await publisher.PublishAsync("someone else's passphrase", OwnerEmail, default);
+        await publisher.PublishAsync("someone else’s passphrase", OwnerEmail, default);
         var theirs = file.Content;
 
         var result = await publisher.PublishAsync(Passphrase, HerEmail, default);

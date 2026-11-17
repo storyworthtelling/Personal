@@ -28,7 +28,7 @@ public class TasteDishNamesTests
     [Fact]
     public void ABoxThatCannotBeReadNamesNothingAndDoesNotThrow()
     {
-        var names = new TasteDishNames(Box(new RecipeBoxRead.Unavailable("The household file cannot be read.")));
+        var names = new TasteDishNames(Box(new RecipeBoxRead.Unavailable("The household file can’t be read.")));
 
         Assert.Null(names.Of(new RecipeId("tomato-pasta")));
     }

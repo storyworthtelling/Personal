@@ -166,7 +166,7 @@ public class ShelfPage : FolioBinderPage
                 Text = string.Empty,
             };
             SemanticProperties.SetDescription(spine, $"{book.Title}, {book.WordCount:N0} words");
-            SemanticProperties.SetHint(spine, "Opens the book's actions");
+            SemanticProperties.SetHint(spine, "Opens the book’s actions");
             spine.Clicked += (_, _) => ShowActions(book);
             AbsoluteLayout.SetLayoutBounds(spine, new Rect(span.LeftDp, 0, span.WidthDp, height));
             layer.Children.Add(spine);

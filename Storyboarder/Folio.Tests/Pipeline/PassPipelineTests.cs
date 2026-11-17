@@ -59,7 +59,7 @@ public class PassPipelineTests
     [Fact]
     public void ASectionWithSomethingToSayHasContent()
     {
-        var read = new SectionRead("pacing", "The middle slackens.", [new ReportFinding("Ch. 12", "Four chapters do one chapter's work.")]);
+        var read = new SectionRead("pacing", "The middle slackens.", [new ReportFinding("Ch. 12", "Four chapters do one chapter’s work.")]);
 
         Assert.True(read.HasContent);
     }

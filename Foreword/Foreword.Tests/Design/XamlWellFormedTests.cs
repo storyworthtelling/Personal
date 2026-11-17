@@ -46,7 +46,7 @@ public class XamlWellFormedTests
         }
 
         Assert.True(broken.Count == 0,
-            "These XAML files are not well-formed XML, so the head will not build:\n"
+            "These XAML files aren’t well-formed XML, so the head won’t build:\n"
             + string.Join("\n", broken));
     }
 
@@ -160,7 +160,7 @@ public class XamlWellFormedTests
             kit = kit.Parent;
         }
 
-        Assert.True(kit is not null, "Could not find Storyworthtelling.Maui above " + Root());
+        Assert.True(kit is not null, "Couldn’t find Storyworthtelling.Maui above " + Root());
         return Directory.EnumerateFiles(
             Path.Combine(kit!.FullName, "Storyworthtelling.Maui"), "*.xaml", SearchOption.AllDirectories);
     }

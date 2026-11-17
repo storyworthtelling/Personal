@@ -45,7 +45,7 @@ public class DocumentGreyscaleTests
                 var outline = paths.Where(p => p.Stroked && PdfReadBack.Same(p.Bounds, target.Bounds)).ToList();
 
                 Assert.NotEmpty(outline);
-                Assert.All(outline, p => Assert.True(PdfReadBack.SameColour(p.Stroke, muted), $"{target.Id} is not drawn in the muted ink."));
+                Assert.All(outline, p => Assert.True(PdfReadBack.SameColour(p.Stroke, muted), $"{target.Id} isn’t drawn in the muted ink."));
                 checkedTargets++;
             }
 
@@ -54,11 +54,11 @@ public class DocumentGreyscaleTests
                 var line = paths.Where(p => p.Stroked && PdfReadBack.Same(p.Bounds, rule.Bounds)).ToList();
 
                 Assert.NotEmpty(line);
-                Assert.All(line, p => Assert.True(PdfReadBack.SameColour(p.Stroke, muted), $"{rule.Name} is not drawn in the muted ink."));
+                Assert.All(line, p => Assert.True(PdfReadBack.SameColour(p.Stroke, muted), $"{rule.Name} isn’t drawn in the muted ink."));
             }
         }
 
-        Assert.True(checkedTargets >= 12, $"Only {checkedTargets} targets were checked; the walk is not reaching the page.");
+        Assert.True(checkedTargets >= 12, $"Only {checkedTargets} targets were checked; the walk isn’t reaching the page.");
     }
 
     [Fact]
@@ -134,7 +134,7 @@ public class DocumentGreyscaleTests
         var muted = SKColor.Parse(PaperColorTokens.InkMuted);
         var ground = SKColor.Parse(PaperColorTokens.Rm2Ground);
 
-        Assert.True(Luma(muted) > 0.35, "Muted ink is too close to the pen's black.");
+        Assert.True(Luma(muted) > 0.35, "Muted ink is too close to the pen’s black.");
         Assert.True(Luma(ground) - Luma(muted) > 0.25, "Muted ink is too close to the ground.");
     }
 

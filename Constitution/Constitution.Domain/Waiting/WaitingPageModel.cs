@@ -64,7 +64,7 @@ public sealed class WaitingPageModel
         if (!item.Chips.Contains(chosen))
         {
             throw new ArgumentException(
-                $"\"{chosen.Value}\" is not one of the chips on this row ({item.Chips.Count} offered).", nameof(chosen));
+                $"\"{chosen.Value}\" isn’t one of the chips on this row ({item.Chips.Count} offered).", nameof(chosen));
         }
 
         board.Resolve(item.CauseKey);
@@ -119,7 +119,7 @@ public sealed class WaitingPageModel
                 NoChips),
             NoticeKind.WeekNotPlanned => (
                 "This week couldn’t be planned",
-                "Constitution couldn’t read a calendar or record it needs, so it has not planned the week, written to a calendar or sent a page. It looks again at the next run.",
+                "Constitution couldn’t read a calendar or record it needs, so it hasn’t planned the week, written to a calendar or sent a page. It looks again at the next run.",
                 null,
                 NoChips),
             NoticeKind.HouseholdFileUnreadable => (
@@ -144,7 +144,7 @@ public sealed class WaitingPageModel
             // The cause named no candidates: say so plainly rather than offer chips with nothing on them.
             return (
                 "A handwritten number was hard to read",
-                "The page was hard to read, and the two possible values could not be shown.",
+                "The page was hard to read, and the two possible values couldn’t be shown.",
                 null,
                 NoChips);
         }

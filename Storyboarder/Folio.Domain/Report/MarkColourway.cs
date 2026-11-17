@@ -46,7 +46,7 @@ public static class MarkColourway
         if (pixels is not { Count: > 0 })
         {
             throw new ArgumentException(
-                "A jacket with no pixels cannot colour the mark. Every book has a jacket by the time a "
+                "A jacket with no pixels can’t colour the mark. Every book has a jacket by the time a "
                 + "report is composed — the plain cloth fallback included — so an empty image here is a "
                 + "decode that failed silently upstream, and a constant colourway would hide it.",
                 nameof(pixels));

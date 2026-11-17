@@ -312,7 +312,7 @@ public class BusyTimeEdgeTests
     {
         // Lee's calendar could not be read (the share is not done yet). That is not "Lee is free":
         // nothing may be placed for her, and the answer says why.
-        var calendars = CalendarsWith(lee: CalendarRead.Unreadable("The calendar is not shared with this account."));
+        var calendars = CalendarsWith(lee: CalendarRead.Unreadable("The calendar isn’t shared with this account."));
 
         var lee = Day(Lee, Monday, calendars);
 
@@ -321,13 +321,13 @@ public class BusyTimeEdgeTests
         Assert.Empty(lee.FreeGaps(Edt(10, 26, 0), Edt(10, 27, 0), TimeSpan.FromMinutes(30)));
         var unreadable = Assert.Single(lee.Unreadable);
         Assert.Equal(CalendarSource.Own, unreadable.Source);
-        Assert.Equal("The calendar is not shared with this account.", unreadable.Reason);
+        Assert.Equal("The calendar isn’t shared with this account.", unreadable.Reason);
     }
 
     [Fact]
     public void APartnersUnreadableCalendarDoesNotStopMe()
     {
-        var calendars = CalendarsWith(lee: CalendarRead.Unreadable("The calendar is not shared with this account."));
+        var calendars = CalendarsWith(lee: CalendarRead.Unreadable("The calendar isn’t shared with this account."));
 
         var sam = Day(Sam, Monday, calendars);
 
@@ -339,7 +339,7 @@ public class BusyTimeEdgeTests
     [Fact]
     public void AnUnreadableFamilyCalendarStopsBoth()
     {
-        var calendars = CalendarsWith(family: CalendarRead.Unreadable("Google Calendar would not answer."));
+        var calendars = CalendarsWith(family: CalendarRead.Unreadable("Google Calendar wouldn’t answer."));
 
         foreach (var person in new[] { Sam, Lee })
         {
@@ -352,7 +352,7 @@ public class BusyTimeEdgeTests
     [Fact]
     public void AnUnreadableChildrensCalendarStopsBoth()
     {
-        var calendars = CalendarsWith(children: CalendarRead.Unreadable("Google Calendar would not answer."));
+        var calendars = CalendarsWith(children: CalendarRead.Unreadable("Google Calendar wouldn’t answer."));
 
         foreach (var person in new[] { Sam, Lee })
         {

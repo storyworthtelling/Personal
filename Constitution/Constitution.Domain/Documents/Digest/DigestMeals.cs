@@ -51,7 +51,7 @@ public static class DigestMeals
             baseline += 20f;
         }
 
-        PageDraft.RequireRoom(baseline, PageDraft.NotesBottom - 20f, "The digest's meals page");
+        PageDraft.RequireRoom(baseline, PageDraft.NotesBottom - 20f, "The digest’s meals page");
         draft.Footer("Digest", saturday.ToDateTime(TimeOnly.MinValue), number, pages);
         return draft.ToLayout();
     }
@@ -78,7 +78,7 @@ public static class DigestMeals
             top += InkTargets.WriteLineHeight + InkTargets.MinimumClearance;
         }
 
-        PageDraft.RequireRoom(top, 556f, "The digest's next-week page");
+        PageDraft.RequireRoom(top, 556f, "The digest’s next-week page");
         draft.Footer("Digest", saturday.ToDateTime(TimeOnly.MinValue), number, pages);
         return draft.ToLayout();
     }

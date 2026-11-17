@@ -50,7 +50,7 @@ public class NudgeNeverWriteTests
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "A mark diagnoses and stops — nudge never write. These members could hold the author's "
+            "A mark diagnoses and stops — nudge never write. These members could hold the author’s "
             + "sentences instead of a note about them:\n" + string.Join("\n", offenders));
     }
 

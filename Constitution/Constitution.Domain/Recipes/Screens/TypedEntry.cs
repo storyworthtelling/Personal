@@ -20,7 +20,7 @@ public sealed class TypedEntry
 
     public const string ReadHeading = "Check what was read.";
 
-    public const string ReadNote = "Edit anything that is wrong. The photos are not kept, only these words.";
+    public const string ReadNote = "Edit anything that is wrong. The photos aren’t kept, only these words.";
 
     public const string TitleLabel = "Title";
 

@@ -108,7 +108,7 @@ public class KitAdoptionTests
             .ToList();
 
         Assert.True(missing.Count == 0,
-            "These screens ask for tokens the kit does not define. Nothing fails until the page is "
+            "These screens ask for tokens the kit doesn’t define. Nothing fails until the page is "
             + "inflated on a device:\n" + string.Join("\n", missing));
     }
 
@@ -137,7 +137,7 @@ public class KitAdoptionTests
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "These read a Paper & Ink token with the indexer, which does not see merged dictionaries "
+            "These read a Paper & Ink token with the indexer, which doesn’t see merged dictionaries "
             + "and throws once the kit is the only source. Use PaperResources:\n"
             + string.Join("\n", offenders));
     }
@@ -173,7 +173,7 @@ public class KitAdoptionTests
     private static string KitDictionary()
     {
         var kit = Path.Combine(RepoRoot(), "Storyworthtelling.Maui", "Resources", "Styles", "Paper.xaml");
-        Assert.True(File.Exists(kit), $"The shared kit's dictionary is not where this guard expects it: {kit}");
+        Assert.True(File.Exists(kit), $"The shared kit’s dictionary isn’t where this guard expects it: {kit}");
         return kit;
     }
 

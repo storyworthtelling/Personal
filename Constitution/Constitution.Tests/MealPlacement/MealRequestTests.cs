@@ -274,7 +274,7 @@ public class MealRequestTests
     {
         var refusal = Assert.Throws<ArgumentException>(() => Requests(WeekOf(CookedOn(0, Chili, Robin, 45))));
 
-        Assert.Contains("household's adults", refusal.Message, StringComparison.Ordinal);
+        Assert.Contains("household’s adults", refusal.Message, StringComparison.Ordinal);
     }
 
     [Fact]

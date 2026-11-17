@@ -77,7 +77,7 @@ public class ConstitutionKindsTests
     public void KindsAreLiteralsNeverNameof()
     {
         var file = ConstitutionSource.Files(".cs").SingleOrDefault(path => ConstitutionSource.IsGuard(path, "ConstitutionKinds.cs"));
-        Assert.True(file is not null, "ConstitutionKinds.cs was not found under Constitution/.");
+        Assert.True(file is not null, "ConstitutionKinds.cs wasn’t found under Constitution/.");
 
         var code = Regex.Replace(File.ReadAllText(file!), @"///.*|//.*", string.Empty);
         Assert.DoesNotContain("nameof(", code, StringComparison.Ordinal);

@@ -15,7 +15,7 @@ public static class TasteJudgePrompt
     public static string System { get; } =
         "You read one short sentence that a member of a household wrote about a dish, or about a line of their meal sheet, and decide whether it states "
         + "a lasting lesson about their taste or only a remark about one evening. You are told the dish name (or none) and the written reason. "
-        + "A lasting lesson is a cuisine, an ingredient or a whole dish they will not want again or really like. Being tired, a missing item, the "
+        + "A lasting lesson is a cuisine, an ingredient or a whole dish they won’t want again or really like. Being tired, a missing item, the "
         + "timing, the weather or a mood is a remark about one evening and teaches nothing. Use only these kinds: cuisine, whose subject is exactly "
         + "one of " + string.Join(", ", Cuisines.All.Select(Cuisines.Words.Word)) + "; ingredient, whose subject is one or two plain lower-case food words; "
         + "dish, for the dish you were told, with no subject. The stance is likes or dislikes. Write at most three lessons and never one the words do "
@@ -52,12 +52,12 @@ public static class TasteJudgeReply
     {
         if (string.IsNullOrWhiteSpace(text))
         {
-            return Unusable("The judge's reply was empty.");
+            return Unusable("The judge’s reply was empty.");
         }
 
         if (text.Length > LongestReply)
         {
-            return Unusable("The judge's reply was longer than a judgement can be.");
+            return Unusable("The judge’s reply was longer than a judgement can be.");
         }
 
         JsonDocument document;
@@ -68,7 +68,7 @@ public static class TasteJudgeReply
         catch (JsonException)
         {
             // Nothing from the exception is kept: its text can quote the reply.
-            return Unusable("The judge's reply was not the JSON that was asked for.");
+            return Unusable("The judge’s reply wasn’t the JSON that was asked for.");
         }
 
         using (document)
@@ -82,13 +82,13 @@ public static class TasteJudgeReply
         if (root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("verdict", out var verdict) || verdict.ValueKind != JsonValueKind.String)
         {
-            return Unusable("The judge's reply had no verdict.");
+            return Unusable("The judge’s reply had no verdict.");
         }
 
         var lessons = root.TryGetProperty("lessons", out var listed) ? listed : (JsonElement?)null;
         if (lessons is { ValueKind: not JsonValueKind.Array and not JsonValueKind.Null })
         {
-            return Unusable("The judge's reply listed its lessons in a shape that was not asked for.");
+            return Unusable("The judge’s reply listed its lessons in a shape that wasn’t asked for.");
         }
 
         var items = lessons is { ValueKind: JsonValueKind.Array } array ? array.EnumerateArray().ToList() : [];
@@ -99,7 +99,7 @@ public static class TasteJudgeReply
             case "lasting":
                 return LastingFrom(items, recipe);
             default:
-                return Unusable("The judge's verdict was not one that was asked for.");
+                return Unusable("The judge’s verdict wasn’t one that was asked for.");
         }
     }
 
@@ -107,7 +107,7 @@ public static class TasteJudgeReply
     {
         if (items.Count is 0 or > TasteLearner.MaxLessonsPerEvidence)
         {
-            return Unusable("The judge's lasting verdict had no lesson or too many.");
+            return Unusable("The judge’s lasting verdict had no lesson or too many.");
         }
 
         var lessons = new List<TasteLesson>();
@@ -117,7 +117,7 @@ public static class TasteJudgeReply
                 || Word(item, "kind") is not { } kindWord || !TasteNoteWords.Kinds.TryValue(kindWord, out var kind)
                 || Word(item, "stance") is not { } stanceWord || !TasteNoteWords.Stances.TryValue(stanceWord, out var stance))
             {
-                return Unusable("A lesson had a kind or a stance that was not asked for.");
+                return Unusable("A lesson had a kind or a stance that wasn’t asked for.");
             }
 
             if (kind == TasteSubjectKind.Dish)

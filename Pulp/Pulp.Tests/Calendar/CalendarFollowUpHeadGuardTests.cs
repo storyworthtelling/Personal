@@ -10,7 +10,7 @@ public class CalendarFollowUpHeadGuardTests
     private static string Head(string relative)
     {
         var path = Path.Combine(PulpSource.Root(), relative);
-        Assert.True(File.Exists(path), relative + " does not exist, so nothing it should contain can be checked.");
+        Assert.True(File.Exists(path), relative + " doesn’t exist, so nothing it should contain can be checked.");
         return File.ReadAllText(path);
     }
 

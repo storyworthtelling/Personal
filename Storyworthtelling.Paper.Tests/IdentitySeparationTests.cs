@@ -113,7 +113,7 @@ public class IdentitySeparationTests
         }
 
         Assert.True(tooClose.Count == 0,
-            $"Constitution's ladder must clear every sibling and role by {RequiredSeparation}°:\n"
+            $"Constitution’s ladder must clear every sibling and role by {RequiredSeparation}°:\n"
             + string.Join("\n", tooClose));
     }
 

@@ -91,7 +91,7 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         }
 
         var deliverFor = request.DeliverFor.Select(name => rules.FindAdult(name)?.Name
-            ?? throw new ArgumentException($"'{name}' is not one of the household's adults, so no page can be delivered for them.", nameof(request)))
+            ?? throw new ArgumentException($"'{name}' is not one of the household’s adults, so no page can be delivered for them.", nameof(request)))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -112,7 +112,7 @@ public sealed class WorkoutWeekRun(WorkoutWeekSeams seams)
         if (!busy.Any(item => item.IsComplete))
         {
             var causes = busy.SelectMany(item => item.Unreadable).Distinct().ToList();
-            return Finish(new WorkoutWeekOutcome.NotPlanned(NotPlannedBecause.CalendarsUnreadable, causes, "No adult's calendars could be read in full, so nobody's free time is known."));
+            return Finish(new WorkoutWeekOutcome.NotPlanned(NotPlannedBecause.CalendarsUnreadable, causes, "No adult’s calendars could be read in full, so nobody’s free time is known."));
         }
 
         var planRequest = new WorkoutPlanRequest(

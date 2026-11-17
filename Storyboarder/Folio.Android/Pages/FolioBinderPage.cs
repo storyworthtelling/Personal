@@ -74,7 +74,7 @@ public abstract class FolioBinderPage : PaperBinderPage
         catch (Exception e)
         {
             MauiLog.Current?.Write("Folio", Microsoft.Extensions.Logging.LogLevel.Error,
-                "A deleted item's undo window closed but the delete itself failed; it is hidden and may come back.", e);
+                "A deleted item’s undo window closed but the delete itself failed; it is hidden and may come back.", e);
         }
     }
 

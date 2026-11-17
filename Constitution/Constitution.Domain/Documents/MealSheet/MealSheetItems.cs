@@ -97,7 +97,7 @@ internal static class MealSheetItems
         var items = new List<MealSheetItem>();
         for (var index = 0; index < lines.Count; index++)
         {
-            Require(lines[index].Label, $"A weekday {kind} line's person");
+            Require(lines[index].Label, $"A weekday {kind} line’s person");
             items.Add(Item($"{kind}-{index + 1}", lines[index].Label.Trim(), lines[index].Text, yes(index + 1), reason(index + 1), $"Weekday {kind}, {lines[index].Label.Trim()}"));
         }
 

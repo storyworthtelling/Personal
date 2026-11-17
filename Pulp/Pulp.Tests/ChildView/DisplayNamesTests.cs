@@ -71,11 +71,11 @@ public class DisplayNamesTests
         }
 
         Assert.True(head.Count(file => file.Text.Contains("NameOf", StringComparison.Ordinal)) >= 5,
-            "Too few screens ask the household for a name; the guard is not looking at the right files.");
+            "Too few screens ask the household for a name; the guard isn’t looking at the right files.");
 
         var offenders = head
             .SelectMany(file => IdAsName.Matches(file.Text).Select(match => file.Path + ": " + match.Value))
             .ToList();
-        Assert.True(offenders.Count == 0, "A screen writes a ViewerId's Value where a name belongs:\n" + string.Join("\n", offenders));
+        Assert.True(offenders.Count == 0, "A screen writes a ViewerId’s Value where a name belongs:\n" + string.Join("\n", offenders));
     }
 }

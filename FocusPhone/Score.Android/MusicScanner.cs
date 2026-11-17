@@ -230,7 +230,7 @@ public sealed class MusicScanner
         }
 
         AudioDiagnostics.LogWarning(
-            "MusicScanner", $"Could not read {file.Name} (id={file.Id}) after {ReadAttempts} attempts.", lastFailure);
+            "MusicScanner", $"Couldn’t read {file.Name} (id={file.Id}) after {ReadAttempts} attempts.", lastFailure);
         return ([], default);
     }
 }

@@ -64,7 +64,7 @@ public static class GoogleEventMapper
     private const string Cancelled = "cancelled";
     private const string Declined = "declined";
     private const string Transparent = "transparent";
-    private const string UnusableReason = "An event on a calendar could not be understood.";
+    private const string UnusableReason = "An event on a calendar couldn’t be understood.";
 
     /// <param name="googleEvent">The event as Google sent it.</param>
     /// <param name="calendarId">The calendar the copy is on, to tell the owner's own answer from a guest's.</param>
@@ -75,7 +75,7 @@ public static class GoogleEventMapper
         ArgumentNullException.ThrowIfNull(googleEvent);
         if (ownFamily == KeyFamily.Unknown)
         {
-            throw new ArgumentOutOfRangeException(nameof(ownFamily), ownFamily, "No run owns the unknown family, and dropping its events would drop somebody's time.");
+            throw new ArgumentOutOfRangeException(nameof(ownFamily), ownFamily, "No run owns the unknown family, and dropping its events would drop somebody’s time.");
         }
 
         if (googleEvent.ExtendedProperties?.Private__ is { } properties

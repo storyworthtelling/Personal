@@ -237,7 +237,7 @@ public sealed class AnalysisDocumentRenderer
                 + "praise — and the note in the margin says why. Its rule says how much it matters: a solid "
                 + "rose rule must be fixed, a dashed ochre one should be, a dotted grey one is worth "
                 + "considering. A note that is about a chapter rather "
-                + "than a line is listed at the chapter's head. None of them writes the line for you. "
+                + "than a line is listed at the chapter’s head. None of them writes the line for you. "
                 + "At the end of each scene, a block shows the picture a reader forms from your words, "
                 + "and what the scene is doing.",
                 bodyItalic, Muted);
@@ -331,7 +331,7 @@ public sealed class AnalysisDocumentRenderer
                 writer.Heading("Not tied to a place in the text", h3, Ink);
                 writer.Paragraph(
                     "These notes are about the book rather than a passage, or named a place the "
-                    + "manuscript could not confirm — so they are listed here instead of on a page.",
+                    + "manuscript couldn’t confirm — so they are listed here instead of on a page.",
                     bodyItalic, Muted);
                 foreach (var group in unplaced.GroupBy(note => note.Source))
                 {
@@ -412,7 +412,7 @@ public sealed class AnalysisDocumentRenderer
                 writer.Paragraph(WholeBookNotes.Summary(section!.Summary, length), body, Ink);
             if (!string.IsNullOrWhiteSpace(voice))
             {
-                writer.Paragraph("The book's voice:", bodyBold, Ink);
+                writer.Paragraph("The book’s voice:", bodyBold, Ink);
                 writer.Paragraph(voice, body, Ink);
             }
             writer.Gap(PageGeometry.BlockGap);
@@ -582,7 +582,7 @@ public sealed class AnalysisDocumentRenderer
             writer.Hairline();
             writer.ProsAndCons(
                 "What works, for me", review.Strengths ?? [],
-                "What does not", review.Weaknesses ?? [],
+                "What doesn’t", review.Weaknesses ?? [],
                 reserve: string.IsNullOrWhiteSpace(review.Condition) ? 0f : writer.FooterHeight("Would need", review.Condition, body));
         }
 

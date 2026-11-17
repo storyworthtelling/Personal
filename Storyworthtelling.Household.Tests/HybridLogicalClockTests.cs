@@ -34,7 +34,7 @@ public class HybridLogicalClockTests
 
         var after = clock.Now(4000);
 
-        Assert.True(after > before, $"stamp went from {before} to {after} when the phone's clock stepped back");
+        Assert.True(after > before, $"stamp went from {before} to {after} when the phone’s clock stepped back");
     }
 
     [Fact]

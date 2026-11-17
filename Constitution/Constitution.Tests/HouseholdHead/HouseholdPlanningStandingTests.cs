@@ -22,7 +22,7 @@ public class HouseholdPlanningStandingTests
     public async Task AnUnreadableFileMayNotPlan()
     {
         using var rig = new HeadRig();
-        rig.Drive.Content = "this is not an envelope";
+        rig.Drive.Content = "this isn’t an envelope";
         await rig.Service.SyncAsync(CancellationToken.None);
 
         var standing = await new HouseholdPlanningStanding(rig.Service).AskAsync(CancellationToken.None);

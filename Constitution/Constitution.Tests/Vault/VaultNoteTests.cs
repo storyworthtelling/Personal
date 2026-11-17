@@ -56,12 +56,12 @@ public class VaultNoteTests
 
         var note = VaultNote.For(result, VaultNoteSubject.SleepNumber);
 
-        Assert.StartsWith("Saved on this phone, but the vault could not be updated", note, StringComparison.Ordinal);
+        Assert.StartsWith("Saved on this phone, but the vault couldn’t be updated", note, StringComparison.Ordinal);
         Assert.Contains("TaskCanceledException", note, StringComparison.Ordinal);
     }
 
     [Theory]
-    [InlineData(VaultWriteOutcome.RefusedUnreadable, "does not open")]
+    [InlineData(VaultWriteOutcome.RefusedUnreadable, "doesn’t open")]
     [InlineData(VaultWriteOutcome.RefusedNotOwner, "another Google account")]
     [InlineData(VaultWriteOutcome.RefusedUnknownAccount, "Sign in with Google")]
     [InlineData(VaultWriteOutcome.Failed, "Drive")]
@@ -110,14 +110,14 @@ public class VaultNoteTests
     [Fact]
     public void AFailedWriteNamesTheFailureTypeNotItsMessage()
     {
-        var detail = "HttpRequestException: could not reach " + Invented.Passphrase + " " + Invented.SleepWord;
+        var detail = "HttpRequestException: couldn’t reach " + Invented.Passphrase + " " + Invented.SleepWord;
 
         var note = VaultNote.For(Published(VaultWriteOutcome.Failed, detail), VaultNoteSubject.SleepNumber);
 
         Assert.Contains("HttpRequestException", note, StringComparison.Ordinal);
         Assert.DoesNotContain(Invented.Passphrase, note, StringComparison.Ordinal);
         Assert.DoesNotContain(Invented.SleepWord, note, StringComparison.Ordinal);
-        Assert.DoesNotContain("could not reach", note, StringComparison.Ordinal);
+        Assert.DoesNotContain("couldn’t reach", note, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public class VaultNoteTests
 
         Assert.DoesNotContain(Invented.SleepWord, note, StringComparison.Ordinal);
         Assert.DoesNotContain("refused", note, StringComparison.Ordinal);
-        Assert.StartsWith("Saved on this phone, but Drive did not take the update", note, StringComparison.Ordinal);
+        Assert.StartsWith("Saved on this phone, but Drive didn’t take the update", note, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -234,7 +234,7 @@ public static class MealSheetDocument
             case DinnerKind.Cooked:
                 if (dinner.Recipe is not { } card || !model.Dishes.TryGetValue(card, out var dish))
                 {
-                    throw new ArgumentException($"{day}'s dinner is a card the sheet has no dish for ({dinner.Recipe}); say what it is called.", nameof(model));
+                    throw new ArgumentException($"{day}’s dinner is a card the sheet has no dish for ({dinner.Recipe}); say what it is called.", nameof(model));
                 }
 
                 var start = dinner.CookStart!.Value.DateTime;
@@ -289,7 +289,7 @@ public static class MealSheetDocument
         if (lines.Count > MaxRowLines)
         {
             throw new ArgumentException(
-                $"{dinner.Day.DayOfWeek}'s dinner ('{facts.Title}') takes {lines.Count} lines and a row holds {MaxRowLines}; shorten the dish's name.",
+                $"{dinner.Day.DayOfWeek}’s dinner ('{facts.Title}') takes {lines.Count} lines and a row holds {MaxRowLines}; shorten the dish’s name.",
                 nameof(facts));
         }
 

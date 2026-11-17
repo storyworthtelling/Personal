@@ -57,7 +57,7 @@ public static class CalendarItems
         if (unknown.Count > 0)
         {
             throw new ArgumentException(
-                "The household calendar was not given the spoiler holds of every adult who follows a game; missing: "
+                "The household calendar wasn’t given the spoiler holds of every adult who follows a game; missing: "
                 + string.Join(", ", unknown) + ".",
                 nameof(heldByAdult));
         }

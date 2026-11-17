@@ -119,7 +119,7 @@ internal static class SeatWords
     {
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw new ArgumentException($"A seat's facts need {what}; it was blank.", nameof(text));
+            throw new ArgumentException($"A seat’s facts need {what}; it was blank.", nameof(text));
         }
 
         return text.Trim();
@@ -129,7 +129,7 @@ internal static class SeatWords
     {
         if (!double.IsFinite(value))
         {
-            throw new ArgumentException($"A seat's facts need a real number for {what}.", nameof(value));
+            throw new ArgumentException($"A seat’s facts need a real number for {what}.", nameof(value));
         }
 
         return value;

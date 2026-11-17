@@ -64,7 +64,7 @@ public sealed class RunGate
 
         if (!await EnterAsync(wait, cancellation))
         {
-            return new GateResult<T>.Busy("Another run was placing events on the calendars, so this one did not start. It will be tried again.");
+            return new GateResult<T>.Busy("Another run was placing events on the calendars, so this one didn’t start. It will be tried again.");
         }
 
         try

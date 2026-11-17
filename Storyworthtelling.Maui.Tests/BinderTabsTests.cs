@@ -77,7 +77,7 @@ public class BinderTabsTests
             @"private void Rebuild\(\)\s*\{(?<body>.*?)\n    \}",
             RegexOptions.Singleline);
 
-        Assert.True(match.Success, "Could not find Rebuild()'s body in BinderTabs.cs.");
+        Assert.True(match.Success, "Couldn’t find Rebuild()'s body in BinderTabs.cs.");
         return match.Groups["body"].Value;
     }
 

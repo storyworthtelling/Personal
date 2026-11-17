@@ -7,7 +7,7 @@ public class HouseholdWiringSourceTests
     private static string Source(string relative)
     {
         var file = ConstitutionSource.Files(".cs").SingleOrDefault(candidate => ConstitutionSource.Relative(candidate) == relative);
-        Assert.True(file is not null, relative + " was not found.");
+        Assert.True(file is not null, relative + " wasn’t found.");
         return File.ReadAllText(file!);
     }
 

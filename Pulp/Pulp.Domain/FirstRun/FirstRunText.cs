@@ -8,7 +8,7 @@ public static class FirstRunText
     public const string VaultTitle = "The vault";
 
     public const string VaultLead =
-        "Sign in and enter the vault passphrase your other apps use. Pulp's keys come back by themselves.";
+        "Sign in and enter the vault passphrase your other apps use. Pulp’s keys come back by themselves.";
 
     public const string OpenVault = "Open the vault";
 
@@ -44,7 +44,7 @@ public static class FirstRunText
 
     public static string Step(int number, int of) => $"Step {number} of {of}";
 
-    public static string ThisPhoneIs(string name) => $"This phone is {name}'s";
+    public static string ThisPhoneIs(string name) => $"This phone is {name}’s";
 
     /// <summary>Said when the household arrived from Drive while the owner typed, and some of those typed were already in it.</summary>
     public static string AlreadyThere(IReadOnlyList<string> names)

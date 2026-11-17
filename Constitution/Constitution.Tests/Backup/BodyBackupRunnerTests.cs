@@ -765,12 +765,12 @@ public class BodyBackupWiringGuardTests
 
         if (FileNameConstant.IsMatch(code) && !inBackup && !isWiring)
         {
-            found.Add("names the Body file's constant outside the backup");
+            found.Add("names the Body file’s constant outside the backup");
         }
 
         if (source.Contains(FileNameLiteral, StringComparison.Ordinal) && relativePath != CodecFile)
         {
-            found.Add("spells the Body file's name");
+            found.Add("spells the Body file’s name");
         }
 
         if (DriveFileConstruction.IsMatch(code) && FileNameConstant.IsMatch(code) && !isWiring)
@@ -802,7 +802,7 @@ public class BodyBackupWiringGuardTests
     public void TheWiringDoesBuildTheBackupOverADriveFileOfTheBodyName()
     {
         var path = Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "Services", "BodyBackups.cs");
-        Assert.True(File.Exists(path), "Services/BodyBackups.cs does not exist.");
+        Assert.True(File.Exists(path), "Services/BodyBackups.cs doesn’t exist.");
         var code = HeadScan.Sanitise(File.ReadAllText(path));
 
         Assert.Matches(Construction, code);
@@ -815,14 +815,14 @@ public class BodyBackupWiringGuardTests
     {
         var files = Production().ToList();
 
-        Assert.True(files.Count >= 100, $"Only {files.Count} production files were read; the guard is not seeing the tree.");
+        Assert.True(files.Count >= 100, $"Only {files.Count} production files were read; the guard isn’t seeing the tree.");
         Assert.Contains(files, file => file.Path == CodecFile);
     }
 
     [Theory]
     [InlineData("Constitution.Android/Body/BodyServices.cs", "var b = new BodyBackup(file, log);", "constructs a BodyBackup outside the device wiring")]
-    [InlineData("Constitution.Android/Settings/Foo.cs", "var n = BodyBackup.FileName;", "names the Body file's constant outside the backup")]
-    [InlineData("Constitution.Infrastructure/Vault/Foo.cs", "var n = \"storyworthtelling-constitution-body.json\";", "spells the Body file's name")]
+    [InlineData("Constitution.Android/Settings/Foo.cs", "var n = BodyBackup.FileName;", "names the Body file’s constant outside the backup")]
+    [InlineData("Constitution.Infrastructure/Vault/Foo.cs", "var n = \"storyworthtelling-constitution-body.json\";", "spells the Body file’s name")]
     [InlineData("Constitution.Android/Services/Other.cs", "var f = new DriveTextFile(d, BodyBackup.FileName);", "builds a Drive file for the Body backup outside the device wiring")]
     public void APlantedBreachIsNamed(string path, string source, string kind)
     {

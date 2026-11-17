@@ -10,8 +10,8 @@ namespace Constitution.Domain.Recipes.Screens;
 /// </summary>
 public sealed class CuisineMoveUndo
 {
-    public const string NotKeptSentence = "That card could not be moved, so it was left where it was.";
-    public const string NotUndoneSentence = "That move could not be undone. Move the card back by hand.";
+    public const string NotKeptSentence = "That card couldn’t be moved, so it was left where it was.";
+    public const string NotUndoneSentence = "That move couldn’t be undone. Move the card back by hand.";
 
     private DateTimeOffset expires;
 

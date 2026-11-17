@@ -31,7 +31,7 @@ public sealed class BudgetIntake
         var parsed = BudgetPayload.Parse(extra);
         if (parsed.Payload is null)
         {
-            trail($"budget broadcast dropped: the {parsed.RefusedField} extra did not parse");
+            trail($"budget broadcast dropped: the {parsed.RefusedField} extra didn’t parse");
             return BudgetIntakeOutcome.Dropped;
         }
 

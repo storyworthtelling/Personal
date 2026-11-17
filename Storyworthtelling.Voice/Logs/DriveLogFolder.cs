@@ -175,4 +175,4 @@ public sealed class DriveLogFolder : IDriveLogFolder
 
 /// <summary>Her phone found no log folder shared with it, and does not make one of its own (§5.6).</summary>
 public sealed class LogFolderNotSharedException(string folderName)
-    : IOException($"No Drive folder named {folderName} is shared with this account yet; the owner shares it, and this phone's logs wait until then.");
+    : IOException($"No Drive folder named {folderName} is shared with this account yet; the owner shares it, and this phone’s logs wait until then.");

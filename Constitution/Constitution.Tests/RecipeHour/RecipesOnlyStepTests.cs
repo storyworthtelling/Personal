@@ -27,7 +27,7 @@ public class RecipesOnlyStepTests
     public async Task ThePantryIsNotNeeded()
     {
         var rig = new DocsRig { Now = Inside };
-        rig.Pantry.Answer = new MealPantryRead.Unreadable("The pantry cannot be opened.");
+        rig.Pantry.Answer = new MealPantryRead.Unreadable("The pantry can’t be opened.");
 
         var done = await rig.RunAsync(rig.Request().WithRecipesOnly());
 
@@ -61,7 +61,7 @@ public class RecipesOnlyStepTests
     public async Task TheRosterIsStillNeeded()
     {
         var rig = new DocsRig { Now = Inside };
-        rig.Roster.Answer = new MealRosterRead.Unavailable("The household file cannot be opened.");
+        rig.Roster.Answer = new MealRosterRead.Unavailable("The household file can’t be opened.");
 
         var result = await MealDocumentsStep.RunAsync(rig.Request().WithRecipesOnly(), rig.Seams, CancellationToken.None);
 

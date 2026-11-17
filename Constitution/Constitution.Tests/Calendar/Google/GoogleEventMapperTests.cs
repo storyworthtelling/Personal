@@ -243,7 +243,7 @@ public class GoogleEventMapperTests
     {
         var nothing = Assert.IsType<EventMapping.Unusable>(GoogleEventMapper.Map(new Event { Id = "x", Status = "confirmed", Summary = "?" }, CalendarId));
 
-        Assert.Equal("An event on a calendar could not be understood.", nothing.Reason);
+        Assert.Equal("An event on a calendar couldn’t be understood.", nothing.Reason);
     }
 
     [Fact]

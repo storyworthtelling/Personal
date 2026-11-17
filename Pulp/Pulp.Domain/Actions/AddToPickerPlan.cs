@@ -130,7 +130,7 @@ public static class AddToPickerPlan
         if (title is null && childList.Count > 0)
         {
             throw new ArgumentException(
-                "A film or a show needs its facts to say how it sits with each child's ceiling.", nameof(title));
+                "A film or a show needs its facts to say how it sits with each child’s ceiling.", nameof(title));
         }
 
         var favoriteRows = childList.Select(child => ChildRow(child, title!)).ToList();

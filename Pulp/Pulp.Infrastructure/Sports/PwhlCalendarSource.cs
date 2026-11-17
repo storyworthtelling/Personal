@@ -53,7 +53,7 @@ public sealed class PwhlCalendarSource : ISportsSource
     private readonly Func<DateTimeOffset> clock;
     private readonly Dictionary<string, string> identify = new()
     {
-        ["User-Agent"] = "Pulp (storyworthtelling household guide; reads the PWHL's calendar file as a calendar app would, at most every six hours)",
+        ["User-Agent"] = "Pulp (storyworthtelling household guide; reads the PWHL’s calendar file as a calendar app would, at most every six hours)",
     };
 
     private (DateTimeOffset At, ParsedCalendar Calendar)? held;

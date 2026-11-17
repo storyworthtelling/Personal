@@ -11,7 +11,7 @@ public static class SampleAnalysis
 {
     public static BookAnalysisResult Of(
         string logline = "A woman returns to the marsh village that drowned her brother.",
-        string synopsis = "Ruth Vance comes back to Saltings after eleven years to settle her mother's estate.",
+        string synopsis = "Ruth Vance comes back to Saltings after eleven years to settle her mother’s estate.",
         IReadOnlyList<CharacterProfile>? characters = null,
         IReadOnlyList<ReportFinding>? plotHoles = null) =>
         new(

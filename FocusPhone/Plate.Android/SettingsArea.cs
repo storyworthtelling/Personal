@@ -53,7 +53,7 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         PaperUi.CommitsAsTyped(passphrase, text => VaultPassphraseStore.Passphrase = text);
         vault.AddView(passphrase);
         vault.AddView(PaperUi.Secondary(Host,
-            "Shown in the clear on purpose: it is the one secret the vault cannot hold, so it "
+            "Shown in the clear on purpose: it is the one secret the vault can’t hold, so it "
             + "has to be read back and set identically in every app."));
 
         // The Google account, which is here for the vault and nothing else.
@@ -155,9 +155,9 @@ public sealed class SettingsArea(PlateActivity host) : PlateArea(host)
         }
         catch (Exception e)
         {
-            ShowStatus($"Could not sign in: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google")}. Package: {AppSigningInfo.PackageName}, "
+            ShowStatus($"Couldn’t sign in: {Storyworthtelling.Diagnostics.PlainError.Describe(e, "Google")}. Package: {AppSigningInfo.PackageName}, "
                 + $"SHA-1: {AppSigningInfo.Sha1Fingerprint()} — register these as an OAuth client "
-                + "if they aren't already.");
+                + "if they aren’t already.");
         }
     }
 

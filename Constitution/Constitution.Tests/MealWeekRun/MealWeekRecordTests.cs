@@ -53,7 +53,7 @@ public class MealWeekRecordTests
     }
 
     [Theory]
-    [InlineData("this is not json", MealWeekRecordCodec.NotJson)]
+    [InlineData("this isn’t json", MealWeekRecordCodec.NotJson)]
     [InlineData("[]", MealWeekRecordCodec.WrongShape)]
     [InlineData("{\"version\":2,\"weeks\":[]}", MealWeekRecordCodec.WrongShape)]
     [InlineData("{\"version\":1}", MealWeekRecordCodec.WrongShape)]

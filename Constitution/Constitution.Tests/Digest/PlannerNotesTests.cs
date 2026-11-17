@@ -190,7 +190,7 @@ public class PlannerNotesTests : IDisposable
     [Fact]
     public void NoNotesIsTodaysWeekByteForByte()
     {
-        Assert.Equal(7827400281381623395UL, PlannerFingerprint.Of(seed => PlannerFingerprint.RequestFor(seed) with { PlannerNotes = [] }));
+        Assert.Equal(9008526175038720656UL, PlannerFingerprint.Of(seed => PlannerFingerprint.RequestFor(seed) with { PlannerNotes = [] }));
     }
 
     [Fact]

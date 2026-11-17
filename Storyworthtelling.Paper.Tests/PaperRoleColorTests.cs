@@ -96,7 +96,7 @@ public class PaperRoleColorTests
         var values = order.Select(r =>
         {
             var c = PaperPalette.ResolveRole(r, ColorTier.Mark, UiColorProfile.DocumentGray);
-            Assert.True(c.Red == c.Green && c.Green == c.Blue, $"{r} is not a true gray under the rM2 profile.");
+            Assert.True(c.Red == c.Green && c.Green == c.Blue, $"{r} isn’t a true gray under the rM2 profile.");
             return (int)c.Red;
         }).ToList();
 

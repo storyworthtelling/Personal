@@ -55,7 +55,7 @@ public class TaskEditor(ITaskStore store, IGoogleTasksClient google)
             // mirror exists to prevent, and doing it silently is worse than failing.
             store.Save(task);
             return new TaskSaveResult(false,
-                $"Saved on this phone only — Google would not take the change ({ex.Message}). "
+                $"Saved on this phone only — Google wouldn’t take the change ({ex.Message}). "
                 + "It needs the Tasks write permission.");
         }
     }
@@ -84,7 +84,7 @@ public class TaskEditor(ITaskStore store, IGoogleTasksClient google)
         catch (Exception ex)
         {
             return new TaskSaveResult(false,
-                $"Google would not remove it ({ex.Message}). It needs the Tasks write permission.");
+                $"Google wouldn’t remove it ({ex.Message}). It needs the Tasks write permission.");
         }
     }
 }

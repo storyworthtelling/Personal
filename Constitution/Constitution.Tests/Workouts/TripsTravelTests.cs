@@ -89,7 +89,7 @@ public class TravelTests
         var week = await TripsFixtures.RunAsync(SamAwayMidweek());
 
         var onTheRoad = TripsFixtures.OnDays(week.SamPlan, 2, 3, 4);
-        Assert.True(onTheRoad.Count >= 2, $"Sam's plan holds only {onTheRoad.Count} sessions on the trip days.");
+        Assert.True(onTheRoad.Count >= 2, $"Sam’s plan holds only {onTheRoad.Count} sessions on the trip days.");
         Assert.All(onTheRoad, session => Assert.Empty(session.Session.EquipmentNeeded));
         Assert.Empty(TripsFixtures.OnDays(week.SamPlan, 0, 1, 5));
         Assert.Contains(onTheRoad, session => session.Session.Kind == SessionKind.Strength);
@@ -336,7 +336,7 @@ public class TravelTests
                         onTheRoad++;
                         Assert.True(
                             session.Session.EquipmentNeeded.All(id => week.Travel.GymFor(trip)?.Has(id) == true),
-                            $"{where}: a road session uses equipment that is not there");
+                            $"{where}: a road session uses equipment that isn’t there");
                     }
                 }
             }
@@ -344,7 +344,7 @@ public class TravelTests
             paused += week.Result.Notes.Count(note => note.Line == "Paused: family holiday");
         }
 
-        Assert.True(onTheRoad > 10, $"Only {onTheRoad} sessions fell on the road; the test is not exercising the adapter.");
+        Assert.True(onTheRoad > 10, $"Only {onTheRoad} sessions fell on the road; the test isn’t exercising the adapter.");
         Assert.True(paused > 10, $"Only {paused} days were paused.");
     }
 

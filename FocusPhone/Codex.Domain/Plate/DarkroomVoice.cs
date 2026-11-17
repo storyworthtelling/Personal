@@ -43,8 +43,8 @@ public static class DarkroomVoice
     public static string CaptionPrompt(int pictures) =>
         pictures == 1
             ? "Look at this one picture waiting to be chosen. Write one short line about what "
-              + "is in it, in the owner's voice. No more than a sentence, and never an instruction."
+              + "is in it, in the owner’s voice. No more than a sentence, and never an instruction."
             : $"Look at these {pictures} pictures waiting to be chosen. Write one short line "
-              + "about what they have in common, in the owner's voice. No more than a sentence, "
+              + "about what they have in common, in the owner’s voice. No more than a sentence, "
               + "and never an instruction.";
 }

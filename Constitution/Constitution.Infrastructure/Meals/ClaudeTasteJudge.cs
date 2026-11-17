@@ -41,7 +41,7 @@ public sealed class ClaudeTasteJudge(HttpClient http, IOptions<ClaudeVisionOptio
         var settings = options.Value;
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
-            return new TasteJudgement.Unavailable(AuthorUnavailable.NotConfigured, "No Claude key is set, so the written words were not judged.");
+            return new TasteJudgement.Unavailable(AuthorUnavailable.NotConfigured, "No Claude key is set, so the written words weren’t judged.");
         }
 
         var dish = evidence.Recipe is { } card ? dishName(card) : null;
@@ -61,11 +61,11 @@ public sealed class ClaudeTasteJudge(HttpClient http, IOptions<ClaudeVisionOptio
         catch (OperationCanceledException timeout) when (!cancellation.IsCancellationRequested)
         {
             // The client's own timeout, not the caller stopping: the service did not answer in time.
-            return new TasteJudgement.Unavailable(AuthorUnavailable.TimedOut, "The taste judge did not answer in time.", timeout);
+            return new TasteJudgement.Unavailable(AuthorUnavailable.TimedOut, "The taste judge didn’t answer in time.", timeout);
         }
         catch (Exception failure) when (failure is HttpRequestException or IOException)
         {
-            return new TasteJudgement.Unavailable(AuthorUnavailable.Offline, $"The taste judge could not reach the service ({failure.GetType().Name}).", failure);
+            return new TasteJudgement.Unavailable(AuthorUnavailable.Offline, $"The taste judge couldn’t reach the service ({failure.GetType().Name}).", failure);
         }
         catch (JsonException)
         {

@@ -15,7 +15,7 @@ public class LandingCheckTests
     private static PendingHandOff Pending()
     {
         var plan = Planner().Plan(Request(Flix, Sam), At);
-        return plan.Pending ?? throw new InvalidOperationException("The fixture's adult request should start.");
+        return plan.Pending ?? throw new InvalidOperationException("The fixture’s adult request should start.");
     }
 
     private static readonly DateTimeOffset Later = At + LandingCheck.Window + TimeSpan.FromMinutes(1);

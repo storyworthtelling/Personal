@@ -50,13 +50,13 @@ public class ReadBackReportTests
     public void SomeDoneAndSomeNotIsPartial()
     {
         Assert.Equal(DiagnosticsOutcome.Partial, Outcome(Settled, Failed(new HttpRequestException("down"))));
-        Assert.Equal(DiagnosticsOutcome.Partial, Outcome(Settled, new DocumentReadBack.Unfinished("c", "a box was not read")));
+        Assert.Equal(DiagnosticsOutcome.Partial, Outcome(Settled, new DocumentReadBack.Unfinished("c", "a box wasn’t read")));
     }
 
     [Fact]
     public void ALocalFailureAloneIsPartialNotUnreachable()
     {
         Assert.Equal(DiagnosticsOutcome.Partial, Outcome(Failed(new IOException("disk"), ReadBackStage.Persist)));
-        Assert.Equal(DiagnosticsOutcome.Partial, Outcome(new DocumentReadBack.Unfinished("c", "a box was not read")));
+        Assert.Equal(DiagnosticsOutcome.Partial, Outcome(new DocumentReadBack.Unfinished("c", "a box wasn’t read")));
     }
 }

@@ -51,7 +51,7 @@ public sealed class SportsCache
             {
                 // Anything that stops an entry being read (a locked or unreadable file, a null where text should be, a
                 // wrong-typed field) means "no cache" for this league: the caller logs the reason and fetches again.
-                return new SportsCacheRead(CacheReadStatus.Unreadable, null, $"Cached league {league} could not be read: {exception.Message}");
+                return new SportsCacheRead(CacheReadStatus.Unreadable, null, $"Cached league {league} couldn’t be read: {exception.Message}");
             }
         }
     }

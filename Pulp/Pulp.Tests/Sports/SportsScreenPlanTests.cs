@@ -28,7 +28,7 @@ public class SportsScreenPlanTests
         null);
 
     private static LeagueFeed LakeshoreOffSeason() => new(
-        new League(Lakeshore, "Lakeshore Women's Hockey", "badge://lwh", SeasonPhase.OffSeason, new DateOnly(2026, 3, 1), new DateOnly(2026, 11, 8)),
+        new League(Lakeshore, "Lakeshore Women’s Hockey", "badge://lwh", SeasonPhase.OffSeason, new DateOnly(2026, 3, 1), new DateOnly(2026, 11, 8)),
         [Wolves],
         [],
         [Wolves],
@@ -57,7 +57,7 @@ public class SportsScreenPlanTests
     {
         var plan = Plan(MockupPage());
 
-        Assert.Equal(["Coastal Football League", "Southern Rules League", "Lakeshore Women's Hockey"], plan.Select(league => league.Name));
+        Assert.Equal(["Coastal Football League", "Southern Rules League", "Lakeshore Women’s Hockey"], plan.Select(league => league.Name));
     }
 
     [Fact]

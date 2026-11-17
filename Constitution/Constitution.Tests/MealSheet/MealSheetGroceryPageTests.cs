@@ -287,7 +287,7 @@ public class GroceryPageTests
         var model = MealSheetGrocerySamples.Model(Long());
         var pages = GroceryPages(model);
 
-        Assert.True(pages.Count >= 2, "the list does not fit one page");
+        Assert.True(pages.Count >= 2, "the list doesn’t fit one page");
         Assert.Equal("Groceries", pages[0].Title);
         Assert.All(pages.Skip(1), p => Assert.Equal("Groceries, continued", p.Title));
         Assert.All(pages, p => Assert.Empty(p.Violations()));

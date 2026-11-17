@@ -50,7 +50,7 @@ public static class NeverPlacedTime
         ArgumentNullException.ThrowIfNull(ownEntries);
         ArgumentNullException.ThrowIfNull(familyEntries);
         var adult = rules.FindAdult(person)
-            ?? throw new ArgumentException("The person asked for is not one of the household's adults.", nameof(person));
+            ?? throw new ArgumentException("The person asked for is not one of the household’s adults.", nameof(person));
 
         var intervals = new List<BusyInterval>();
         var markers = new DayMarkers(adult, rules, ownEntries, familyEntries);

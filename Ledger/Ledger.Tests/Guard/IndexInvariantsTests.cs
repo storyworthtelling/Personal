@@ -259,7 +259,7 @@ public class IndexInvariantsTests
     private static string ComponentSource(string typeName)
     {
         var file = AppFiles("*.cs").SingleOrDefault(f => Path.GetFileName(f) == $"{typeName}.cs");
-        Assert.True(file is not null, $"{typeName}.cs was not found anywhere under Index's app root.");
+        Assert.True(file is not null, $"{typeName}.cs wasn’t found anywhere under Index’s app root.");
         return File.ReadAllText(file!);
     }
 

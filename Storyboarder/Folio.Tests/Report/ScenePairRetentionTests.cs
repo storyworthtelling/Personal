@@ -62,7 +62,7 @@ public class ScenePairRetentionTests : IDisposable
         Assert.False(onlyNew.ShowsPair);
         Assert.False(onlyOld.ShowsPair,
             "A scene whose own render failed must not print its predecessor alone — the reader would "
-            + "take the old picture for this draft's.");
+            + "take the old picture for this draft’s.");
     }
 
     /// <summary>
@@ -121,7 +121,7 @@ public class ScenePairRetentionTests : IDisposable
         Assert.True(offenders.Count == 0,
             "These delete rendered images without asking SceneRetention which drafts are still "
             + "paired against: " + string.Join(", ", offenders)
-            + ". A changed scene's predecessor has to survive, or the pair prints one panel.");
+            + ". A changed scene’s predecessor has to survive, or the pair prints one panel.");
     }
 
     /// <summary>

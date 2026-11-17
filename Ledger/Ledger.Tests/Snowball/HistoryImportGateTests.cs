@@ -188,7 +188,7 @@ public class HistoryImportGateTests
             SnowballHistoryStatus.Absent => SnowballHistoryReadResult.Absent,
             SnowballHistoryStatus.NeedsPassphrase => SnowballHistoryReadResult.NeedsPassphrase,
             SnowballHistoryStatus.WrongPassphrase => SnowballHistoryReadResult.WrongPassphrase,
-            _ => SnowballHistoryReadResult.Unreadable("could not tell"),
+            _ => SnowballHistoryReadResult.Unreadable("couldn’t tell"),
         });
 
         var exception = await Record.ExceptionAsync(() => harness.Service.ImportHistoryIfNeededAsync(default));

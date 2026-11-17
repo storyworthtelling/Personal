@@ -48,7 +48,7 @@ public class SmsRoleTests
 
         Assert.True(notice.Speaks);
         Assert.False(notice.OffersMessages);
-        Assert.Contains("not installed", notice.Headline);
+        Assert.Contains("isn’t installed", notice.Headline);
     }
 
     [Theory]

@@ -458,7 +458,7 @@ public static class RecipeDocument
             lastRow = Row(draft, count, count == 1 ? at : lastRow + RowPitch, ingredient.Quantity.Trim(), ingredient.Name.Trim());
         }
 
-        PageDraft.RequireRoom(lastRow, ContentLimit, $"The children's ingredients for {meal.Title} ({count} ingredients)");
+        PageDraft.RequireRoom(lastRow, ContentLimit, $"The children’s ingredients for {meal.Title} ({count} ingredients)");
 
         var firstRule = lastRow + KidsRuleGap;
         var laterRule = FirstRule;
@@ -624,7 +624,7 @@ public static class RecipeDocument
         {
             if (model.KidsMeal is not null)
             {
-                throw new ArgumentException($"'{model.Title}' has a children's dinner but no timed steps to hand the cook over from.", nameof(model));
+                throw new ArgumentException($"'{model.Title}' has a children’s dinner but no timed steps to hand the cook over from.", nameof(model));
             }
 
             if (model.Pages < 1 || model.KidsDinnerPage is { } kids && (kids < 2 || kids > model.Pages))
@@ -647,7 +647,7 @@ public static class RecipeDocument
 
         if (model.KidsMeal is null && model.Steps.FirstOrDefault(s => s.KidsHandOff) is { } stranded)
         {
-            throw new ArgumentException($"The step '{stranded.Text}' sends the cook to the children's page but there is no children's dinner tonight.", nameof(model));
+            throw new ArgumentException($"The step '{stranded.Text}' sends the cook to the children’s page but there is no children’s dinner tonight.", nameof(model));
         }
 
         if (model.KidsMeal is { } meal)
@@ -658,7 +658,7 @@ public static class RecipeDocument
 
     private static void ValidateKids(RecipeKidsMeal meal)
     {
-        Require(meal.Title, "title", "the children's dinner");
+        Require(meal.Title, "title", "the children’s dinner");
         Require(meal.ShortName, "short name", $"'{meal.Title}'");
         Require(meal.WhyLine, "line saying why tonight is different", $"'{meal.Title}'");
         Require(meal.DinnerLine, "final line", $"'{meal.Title}'");
@@ -674,7 +674,7 @@ public static class RecipeDocument
 
         foreach (var ingredient in meal.Ingredients)
         {
-            Require(ingredient.Name, "name", "a children's ingredient");
+            Require(ingredient.Name, "name", "a children’s ingredient");
         }
 
         if (meal.Steps.Count == 0)

@@ -59,7 +59,7 @@ public partial class SetupPage : FolioBinderPage
         MigrationErrorCard.IsVisible = !string.IsNullOrEmpty(migrationError);
         if (MigrationErrorCard.IsVisible)
             MigrationErrorLabel.Text =
-                "The last app update couldn't finish updating your library, so work is paused. " +
+                "The last app update couldn’t finish updating your library, so work is paused. " +
                 "Restoring a recent backup usually fixes it. Details: " + migrationError;
     }
 
@@ -130,7 +130,7 @@ public partial class SetupPage : FolioBinderPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            BackupStatusLabel.Text = "Couldn't start the backup (no active window).";
+            BackupStatusLabel.Text = "Couldn’t start the backup (no active window).";
             return;
         }
 
@@ -165,7 +165,7 @@ public partial class SetupPage : FolioBinderPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            BackupStatusLabel.Text = "Couldn't start the restore (no active window).";
+            BackupStatusLabel.Text = "Couldn’t start the restore (no active window).";
             return;
         }
 
@@ -246,7 +246,7 @@ public partial class SetupPage : FolioBinderPage
         }
         catch (Exception ex)
         {
-            Say(DiagnosticsStatusLabel, "The snapshot could not be built: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), problem: true);
+            Say(DiagnosticsStatusLabel, "The snapshot couldn’t be built: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), problem: true);
             return;
         }
 
@@ -280,7 +280,7 @@ public partial class SetupPage : FolioBinderPage
         }
         catch (Exception ex)
         {
-            Say(DiagnosticsStatusLabel, "The diagnostics could not be exported: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), problem: true);
+            Say(DiagnosticsStatusLabel, "The diagnostics couldn’t be exported: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex), problem: true);
         }
     }
 
@@ -371,7 +371,7 @@ public partial class SetupPage : FolioBinderPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            Say(GoogleStatusLabel, "Sign-in could not start: Folio has no open window. Try again.", problem: true);
+            Say(GoogleStatusLabel, "Sign-in couldn’t start: Folio has no open window. Try again.", problem: true);
             return;
         }
 
@@ -388,13 +388,13 @@ public partial class SetupPage : FolioBinderPage
             await Clipboard.SetTextAsync(info);
             // Said under the button, beside the one-time setup card that already explains the console.
             Say(GoogleStatusLabel,
-                "Google turned the sign-in away: this app is not registered with it yet. The package and SHA-1 "
+                "Google turned the sign-in away: this app isn’t registered with it yet. The package and SHA-1 "
                 + "are copied; set them up as the card above says, then sign in again.", problem: true);
         }
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            Say(GoogleStatusLabel, "Sign-in did not finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google")
+            Say(GoogleStatusLabel, "Sign-in didn’t finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google")
                 + " The details are copied.", problem: true);
         }
     }
@@ -476,7 +476,7 @@ public partial class SetupPage : FolioBinderPage
         if (result.NeedsAttention)
         {
             // Behind the fold, here and on the page saving returns to (audit W8.2b: it was an alert).
-            var notice = new DogEarNotice("The vault backup did not finish.", result.Message, DogEarHue.Problem);
+            var notice = new DogEarNotice("The vault backup didn’t finish.", result.Message, DogEarHue.Problem);
             SetNotice(VaultBackupNotice, notice);
             CarriedNotices.Shared.Carry(VaultBackupNotice, notice);
         }
@@ -527,12 +527,12 @@ public partial class SetupPage : FolioBinderPage
         {
             PairingTrail.Failed(pairing, ex);
             Say(RemarkableStatusLabel,
-                $"The reMarkable cloud did not accept that code ({(int?)ex.StatusCode}). Check it and pair again.", problem: true);
+                $"The reMarkable cloud didn’t accept that code ({(int?)ex.StatusCode}). Check it and pair again.", problem: true);
         }
         catch (Exception ex)
         {
             PairingTrail.Failed(pairing, ex);
-            Say(RemarkableStatusLabel, "Pairing did not finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "reMarkable"), problem: true);
+            Say(RemarkableStatusLabel, "Pairing didn’t finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "reMarkable"), problem: true);
         }
     }
 

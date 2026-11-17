@@ -99,7 +99,7 @@ public sealed class DiscoverPageWeek
         ArgumentNullException.ThrowIfNull(vetoes);
         if (vetoes.Viewer != Viewer)
         {
-            throw new ArgumentException($"The vetoes are {vetoes.Viewer}'s, not {Viewer}'s; vetoes are per viewer (D111).", nameof(vetoes));
+            throw new ArgumentException($"The vetoes are {vetoes.Viewer}’s, not {Viewer}’s; vetoes are per viewer (D111).", nameof(vetoes));
         }
 
         return Rows(kind).Select(row => new DiscoverCard(row, State(row.Id, vetoes))).ToList();
@@ -110,7 +110,7 @@ public sealed class DiscoverPageWeek
     {
         if (!films.Concat(shows).Any(row => row.Id == title))
         {
-            throw new ArgumentException($"{title} is not in this week's stack.", nameof(title));
+            throw new ArgumentException($"{title} is not in this week’s stack.", nameof(title));
         }
 
         return new DiscoverPageWeek(Viewer, Turnover, Until, films, shows, new HashSet<TitleId>(added) { title });

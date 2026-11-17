@@ -70,7 +70,7 @@ public sealed class SeatVoice(
             context.Append("\n- ").Append(fact);
         }
 
-        context.Append("\nSay only what these facts say. Add no figure, name or claim that is not stated.");
+        context.Append("\nSay only what these facts say. Add no figure, name or claim that isn’t stated.");
         return context.ToString();
     }
 }

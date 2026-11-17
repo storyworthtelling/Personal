@@ -50,9 +50,9 @@ public class LeaderRouteTests
         var route = LeaderRoute.For(PhraseLeft, PhraseRight, Baseline, Gutter, NoteLeft, NoteY, stack);
         var level = route.Where((point, i) => i > 0 && point.Y == route[i - 1].Y && point.X < Gutter).Select(point => point.Y).Single();
 
-        Assert.True(level > Baseline + 2, "The run should sit below a query's underline.");
+        Assert.True(level > Baseline + 2, "The run should sit below a query’s underline.");
         var nextCaps = Baseline + MarkupGeometry.LineHeight - (0.7 * MarkupGeometry.TypeSize);
-        Assert.True(level < nextCaps, "The run should stay clear of the next line's capitals.");
+        Assert.True(level < nextCaps, "The run should stay clear of the next line’s capitals.");
     }
 
     [Fact]

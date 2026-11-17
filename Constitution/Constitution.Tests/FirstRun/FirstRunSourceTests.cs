@@ -25,7 +25,7 @@ public class FirstRunSourceTests
             .Select(ConstitutionSource.Relative)
             .ToList();
 
-        Assert.True(offenders.Count == 0, "First run is not a book page: " + string.Join(", ", offenders));
+        Assert.True(offenders.Count == 0, "First run isn’t a book page: " + string.Join(", ", offenders));
     }
 
     [Fact]

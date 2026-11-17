@@ -12,7 +12,7 @@ public class VaultCalendarConsentGuardTests
         // Bug kept out: no way to give the consent (the nightly writer waits forever); a button drawn on the
         // other phone; a cancelled chooser shown as a failure; a success toast instead of a status change.
         var path = Path.Combine(PulpSource.Root(), "Pulp.Android/Vault/VaultActivity.cs");
-        Assert.True(File.Exists(path), "VaultActivity.cs does not exist.");
+        Assert.True(File.Exists(path), "VaultActivity.cs doesn’t exist.");
         var text = File.ReadAllText(path);
 
         Assert.Contains("CalendarConnection.Status(services.HouseholdFileRole)", text, StringComparison.Ordinal);

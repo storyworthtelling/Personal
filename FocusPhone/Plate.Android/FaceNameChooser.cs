@@ -43,7 +43,7 @@ internal static class FaceNameChooser
         if (people.Count == 0)
         {
             card.AddView(PaperUi.Secondary(context,
-                "Plate cannot read the address book, so there is nobody to choose. Allow Contacts for Plate, then try again."));
+                "Plate can’t read the address book, so there is nobody to choose. Allow Contacts for Plate, then try again."));
         }
 
         var field = PaperUi.Field(context, "Type a name");

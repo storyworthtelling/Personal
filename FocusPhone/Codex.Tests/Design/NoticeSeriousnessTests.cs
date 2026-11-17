@@ -114,7 +114,7 @@ public class NoticeSeriousnessTests
         {
             Assert.True(
                 Regex.IsMatch(source, $@"\(FoldRole\.{role},\s*{role}\)"),
-                $"DogEar.Hues.RoleOf cannot read the {role} colour back to FoldRole.{role}.");
+                $"DogEar.Hues.RoleOf can’t read the {role} colour back to FoldRole.{role}.");
         }
     }
 

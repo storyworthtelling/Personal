@@ -112,7 +112,7 @@ public static class ScanRecipeIds
 public sealed class ScanConfirmModel
 {
     public const string TitleSentence = "Give the card a title.";
-    public const string NotKeptSentence = "That card could not be kept, so it is still here to try again.";
+    public const string NotKeptSentence = "That card couldn’t be kept, so it is still here to try again.";
 
     private readonly List<string> ingredientLines;
     private readonly List<string> stepLines;

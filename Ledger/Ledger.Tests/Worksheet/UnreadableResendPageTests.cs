@@ -50,9 +50,9 @@ public class UnreadableResendPageTests
         var text = Text(ResendOnly());
 
         Assert.Contains("1 limit to write again", text, StringComparison.Ordinal);
-        Assert.Contains("couldn't be read", text, StringComparison.Ordinal);
+        Assert.Contains("couldn’t be read", text, StringComparison.Ordinal);
         Assert.Contains("not read", text, StringComparison.Ordinal);
-        Assert.Contains("If a limit still can't be read, another page like this comes tomorrow.", text, StringComparison.Ordinal);
+        Assert.Contains("If a limit still can’t be read, another page like this comes tomorrow.", text, StringComparison.Ordinal);
         Assert.DoesNotContain("With the suggestion", text, StringComparison.Ordinal);
         Assert.DoesNotContain("to place", text, StringComparison.Ordinal);
     }
@@ -92,7 +92,7 @@ public class UnreadableResendPageTests
         Assert.Contains("With the suggestions", text, StringComparison.Ordinal);
         Assert.Contains("not read", text, StringComparison.Ordinal);
         Assert.Contains("a line marked not read needs your figure again", text, StringComparison.Ordinal);
-        Assert.Contains("or a limit can't be read", text, StringComparison.Ordinal);
+        Assert.Contains("or a limit can’t be read", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class UnreadableResendPageTests
 
         Assert.DoesNotContain("not read", text, StringComparison.Ordinal);
         Assert.Contains("Leave a box empty to take the suggestion, or write your own figure.", text, StringComparison.Ordinal);
-        Assert.Contains("If the final figures still don't come to $3,100, another page like this comes tomorrow.", text, StringComparison.Ordinal);
+        Assert.Contains("If the final figures still don’t come to $3,100, another page like this comes tomorrow.", text, StringComparison.Ordinal);
     }
 
     // ---- R-G12 with the new rows: nothing painted over, nothing past the margins ----

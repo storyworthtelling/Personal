@@ -29,7 +29,7 @@ public class SharedLibraryCoverageTests
             var name = Path.GetFileName(project);
             if (!workflow.Contains(name, StringComparison.Ordinal))
             {
-                missing.Add($"{name}: never run — build-shared-libs.yml does not name it");
+                missing.Add($"{name}: never run — build-shared-libs.yml doesn’t name it");
             }
 
             var library = Path.GetFileName(Path.GetDirectoryName(project)!).Replace(".Tests", string.Empty);
@@ -41,7 +41,7 @@ public class SharedLibraryCoverageTests
 
         Assert.NotEmpty(RootTestProjects());
         Assert.True(missing.Count == 0,
-            "A shared library outside the workflow is not tested by anything, and says so by "
+            "A shared library outside the workflow isn’t tested by anything, and says so by "
             + "staying silent:\n" + string.Join("\n", missing));
     }
 

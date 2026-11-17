@@ -36,7 +36,7 @@ public sealed class MorningOutcome
     public string Summary()
     {
         var failed = entries.Where(e => e.State == State.Failed)
-            .Select(e => $"{Capitalised(Name(e.Document))} did not arrive ({e.Detail})");
+            .Select(e => $"{Capitalised(Name(e.Document))} didn’t arrive ({e.Detail})");
         var delivered = entries.Where(e => e.State is State.Delivered or State.Earlier)
             .Select(e => e.State == State.Earlier ? $"{Name(e.Document)} (earlier this morning)"
                 : string.IsNullOrWhiteSpace(e.Detail) ? Name(e.Document) : $"{Name(e.Document)} ({e.Detail})")

@@ -61,8 +61,8 @@ public class AreaHueTests
             .ToArray();
 
         Assert.True(clashes.Length == 0,
-            $"{head}'s binder strip cannot code anything — a divider the same colour as every "
-            + "other divider is not a divider (§9):\n" + string.Join("\n", clashes));
+            $"{head}’s binder strip can’t code anything — a divider the same colour as every "
+            + "other divider isn’t a divider (§9):\n" + string.Join("\n", clashes));
     }
 
     [Theory]
@@ -180,7 +180,7 @@ public class AreaHueTests
         }
 
         Assert.True(offenders.Count == 0,
-            "A page's accents take its tab's hue (§9, owner's ruling); use Tab.Hue, not the identity:\n"
+            "A page’s accents take its tab’s hue (§9, owner’s ruling); use Tab.Hue, not the identity:\n"
             + string.Join("\n", offenders));
     }
 

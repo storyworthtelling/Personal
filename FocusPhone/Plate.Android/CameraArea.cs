@@ -177,7 +177,7 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
     {
         if (shell.Camera.Video is not { } video)
         {
-            ShowStatus("The camera is not ready yet.");
+            ShowStatus("The camera isn’t ready yet.");
             return;
         }
 
@@ -222,7 +222,7 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         var intent = Host.PackageManager!.GetLaunchIntentForPackage("com.google.android.apps.photos");
         if (intent is null)
         {
-            ShowStatus("Google Photos is not installed.");
+            ShowStatus("Google Photos isn’t installed.");
             return;
         }
         Host.StartActivity(intent);
@@ -252,7 +252,7 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
             {
                 area.shell.Camera.Recording = null;
                 area.ShowStatus(finished.HasError
-                    ? $"That recording did not save: {finished.Cause?.Message}"
+                    ? $"That recording didn’t save: {finished.Cause?.Message}"
                     : $"Video saved to your camera roll · {TimeFormats.Clock12(DateTime.Now)}");
                 area.Invalidate();
             });
@@ -278,7 +278,7 @@ public sealed class CameraArea(PlateActivity host) : PlateArea(host)
         {
             shooting.Failed($"capture error {exception?.ImageCaptureError}: {exception?.Message}");
             area.Host.RunOnUiThread(() => area.ShowStatus(
-                $"That one did not save: {exception?.Message}"));
+                $"That one didn’t save: {exception?.Message}"));
         }
     }
 }

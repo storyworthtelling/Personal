@@ -83,5 +83,5 @@ internal static class ReadBackFixture
 
     /// <summary>Every page not read, with a reason.</summary>
     public static InkDocumentRead NothingRead(ExpectedDocument document) =>
-        new(document.Pages.ToDictionary(page => page.Number, _ => InkPageRead.NotRead("The reply could not be read.")), PenStrokes.Unknown);
+        new(document.Pages.ToDictionary(page => page.Number, _ => InkPageRead.NotRead("The reply couldn’t be read.")), PenStrokes.Unknown);
 }

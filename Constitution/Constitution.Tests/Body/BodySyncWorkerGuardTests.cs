@@ -41,7 +41,7 @@ public class BodySyncWorkerGuardTests
     private static string WorkerSource()
     {
         var file = ConstitutionSource.Files(".cs").SingleOrDefault(path => Path.GetFileName(path) == "BodySyncWorker.cs");
-        Assert.True(file is not null, "BodySyncWorker.cs was not found under Constitution/.");
+        Assert.True(file is not null, "BodySyncWorker.cs wasn’t found under Constitution/.");
         return File.ReadAllText(file!);
     }
 

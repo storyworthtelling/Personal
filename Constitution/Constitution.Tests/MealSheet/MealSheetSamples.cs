@@ -27,7 +27,7 @@ internal static class MealSheetSamples
         Cooked(2, "sheet-pan-chicken", "Lee", 17, 15, kids: true),
         Cooked(3, "black-bean-chili", "Sam", 7, 40),
         Cooked(4, "miso-salmon", "Lee", 17, 15),
-        DinnerChoice.EatOut(Sunday.AddDays(5), "Friday is somebody else's kitchen."),
+        DinnerChoice.EatOut(Sunday.AddDays(5), "Friday is somebody else’s kitchen."),
         Cooked(6, "turkey-meatballs", "Sam", 17, 15),
     ];
 

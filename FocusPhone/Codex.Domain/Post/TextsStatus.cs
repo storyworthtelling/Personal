@@ -52,23 +52,23 @@ public sealed record TextsStatus(
     {
         if (HoldsSmsRole && Messages != MessagesAppState.NotInstalled)
         {
-            yield return "Google Messages is not the default SMS app, so it cannot keep RCS (\"chat features\") " +
+            yield return "Google Messages isn’t the default SMS app, so it can’t keep RCS (\"chat features\") " +
                 "turned on. Other phones go on sending RCS to this number until they notice, then fall back to " +
-                "SMS: those texts arrive late, a group's fall back as separate texts from each sender, and some " +
+                "SMS: those texts arrive late, a group’s fall back as separate texts from each sender, and some " +
                 "never fall back at all.";
         }
         if (!BridgePaired && ListenerEnabled)
         {
-            yield return "The bridge is not paired, so Post has no route for RCS except Google Messages' own " +
+            yield return "The bridge isn’t paired, so Post has no route for RCS except Google Messages' own " +
                 "notifications, which name only the members who have spoken.";
         }
         if (!BridgePaired && !ListenerEnabled)
         {
-            yield return "With no bridge and no notification capture, RCS messages cannot reach Post at all.";
+            yield return "With no bridge and no notification capture, RCS messages can’t reach Post at all.";
         }
         if (Messages is MessagesAppState.Suspended or MessagesAppState.Disabled)
         {
-            yield return "Google Messages cannot run, so it neither receives RCS nor posts the notifications " +
+            yield return "Google Messages can’t run, so it neither receives RCS nor posts the notifications " +
                 "Post reads it from.";
         }
     }

@@ -35,7 +35,7 @@ public class PrayerPagesTests
             new PrintedRequest(PrayerText.Of("Dad — the scan on the 14th"), "held 9 days", false),
             new PrintedRequest(PrayerText.Of("The Kellers, moving"), "held 3 weeks", false),
             new PrintedRequest(PrayerText.Of("Riley, settling into the new class"), "held 6 weeks", false),
-            new PrintedRequest(PrayerText.Of("Sam's Boston trip"), "held 4 days", false),
+            new PrintedRequest(PrayerText.Of("Sam’s Boston trip"), "held 4 days", false),
             new PrintedRequest(PrayerText.Of("Work — the decision about the team"), "answered", true),
         ],
         Rotations =
@@ -63,7 +63,7 @@ public class PrayerPagesTests
         Assert.Equal(2, document.NumberOfPages);
         foreach (var page in document.GetPages())
         {
-            Assert.True(page.Height > page.Width, $"page {page.Number} is not portrait");
+            Assert.True(page.Height > page.Width, $"page {page.Number} isn’t portrait");
             Assert.Equal(PageWidth, page.Width, 1);
         }
     }

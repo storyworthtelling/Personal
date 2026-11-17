@@ -397,7 +397,7 @@ public sealed class SnowballService
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             // Not the caller giving up: Drive did not answer in time. The page opens; the next open retries.
-            return SnowballHistoryReadResult.Unreadable("Drive did not answer in time.");
+            return SnowballHistoryReadResult.Unreadable("Drive didn’t answer in time.");
         }
         catch (OperationCanceledException)
         {

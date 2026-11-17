@@ -27,7 +27,7 @@ public class SleepIqIsolationTests
             .Select(Path.GetFileName)
             .ToList();
 
-        Assert.True(offenders.Count == 0, "SleepIQ's shape leaked out of SleepIqClient: " + string.Join(", ", offenders));
+        Assert.True(offenders.Count == 0, "SleepIQ’s shape leaked out of SleepIqClient: " + string.Join(", ", offenders));
     }
 
     [Fact]

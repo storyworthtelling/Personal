@@ -95,7 +95,7 @@ public class HouseholdRosterChangesTests
     {
         using var rig = new HeadRig();
         await Hold(rig, SheetData.Full());
-        rig.Drive.Content = "this is not an envelope";
+        rig.Drive.Content = "this isn’t an envelope";
         await rig.Service.SyncAsync(CancellationToken.None);
         var before = await Kept(rig);
 
@@ -107,7 +107,7 @@ public class HouseholdRosterChangesTests
         Assert.False(saved.Done);
         Assert.Equal(rig.Service.BlockedSentence, saved.Sentence);
         Assert.True((await Kept(rig)).ContentEquals(before));
-        Assert.Equal("this is not an envelope", rig.Drive.Content);
+        Assert.Equal("this isn’t an envelope", rig.Drive.Content);
         Assert.Equal(0, rig.Drive.Writes);
     }
 

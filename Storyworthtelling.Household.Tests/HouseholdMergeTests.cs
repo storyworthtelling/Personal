@@ -79,13 +79,13 @@ public class HouseholdMergeTests
         var hour = 3600000L;
         var clockA = new HybridLogicalClock();
         var clockB = new HybridLogicalClock();
-        var fromA = Doc(HouseholdRecord.Write(Key, 1, Fields(("name", "A's edit")), clockA.Now(10 * hour), "phone-a"));
+        var fromA = Doc(HouseholdRecord.Write(Key, 1, Fields(("name", "A’s edit")), clockA.Now(10 * hour), "phone-a"));
 
         clockB.Witness(fromA.MaxStamp, 9 * hour);
-        var fromB = fromA.With(fromA.Find(Key)!.Edit(Fields(("name", "B's later edit")), 1, clockB.Now(9 * hour + 1000), "phone-b"));
+        var fromB = fromA.With(fromA.Find(Key)!.Edit(Fields(("name", "B’s later edit")), 1, clockB.Now(9 * hour + 1000), "phone-b"));
 
         AssertBothOrders(fromA, fromB, merged =>
-            Assert.Equal("B's later edit", merged.Live(Key)!.Fields["name"]));
+            Assert.Equal("B’s later edit", merged.Live(Key)!.Fields["name"]));
     }
 
     [Fact]
@@ -95,11 +95,11 @@ public class HouseholdMergeTests
         // clock's edit loses even though it happened later in real time. The publisher always reads
         // before it writes (HouseholdPublish), which is what keeps this case off the real path.
         var hour = 3600000L;
-        var fromA = Doc(Put(10 * hour, "phone-a", "A's edit"));
-        var fromB = Doc(Put(9 * hour + 1000, "phone-b", "B's blind edit"));
+        var fromA = Doc(Put(10 * hour, "phone-a", "A’s edit"));
+        var fromB = Doc(Put(9 * hour + 1000, "phone-b", "B’s blind edit"));
 
         AssertBothOrders(fromA, fromB, merged =>
-            Assert.Equal("A's edit", merged.Live(Key)!.Fields["name"]));
+            Assert.Equal("A’s edit", merged.Live(Key)!.Fields["name"]));
     }
 
     [Fact]

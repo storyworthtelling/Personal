@@ -65,14 +65,14 @@ public sealed class DriveIndexUsageStore
                     if (!IndexUsageFile.TryRead(read.Plaintext, out var entries))
                     {
                         throw new IndexUsageUnreadableException(
-                            $"'{IndexUsageFile.FileName}' in Drive opened but is not a usage file this version can read; it is left exactly as it is.");
+                            $"'{IndexUsageFile.FileName}' in Drive opened but isn’t a usage file this version can read; it is left exactly as it is.");
                     }
 
                     existing = entries!;
                     break;
                 default:
                     throw new IndexUsageUnreadableException(
-                        $"'{IndexUsageFile.FileName}' in Drive does not open with this phone's passphrase ({read.Status}); it is left exactly as it is.");
+                        $"'{IndexUsageFile.FileName}' in Drive doesn’t open with this phone’s passphrase ({read.Status}); it is left exactly as it is.");
             }
 
             var merged = IndexUsageFile.Apply(existing, payloads, catalogue);

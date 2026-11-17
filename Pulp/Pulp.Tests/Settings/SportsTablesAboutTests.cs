@@ -35,7 +35,7 @@ public class SportsTablesAboutTests
             Assert.Contains(printed, line => line.StartsWith(name + " — no schedule source yet", StringComparison.Ordinal));
         }
 
-        Assert.Contains(printed, line => line.StartsWith("PWHL — read from the PWHL's own calendar file", StringComparison.Ordinal));
+        Assert.Contains(printed, line => line.StartsWith("PWHL — read from the PWHL’s own calendar file", StringComparison.Ordinal));
         Assert.DoesNotContain(printed, line => line.StartsWith("PWHL — no schedule source yet", StringComparison.Ordinal));
         Assert.Contains(printed, line => line.StartsWith("MLS — read from ESPN", StringComparison.Ordinal));
         Assert.Contains(printed, line => line.StartsWith("NWSL — read from ESPN", StringComparison.Ordinal));

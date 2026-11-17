@@ -87,7 +87,7 @@ public class HouseholdViewTests
     {
         var own = new HouseholdPlaylist(new PlaylistId("pl-own-example"), Robin, false, Playlist.Named("Mine"));
         var shared = new HouseholdPlaylist(new PlaylistId("pl-shared-example"), Avery, true, Playlist.Named("Ours"));
-        var private2 = new HouseholdPlaylist(new PlaylistId("pl-private-example"), Avery, false, Playlist.Named("Avery's"));
+        var private2 = new HouseholdPlaylist(new PlaylistId("pl-private-example"), Avery, false, Playlist.Named("Avery’s"));
         var document = HouseholdDocument.Empty;
         foreach (var playlist in new[] { own, shared, private2 })
         {

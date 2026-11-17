@@ -45,13 +45,13 @@ public sealed class FileLedgerStoreTests : IDisposable
     public void AnUnreadableLedgerIsLeftAlone()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(PathOf())!);
-        File.WriteAllText(PathOf(), "this is not json");
+        File.WriteAllText(PathOf(), "this isn’t json");
         var store = new FileLedgerStore(PathOf());
 
         var read = store.Load();
 
         Assert.True(read.WholeFileUnreadable);
-        Assert.Equal("this is not json", File.ReadAllText(PathOf()));
+        Assert.Equal("this isn’t json", File.ReadAllText(PathOf()));
     }
 
     [Fact]

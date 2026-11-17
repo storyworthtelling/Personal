@@ -186,7 +186,7 @@ internal static class SessionMover
     {
         PlanRule.SundayNotGentle => "Sundays are gentle walks",
         PlanRule.HardOnConsecutiveDays => "two hard days in a row",
-        PlanRule.UntickedEquipment => "needs equipment that is not ticked",
+        PlanRule.UntickedEquipment => "needs equipment that isn’t ticked",
         PlanRule.InThePast => "that time has already passed",
         PlanRule.TwoOnOneDay => "already has a workout",
         PlanRule.NotInTheRequest or PlanRule.OutsideTheWeek => "outside the weeks planned",

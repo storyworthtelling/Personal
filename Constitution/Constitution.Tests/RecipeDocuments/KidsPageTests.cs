@@ -151,7 +151,7 @@ public class KidsPageTests
         var kids = RecipeSamples.Kids() with
         {
             Children = ["Maximilian-Wilhelmina", "Wolfgang", "Juniper", "Robin", "Marigold"],
-            WhyLine = "Same table, same time, but the chicken has smoked paprika and garlic that they will not touch at all, which is a long way to say it.",
+            WhyLine = "Same table, same time, but the chicken has smoked paprika and garlic that they won’t touch at all, which is a long way to say it.",
             Ingredients =
             [
                 new("Main", "6 oz", "small pasta shapes, any kind at all that they like the look of tonight"),

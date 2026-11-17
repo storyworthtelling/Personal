@@ -127,7 +127,7 @@ public sealed class SealedDriveFile
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new SealedRead(SealedReadStatus.Unreachable, null, null, null, Describe("Drive could not be read", ex)) { Error = ex };
+            return new SealedRead(SealedReadStatus.Unreachable, null, null, null, Describe("Drive couldn’t be read", ex)) { Error = ex };
         }
 
         return Open(raw, key, revision);
@@ -143,7 +143,7 @@ public sealed class SealedDriveFile
         if (basis.Status == SealedReadStatus.Absent && file is IDriveFileMemory { HasFoundBefore: true })
         {
             return new SealedWriteResult(SealedWriteOutcome.Refused,
-                "This install has found the file in Drive before and cannot find it now, so a second one is not created; "
+                "This install has found the file in Drive before and can’t find it now, so a second one isn’t created; "
                 + "check that it is still in Drive and shared with this account.");
         }
         if (basis.Status == SealedReadStatus.Absent && !options.MayCreate)
@@ -163,7 +163,7 @@ public sealed class SealedDriveFile
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new SealedWriteResult(SealedWriteOutcome.Failed, Describe("The file could not be written", ex)) { Error = ex };
+            return new SealedWriteResult(SealedWriteOutcome.Failed, Describe("The file couldn’t be written", ex)) { Error = ex };
         }
 
         return options.Verify
@@ -180,7 +180,7 @@ public sealed class SealedDriveFile
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new SealedWriteResult(SealedWriteOutcome.Unverified, Describe("The file was written but could not be read back", ex));
+            return new SealedWriteResult(SealedWriteOutcome.Unverified, Describe("The file was written but couldn’t be read back", ex));
         }
 
         var opened = Open(readBack, key, null);
@@ -204,10 +204,10 @@ public sealed class SealedDriveFile
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new SealedWriteResult(SealedWriteOutcome.Failed,
-                Describe("The file did not read back, and the previous file could not be put back", ex));
+                Describe("The file didn’t read back, and the previous file couldn’t be put back", ex));
         }
 
-        return new SealedWriteResult(SealedWriteOutcome.Unconfirmed, "The file did not read back as written, so the previous file was put back.");
+        return new SealedWriteResult(SealedWriteOutcome.Unconfirmed, "The file didn’t read back as written, so the previous file was put back.");
     }
 
     private SealedRead Open(string? raw, string key, string? revision)
@@ -239,11 +239,11 @@ public sealed class SealedDriveFile
 
     private static string RefusalFor(SealedRead basis) => basis.Status switch
     {
-        SealedReadStatus.WrongPassphrase => "The file there does not open with this passphrase, so it is not written over.",
-        SealedReadStatus.Corrupt => "The file there is damaged, so it is not written over.",
+        SealedReadStatus.WrongPassphrase => "The file there doesn’t open with this passphrase, so it isn’t written over.",
+        SealedReadStatus.Corrupt => "The file there is damaged, so it isn’t written over.",
         SealedReadStatus.NewerFormat => "The file there was written by a newer app; update this one first.",
-        SealedReadStatus.Unreachable => "Drive could not be read, so nothing was written.",
-        _ => "The file is not one this install may write over.",
+        SealedReadStatus.Unreachable => "Drive couldn’t be read, so nothing was written.",
+        _ => "The file isn’t one this install may write over.",
     };
 
     // The exception's type and message only: Drive's messages name the request, not the payload.

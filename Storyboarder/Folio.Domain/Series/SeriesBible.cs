@@ -241,7 +241,7 @@ public static class BibleText
             $"  - in \"{state.Book}\"{(state.Era.Length > 0 ? $", {state.Era}" : string.Empty)}: {state.Text}"
             + (state.Quote.Length > 0 ? $" Quoted: \"{state.Quote}\"" : string.Empty));
         var correction = entry.Correction.Length > 0
-            ? [$"  - the author's correction, which wins over the books: {entry.Correction}"]
+            ? [$"  - the author’s correction, which wins over the books: {entry.Correction}"]
             : Array.Empty<string>();
         return string.Join("\n", states.Concat(correction).Prepend($"- {name}"));
     }

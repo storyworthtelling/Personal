@@ -18,7 +18,7 @@ public static class PaperResources
         Application.Current?.Resources.TryGetValue(key, out var value) == true && value is T typed
             ? typed
             : throw new InvalidOperationException(
-                $"The Paper & Ink kit is not merged: no resource named '{key}'. A head adds "
+                $"The Paper & Ink kit isn’t merged: no resource named '{key}'. A head adds "
                 + "Resources.MergedDictionaries.Add(new PaperKit()) in its App constructor.");
 
     /// <summary>The colour under <paramref name="key"/>. The common case, so it has a name.</summary>

@@ -89,7 +89,7 @@ public class ChildFavoritesTests
         Assert.Empty(ChildFavorites.Tallies([new WatchEvent(Tidewater, WatchedKind.Game, DaysAgo(1), null)]));
 
     [Theory]
-    [InlineData(FavoriteSource.ChildStar, "★ Robin's star")]
+    [InlineData(FavoriteSource.ChildStar, "★ Robin’s star")]
     [InlineData(FavoriteSource.ParentPick, "Picked by parent-example-a")]
     [InlineData(FavoriteSource.WatchedMost, "Watched most")]
     public void EachPosterSaysWhereItCameFrom(FavoriteSource source, string line)

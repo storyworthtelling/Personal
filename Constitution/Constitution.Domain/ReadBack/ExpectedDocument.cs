@@ -23,7 +23,7 @@ public sealed partial class ExpectedDocument
         RatingRows = (ratingRows ?? []).ToList();
         if (RatingRows.Count > 0 && kind != DeliveryKind.Recipe)
         {
-            throw new ArgumentException("Only a recipe's rating page has rating rows to carry.", nameof(ratingRows));
+            throw new ArgumentException("Only a recipe’s rating page has rating rows to carry.", nameof(ratingRows));
         }
 
         if (RatingRows.Select(row => row.Group).Distinct(StringComparer.Ordinal).Count() != RatingRows.Count)
@@ -192,7 +192,7 @@ public sealed partial class ExpectedDocument
             var reason = MealSheetIds.DinnerReason(weekday);
             if (map.TryGet(yes) is not null && map.TryGet(reason) is not null)
             {
-                rules.Add(new MealItemRule($"{weekday}'s dinner: {DinnerWords(model, dinner)}", yes, reason, model.Deadline));
+                rules.Add(new MealItemRule($"{weekday}’s dinner: {DinnerWords(model, dinner)}", yes, reason, model.Deadline));
             }
         }
 

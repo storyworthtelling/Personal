@@ -54,7 +54,7 @@ public class MessagesPairingTests
     [Fact]
     public void SettingsSaysWhereTextingStands()
     {
-        Assert.Contains("not connected", TextsSetting.Describe(paired: false, connected: false));
+        Assert.Contains("aren’t connected", TextsSetting.Describe(paired: false, connected: false));
         Assert.Contains("RCS", TextsSetting.Describe(paired: true, connected: true));
         Assert.Contains("reconnects", TextsSetting.Describe(paired: true, connected: false));
     }

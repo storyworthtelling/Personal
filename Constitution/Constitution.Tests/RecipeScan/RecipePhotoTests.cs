@@ -147,7 +147,7 @@ public class RecipePhotoTests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    [InlineData("I cannot help with that.")]
+    [InlineData("I can’t help with that.")]
     [InlineData("{\"is_recipe\":true,\"title\":\"Soup\",\"ingredients\":\"one onion\",\"steps\":[]}")]
     [InlineData("{\"is_recipe\":true,\"title\":\"Soup\",\"ingredients\":[1,2],\"steps\":[]}")]
     [InlineData("[\"not an object\"]")]

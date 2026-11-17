@@ -43,7 +43,7 @@ public class DateOnlyDisplayTests
         }
 
         Assert.True(violations.Count == 0,
-            "A date-only value (due date / transaction date) is shown through the phone's zone, so it reads "
+            "A date-only value (due date / transaction date) is shown through the phone’s zone, so it reads "
             + "a day early in the US. Read it with CalendarDate instead:\n" + string.Join("\n", violations));
     }
 

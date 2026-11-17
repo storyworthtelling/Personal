@@ -86,7 +86,7 @@ public class ReviewProcessorTests : IDisposable
                 readerFrames.Add(frame);
                 return Task.FromResult(new Review(
                     persona.Id, "A verdict in one clause.", "A sustained read in character.",
-                    ["what works"], ["what does not"], "what it would need")
+                    ["what works"], ["what doesn’t"], "what it would need")
                 { Score = 7, ScoreReason = "One clause on why." });
             });
 
@@ -199,7 +199,7 @@ public class ReviewProcessorTests : IDisposable
             {
                 biblesSeen.Add(soFar);
                 return Task.FromResult<IReadOnlyList<BibleFact>>(
-                    [new BibleFact(BibleKind.Character, "Hero", [], "", "Now a knight errant.", "The knight's son rode out")]);
+                    [new BibleFact(BibleKind.Character, "Hero", [], "", "Now a knight errant.", "The knight’s son rode out")]);
             });
 
         // Default round table (release H): the host hands to Hugo Hook once, then closes.
@@ -212,7 +212,7 @@ public class ReviewProcessorTests : IDisposable
                 roundTablePanel = reviews;
                 return Task.FromResult(hostCalls == 1
                     ? new HostMove("Welcome to the round table.", "agent", "Hugo, what sold you?", "", false)
-                    : new HostMove("That's the show.", "", "", "", true));
+                    : new HostMove("That’s the show.", "", "", "", true));
             });
         claude.Setup(c => c.RoundTableSpeak(
                 It.IsAny<Persona>(), It.IsAny<IReadOnlyList<Review>>(), It.IsAny<RoundTable>(), It.IsAny<RoundTableCue>(), It.IsAny<CancellationToken>()))
@@ -414,7 +414,7 @@ public class ReviewProcessorTests : IDisposable
         Assert.Contains("Scene 2 does its own job.", report, StringComparison.Ordinal);
         Assert.True(
             report.IndexOf("At the gate", StringComparison.Ordinal) < report.IndexOf("Scene 2 does its own job.", StringComparison.Ordinal),
-            "Scene two's verdict should follow scene two's prose.");
+            "Scene two’s verdict should follow scene two’s prose.");
         Assert.DoesNotContain("Opens the confrontation.", report, StringComparison.Ordinal);
     }
 
@@ -812,7 +812,7 @@ public class ReviewProcessorTests : IDisposable
     {
         var first = SeedManuscript();
         await DriveToCompletion(NewProcessor());
-        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var second = SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         using (var context = database.NewContext())
         {
             var sequel = context.Novels.Single(n => n.Id == second);
@@ -1039,7 +1039,7 @@ public class ReviewProcessorTests : IDisposable
         }
 
         Assert.Equal(4, waits.Count);
-        Assert.True(waits[3] > waits[0] * 4, $"Waits did not grow: {string.Join(", ", waits)}");
+        Assert.True(waits[3] > waits[0] * 4, $"Waits didn’t grow: {string.Join(", ", waits)}");
         Assert.Equal(4, LoadNovel(id).StageAttempts);
     }
 
@@ -1611,7 +1611,7 @@ public class ReviewProcessorTests : IDisposable
         await DriveToCompletion(NewProcessor());
 
         Assert.True(Pictures(ReportOf(secondId)) > Pictures(ReportOf(firstId)),
-            "The second draft's report carries no more pictures than the first's, though one of its "
+            "The second draft’s report carries no more pictures than the first’s, though one of its "
             + "two scenes changed and should print its predecessor beside it.");
     }
 
@@ -1870,7 +1870,7 @@ public class ReviewProcessorTests : IDisposable
         Assert.All(readerFrames, frame => Assert.Equal(string.Empty, frame.SeriesCanon));
 
         readerFrames.Clear();
-        SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         await DriveToCompletion(NewProcessor());
 
         Assert.Equal(PersonaCatalogue.Readers.Count, readerFrames.Count);
@@ -1888,7 +1888,7 @@ public class ReviewProcessorTests : IDisposable
         await DriveToCompletion(NewProcessor());
         Assert.Empty(biblesSeen);
 
-        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var second = SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         await DriveToCompletion(NewProcessor());
 
         // Once, shown what book one established.
@@ -1903,7 +1903,7 @@ public class ReviewProcessorTests : IDisposable
         var hero = Assert.Single(bible.Entries, entry => entry.Kind == BibleKind.Character && entry.Name == "Hero");
         Assert.Equal(2, hero.States.Count);
         Assert.Equal("Now a knight errant.", hero.Current);
-        Assert.Equal("The knight's son rode out", hero.States[1].Quote);
+        Assert.Equal("The knight’s son rode out", hero.States[1].Quote);
     }
 
     /// <summary>A sequel's place in the series is guessed once, from the other books, and kept as a guess (R21).</summary>
@@ -1914,7 +1914,7 @@ public class ReviewProcessorTests : IDisposable
         await DriveToCompletion(NewProcessor());
         Assert.Empty(placementBooks);
 
-        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var second = SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         await DriveToCompletion(NewProcessor());
 
         Assert.Equal(["Quest"], Assert.Single(placementBooks));
@@ -1931,7 +1931,7 @@ public class ReviewProcessorTests : IDisposable
     {
         var first = SeedManuscript();
         await DriveToCompletion(NewProcessor());
-        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var second = SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         using (var context = database.NewContext())
         {
             context.Novels.Single(n => n.Id == second).PlacementJson =
@@ -1968,7 +1968,7 @@ public class ReviewProcessorTests : IDisposable
             });
 
         readerFrames.Clear();
-        SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         await DriveToCompletion(NewProcessor());
 
         Assert.StartsWith("SERIES BIBLE", bibleSent, StringComparison.Ordinal);
@@ -1986,7 +1986,7 @@ public class ReviewProcessorTests : IDisposable
     {
         var first = SeedManuscript();
         await DriveToCompletion(NewProcessor());
-        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var second = SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         using (var context = database.NewContext())
         {
             foreach (var novel in context.Novels)
@@ -2024,7 +2024,7 @@ public class ReviewProcessorTests : IDisposable
     {
         var first = SeedManuscript();
         await DriveToCompletion(NewProcessor());
-        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var second = SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         var remarkable = new Mock<IRemarkableClient>();
         remarkable.Setup(r => r.Upload(It.Is<string>(title => title.Contains("Series bible")), It.IsAny<Stream>(),
                 It.IsAny<long>(), null, It.IsAny<CancellationToken>()))
@@ -2043,7 +2043,7 @@ public class ReviewProcessorTests : IDisposable
     {
         var first = SeedManuscript();
         await DriveToCompletion(NewProcessor());
-        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var second = SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         Guid series;
         using (var context = database.NewContext())
             series = context.Novels.Single(n => n.Id == second).SeriesId!.Value;
@@ -2102,7 +2102,7 @@ public class ReviewProcessorTests : IDisposable
                 return Task.FromResult(SeriesContinuity.Empty with { PriorBookTitle = canon.PriorBookTitle });
             });
 
-        SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         await DriveToCompletion(NewProcessor(new ArchiveOptions { Enabled = true }, driveArchive: drive.Object));
 
         Assert.Contains("Black basalt, as the author corrected it.", bibleSent, StringComparison.Ordinal);
@@ -2130,7 +2130,7 @@ public class ReviewProcessorTests : IDisposable
     {
         var first = SeedManuscript();
         await DriveToCompletion(NewProcessor());
-        var second = SeedNextBook(first, "The knight's son rode out. At the gate, he knocked.");
+        var second = SeedNextBook(first, "The knight’s son rode out. At the gate, he knocked.");
         Guid series;
         using (var context = database.NewContext())
         {
@@ -2232,8 +2232,8 @@ public class ReviewProcessorTests : IDisposable
             .Returns((string _, SeriesCanon canon, string _, StoryPlacement? _, IReadOnlyList<ChapterNotes> _, string _, CancellationToken _) =>
                 Task.FromResult(new SeriesContinuity(
                     canon.PriorBookTitle,
-                    [new SeriesBreak("Chapter 1", "The hero's eyes were grey", "Now they are green")],
-                    [new CarriedThread("The gate's mechanism was never explained", "Ignored")])));
+                    [new SeriesBreak("Chapter 1", "The hero’s eyes were grey", "Now they are green")],
+                    [new CarriedThread("The gate’s mechanism was never explained", "Ignored")])));
 
         var secondId = SeedNextBook(firstId, "A short tale. The hero walked to the castle and knocked on the gate.");
         await DriveToCompletion(NewProcessor());

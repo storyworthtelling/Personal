@@ -118,9 +118,9 @@ public partial class MainPage : FolioBinderPage
             // (a failed migration, say) used to look current with no sign of it (audit 11 §24). It is said behind the
             // fold, and logged.
             Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write(
-                "Desk", Microsoft.Extensions.Logging.LogLevel.Warning, "The desk could not be refreshed", failure);
+                "Desk", Microsoft.Extensions.Logging.LogLevel.Warning, "The desk couldn’t be refreshed", failure);
             SetNotice(DeskUnreadableKey, new DogEarNotice(
-                "The desk could not be refreshed",
+                "The desk couldn’t be refreshed",
                 $"What is shown may be out of date: {Storyworthtelling.Diagnostics.PlainError.Describe(failure)}. Folio tries again shortly.",
                 DogEarHue.Caution, At: DateTimeOffset.Now));
         }
@@ -334,7 +334,7 @@ public partial class MainPage : FolioBinderPage
         }
         catch
         {
-            LastRunLabel.Text = "That image could not be read.";
+            LastRunLabel.Text = "That image couldn’t be read.";
             return;
         }
 
@@ -381,7 +381,7 @@ public partial class MainPage : FolioBinderPage
         catch (Exception ex)
         {
             // A jacket is never the point of the app: say so quietly and leave the book as it was.
-            LastRunLabel.Text = "Couldn't paint a jacket: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Gemini");
+            LastRunLabel.Text = "Couldn’t paint a jacket: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Gemini");
             return;
         }
 
@@ -614,12 +614,12 @@ public partial class MainPage : FolioBinderPage
     {
         var opening = MauiTapWatch.Action(FolioKeyActions.OpenReport, TimeSpan.FromSeconds(15));
         var opened = await ReportFile.OpenAsync(status.Id, status.Title);
-        if (opened) opening.Succeeded(); else opening.Failed("the report is not on this phone");
+        if (opened) opening.Succeeded(); else opening.Failed("the report isn’t on this phone");
         if (!opened)
         {
             // The status line, not a dialog (§8): the report has been delivered and cleared off the
             // device, or has not been rendered yet. Either way there is nothing here to open.
-            LastRunLabel.Text = "That report is not on this phone — it is in Drive, beside the manuscript.";
+            LastRunLabel.Text = "That report isn’t on this phone — it is in Drive, beside the manuscript.";
         }
     }
 

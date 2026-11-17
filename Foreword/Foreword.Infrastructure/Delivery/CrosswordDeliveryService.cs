@@ -182,7 +182,7 @@ public class CrosswordDeliveryService(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning("The brief's opening was not written ({Kind})", ex.GetType().Name);
+            logger.LogWarning("The brief’s opening was not written ({Kind})", ex.GetType().Name);
             return string.Empty;
         }
     }

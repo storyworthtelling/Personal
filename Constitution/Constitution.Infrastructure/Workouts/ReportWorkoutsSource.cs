@@ -40,7 +40,7 @@ public sealed class ReportWorkoutsSource(
 {
     public const string NoOwner = "No adult is marked as the owner of this phone yet, so there is no workout week to show.";
 
-    public const string LedgerUnreadable = "The skip ledger could not be read, so the week is not shown.";
+    public const string LedgerUnreadable = "The skip ledger couldn’t be read, so the week isn’t shown.";
 
     public WorkoutsRead Read(DateTimeOffset now)
     {
@@ -99,7 +99,7 @@ public sealed class ReportWorkoutsSource(
         {
             WeekRequestRead.Ready ready => WeekRecordSnapshot.From(week, new WeekReadInputs(owner, now, ready.Request, numbers.Assignments, skips.Ledger, pagesDelivered)),
             WeekRequestRead.Unavailable unavailable => new WorkoutsRead.Unavailable(unavailable.Reason),
-            _ => throw new InvalidOperationException("The week's request came back as neither made nor unavailable."),
+            _ => throw new InvalidOperationException("The week’s request came back as neither made nor unavailable."),
         };
     }
 }

@@ -29,7 +29,7 @@ public class SportsScreenGetsOnlySheetsTests
             .Where(line => Regex.IsMatch(line, @"^\s*public\s") && !line.TrimStart().StartsWith("///", StringComparison.Ordinal))
             .ToList();
 
-        Assert.True(publicLines.Count >= 30, $"Only {publicLines.Count} public members found; the guard is not reading the composition root.");
+        Assert.True(publicLines.Count >= 30, $"Only {publicLines.Count} public members found; the guard isn’t reading the composition root.");
         Assert.DoesNotContain(publicLines, line => line.Contains("LeagueFeed", StringComparison.Ordinal));
     }
 

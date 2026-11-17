@@ -667,7 +667,7 @@ public class MealDeadlineStepTests
     public async Task AFileThatCannotBeReadStopsTheStep()
     {
         var rig = await PlannedAsync();
-        rig.Answers.Cannot = "The household file cannot be read.";
+        rig.Answers.Cannot = "The household file can’t be read.";
 
         var outcome = await rig.RunAsync();
 
@@ -692,7 +692,7 @@ public class MealDeadlineStepTests
     public async Task AnUnreadableLibraryStopsTheStep()
     {
         var rig = await PlannedAsync();
-        rig.Library.Answer = new TemplateLibraryRead.Unreadable("The household file cannot be read.");
+        rig.Library.Answer = new TemplateLibraryRead.Unreadable("The household file can’t be read.");
 
         var outcome = await rig.RunAsync();
 
@@ -706,7 +706,7 @@ public class MealDeadlineStepTests
     {
         var rig = await PlannedAsync();
         rig.Answers.All.Add(Tick(Sam, TickedLine, Before(90)));
-        rig.Notes.RefuseWith = "The household file cannot be written.";
+        rig.Notes.RefuseWith = "The household file can’t be written.";
 
         var outcome = await rig.RunAsync();
 
@@ -725,7 +725,7 @@ public class MealDeadlineStepTests
     {
         var rig = await PlannedAsync();
         rig.Answers.All.Add(Tick(Sam, TickedLine, Before(90)));
-        rig.Library.RefuseWith = "The household file cannot be written.";
+        rig.Library.RefuseWith = "The household file can’t be written.";
 
         var outcome = await rig.RunAsync();
 

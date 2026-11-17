@@ -513,7 +513,7 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
         rig.Learning.Held = rig.Learning.Held with { Progression = ledger };
         rig.Encouragement.Answer = "15 lb today, up from 10.";
         await rig.PlannedAsync();
-        rig.Encouragement.Answer = "A better line, in the owner's own hand.";
+        rig.Encouragement.Answer = "A better line, in the owner’s own hand.";
 
         var report = await rig.PlannedAsync(rig.Request(Est(11, 2, 9)));
 

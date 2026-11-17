@@ -23,7 +23,7 @@ public class PkceCodesTests
         // RFC 7636 section 4.1: 43 to 128 characters, unreserved only.
         Assert.InRange(codes.Verifier.Length, 43, 128);
         Assert.All(codes.Verifier, c =>
-            Assert.True(char.IsAsciiLetterOrDigit(c) || c is '-' or '.' or '_' or '~', $"'{c}' is not unreserved"));
+            Assert.True(char.IsAsciiLetterOrDigit(c) || c is '-' or '.' or '_' or '~', $"'{c}' isn’t unreserved"));
     }
 
     [Fact]

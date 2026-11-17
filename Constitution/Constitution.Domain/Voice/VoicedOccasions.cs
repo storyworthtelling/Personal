@@ -54,7 +54,7 @@ public static class VoicedOccasions
         BySeat.TryGetValue(seat, out var occasion)
             ? occasion
             : throw new ArgumentOutOfRangeException(nameof(seat), seat,
-                "This seat is not on Constitution's closed list of six voiced seats; a voiced seat is a decision, not a diff.");
+                "This seat isn’t on Constitution’s closed list of six voiced seats; a voiced seat is a decision, not a diff.");
 
     /// <summary>
     /// The occasion for a stored id, or null for one this build does not know (an older or newer

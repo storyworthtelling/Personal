@@ -117,7 +117,7 @@ public sealed class DeviceAccountTokens
         catch (Exception e) when (e is AuthenticatorException or global::Android.Accounts.OperationCanceledException)
         {
             signInHealth?.Invoke("Google refused the sign-in.");
-            throw new GoogleSignInRequiredException("Google refused this phone's sign-in. Sign in with Google again.", null, e);
+            throw new GoogleSignInRequiredException("Google refused this phone’s sign-in. Sign in with Google again.", null, e);
         }
 
         if (bundle?.GetString(AccountManager.KeyAuthtoken) is { Length: > 0 } token)
@@ -128,6 +128,6 @@ public sealed class DeviceAccountTokens
 
         var consent = bundle?.GetParcelable(AccountManager.KeyIntent);
         signInHealth?.Invoke("Google wants the sign-in confirmed again.");
-        throw new GoogleSignInRequiredException("Google wants this phone's sign-in confirmed again. Sign in with Google again.", consent);
+        throw new GoogleSignInRequiredException("Google wants this phone’s sign-in confirmed again. Sign in with Google again.", consent);
     }
 }

@@ -33,7 +33,7 @@ public partial class TodayHasOneActionTests
 
         Assert.Contains(files, file => file.EndsWith("TodayArea.cs", StringComparison.Ordinal));
         Assert.Contains(files, file => file.EndsWith(BarFile, StringComparison.Ordinal));
-        Assert.True(files.Count >= 3, "Today's page, its bar and its area should all be scanned: " + files.Count);
+        Assert.True(files.Count >= 3, "Today’s page, its bar and its area should all be scanned: " + files.Count);
     }
 
     [Theory]
@@ -59,7 +59,7 @@ public partial class TodayHasOneActionTests
             .Select(ConstitutionSource.Relative)
             .ToList();
 
-        Assert.True(offenders.Count == 0, "Today's rows must do nothing on a tap: " + string.Join(", ", offenders));
+        Assert.True(offenders.Count == 0, "Today’s rows must do nothing on a tap: " + string.Join(", ", offenders));
     }
 
     [Fact]

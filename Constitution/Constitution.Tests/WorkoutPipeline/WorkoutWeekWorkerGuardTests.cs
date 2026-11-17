@@ -13,7 +13,7 @@ public class WorkoutWeekWorkerGuardTests
     private static string Source(string fileName)
     {
         var file = ConstitutionSource.Files(".cs").SingleOrDefault(path => Path.GetFileName(path) == fileName);
-        Assert.True(file is not null, fileName + " was not found under Constitution/.");
+        Assert.True(file is not null, fileName + " wasn’t found under Constitution/.");
         return File.ReadAllText(file!);
     }
 
@@ -96,7 +96,7 @@ public class WorkoutWeekWorkerGuardTests
     public void TheFolderOpensNoWayOffThePhone()
     {
         var files = ConstitutionSource.Files(".cs").Where(path => ConstitutionSource.Relative(path).Contains("Constitution.Android/WorkoutWeek/", StringComparison.Ordinal)).ToList();
-        Assert.True(files.Count >= 2, "The workout week's head folder looks empty; the guard is not reading it.");
+        Assert.True(files.Count >= 2, "The workout week’s head folder looks empty; the guard isn’t reading it.");
 
         foreach (var file in files)
         {

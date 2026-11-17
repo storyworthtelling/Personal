@@ -23,7 +23,7 @@ public sealed record RemarkablePairingStatus(string Line, string Button, bool Ne
         return health.Status switch
         {
             CredentialStatus.Failing => new RemarkablePairingStatus(
-                "The reMarkable turned this phone's pairing away. Pair again.", "Pair again", NeedsPairing: true),
+                "The reMarkable turned this phone’s pairing away. Pair again.", "Pair again", NeedsPairing: true),
             CredentialStatus.Ok => new RemarkablePairingStatus("Paired ✓", "Re-pair", NeedsPairing: false),
             _ => new RemarkablePairingStatus("Paired", "Re-pair", NeedsPairing: false),
         };

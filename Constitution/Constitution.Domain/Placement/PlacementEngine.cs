@@ -102,7 +102,7 @@ public static class PlacementEngine
                     standings[copy.Key] = Standing.Skipped;
                     if (copy.Kind is { } kind && !copy.Vouched)
                     {
-                        doubts.TryAdd((Normal(copy.Person), kind), "A key just numbered for this session is recorded as written with nothing on the calendar, and no record says it was ever issued to it: a delete cannot be told from a different numbering.");
+                        doubts.TryAdd((Normal(copy.Person), kind), "A key just numbered for this session is recorded as written with nothing on the calendar, and no record says it was ever issued to it: a delete can’t be told from a different numbering.");
                     }
                 }
                 else

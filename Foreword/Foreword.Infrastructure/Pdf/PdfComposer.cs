@@ -215,7 +215,7 @@ public class PdfComposer : IPdfComposer
         // the reader has no way to tell the difference.
         if (article.AbstractOnly)
         {
-            layout.DrawWrapped("Abstract only — the full article did not fetch.", noticeFont);
+            layout.DrawWrapped("Abstract only — the full article didn’t fetch.", noticeFont);
             layout.Advance(4);
         }
 

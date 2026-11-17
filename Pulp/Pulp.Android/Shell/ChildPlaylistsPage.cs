@@ -193,7 +193,7 @@ public sealed class ChildPlaylistsPage(Activity host, Func<FrameLayout> overlay,
             }
             catch (Exception exception)
             {
-                services.Diagnostics.Warn("child", "A child's Playlists could not be read.", exception);
+                services.Diagnostics.Warn("child", "A child’s Playlists could not be read.", exception);
                 host.RunOnUiThread(() =>
                 {
                     unreadable = lists is null;

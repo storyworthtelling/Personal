@@ -450,7 +450,7 @@ public sealed class MusicLibrary(
         }
         else
         {
-            Status = state == WorkInfo.State.Failed ? "Scan couldn't finish." : null;
+            Status = state == WorkInfo.State.Failed ? "Scan couldn’t finish." : null;
         }
 
         StopObservingScan();
@@ -516,7 +516,7 @@ public sealed class MusicLibrary(
         {
             // Ignore: restore is a convenience; the folder picker is always available.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet(LogSources.Vault, "Music folder restore did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Music folder restore didn’t complete", e);
         }
     });
 
@@ -704,7 +704,7 @@ public sealed class MusicLibrary(
         {
             // Best-effort: the vault picks the folder up on the next successful publish.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet(LogSources.Vault, "Music folder backup did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Music folder backup didn’t complete", e);
         }
     }
 }

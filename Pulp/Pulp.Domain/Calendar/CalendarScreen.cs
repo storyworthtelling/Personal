@@ -49,7 +49,7 @@ public static class CalendarScreen
     public const string ReadingStatus = "Looking at what is coming.";
 
     /// <summary>The status sentence when the page could not be read; Diagnostics has why.</summary>
-    public const string UnreadableStatus = "The calendar could not be read just now.";
+    public const string UnreadableStatus = "The calendar couldn’t be read just now.";
 
     public const string AllDayText = "All day";
 

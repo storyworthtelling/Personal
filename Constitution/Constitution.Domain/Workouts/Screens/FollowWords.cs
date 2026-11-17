@@ -28,22 +28,22 @@ public sealed record FollowReading(FollowVerdict Verdict, string? Sentence, bool
 public static class FollowWords
 {
     /// <summary>The swap could not be written down, so the tab has taken it back.</summary>
-    public const string SwapNotKept = "The swap could not be saved, so the plan is as it was.";
+    public const string SwapNotKept = "The swap couldn’t be saved, so the plan is as it was.";
 
     /// <summary>The skip could not be written down yet; the day stays struck through and it is tried again.</summary>
-    public const string SkipNotKept = "The skip could not be saved yet. It will try again.";
+    public const string SkipNotKept = "The skip couldn’t be saved yet. It will try again.";
 
     /// <summary>The change never started: the meal run, the workout run or the deadline step held the calendars for the whole wait. Nothing was written.</summary>
     public const string GateBusy = "Another plan is being written; try again in a minute.";
 
-    public const string CalendarUnchanged = "The calendar did not change. It will try again.";
+    public const string CalendarUnchanged = "The calendar didn’t change. It will try again.";
 
     public const string CalendarPartlyChanged = "Only part of the calendar changed. Look it over.";
 
     public const string CalendarLeftAlone = "The calendar was left as you had it.";
 
     /// <summary>The calendar was asked again as often as it will be, and still did not change.</summary>
-    public const string CalendarGaveUp = "The calendar still did not change.";
+    public const string CalendarGaveUp = "The calendar still didn’t change.";
 
     public static FollowReading Judge(IReadOnlyList<FollowOutcome> outcomes)
     {

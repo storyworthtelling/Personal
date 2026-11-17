@@ -53,7 +53,7 @@ public class TemplateChainTests
                 var reads = page.Readout.Map.Targets.Select(target => target.Id switch
                 {
                     var id when id == weekendYes => new InkTargetRead(id, true, 0.95),
-                    var id when person == LeeId && id == MealSheetIds.BoxFruitReason => new InkTargetRead(id, true, 0.95, "Robin will not eat it"),
+                    var id when person == LeeId && id == MealSheetIds.BoxFruitReason => new InkTargetRead(id, true, 0.95, "Robin won’t eat it"),
                     var id => new InkTargetRead(id, false, 0.95),
                 }).ToList();
                 var resolved = new InkResolver(page.Readout).Resolve(InkPageRead.Read(reads), page.Rules, readAt);
@@ -68,7 +68,7 @@ public class TemplateChainTests
         Assert.Equal(TemplateStatus.Approved, feedback.Library.Find(proposal.Id)!.Status);
         Assert.Equal(TemplateApproval.Explicit, feedback.Library.Find(proposal.Id)!.Approval);
         Assert.Equal(TemplateStatus.Rejected, feedback.Library.Find(boxFruit)!.Status);
-        Assert.Contains("Robin will not eat it", feedback.Library.Find(boxFruit)!.Reason, StringComparison.Ordinal);
+        Assert.Contains("Robin won’t eat it", feedback.Library.Find(boxFruit)!.Reason, StringComparison.Ordinal);
         Assert.Empty(feedback.Library.Proposed);
         Assert.Contains(feedback.Evidence, item => item.Recipe?.Value == boxFruit);
         Assert.Equal(2, feedback.Likes.Count);

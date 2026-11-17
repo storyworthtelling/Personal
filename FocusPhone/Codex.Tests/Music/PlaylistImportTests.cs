@@ -85,7 +85,7 @@ public class PlaylistImportTests
     [Fact]
     public void Resolve_ReportsWhatTheLibraryDoesNotHave()
     {
-        var absent = new ImportedTrack("Some Song We Don't Own", "A Band");
+        var absent = new ImportedTrack("Some Song We Don’t Own", "A Band");
         var result = Resolve(new ImportedTrack("Meant to Live", "Switchfoot"), absent);
 
         Assert.Equal(["2"], result.Matched.Select(track => track.Id));

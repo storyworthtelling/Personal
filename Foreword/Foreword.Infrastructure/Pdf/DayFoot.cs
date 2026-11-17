@@ -97,7 +97,7 @@ internal static class DayFoot
             if (y + lineHeight > bottom) return;
 
             layout.DrawText(
-                layout.Truncate($"Couldn't read — {note.Text}", lineFont, width),
+                layout.Truncate($"Couldn’t read — {note.Text}", lineFont, width),
                 lineFont, x, y, width, lineHeight, TextAlign.TopLeft, SkiaPageLayout.InkMuted);
             y += lineHeight;
         }

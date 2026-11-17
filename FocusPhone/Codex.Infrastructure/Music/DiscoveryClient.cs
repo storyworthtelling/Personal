@@ -24,7 +24,7 @@ public sealed class DiscoveryClient : IDiscoveryClient
     private const int WeeklyMaxTokens = 4_000;
 
     private const string PlaylistInstruction =
-        "You are a music curator picking a playlist from ONE listener's own library. You are given their " +
+        "You are a music curator picking a playlist from ONE listener’s own library. You are given their " +
         "TASTE PROFILE, a CATALOG (each track: n, title, artist, genre), and a REQUEST (a mood/genre/idea). " +
         "Choose tracks from the catalog that fit the request and their taste, honoring what the profile says " +
         "they avoid. Use ONLY numbers n present in the catalog. Respond with ONLY a JSON object: " +
@@ -32,7 +32,7 @@ public sealed class DiscoveryClient : IDiscoveryClient
         "tracks' n, as strings, in play order, at most the requested count. No prose outside the JSON.";
 
     private const string DiscoveriesInstruction =
-        "You are filling ONE listener's weekly crate: things they do NOT already have and might like. You are " +
+        "You are filling ONE listener’s weekly crate: things they do NOT already have and might like. You are " +
         "given their TASTE PROFILE, a sample of the LIBRARY THEY ALREADY HAVE (tracks, which also stand for " +
         "the albums they belong to), and the PODCASTS THEY ALREADY FOLLOW. Both lists are evidence of taste " +
         "and lists of what to AVOID recommending — never pick a track, another release of an album already " +

@@ -228,7 +228,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             // in a proportional face is a value the owner cannot check character by character.
             column.AddView(PaperUi.Mono(Host, reading.Value));
             column.AddView(PaperUi.Secondary(Host,
-                "A web address opens in the phone's browser. A Wi-Fi network offers to join "
+                "A web address opens in the phone’s browser. A Wi-Fi network offers to join "
                 + "it. Anything else stays here."));
         }
 
@@ -334,7 +334,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         var scanner = GmsDocumentScanning.GetClient(options);
         scanner.GetStartScanIntent(Host)
             .AddOnSuccessListener(new IntentSenderListener(this, opening))
-            .AddOnFailureListener(new FailureListener(this, "The scanner is not available", opening));
+            .AddOnFailureListener(new FailureListener(this, "The scanner isn’t available", opening));
     }
 
     public override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
@@ -397,13 +397,13 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
             HeadLog.Warn("Plate", "A scan could not be composed", e);
             ShowStatus(e is OutOfMemoryException || e.GetType().Name.Contains("OutOfMemory", StringComparison.Ordinal)
                 ? "That scan is too large to put together at once. The pages are still here; remove some and try again."
-                : $"That scan could not be put together ({e.GetType().Name}). The pages are still here; try again.");
+                : $"That scan couldn’t be put together ({e.GetType().Name}). The pages are still here; try again.");
             return;
         }
 
         if (filed is null)
         {
-            ShowStatus("Could not file that scan.");
+            ShowStatus("Couldn’t file that scan.");
             return;
         }
 
@@ -500,9 +500,9 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         }
         catch (ActivityNotFoundException)
         {
-            Delivered(delivering, destination, false, "that app is not installed");
+            Delivered(delivering, destination, false, "that app isn’t installed");
             ShowStatus($"Saved to Documents · {TimeFormats.Clock12(DateTime.Now)}. "
-                + "That app is not installed.");
+                + "That app isn’t installed.");
         }
     }
 
@@ -526,7 +526,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     {
         if (!PlateRemarkable.IsPaired)
         {
-            Delivered(delivering, ScanDestination.Remarkable, false, "the reMarkable is not paired");
+            Delivered(delivering, ScanDestination.Remarkable, false, "the reMarkable isn’t paired");
             ShowStatus($"Saved to Documents · {TimeFormats.Clock12(DateTime.Now)}. "
                 + "Pair the reMarkable in Settings to send it there.");
             return;
@@ -574,7 +574,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
     {
         if (shell.Camera.Capture is not { } capture)
         {
-            ShowStatus("The camera is not ready yet.");
+            ShowStatus("The camera isn’t ready yet.");
             return;
         }
 
@@ -646,7 +646,7 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
         }
         catch (ActivityNotFoundException)
         {
-            ShowStatus("This phone can't add a Wi-Fi network from here.");
+            ShowStatus("This phone can’t add a Wi-Fi network from here.");
         }
     }
 
@@ -712,12 +712,12 @@ public sealed class ScanArea(PlateActivity host) : PlateArea(host)
                 .Build();
             BarcodeScanning.GetClient(options).Process(image)
                 .AddOnSuccessListener(new QrResultListener(area))
-                .AddOnFailureListener(new FailureListener(area, "Could not read that frame"));
+                .AddOnFailureListener(new FailureListener(area, "Couldn’t read that frame"));
         }
 
         public void OnError(ImageCaptureException? exception) =>
             area.Host.RunOnUiThread(() => area.ShowStatus(
-                $"Could not take that frame: {exception?.Message}"));
+                $"Couldn’t take that frame: {exception?.Message}"));
     }
 
     private sealed class QrResultListener(ScanArea area)

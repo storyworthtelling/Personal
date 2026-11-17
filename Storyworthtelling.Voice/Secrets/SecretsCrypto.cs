@@ -105,7 +105,7 @@ public static class SecretsCrypto
 public sealed class WrongPassphraseException : Exception
 {
     public WrongPassphraseException(Exception inner)
-        : base("The vault could not be decrypted — the passphrase is wrong or the file is corrupt.", inner)
+        : base("The vault couldn’t be decrypted — the passphrase is wrong or the file is corrupt.", inner)
     {
     }
 }

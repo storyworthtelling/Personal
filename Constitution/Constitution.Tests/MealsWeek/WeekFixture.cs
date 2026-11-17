@@ -19,7 +19,7 @@ internal static class WeekFixture
 
     public static MealWeek Week() => MealWeek.Planned(Sunday,
     [
-        DinnerChoice.Leftovers(Sunday, "Saturday's meatballs, again."),
+        DinnerChoice.Leftovers(Sunday, "Saturday’s meatballs, again."),
         Cooked(1, "lentil-soup", "Sam", 5, 30),
         Cooked(2, "sheet-pan-chicken", "Lee", 5, 45),
         Cooked(3, "black-bean-chili", "Robin", 4, 0),

@@ -83,7 +83,7 @@ public sealed class LaunchFaultPage : ContentPage
         }
         catch (Exception ex)
         {
-            status.Text = $"Could not copy: {Storyworthtelling.Diagnostics.PlainError.Describe(ex)}";
+            status.Text = $"Couldn’t copy: {Storyworthtelling.Diagnostics.PlainError.Describe(ex)}";
         }
     }
 }

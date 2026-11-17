@@ -58,7 +58,7 @@ public static class MealDeadline
         var weeks = all.Select(answer => answer.Week).Distinct().ToList();
         if (weeks.Count > 1)
         {
-            throw new ArgumentException($"A verdict is for one week's sheet; these answers are for {weeks.Count} weeks ({string.Join(", ", weeks.Order())}).", nameof(answers));
+            throw new ArgumentException($"A verdict is for one week’s sheet; these answers are for {weeks.Count} weeks ({string.Join(", ", weeks.Order())}).", nameof(answers));
         }
 
         var settled = now >= deadline;

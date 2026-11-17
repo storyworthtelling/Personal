@@ -16,7 +16,7 @@ public sealed record NoticeCount
         }
         if (count is < 0 or > Ceiling)
         {
-            throw new ArgumentOutOfRangeException(nameof(count), "A count must be between zero and the export's ceiling.");
+            throw new ArgumentOutOfRangeException(nameof(count), "A count must be between zero and the export’s ceiling.");
         }
 
         Kind = kind;
@@ -80,5 +80,5 @@ public sealed record DiagnosticsCounts
     private static int Bounded(int count, string parameter) =>
         count is >= 0 and <= NoticeCount.Ceiling
             ? count
-            : throw new ArgumentOutOfRangeException(parameter, "A count must be between zero and the export's ceiling.");
+            : throw new ArgumentOutOfRangeException(parameter, "A count must be between zero and the export’s ceiling.");
 }

@@ -60,11 +60,11 @@ public sealed record PrayerListSave(PrayerSaveOutcome Outcome, PrayerArchiveStat
     public string Sentence() => Outcome switch
     {
         PrayerSaveOutcome.Saved => string.Empty,
-        PrayerSaveOutcome.WrongPassphrase => "The archive would not open with the passphrase in Settings. Nothing was changed.",
-        PrayerSaveOutcome.Unreadable => "The archive in Drive could not be read. Nothing was changed — it is the only copy.",
-        PrayerSaveOutcome.Refused => "The archive refused to be written over, because what is in Drive would not open. Nothing was changed.",
-        PrayerSaveOutcome.Offline => "The phone has no network, so the archive could not be reached. Nothing was changed; try again once it is back.",
-        _ => $"The lists could not be saved: {Cause}. Nothing was changed.",
+        PrayerSaveOutcome.WrongPassphrase => "The archive wouldn’t open with the passphrase in Settings. Nothing was changed.",
+        PrayerSaveOutcome.Unreadable => "The archive in Drive couldn’t be read. Nothing was changed — it is the only copy.",
+        PrayerSaveOutcome.Refused => "The archive refused to be written over, because what is in Drive wouldn’t open. Nothing was changed.",
+        PrayerSaveOutcome.Offline => "The phone has no network, so the archive couldn’t be reached. Nothing was changed; try again once it is back.",
+        _ => $"The lists couldn’t be saved: {Cause}. Nothing was changed.",
     };
 
     // The archive's own refusal is not a bug to route around; no network is not a failure of the archive. Only the

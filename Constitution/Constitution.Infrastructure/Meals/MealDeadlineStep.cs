@@ -95,7 +95,7 @@ public static class MealDeadlineStep
                 decided = held.Record;
                 break;
             case MealDecisionRecordRead.Unreadable:
-                return Stop(MealDeadlineStoppedBecause.DecisionsUnreadable, "The saved meal decisions cannot be read, so no week was decided.");
+                return Stop(MealDeadlineStoppedBecause.DecisionsUnreadable, "The saved meal decisions can’t be read, so no week was decided.");
             default:
                 throw new InvalidOperationException("The decided weeks came back as neither a record nor a reason.");
         }
@@ -109,7 +109,7 @@ public static class MealDeadlineStep
                 kept = held.Record;
                 break;
             case MealWeekRecordRead.Unreadable:
-                return Stop(MealDeadlineStoppedBecause.WeeksUnreadable, "The saved meal weeks cannot be read, so no week was decided.");
+                return Stop(MealDeadlineStoppedBecause.WeeksUnreadable, "The saved meal weeks can’t be read, so no week was decided.");
             default:
                 throw new InvalidOperationException("The saved weeks came back as neither a record nor a reason.");
         }
@@ -138,9 +138,9 @@ public static class MealDeadlineStep
                 answers = held.Answers;
                 break;
             case MealAnswersRead.Held:
-                return Stop(MealDeadlineStoppedBecause.AnswersUnreadable, "An answer for this week cannot be read by this version, so the week was not decided.");
+                return Stop(MealDeadlineStoppedBecause.AnswersUnreadable, "An answer for this week can’t be read by this version, so the week wasn’t decided.");
             case MealAnswersRead.Unreadable:
-                return Stop(MealDeadlineStoppedBecause.AnswersUnreadable, "The household file cannot be read, so the week was not decided.");
+                return Stop(MealDeadlineStoppedBecause.AnswersUnreadable, "The household file can’t be read, so the week wasn’t decided.");
             default:
                 throw new InvalidOperationException("The answers came back as neither answers nor a reason.");
         }
@@ -155,7 +155,7 @@ public static class MealDeadlineStep
                 library = null;
                 break;
             case TemplateLibraryRead.Unreadable:
-                return Stop(MealDeadlineStoppedBecause.LibraryUnreadable, "The template library cannot be read, so the week was not decided.");
+                return Stop(MealDeadlineStoppedBecause.LibraryUnreadable, "The template library can’t be read, so the week wasn’t decided.");
             default:
                 throw new InvalidOperationException("The template library came back as neither a library nor a reason.");
         }
@@ -179,12 +179,12 @@ public static class MealDeadlineStep
         var notes = likes.Concat(learned.Notes).ToList();
         if (notes.Count > 0 && seams.Notes.Save(notes) is MealNotesSave.Refused)
         {
-            return Stop(MealDeadlineStoppedBecause.NotesNotSaved, "The taste notes could not be saved, so the week was not decided.");
+            return Stop(MealDeadlineStoppedBecause.NotesNotSaved, "The taste notes couldn’t be saved, so the week wasn’t decided.");
         }
 
         if (library is not null && !retry && !TemplateRunRules.Same(library, feedback.Library) && seams.Library.Save(feedback.Library) is TemplateSave.Refused)
         {
-            return Stop(MealDeadlineStoppedBecause.LibraryNotSaved, "The template library could not be saved, so the week was not decided.");
+            return Stop(MealDeadlineStoppedBecause.LibraryNotSaved, "The template library couldn’t be saved, so the week wasn’t decided.");
         }
 
         var unjudged = learned.Outcomes.Count(outcome => outcome == TasteOutcome.Unjudged);

@@ -99,7 +99,7 @@ public class EqualizerActivity : Activity
         }
         catch (Exception e) when (e is Java.Lang.RuntimeException or Java.Lang.UnsupportedOperationException)
         {
-            content.AddView(PaperUi.Body(this, "This device doesn't offer an equalizer."));
+            content.AddView(PaperUi.Body(this, "This device doesn’t offer an equalizer."));
             var bare = Framed(content);
             root.AddView(bare, Fill());
             BinderFrame.SetBar(bare, PaperUi.BottomBar(this, PaperUi.SecondaryButton(this, "Back", Finish)));

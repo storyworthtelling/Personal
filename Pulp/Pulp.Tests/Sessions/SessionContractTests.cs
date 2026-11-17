@@ -80,7 +80,7 @@ public class SessionContractTests
     private static string ReceiverSource()
     {
         var path = Path.Combine(PulpSource.Root(), ReceiverPath);
-        Assert.True(File.Exists(path), $"{ReceiverPath} was not found.");
+        Assert.True(File.Exists(path), $"{ReceiverPath} wasn’t found.");
         return File.ReadAllText(path);
     }
 
@@ -90,7 +90,7 @@ public class SessionContractTests
         Assert.True(File.Exists(path), $"{FlyleafContract} not found at {path}; is FocusPhone checked out?");
         var match = Regex.Match(
             File.ReadAllText(path), $@"public const string {Regex.Escape(name)}\s*=\s*""([^""]*)""\s*;");
-        Assert.True(match.Success, $"Could not find PlaybackSessionHandoff.{name} in {FlyleafContract}.");
+        Assert.True(match.Success, $"Couldn’t find PlaybackSessionHandoff.{name} in {FlyleafContract}.");
         return match.Groups[1].Value;
     }
 }

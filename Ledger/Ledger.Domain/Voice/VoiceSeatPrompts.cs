@@ -50,7 +50,7 @@ public static class VoiceSeatInstructions
 
     /// <summary>The seat's standing instruction, written on the suite's voice-line Call Sheet.</summary>
     public static string For(VoiceSeat seat) => VoicedOccasions.Line(seat).Guidance
-        ?? throw new InvalidOperationException($"The Call Sheet gives Index's {seat} seat no instruction.");
+        ?? throw new InvalidOperationException($"The Call Sheet gives Index’s {seat} seat no instruction.");
 }
 
 /// <summary>What the composer sends: the occasion (<c>Purpose</c>), the pinned instruction followed by the

@@ -112,7 +112,7 @@ public class FollowWordsTests
             Assert.DoesNotContain("exception", sentence, StringComparison.OrdinalIgnoreCase);
         });
         Assert.Equal(sentences.Length, sentences.Distinct().Count());
-        Assert.Contains("did not change", FollowWords.CalendarUnchanged, StringComparison.Ordinal);
+        Assert.Contains("didn’t change", FollowWords.CalendarUnchanged, StringComparison.Ordinal);
         Assert.Contains("try again", FollowWords.CalendarUnchanged, StringComparison.Ordinal);
         Assert.Contains("as it was", FollowWords.SwapNotKept, StringComparison.Ordinal);
     }

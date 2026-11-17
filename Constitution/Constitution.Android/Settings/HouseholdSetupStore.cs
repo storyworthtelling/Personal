@@ -42,7 +42,7 @@ public sealed class HouseholdSetupStore(Context context)
         var trimmed = name?.Trim() ?? string.Empty;
         if (trimmed.Length == 0)
         {
-            return "Type the adult's name first.";
+            return "Type the adult’s name first.";
         }
 
         var existing = Read() is HouseholdSetupRead.Configured configured ? configured.Setup : new PlanningSetup([]);
@@ -66,14 +66,14 @@ public sealed class HouseholdSetupStore(Context context)
         {
             var result = PlanningSetupFile.Write(path, build.Setup);
             var saved = result == PlanningSetupWrite.WrittenAfterSettingAsideAnUnreadableFile
-                ? "Saved. The earlier file could not be read, so it was kept beside this one."
+                ? "Saved. The earlier file couldn’t be read, so it was kept beside this one."
                 : "Saved on this phone.";
             var missing = HouseholdGroupModel.Describe(build.Gaps);
             return missing.Length == 0 ? saved : saved + " " + missing;
         }
         catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
         {
-            return $"Not saved: the household setup could not be written ({failure.GetType().Name}).";
+            return $"Not saved: the household setup couldn’t be written ({failure.GetType().Name}).";
         }
     }
 }

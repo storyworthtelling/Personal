@@ -65,7 +65,7 @@ public sealed class CatalogueCache
             }
             catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or ArgumentException or CacheFormatException)
             {
-                return new CacheRead(CacheReadStatus.Unreadable, null, $"Cached title {id} could not be read: {exception.Message}");
+                return new CacheRead(CacheReadStatus.Unreadable, null, $"Cached title {id} couldn’t be read: {exception.Message}");
             }
         }
     }

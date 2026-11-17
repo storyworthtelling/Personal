@@ -60,8 +60,8 @@ public static class PlateStatementRead
     /// <summary>The line the post-it shows when a read did not change the balance, or null when there is nothing to say.</summary>
     public static string? Describe(PlateReadOutcome outcome) => outcome switch
     {
-        PlateReadOutcome.NotInstalled => "Plate is not on this phone, so it cannot read the statement.",
-        PlateReadOutcome.NotPermitted => "Plate would not read for Index. Updating both apps puts that right.",
+        PlateReadOutcome.NotInstalled => "Plate isn’t on this phone, so it can’t read the statement.",
+        PlateReadOutcome.NotPermitted => "Plate wouldn’t read for Index. Updating both apps puts that right.",
         PlateReadOutcome.Unreadable => "Plate found no balance on the statement, so nothing changed.",
         _ => null,
     };

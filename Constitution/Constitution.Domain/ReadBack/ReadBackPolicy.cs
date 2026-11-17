@@ -42,7 +42,7 @@ public static class ReadBackPolicy
         {
             if (page.Resolutions.Any(resolution => resolution is InkResolution.NotRead))
             {
-                return $"A box on page {page.Number} was not read.";
+                return $"A box on page {page.Number} wasn’t read.";
             }
 
             var asking = page.Resolutions.Any(resolution => resolution is InkResolution.NeedsAsking);

@@ -69,7 +69,7 @@ public class DailyDeliveryService(
         if (failure is null)
             await TrashDocs(yesterdayDocIds);
         else
-            logger.LogWarning("Skipping trash of yesterday's documents because the upload failed for {Date}", date);
+            logger.LogWarning("Skipping trash of yesterday’s documents because the upload failed for {Date}", date);
 
         return new DayResult(failure is null, failure, agenda.UnreadableCalendars);
     }

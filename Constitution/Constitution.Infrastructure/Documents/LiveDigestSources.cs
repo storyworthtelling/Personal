@@ -17,7 +17,7 @@ namespace Constitution.Infrastructure.Documents;
 /// </summary>
 public sealed class LiveDigestSources(IWorkoutWeekReports reports, ILedgerStore ledger, IBodyStore body, IKeptWeeks meals) : IDigestSources
 {
-    public const string LedgerUnreadable = "The skip ledger could not be read, so the Saturday digest was not sent.";
+    public const string LedgerUnreadable = "The skip ledger couldn’t be read, so the Saturday digest wasn’t sent.";
 
     public DigestRead<DigestWorkoutWeek> Workouts(string person, DateOnly weekStart)
     {

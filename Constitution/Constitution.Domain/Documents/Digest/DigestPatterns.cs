@@ -109,6 +109,6 @@ public static class DigestPatterns
         BodySignal.BodyComposition => higher ? "a higher body fat reading" : "a lower body fat reading",
         BodySignal.RestingHeartRate => higher ? "a higher resting heart rate" : "a lower resting heart rate",
         BodySignal.HeartRateVariability => higher ? "a higher heart rate variability" : "a lower heart rate variability",
-        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body's signals."),
+        _ => throw new ArgumentOutOfRangeException(nameof(signal), signal, "That is not one of Body’s signals."),
     };
 }

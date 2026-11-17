@@ -54,10 +54,10 @@ public class WorksheetPageDriftTests
         using var document = Open(MockupPlan());
         var text = document.GetPage(1).Text;
 
-        Assert.Contains("keeps September's figure", text, StringComparison.Ordinal);
-        Assert.Contains("September's spending", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("Last month's spending", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("last month's figure", text, StringComparison.Ordinal);
+        Assert.Contains("keeps September’s figure", text, StringComparison.Ordinal);
+        Assert.Contains("September’s spending", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Last month’s spending", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("last month’s figure", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public class WorksheetPageDriftTests
         using var document = Open(MockupPlan("2027-01"));
         var text = document.GetPage(1).Text;
 
-        Assert.Contains("December's figure", text, StringComparison.Ordinal);
-        Assert.Contains("December's spending", text, StringComparison.Ordinal);
+        Assert.Contains("December’s figure", text, StringComparison.Ordinal);
+        Assert.Contains("December’s spending", text, StringComparison.Ordinal);
         Assert.Contains("DECEMBER", text, StringComparison.Ordinal);
     }
 

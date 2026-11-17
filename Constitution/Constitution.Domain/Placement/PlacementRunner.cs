@@ -58,7 +58,7 @@ public sealed class PlacementRunner
         var record = store.Load();
         if (!record.IsReadable)
         {
-            return new PlacementRun(null, [], [], $"The record of written events could not be read, so nothing was written: {record.UnreadableBecause}");
+            return new PlacementRun(null, [], [], $"The record of written events couldn’t be read, so nothing was written: {record.UnreadableBecause}");
         }
 
         KeyAssignments? issued = null;
@@ -67,7 +67,7 @@ public sealed class PlacementRunner
             var numbers = issuedNumbers.Load();
             if (!numbers.IsReadable)
             {
-                return new PlacementRun(null, [], [], $"The record of issued workout numbers could not be read, so nothing was written: {numbers.UnreadableBecause}");
+                return new PlacementRun(null, [], [], $"The record of issued workout numbers couldn’t be read, so nothing was written: {numbers.UnreadableBecause}");
             }
 
             issued = numbers.Assignments;

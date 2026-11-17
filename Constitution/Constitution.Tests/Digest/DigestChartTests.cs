@@ -23,7 +23,7 @@ public class DigestChartTests
     public void ARisingValueDrawsHigherUp()
     {
         var run = Assert.Single(Make(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).Runs);
-        Assert.True(run[11].Y < run[0].Y, "In the page's coordinates a larger value has a smaller Y.");
+        Assert.True(run[11].Y < run[0].Y, "In the page’s coordinates a larger value has a smaller Y.");
         Assert.All(run, point => Assert.InRange(point.Y, 0, 44));
     }
 

@@ -283,14 +283,14 @@ internal sealed class WeekPlanner
     private static string Unreadable(Person person)
     {
         var reasons = person.Week.Busy.Unreadable.Select(item => $"{Describe(item.Source)}: {item.Reason}");
-        return $"{person.Name}'s calendars could not all be read ({string.Join("; ", reasons)}), so no workouts were planned.";
+        return $"{person.Name}’s calendars couldn’t all be read ({string.Join("; ", reasons)}), so no workouts were planned.";
     }
 
     private static string Describe(CalendarSource source) => source switch
     {
         CalendarSource.Own => "their own calendar",
         CalendarSource.Family => "the family calendar",
-        CalendarSource.Children => "the children's calendars",
+        CalendarSource.Children => "the children’s calendars",
         _ => throw new ArgumentOutOfRangeException(nameof(source), source, "Unknown calendar source."),
     };
 
@@ -298,7 +298,7 @@ internal sealed class WeekPlanner
     {
         if (request.Rules is null)
         {
-            throw new ArgumentException("The planner needs the household's rules.", nameof(request));
+            throw new ArgumentException("The planner needs the household’s rules.", nameof(request));
         }
 
         if (request.Equipment is null)
@@ -328,12 +328,12 @@ internal sealed class WeekPlanner
         {
             if (request.Rules.FindAdult(week.Busy.Person) is null)
             {
-                throw new ArgumentException($"{week.Busy.Person} is not one of the household's adults.", nameof(request));
+                throw new ArgumentException($"{week.Busy.Person} is not one of the household’s adults.", nameof(request));
             }
 
             if (week.Recovery.SessionsDoneLastWeek < 0 || week.Recovery.SessionsSkippedLastWeek < 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(request), $"{week.Busy.Person}'s history counts sessions, so it cannot be negative.");
+                throw new ArgumentOutOfRangeException(nameof(request), $"{week.Busy.Person}’s history counts sessions, so it cannot be negative.");
             }
         }
     }

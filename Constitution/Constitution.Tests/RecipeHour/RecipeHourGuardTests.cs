@@ -10,7 +10,7 @@ public class RecipeHourGuardTests
     private static string Source(string fileName)
     {
         var file = ConstitutionSource.Files(".cs").SingleOrDefault(path => Path.GetFileName(path) == fileName);
-        Assert.True(file is not null, fileName + " was not found under Constitution/.");
+        Assert.True(file is not null, fileName + " wasn’t found under Constitution/.");
         return File.ReadAllText(file!);
     }
 

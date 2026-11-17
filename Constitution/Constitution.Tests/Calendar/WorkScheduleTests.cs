@@ -157,7 +157,7 @@ public class WorkScheduleTests
         var schedule = WorkSchedule.Read("{\"Shifts\": [");
 
         Assert.False(schedule.IsKnown);
-        Assert.Contains("not valid JSON", schedule.Problem);
+        Assert.Contains("valid JSON", schedule.Problem);
     }
 
     [Theory]

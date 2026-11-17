@@ -52,7 +52,7 @@
                 <VerticalStackLayout x:Name="Toggles" />
             </Border>
 
-            <Label Text="A paused task is not late and does not pile up: the mornings simply pass. Anything with a date of its own still prints."
+            <Label Text="A paused task isn’t late and doesn’t pile up: the mornings simply pass. Anything with a date of its own still prints."
                    Style="{StaticResource CardCaption}" />
 
             <Button Text="Not going anywhere" Clicked="OnClearClicked"

@@ -57,7 +57,7 @@ public class RecipeHourRunTests
     [Fact]
     public async Task TheSheetIsNeverBuiltOrSent()
     {
-        docs.Pantry.Answer = new MealPantryRead.Unreadable("The pantry cannot be opened.");
+        docs.Pantry.Answer = new MealPantryRead.Unreadable("The pantry can’t be opened.");
 
         var done = await DoneAsync(Inside);
 
@@ -146,7 +146,7 @@ public class RecipeHourRunTests
     [Fact]
     public async Task UnreadableWeeksAreATypedStop()
     {
-        weeks.Records.Json = "this is not a saved week";
+        weeks.Records.Json = "this isn’t a saved week";
 
         var stopped = Assert.IsType<MealRecipesOutcome.Stopped>(await RunAsync(Inside));
 
@@ -157,7 +157,7 @@ public class RecipeHourRunTests
     [Fact]
     public async Task AnUnavailableBoxIsATypedStop()
     {
-        weeks.Box.Answer = new RecipeBoxRead.Unavailable("The household file cannot be opened.");
+        weeks.Box.Answer = new RecipeBoxRead.Unavailable("The household file can’t be opened.");
 
         var stopped = Assert.IsType<MealRecipesOutcome.Stopped>(await RunAsync(Inside));
 
@@ -178,7 +178,7 @@ public class RecipeHourRunTests
     [Fact]
     public async Task AnUnreadableTasteProfileIsATypedStop()
     {
-        weeks.Taste.Answer = new MealTasteRead.Unreadable("The taste profile cannot be read.");
+        weeks.Taste.Answer = new MealTasteRead.Unreadable("The taste profile can’t be read.");
 
         var stopped = Assert.IsType<MealRecipesOutcome.Stopped>(await RunAsync(Inside));
 
@@ -189,7 +189,7 @@ public class RecipeHourRunTests
     [Fact]
     public async Task EveryStopSaysItsReasonAndLogsOneLine()
     {
-        weeks.Box.Answer = new RecipeBoxRead.Unavailable("The household file cannot be opened.");
+        weeks.Box.Answer = new RecipeBoxRead.Unavailable("The household file can’t be opened.");
 
         await RunAsync(Inside);
 

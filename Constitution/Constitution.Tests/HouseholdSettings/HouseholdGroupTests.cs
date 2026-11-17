@@ -44,11 +44,11 @@ public class HouseholdGroupTests
     public void DislikesShowInOneMutedLine()
     {
         var roster = HouseholdData.Roster();
-        var lines = new Dictionary<PersonId, string> { [new PersonId("lee")] = "Won't eat: cilantro" };
+        var lines = new Dictionary<PersonId, string> { [new PersonId("lee")] = "Won’t eat: cilantro" };
 
         var model = HouseholdGroupModel.Build(roster, RosterRole.Owner, new HouseholdSetupRead.NotSet("x"), lines);
 
-        Assert.Equal("Won't eat: cilantro", model.People.Single(row => row.Name == "Lee").MutedLine);
+        Assert.Equal("Won’t eat: cilantro", model.People.Single(row => row.Name == "Lee").MutedLine);
         Assert.Null(model.People.Single(row => row.Name == "Sam").MutedLine);
     }
 

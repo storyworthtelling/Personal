@@ -46,7 +46,7 @@ public partial class NewProjectPage : FolioBinderPage
             CreateButton.Text = "Add book";
             // Blank inherits the previous book's art style in the service, so a returning look stays consistent.
             ArtStyleEntry.Text = string.Empty;
-            ArtStyleEntry.Placeholder = "Leave blank to keep the previous book's style";
+            ArtStyleEntry.Placeholder = "Leave blank to keep the previous book’s style";
         }
         else if (PreviousDraftId is not null)
         {
@@ -57,7 +57,7 @@ public partial class NewProjectPage : FolioBinderPage
             // Blank inherits the previous draft's art style in the service; prefilling the default would
             // override it. The user can still type a new style to change it for this draft.
             ArtStyleEntry.Text = string.Empty;
-            ArtStyleEntry.Placeholder = "Leave blank to keep the previous draft's style";
+            ArtStyleEntry.Placeholder = "Leave blank to keep the previous draft’s style";
         }
         UpdateAccountLabel();
         if (SettingsStore.IsGoogleConfigured && path.Count == 0)
@@ -74,7 +74,7 @@ public partial class NewProjectPage : FolioBinderPage
         var activity = Platform.CurrentActivity;
         if (activity is null)
         {
-            Problem("Sign-in could not start: Folio has no open window. Try again.");
+            Problem("Sign-in couldn’t start: Folio has no open window. Try again.");
             return;
         }
 
@@ -87,7 +87,7 @@ public partial class NewProjectPage : FolioBinderPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            Problem("Sign-in did not finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google") + " The details are copied.");
+            Problem("Sign-in didn’t finish: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google") + " The details are copied.");
         }
     }
 
@@ -132,7 +132,7 @@ public partial class NewProjectPage : FolioBinderPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            Problem("Drive could not be listed: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Drive") + " The details are copied.");
+            Problem("Drive couldn’t be listed: " + Storyworthtelling.Diagnostics.PlainError.Describe(ex, "Google Drive") + " The details are copied.");
         }
         finally
         {
@@ -217,7 +217,7 @@ public partial class NewProjectPage : FolioBinderPage
         catch (Exception ex)
         {
             await Clipboard.SetTextAsync(ex.ToString());
-            Problem((bookMode ? "The book was not added: " : draftMode ? "The draft was not added: " : "The project was not created: ")
+            Problem((bookMode ? "The book wasn’t added: " : draftMode ? "The draft wasn’t added: " : "The project wasn’t created: ")
                 + Storyworthtelling.Diagnostics.PlainError.Describe(ex) + " The details are copied.");
         }
         finally

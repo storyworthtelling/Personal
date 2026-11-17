@@ -31,7 +31,7 @@ public class NoKeysTests
     /// </summary>
     private static readonly (string File, string Why)[] Allowed =
     [
-        ("FocusPhone/Codex.Tests/Music/TidalSignInTests.cs", "RFC 7636 appendix B's PKCE verifier and challenge"),
+        ("FocusPhone/Codex.Tests/Music/TidalSignInTests.cs", "RFC 7636 appendix B’s PKCE verifier and challenge"),
         ("FocusPhone/Codex.Tests/Music/TidalCatalogClientTests.cs", "a search-result id in a canned TIDAL reply"),
         ("Storyworthtelling.Diagnostics.Tests/LogKeyDeriveTests.cs", "PBKDF2 outputs for an invented passphrase, checked against Python"),
     ];

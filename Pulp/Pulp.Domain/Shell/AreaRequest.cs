@@ -19,7 +19,7 @@ public static class AreaRequest
         PulpArea.Sports => "sports",
         PulpArea.Calendar => "calendar",
         PulpArea.Settings => "settings",
-        _ => throw new ArgumentOutOfRangeException(nameof(area), area, "An area with no word for the shell's intent."),
+        _ => throw new ArgumentOutOfRangeException(nameof(area), area, "An area with no word for the shell’s intent."),
     };
 
     public static PulpArea? Read(string? word)

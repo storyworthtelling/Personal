@@ -35,8 +35,8 @@ public class SampleBriefTests
             Story("World", "The river towns are rebuilding, but not where they were",
                 "By Amara Whitfield \u00b7 The New York Times", false,
                 "Three years after the flood, the question in Marietta is no longer whether to rebuild. It is how far back from the water a town is willing to move, and who pays for the ground it leaves behind.",
-                "The county bought out ninety-one properties along the east bank, most of them bungalows put up in the nineteen-fifties when the levee was new and the river seemed settled. What replaced them is not housing. It is a meadow, mown twice a year, that the county now calls a park and the former residents still call their street.",
-                "Engineers describe the trade in plain terms. Every foot of setback buys a margin against a flood that arrives more often than the old maps promised, and every buyout removes a household from the ledger of people who must be warned, evacuated and, eventually, compensated again. The arithmetic is not in dispute. The difficulty is that it is being done to places rather than by them.",
+                "The county bought out ninety-one properties along the east bank, most of them bungalows put up in the nineteen-fifties when the levee was new and the river seemed settled. What replaced them isn’t housing. It is a meadow, mown twice a year, that the county now calls a park and the former residents still call their street.",
+                "Engineers describe the trade in plain terms. Every foot of setback buys a margin against a flood that arrives more often than the old maps promised, and every buyout removes a household from the ledger of people who must be warned, evacuated and, eventually, compensated again. The arithmetic isn’t in dispute. The difficulty is that it is being done to places rather than by them.",
                 "State officials say the programme will expand. A bill moving through the legislature would let counties buy in advance of a disaster rather than after one, which planners have wanted for years and which residents\u2019 groups have already begun to organise against.",
                 "In Marietta the split runs along an obvious line. Households that took the buyout have largely moved uphill, into subdivisions annexed in the last decade. Those who stayed are older, own outright, and describe the offer as a price rather than a choice."),
             Story("Business", "Chip makers are quietly rewriting their capacity promises",
@@ -45,7 +45,7 @@ public class SampleBriefTests
             Story("Opinion", "The case against the setback programme is weaker than it sounds",
                 "By Priya Raghavan \u00b7 The New York Times", false,
                 "Every objection to buying land before a flood rests on the same assumption: that the town as it stands is the town worth keeping.",
-                "It is an assumption worth examining, because the alternative on offer is not preservation. It is the same street, three feet of water at a time, for as long as anyone can afford to stay."),
+                "It is an assumption worth examining, because the alternative on offer isn’t preservation. It is the same street, three feet of water at a time, for as long as anyone can afford to stay."),
         };
 
         using var puzzle = new SkiaPageLayout();
@@ -59,7 +59,7 @@ public class SampleBriefTests
             articles,
             puzzle.ToPdf(),
             new DateOnly(2026, 9, 6),
-            "A quiet Sunday, and the first one this month you could call cool. The lawn moved to today because Saturday would not stop raining \u2014 do it before noon and the rest of the day is yours. Eight stories below, one of which you will disagree with.");
+            "A quiet Sunday, and the first one this month you could call cool. The lawn moved to today because Saturday wouldn’t stop raining \u2014 do it before noon and the rest of the day is yours. Eight stories below, one of which you will disagree with.");
 
         File.WriteAllBytes(path!, brief);
     }

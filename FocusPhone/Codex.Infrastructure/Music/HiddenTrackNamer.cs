@@ -45,9 +45,9 @@ public sealed class HiddenTrackNamer(HttpClient httpClient, IOptions<VoiceOption
         "the track listing. You are given the ALBUM, the ARTIST, and the HOST TRACK — the listed track the " +
         "hidden song is appended to. If you know, from your own knowledge, the actual title of the hidden " +
         "track on this specific album, respond with ONLY a JSON object: {\"found\":true,\"title\":string}. " +
-        "If you do not know of a hidden track on this album, or are not genuinely confident of its title, " +
+        "If you don’t know of a hidden track on this album, or aren’t genuinely confident of its title, " +
         "respond with ONLY {\"found\":false}. A guessed or plausible-sounding title is worse than admitting " +
-        "you do not know — never invent one.";
+        "you don’t know — never invent one.";
 
     public async Task<HiddenTrackNameResult> NameAsync(
         string albumTitle, string albumArtist, string hostTrackTitle, CancellationToken cancellationToken)

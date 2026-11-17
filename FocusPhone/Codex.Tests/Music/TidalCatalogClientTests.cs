@@ -42,7 +42,7 @@ public class TidalCatalogClientTests
              "included":[
                {"id":"120267","type":"albums","attributes":{"title":"Parachutes"}},
                {"id":"8812","type":"artists","attributes":{"name":"Coldplay"}},
-               {"id":"120268","type":"tracks","attributes":{"title":"Don't Panic","duration":"PT2M17S"},
+               {"id":"120268","type":"tracks","attributes":{"title":"Don’t Panic","duration":"PT2M17S"},
                 "relationships":{"albums":{"data":[{"id":"120267","type":"albums"}]},
                                   "artists":{"data":[{"id":"8812","type":"artists"}]}}},
                {"id":"120272","type":"tracks","attributes":{"title":"Yellow","duration":"PT4M29S"},
@@ -53,7 +53,7 @@ public class TidalCatalogClientTests
 
         var tracks = await client.SearchAsync("token", "Coldplay", "US", CancellationToken.None);
 
-        Assert.Equal(["Don't Panic", "Yellow"], tracks.Select(t => t.Title));
+        Assert.Equal(["Don’t Panic", "Yellow"], tracks.Select(t => t.Title));
         var first = tracks[0];
         Assert.Equal("tidal:120268", first.Id);
         Assert.Equal("Coldplay", first.ArtistName);
@@ -169,7 +169,7 @@ public class TidalCatalogClientTests
     {
         var (client, handler) = Build();
         handler.Respond(TrackUrl, """
-            {"data":{"id":"120268","type":"tracks","attributes":{"title":"Don't Panic","duration":"PT2M17S"},
+            {"data":{"id":"120268","type":"tracks","attributes":{"title":"Don’t Panic","duration":"PT2M17S"},
               "relationships":{"albums":{"data":[{"id":"120267","type":"albums"}]},
                                 "artists":{"data":[{"id":"8812","type":"artists"}]}}},
              "included":[
@@ -182,7 +182,7 @@ public class TidalCatalogClientTests
 
         Assert.NotNull(track);
         Assert.Equal("tidal:120268", track.Id);
-        Assert.Equal("Don't Panic", track.Title);
+        Assert.Equal("Don’t Panic", track.Title);
         Assert.Equal("Coldplay", track.ArtistName);
         Assert.Equal("Parachutes", track.AlbumName);
         Assert.Equal(TrackAvailability.Streaming, track.Availability);

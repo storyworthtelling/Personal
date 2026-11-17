@@ -47,7 +47,7 @@ namespace Pulp.Shell;
 public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Discover)
 {
     /// <summary>What a failed Add to… says above the stack; the stack itself stays.</summary>
-    private const string PlaylistsUnreadable = "Your playlists could not be read just now.";
+    private const string PlaylistsUnreadable = "Your playlists couldn’t be read just now.";
 
     private readonly Handler handler = new(Looper.MainLooper!);
 
@@ -438,7 +438,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         week = week.Add(row.Id);
         var kept = week;
         var store = weekStore.Value;
-        Writes.Enqueue("keep the week's added card", _ =>
+        Writes.Enqueue("keep the week’s added card", _ =>
         {
             store.Save(kept);
             return Task.CompletedTask;
@@ -609,7 +609,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
                 }
                 catch (CatalogueLookupException exception)
                 {
-                    Services.Diagnostics.Warn("discover", $"A mood candidate's lookup failed ({exception.Failure}); it is dropped.", exception);
+                    Services.Diagnostics.Warn("discover", $"A mood candidate’s lookup failed ({exception.Failure}); it is dropped.", exception);
                 }
             }
 
@@ -690,7 +690,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
             }
             catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
             {
-                Services.Diagnostics.Warn("discover", "Discover's background work failed: " + exception.Message, exception);
+                Services.Diagnostics.Warn("discover", "Discover’s background work failed: " + exception.Message, exception);
                 if (failureStatus is not null)
                 {
                     Host.RunOnUiThread(() => ShowStatus(failureStatus));
@@ -711,7 +711,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
             }
             catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
-                Services.Diagnostics.Warn("discover", "A stack button's work failed: " + exception.Message, exception);
+                Services.Diagnostics.Warn("discover", "A stack button’s work failed: " + exception.Message, exception);
                 Host.RunOnUiThread(() => Note(failureNote));
             }
         });

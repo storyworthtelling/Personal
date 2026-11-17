@@ -51,7 +51,7 @@ public class WorkoutsTabSourceTests
     {
         var offenders = ViewFiles().Where(file => Tap.IsMatch(File.ReadAllText(file))).Select(ConstitutionSource.Relative).ToList();
 
-        Assert.True(offenders.Count == 0, "A tap listener or chevron on the tab's rows:\n" + string.Join("\n", offenders));
+        Assert.True(offenders.Count == 0, "A tap listener or chevron on the tab’s rows:\n" + string.Join("\n", offenders));
         Assert.Contains("LongClick", All(), StringComparison.Ordinal);
     }
 

@@ -45,7 +45,7 @@ public class KitRolesTests
 
         var pressed = Regex.Match(primary, @"<VisualState x:Name=""Pressed"">(?<body>.*?)</VisualState>",
             RegexOptions.Singleline);
-        Assert.True(pressed.Success, "The primary button has no Pressed state, so it inherits the platform's.");
+        Assert.True(pressed.Success, "The primary button has no Pressed state, so it inherits the platform’s.");
         Assert.DoesNotContain("BackgroundColor", pressed.Groups["body"].Value);
         Assert.Equal("Hairline", Setter(pressed.Groups["body"].Value, "BorderColor"));
     }

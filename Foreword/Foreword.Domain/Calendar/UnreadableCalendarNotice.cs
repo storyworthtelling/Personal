@@ -21,6 +21,6 @@ public static class UnreadableCalendarNotice
     public static string? Detail(IReadOnlyList<string> names) =>
         names.Count == 0
             ? null
-            : $"Could not read {string.Join(", ", names)}. Skipped this morning; the rest of the day went out. "
+            : $"Couldn’t read {string.Join(", ", names)}. Skipped this morning; the rest of the day went out. "
               + "It will be tried again tomorrow.";
 }

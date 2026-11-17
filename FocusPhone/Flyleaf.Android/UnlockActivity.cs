@@ -410,8 +410,8 @@ public class UnlockActivity : Activity
             using var input = ContentResolver!.OpenInputStream(uri);
             if (input is null)
             {
-                pendingApkInstall?.Failed("the selected file could not be read");
-                inlineStatus = "Could not read the selected file.";
+                pendingApkInstall?.Failed("the selected file couldn’t be read");
+                inlineStatus = "Couldn’t read the selected file.";
                 Render();
                 return;
             }
@@ -496,7 +496,7 @@ public class UnlockActivity : Activity
         {
             // Best-effort: the vault picks the token up on the next successful save.
             // Kept by its shape, never its message (audit 08 §6, §28).
-            HeadLog.Quiet(LogSources.Vault, "Update token backup did not complete", e);
+            HeadLog.Quiet(LogSources.Vault, "Update token backup didn’t complete", e);
         }
     }
 

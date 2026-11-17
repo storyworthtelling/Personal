@@ -123,6 +123,6 @@ public class SettingsIsPlainTests
             .Where(path => Regex.IsMatch(File.ReadAllText(Path.Combine(ConstitutionSource.Root(), path)), @"\bCrinkleGroundPainter\b"))
             .ToList();
 
-        Assert.True(offenders.Count == 0, "Crinkle is reached only through the area base class's ground decision:\n" + string.Join("\n", offenders));
+        Assert.True(offenders.Count == 0, "Crinkle is reached only through the area base class’s ground decision:\n" + string.Join("\n", offenders));
     }
 }

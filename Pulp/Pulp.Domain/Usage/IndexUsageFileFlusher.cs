@@ -42,7 +42,7 @@ public sealed class IndexUsageFileFlusher(
             catch (Exception exception)
             {
                 queue.PutBack(taken);
-                warn("The usage file in Drive was not written; it waits for the next hand-off.", exception);
+                warn("The usage file in Drive wasn’t written; it waits for the next hand-off.", exception);
             }
         }
         finally

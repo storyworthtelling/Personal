@@ -30,7 +30,7 @@ public interface IRecipeKeeper
 /// <summary>The keeper used until the household file is wired: it keeps nothing, and says so.</summary>
 public sealed class NoRecipeKeeper : IRecipeKeeper
 {
-    public const string Sentence = "There is no household file on this phone yet, so the card could not be kept.";
+    public const string Sentence = "There is no household file on this phone yet, so the card couldn’t be kept.";
 
     public RecipeKeepResult Keep(Recipe recipe)
     {

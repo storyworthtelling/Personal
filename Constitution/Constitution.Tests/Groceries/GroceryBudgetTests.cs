@@ -32,7 +32,7 @@ public class GroceryBudgetTests
         Assert.Null(status.Spent);
         Assert.Null(status.Remaining);
         Assert.Null(status.OverBy);
-        Assert.Equal("Index has not sent a grocery budget for this month yet.", status.Sentence);
+        Assert.Equal("Index hasn’t sent a grocery budget for this month yet.", status.Sentence);
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class GroceryBudgetTests
         Assert.Equal(GroceryBudgetState.Within, status.State);
         Assert.Equal(187.50m, status.Remaining);
         Assert.Null(status.OverBy);
-        Assert.Equal("187.50 left of this month's 600.00 grocery budget.", status.Sentence);
+        Assert.Equal("187.50 left of this month’s 600.00 grocery budget.", status.Sentence);
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class GroceryBudgetTests
         Assert.Equal(GroceryBudgetState.Over, status.State);
         Assert.Equal(50.25m, status.OverBy);
         Assert.Null(status.Remaining);
-        Assert.Equal("50.25 over this month's 600.00 grocery budget.", status.Sentence);
+        Assert.Equal("50.25 over this month’s 600.00 grocery budget.", status.Sentence);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class GroceryBudgetTests
         Assert.Equal(460.00m, alone.Remaining);
         Assert.Equal(GroceryBudgetState.Over, withSpend.State);
         Assert.Equal(60.00m, withSpend.OverBy);
-        Assert.Equal("This week's groceries would run 60.00 over this month's 600.00 grocery budget.", withSpend.Sentence);
+        Assert.Equal("This week’s groceries would run 60.00 over this month’s 600.00 grocery budget.", withSpend.Sentence);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class GroceryBudgetTests
 
         Assert.Equal(GroceryBudgetState.Within, weighed.State);
         Assert.Equal(374.50m, weighed.Remaining);
-        Assert.Equal("This week's groceries fit: 374.50 would be left of this month's 600.00 grocery budget.", weighed.Sentence);
+        Assert.Equal("This week’s groceries fit: 374.50 would be left of this month’s 600.00 grocery budget.", weighed.Sentence);
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public class GroceryBudgetTests
 
             var status = GroceryBudget.Read(Held("2026-10", "1200.50", "412.50"), "2026-10");
 
-            Assert.Equal("788.00 left of this month's 1200.50 grocery budget.", status.Sentence);
+            Assert.Equal("788.00 left of this month’s 1200.50 grocery budget.", status.Sentence);
             Assert.Equal("2026-10", GroceryBudget.MonthOf(new DateOnly(2026, 10, 26)));
         }
         finally

@@ -281,12 +281,12 @@ public class TripAdapterTests
         var unreadable = Request(CalendarsWith(sam: CalendarRead.Unreadable("Not shared yet.")));
         var plan = new HouseholdWorkoutPlan(
             WeekStart,
-            [new WeeklyPlan(Sam, WeekStart, [], "Sam's calendars could not all be read, so no workouts were planned."), new WeeklyPlan(Lee, WeekStart, [], null)],
+            [new WeeklyPlan(Sam, WeekStart, [], "Sam’s calendars couldn’t all be read, so no workouts were planned."), new WeeklyPlan(Lee, WeekStart, [], null)],
             []);
 
         var result = TripAdapter.Apply(unreadable, plan, Away(TripKind.FamilyHoliday, 0, 6));
 
-        Assert.Equal("Sam's calendars could not all be read, so no workouts were planned.", SamOf(result.Plan).NothingBecause);
+        Assert.Equal("Sam’s calendars couldn’t all be read, so no workouts were planned.", SamOf(result.Plan).NothingBecause);
     }
 
     [Fact]

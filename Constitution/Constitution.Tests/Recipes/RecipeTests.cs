@@ -73,7 +73,7 @@ public class RecipeTests
     [Theory]
     [InlineData("typed")]
     [InlineData("scanned")]
-    [InlineData("Grandma's card")]
+    [InlineData("Grandma’s card")]
     [InlineData("Cooking magazine, March")]
     public void ALabelTheOwnerTypedIsKept(string label)
     {

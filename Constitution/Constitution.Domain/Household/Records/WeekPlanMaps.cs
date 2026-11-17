@@ -58,7 +58,7 @@ internal sealed class WeekPlanMap : RecordMap<SharedWeekPlan>
         var start = record.OptionalDate("weekStart") ?? throw record.Fail("weekStart", "is missing");
         if (record.Key.Id != RecordIds.Join(RecordDates.Write(start)))
         {
-            throw record.Fail("weekStart", "does not match the record's key");
+            throw record.Fail("weekStart", "does not match the record’s key");
         }
 
         var planned = Moment(record, "planned");

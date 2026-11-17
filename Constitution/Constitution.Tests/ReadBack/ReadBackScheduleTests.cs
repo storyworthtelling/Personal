@@ -13,7 +13,7 @@ public class ReadBackScheduleTests
     {
         var foreword = ForewordsDeliveryTime();
 
-        Assert.True(Ours - foreword >= TimeSpan.FromMinutes(30), $"The read-back at {Ours} is not clear of Foreword's {foreword}.");
+        Assert.True(Ours - foreword >= TimeSpan.FromMinutes(30), $"The read-back at {Ours} isn’t clear of Foreword’s {foreword}.");
     }
 
     [Fact]
@@ -63,11 +63,11 @@ public class ReadBackScheduleTests
     private static TimeSpan ForewordsDeliveryTime()
     {
         var path = Path.GetFullPath(Path.Combine(ConstitutionSource.Root(), "..", "Foreword", "Foreword.Android", "DeliveryWorker.cs"));
-        Assert.True(File.Exists(path), "Foreword's DeliveryWorker.cs was not found beside Constitution; D87 cannot be checked.");
+        Assert.True(File.Exists(path), "Foreword’s DeliveryWorker.cs wasn’t found beside Constitution; D87 can’t be checked.");
         var text = File.ReadAllText(path);
         var hour = Regex.Match(text, @"DeliveryHour\s*=\s*(\d+)");
         var minute = Regex.Match(text, @"DeliveryMinute\s*=\s*(\d+)");
-        Assert.True(hour.Success && minute.Success, "Foreword's delivery time constants were not found.");
+        Assert.True(hour.Success && minute.Success, "Foreword’s delivery time constants weren’t found.");
         return new TimeSpan(int.Parse(hour.Groups[1].Value), int.Parse(minute.Groups[1].Value), 0);
     }
 }

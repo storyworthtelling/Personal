@@ -11,7 +11,7 @@ namespace Constitution.Infrastructure.Meals;
 /// </summary>
 public sealed class FileMealDecisionRecords : IMealDecisionRecords
 {
-    public const string UnopenableReason = "The saved meal decisions could not be opened.";
+    public const string UnopenableReason = "The saved meal decisions couldn’t be opened.";
 
     private static readonly object FileLock = new();
 

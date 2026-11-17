@@ -57,7 +57,7 @@ public sealed class TodayFromRecordTests
     public void NoReportAndAnUnreadableOneBothClipNothing()
     {
         Assert.Null(TodayPlanFromRecord.For(new WorkoutWeekRecordRead.NothingYet(), Sam, Est(11, 3, 7), Eastern));
-        Assert.Null(TodayPlanFromRecord.For(new WorkoutWeekRecordRead.Unreadable("The saved week could not be read."), Sam, Est(11, 3, 7), Eastern));
+        Assert.Null(TodayPlanFromRecord.For(new WorkoutWeekRecordRead.Unreadable("The saved week couldn’t be read."), Sam, Est(11, 3, 7), Eastern));
     }
 
     [Fact]

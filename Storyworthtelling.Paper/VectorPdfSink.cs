@@ -53,7 +53,7 @@ public sealed class VectorPdfSink : IDisposable
 
         document = SKDocument.CreatePdf(stream, metadata)
             ?? throw new InvalidOperationException(
-                "Skia would not create a PDF document. The native library is probably missing — a "
+                "Skia wouldn’t create a PDF document. The native library is probably missing — a "
                 + "head needs SkiaSharp.NativeAssets for its platform.");
     }
 

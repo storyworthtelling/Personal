@@ -78,7 +78,7 @@ public class ConstitutionWorkflowTests
 
         foreach (var permission in HealthReads)
         {
-            Assert.True(step.Contains(permission, StringComparison.Ordinal), $"The health check does not name {permission}.");
+            Assert.True(step.Contains(permission, StringComparison.Ordinal), $"The health check doesn’t name {permission}.");
         }
 
         // Body fat only: lean body mass is not declared (review S11), so the check must not allow it.
@@ -122,7 +122,7 @@ public class ConstitutionWorkflowTests
         Assert.Contains("exit 1", step);
         foreach (var permission in AllowedUses)
         {
-            Assert.True(step.Contains(permission, StringComparison.Ordinal), $"The permission check does not name {permission}.");
+            Assert.True(step.Contains(permission, StringComparison.Ordinal), $"The permission check doesn’t name {permission}.");
         }
     }
 
@@ -274,14 +274,14 @@ public class ConstitutionWorkflowTests
         foreach (var font in fonts)
         {
             Assert.True(step.Contains(font!, StringComparison.Ordinal),
-                $"build-constitution.yml's FONT CHECK does not name {font}.ttf.");
+                $"build-constitution.yml’s FONT CHECK doesn’t name {font}.ttf.");
         }
     }
 
     private static string Workflow()
     {
         var path = RepoFile(".github/workflows/build-constitution.yml");
-        Assert.True(File.Exists(path), "build-constitution.yml does not exist, so Constitution is built and checked by nothing.");
+        Assert.True(File.Exists(path), "build-constitution.yml doesn’t exist, so Constitution is built and checked by nothing.");
         return File.ReadAllText(path);
     }
 

@@ -14,7 +14,7 @@ namespace Pulp.Domain.People;
 /// </summary>
 public static class ViewerNaming
 {
-    public const string NameNeeded = "Write the person's name.";
+    public const string NameNeeded = "Write the person’s name.";
 
     public const string NeedsALetter = "A name needs at least one letter or number.";
 

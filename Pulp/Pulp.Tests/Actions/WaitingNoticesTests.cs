@@ -62,7 +62,7 @@ public class WaitingNoticesTests
     {
         var notice = WaitingNotices.Refused(refusal, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight);
 
-        Assert.Equal("Saltmarsh was not opened", notice.Headline);
+        Assert.Equal("Saltmarsh wasn’t opened", notice.Headline);
         Assert.Equal(HandOffNotice.ForRefusal(refusal, "Lanternbox"), notice.Detail);
         Assert.Equal(NoticeRole.Problem, notice.Role);
         Assert.Equal(WaitingNotices.HandOffKey(Saltmarsh), notice.Key);
@@ -83,7 +83,7 @@ public class WaitingNoticesTests
     {
         var notice = WaitingNotices.NotInstalled("Lanternbox", Saltmarsh, Tonight);
 
-        Assert.Equal("Lanternbox is not installed", notice.Headline);
+        Assert.Equal("Lanternbox isn’t installed", notice.Headline);
         Assert.Equal(HandOffNotice.NotInstalled("Lanternbox"), notice.Detail);
         Assert.Equal(NoticeRole.Problem, notice.Role);
     }
@@ -106,7 +106,7 @@ public class WaitingNoticesTests
         var east = WaitingNotices.SportsFeedUnreachable("league-east", "Eastern Rowing League", Tonight);
         var west = WaitingNotices.SportsFeedUnreachable("league-west", "Western Rowing League", Tonight);
 
-        Assert.Equal("The Eastern Rowing League schedule could not be reached", east.Headline);
+        Assert.Equal("The Eastern Rowing League schedule couldn’t be reached", east.Headline);
         Assert.NotEqual(east.Key, west.Key);
         Assert.Null(east.ActionLabel);
     }

@@ -49,14 +49,14 @@ public static class DeskStatus
                 return null;
             case "Cancelled":
                 return "The owner stopped this review before it finished. " +
-                       "Do not say or imply that it is complete.";
+                       "Don’t say or imply that it is complete.";
         }
 
         if (s.NeedsAttention)
             return null;
 
         return $"The review is still in progress and is NOT finished. Right now: {Core(s)}. " +
-               "Do not say or imply that the draft or the report is complete.";
+               "Don’t say or imply that the draft or the report is complete.";
     }
 
     private static bool Active(NovelStatus s) => s.Stage is not ("Completed" or "Failed" or "Cancelled");

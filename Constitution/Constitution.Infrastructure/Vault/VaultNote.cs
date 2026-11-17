@@ -39,7 +39,7 @@ public static class VaultNote
             case VaultRunStatus.NotSignedIn:
                 return $"{held}. Sign in with Google to keep it in the vault.";
             case VaultRunStatus.Failed:
-                return $"{held}, but the vault could not be updated{Named(result.Detail)}.";
+                return $"{held}, but the vault couldn’t be updated{Named(result.Detail)}.";
             case VaultRunStatus.Published:
                 if (result.Publish is null)
                 {
@@ -68,13 +68,13 @@ public static class VaultNote
             case VaultWriteOutcome.NoPassphrase:
                 return $"{held}. Add the vault passphrase to keep it in the vault.";
             case VaultWriteOutcome.RefusedUnreadable:
-                return $"{held}, but the vault was left alone: the passphrase does not open it, or the file is damaged.";
+                return $"{held}, but the vault was left alone: the passphrase doesn’t open it, or the file is damaged.";
             case VaultWriteOutcome.RefusedNotOwner:
                 return $"{held}. The vault belongs to another Google account, so only that account can change it.";
             case VaultWriteOutcome.RefusedUnknownAccount:
                 return $"{held}. Sign in with Google so the vault knows whose phone this is.";
             case VaultWriteOutcome.Failed:
-                return $"{held}, but Drive did not take the update{Named(publish.SharedDetail)}.";
+                return $"{held}, but Drive didn’t take the update{Named(publish.SharedDetail)}.";
             default:
                 throw new ArgumentOutOfRangeException(nameof(publish), publish.Shared, "Not a write outcome this wording knows.");
         }

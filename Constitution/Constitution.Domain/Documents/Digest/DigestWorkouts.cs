@@ -83,7 +83,7 @@ public static class DigestWorkouts
             }
         }
 
-        PageDraft.RequireRoom(baseline, PageDraft.NotesBottom - 20f, "The digest's workouts page");
+        PageDraft.RequireRoom(baseline, PageDraft.NotesBottom - 20f, "The digest’s workouts page");
         draft.NotesColumn();
         draft.Footer("Digest", saturday.ToDateTime(TimeOnly.MinValue), number, pages);
         return draft.ToLayout();

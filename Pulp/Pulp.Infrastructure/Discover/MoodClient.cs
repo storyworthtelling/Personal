@@ -48,7 +48,7 @@ public sealed class MoodClient : IMoodClient
         "kind = \"film\" or \"show\". Name only real, released films and series; never invent one. No prose outside the JSON.";
 
     private const string MoodInstruction =
-        "You suggest films and TV series for a household's evening from a MOOD they typed. You are given the MOOD, " +
+        "You suggest films and TV series for a household’s evening from a MOOD they typed. You are given the MOOD, " +
         "the streaming SERVICES the household has, and possibly a few TASTE tags the viewer likes. Prefer titles " +
         "available on those services. Fit the mood first and the taste second. If AUDIENCE says children, suggest " +
         "only titles made for or suitable for children. Give at most MAX TITLES, best fit first. title = an empty string. " +
@@ -168,7 +168,7 @@ public sealed class MoodClient : IMoodClient
                 || !root.TryGetProperty("titles", out var titles)
                 || titles.ValueKind != JsonValueKind.Array)
             {
-                return MoodAnswer.NoIdea(MoodOutcome.Malformed, "The reply's JSON had no \"titles\" list.");
+                return MoodAnswer.NoIdea(MoodOutcome.Malformed, "The reply’s JSON had no \"titles\" list.");
             }
 
             var candidates = new List<MoodCandidate>();
@@ -193,7 +193,7 @@ public sealed class MoodClient : IMoodClient
         }
         catch (JsonException exception)
         {
-            return MoodAnswer.NoIdea(MoodOutcome.Malformed, $"The reply's JSON did not parse: {exception.Message}");
+            return MoodAnswer.NoIdea(MoodOutcome.Malformed, $"The reply’s JSON did not parse: {exception.Message}");
         }
     }
 

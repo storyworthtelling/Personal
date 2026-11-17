@@ -88,7 +88,7 @@ public class VoiceSeatComposerTests
     [Fact]
     public async Task AComposedSentenceIsReturned()
     {
-        Assert.Equal("Twelve percent down since last November's peak.", await Composer().ComposeAsync(Snowball(), default));
+        Assert.Equal("Twelve percent down since last November’s peak.", await Composer().ComposeAsync(Snowball(), default));
     }
 
     [Fact]
@@ -223,7 +223,7 @@ public class VoiceSeatComposerTests
 
         clock.Advance(TimeSpan.FromMinutes(2));
         client.Failure = null;
-        Assert.Equal("Twelve percent down since last November's peak.", await composer.ComposeAsync(Snowball(), default));
+        Assert.Equal("Twelve percent down since last November’s peak.", await composer.ComposeAsync(Snowball(), default));
         Assert.Equal(2, client.Requests.Count);
     }
 

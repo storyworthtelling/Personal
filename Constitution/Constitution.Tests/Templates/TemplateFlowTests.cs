@@ -43,7 +43,7 @@ public class TemplateFlowTests
         var answers = new[]
         {
             Tick(Sam, "weekend-breakfast-yes", Before(60)),
-            Deny(Lee, "box-fruit-yes", "Robin will not touch melon", Before(30)),
+            Deny(Lee, "box-fruit-yes", "Robin won’t touch melon", Before(30)),
         };
         var decision = MealDeadline.Decide(answers, Deadline, After(5), expected);
 

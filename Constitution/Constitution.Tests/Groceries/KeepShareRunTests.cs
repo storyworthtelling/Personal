@@ -92,12 +92,12 @@ public class KeepShareRunTests
     [Fact]
     public void AnUnreadableRosterSettlesWithItsReason()
     {
-        roster.Answer = new MealRosterRead.Unavailable("The household file cannot be opened.");
+        roster.Answer = new MealRosterRead.Unavailable("The household file can’t be opened.");
 
         var report = Settled(Prepare());
 
         Assert.Equal(KeepShareOutcome.ListNotBuilt, report.Outcome);
-        Assert.StartsWith("The household file cannot be opened.", report.Sentence, StringComparison.Ordinal);
+        Assert.StartsWith("The household file can’t be opened.", report.Sentence, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -111,12 +111,12 @@ public class KeepShareRunTests
     [Fact]
     public void AnUnreadablePantrySettlesAndNeverReadsAsEmpty()
     {
-        pantry.Answer = new MealPantryRead.Unreadable("The pantry cannot be read.");
+        pantry.Answer = new MealPantryRead.Unreadable("The pantry can’t be read.");
 
         var report = Settled(Prepare());
 
         Assert.Equal(KeepShareOutcome.ListNotBuilt, report.Outcome);
-        Assert.StartsWith("The pantry cannot be read.", report.Sentence, StringComparison.Ordinal);
+        Assert.StartsWith("The pantry can’t be read.", report.Sentence, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public class KeepShareRunTests
         var report = KeepShareRun.Finish(Ready(Prepare()), KeepStart.Started);
 
         Assert.StartsWith("The list went to Keep.", report.Sentence, StringComparison.Ordinal);
-        Assert.Contains("could not be read", report.Sentence, StringComparison.Ordinal);
+        Assert.Contains("couldn’t be read", report.Sentence, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public class KeepShareRunTests
         var report = KeepShareRun.Finish(Ready(Prepare()), KeepStart.NotFound);
 
         Assert.Equal(KeepShareOutcome.KeepNotInstalled, report.Outcome);
-        Assert.Equal("Keep is not on this phone, so the list was not sent.", report.Sentence);
+        Assert.Equal("Keep isn’t on this phone, so the list wasn’t sent.", report.Sentence);
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public class KeepShareRunTests
         var report = KeepShareRun.Finish(Ready(Prepare()), KeepStart.Refused);
 
         Assert.Equal(KeepShareOutcome.KeepRefused, report.Outcome);
-        Assert.Equal("Keep would not take the list, so it was not sent.", report.Sentence);
+        Assert.Equal("Keep wouldn’t take the list, so it wasn’t sent.", report.Sentence);
     }
 
     [Fact]

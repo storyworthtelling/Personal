@@ -38,8 +38,8 @@ public class ReaderPagesTests
             Assert.True(
                 pages.Any(page => page.Contains($"Reader {index} of {of}", StringComparison.OrdinalIgnoreCase)
                     && page.Contains(persona.Name, StringComparison.Ordinal)),
-                $"{persona.Name} has no page of its own. A whole-book read in character is not a "
-                + "paragraph inside somebody else's section.");
+                $"{persona.Name} has no page of its own. A whole-book read in character isn’t a "
+                + "paragraph inside somebody else’s section.");
         }
     }
 
@@ -67,7 +67,7 @@ public class ReaderPagesTests
             var pointer = Pointer(pages[contents], persona.Name);
             var turned = folios.IndexOf(pointer);
 
-            Assert.True(turned >= 0, $"The contents sends the author to page {pointer}, which is not in the file.");
+            Assert.True(turned >= 0, $"The contents sends the author to page {pointer}, which isn’t in the file.");
             Assert.Contains(persona.Name, pages[turned], StringComparison.Ordinal);
             Assert.Contains($"Reader {index} of {of}", pages[turned], StringComparison.OrdinalIgnoreCase);
         }
@@ -220,7 +220,7 @@ public class ReaderPagesTests
             var page = pages.First(page => page.Contains($"{persona.Name} gives the reason", StringComparison.Ordinal));
             var name = page.IndexOf(persona.ReaderName!, StringComparison.Ordinal);
             var role = page.IndexOf(persona.Name, name < 0 ? 0 : name, StringComparison.Ordinal);
-            Assert.True(name >= 0, $"{persona.ReaderName} is not named on their page.");
+            Assert.True(name >= 0, $"{persona.ReaderName} isn’t named on their page.");
             Assert.True(role > name, $"{persona.Name} should follow {persona.ReaderName} on the page.");
         }
     }
@@ -246,10 +246,10 @@ public class ReaderPagesTests
             persona.Id,
             $"{persona.Name} arrives at the middle.",
             "A read long enough to be a read. It runs to several sentences because a whole-book "
-            + "judgement in character is not a line, and the page is drawn around that length.\n\n"
+            + "judgement in character isn’t a line, and the page is drawn around that length.\n\n"
             + "A second paragraph, so the split is exercised too.",
             [$"{persona.Name} found something that works.", "And a second thing."],
-            [$"{persona.Name} found something that does not.", "And a second thing."],
+            [$"{persona.Name} found something that doesn’t.", "And a second thing."],
             "Something specific would have to change before this reader changed their mind.")
         {
             Score = 7,
@@ -270,7 +270,7 @@ public class ReaderPagesTests
         Assert.True(at >= 0, $"{name} has no row on the readers' contents page.");
 
         var marker = contents.IndexOf("p.", at, StringComparison.Ordinal);
-        Assert.True(marker >= 0, $"{name}'s row names no page to turn to.");
+        Assert.True(marker >= 0, $"{name}’s row names no page to turn to.");
 
         var after = contents[(marker + 2)..].TrimStart();
         return int.Parse(new string(after.TakeWhile(char.IsDigit).ToArray()));

@@ -63,7 +63,7 @@ public sealed class SettingsArea : ScoreArea
             new(SettingsAnatomy.Vault, null, body =>
             {
                 body.AddView(PaperUi.Secondary(Host,
-                    "The one secret that isn't in the vault — set the same passphrase in every app and each " +
+                    "The one secret that isn’t in the vault — set the same passphrase in every app and each " +
                     "restores its own keys. Shown in the clear on purpose, so it can be read back and copied."));
                 var passphrase = PaperUi.MonoField(Host, "Vault passphrase");
                 passphrase.Text = VaultPassphraseStore.Passphrase;

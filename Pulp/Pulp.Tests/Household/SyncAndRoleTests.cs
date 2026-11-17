@@ -86,7 +86,7 @@ public class SyncAndRoleTests
     {
         var line = HouseholdSyncText.Line(HouseholdSyncStatus.Offline(Now.AddMinutes(-5), "timeout"), Now);
 
-        Assert.Equal("Drive couldn't be reached. Changes are kept on this phone and go up when it can.", line);
+        Assert.Equal("Drive couldn’t be reached. Changes are kept on this phone and go up when it can.", line);
     }
 
     [Fact]

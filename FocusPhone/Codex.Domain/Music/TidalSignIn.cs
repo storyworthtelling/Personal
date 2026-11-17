@@ -123,7 +123,7 @@ public static class OAuthRedirect
     {
         if (string.IsNullOrWhiteSpace(redirect) || !Uri.TryCreate(redirect, UriKind.Absolute, out var uri))
         {
-            return new OAuthRedirectResult(OAuthRedirectStatus.Failed, Error: "The sign-in did not come back with a result.");
+            return new OAuthRedirectResult(OAuthRedirectStatus.Failed, Error: "The sign-in didn’t come back with a result.");
         }
 
         var query = Parse(uri);
@@ -152,7 +152,7 @@ public static class OAuthRedirect
         {
             return new OAuthRedirectResult(
                 OAuthRedirectStatus.StateMismatch,
-                Error: "The sign-in that came back is not the one that was started.");
+                Error: "The sign-in that came back isn’t the one that was started.");
         }
 
         return new OAuthRedirectResult(OAuthRedirectStatus.Authorized, code);

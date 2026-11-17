@@ -305,7 +305,7 @@ public sealed class SettingsArea(Activity host)
         if (!VoiceGoogleAccount.IsSignedIn || GoogleSignInHealth.NeedsSignIn())
         {
             body.AddView(PaperUi.Secondary(Host, signInStatus ?? (VoiceGoogleAccount.IsSignedIn
-                ? "Google turned this phone's sign-in away, so the vault and the household file are waiting."
+                ? "Google turned this phone’s sign-in away, so the vault and the household file are waiting."
                 : "The vault needs a Google sign-in.")), Spaced(DesignTokens.Space.X3));
             body.AddView(PaperUi.SecondaryButton(Host, GoogleSignInHealth.ButtonLabel("Sign in with Google"), () => _ = SignInAsync()), Spaced(DesignTokens.Space.X1));
         }
@@ -586,7 +586,7 @@ public sealed class SettingsArea(Activity host)
                 token = await new RemarkableRegistrationClient(http).Register(code, CancellationToken.None);
                 if (string.IsNullOrWhiteSpace(token))
                 {
-                    throw new FormatException("The tablet's cloud replied with no token.");
+                    throw new FormatException("The tablet’s cloud replied with no token.");
                 }
             }
             catch (Exception e) when (ConnectionTrail.Expecting(Host, ConnectionAct.PairRemarkable, e,
@@ -722,11 +722,11 @@ public sealed class SettingsArea(Activity host)
         }
         catch (ArgumentException e)
         {
-            exportStatus = $"Diagnostics could not be built ({e.GetType().Name}).";
+            exportStatus = $"Diagnostics couldn’t be built ({e.GetType().Name}).";
         }
         catch (InvalidOperationException e)
         {
-            exportStatus = $"Diagnostics could not be built ({e.GetType().Name}).";
+            exportStatus = $"Diagnostics couldn’t be built ({e.GetType().Name}).";
         }
 
         RaiseChanged();

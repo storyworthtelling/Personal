@@ -86,7 +86,7 @@ public sealed class LogLoopRunTests : IDisposable
 
         Assert.False(result.Succeeded);
         Assert.Equal(1, Run().History.FailedWeeks);
-        Assert.Contains(lines, l => l.Problem && l.Line.StartsWith("Upload did not complete:", StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.Problem && l.Line.StartsWith("Upload didn’t complete:", StringComparison.Ordinal));
     }
 
     [Fact]

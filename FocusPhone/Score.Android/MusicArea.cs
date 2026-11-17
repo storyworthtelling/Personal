@@ -201,14 +201,14 @@ public sealed class MusicArea : ScoreArea
     private View BuildEmptyGuide()
     {
         var layout = new LinearLayout(Host) { Orientation = Orientation.Vertical };
-        layout.AddView(PaperUi.Body(Host, "No music in this folder yet. Here's how to add some."));
+        layout.AddView(PaperUi.Body(Host, "No music in this folder yet. Here’s how to add some."));
         layout.AddView(PaperUi.Secondary(Host,
             "Put audio files in your Drive music folder — rip your CDs to tagged FLAC or MP3, copy the " +
             "files iTunes already made, or buy real downloads (Bandcamp, Qobuz, Amazon Music). Streaming " +
-            "apps like YouTube Music can't be saved here."));
+            "apps like YouTube Music can’t be saved here."));
         layout.AddView(PaperUi.Secondary(Host,
-            "What organizes the library is each file's embedded tags — title, artist, album artist, album, " +
-            "track number, genre. Folder names and structure don't matter; the tags do."));
+            "What organizes the library is each file’s embedded tags — title, artist, album artist, album, " +
+            "track number, genre. Folder names and structure don’t matter; the tags do."));
         layout.AddView(PaperUi.Secondary(Host,
             "Playable file types: " + string.Join(", ", AudioFileTypes.SupportedExtensions) + "."));
         layout.AddView(PaperUi.Secondary(Host, "Rescan from Settings once files are in place."));
@@ -349,7 +349,7 @@ public sealed class MusicArea : ScoreArea
         if (made.IsEmpty)
         {
             making.Failed("the playlist came back empty");
-            generating = "Couldn't make a playlist from that. Try another idea.";
+            generating = "Couldn’t make a playlist from that. Try another idea.";
             Invalidate();
             return;
         }

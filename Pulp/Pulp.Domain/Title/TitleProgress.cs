@@ -137,7 +137,7 @@ public static class EpisodeMarks
                 .Order()
                 .Select(episode => Mark(show.Id, episode, WatchSource.MarkedWatched, at))
                 .ToList(),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "An episode's card offers only Watched, Unwatched and Watched up to here (D160)."),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "An episode’s card offers only Watched, Unwatched and Watched up to here (D160)."),
         };
     }
 

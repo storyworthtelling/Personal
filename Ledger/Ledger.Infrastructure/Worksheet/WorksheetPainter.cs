@@ -71,7 +71,7 @@ public static class WorksheetPainter
             ink.Paragraph(
                 canvas,
                 [
-                    ($"Write each line's limit in its box; an empty box keeps {previousMonth}'s figure. Every dollar gets a job: the boxes should come to ", false),
+                    ($"Write each line’s limit in its box; an empty box keeps {previousMonth}’s figure. Every dollar gets a job: the boxes should come to ", false),
                     (PlanMoney.Whole(target), true),
                     (", and Index checks when it reads the page.", false),
                 ],
@@ -81,7 +81,7 @@ public static class WorksheetPainter
         {
             ink.Paragraph(
                 canvas,
-                [($"Agree a limit for each line together and write it in its box; an empty box keeps {previousMonth}'s figure. Add a category on a blank line at the foot.", false)],
+                [($"Agree a limit for each line together and write it in its box; an empty box keeps {previousMonth}’s figure. Add a category on a blank line at the foot.", false)],
                 left, introBaseline, WorksheetRegions.BodyWidth, IntroLineHeight);
         }
 
@@ -92,7 +92,7 @@ public static class WorksheetPainter
             : Domain.Worksheet.WorksheetPlan.IncomeUnsureText;
         DrawCalcRow(canvas, ink, left, calcTop, $"{monthWord} income, expected", incomeLine, ink.Ink, ink.Soft);
         DrawCalcRow(canvas, ink, left, calcTop + 14f, $"Snowball payments, {FridayWord(plan.FridayCount)}", PlanMoney.Deduction(plan.SnowballPaymentsWholeDollars), ink.Soft, ink.Soft);
-        DrawCalcRow(canvas, ink, left, calcTop + 28f, $"{previousMonth}'s spending", PlanMoney.Deduction(plan.LastMonthSpendingWholeDollars), ink.Soft, ink.Soft);
+        DrawCalcRow(canvas, ink, left, calcTop + 28f, $"{previousMonth}’s spending", PlanMoney.Deduction(plan.LastMonthSpendingWholeDollars), ink.Soft, ink.Soft);
         if (plan.LeftToAssignWholeDollars is { } leftToAssign)
         {
             // .ws-calc .r.tot — a 1pt ink rule across the calc block, then the total.
@@ -138,7 +138,7 @@ public static class WorksheetPainter
         // previous-month header over no rows would be a table of nothing.
         if (page2Categories.Count > 0)
         {
-            canvas.DrawText("The rest of this month's categories, continued from the previous sheet.", left, WorksheetRegions.ContinuationIntroBaseline, ink.Body, ink.Soft);
+            canvas.DrawText("The rest of this month’s categories, continued from the previous sheet.", left, WorksheetRegions.ContinuationIntroBaseline, ink.Body, ink.Soft);
 
             DrawCategoryHeader(
                 canvas, ink, WorksheetRegions.ContinuationHeaderBaseline,

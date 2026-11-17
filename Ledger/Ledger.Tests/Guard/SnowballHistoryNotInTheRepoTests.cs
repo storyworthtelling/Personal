@@ -78,7 +78,7 @@ public class SnowballHistoryNotInTheRepoTests
             program,
             @"new DriveSnowballHistorySource\(\s*new DriveTextFile\(\s*DriveFactory\(sp\),\s*DriveSnowballHistorySource\.FileName,",
             RegexOptions.Singleline);
-        Assert.True(construction.Success, "MauiProgram does not build DriveSnowballHistorySource over a DriveTextFile named DriveSnowballHistorySource.FileName.");
+        Assert.True(construction.Success, "MauiProgram doesn’t build DriveSnowballHistorySource over a DriveTextFile named DriveSnowballHistorySource.FileName.");
     }
 
     [Fact]

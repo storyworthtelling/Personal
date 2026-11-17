@@ -125,7 +125,7 @@ public sealed partial class PrayerNeverLoggedTests : IDisposable
         {
             directory = directory.Parent;
         }
-        return directory?.FullName ?? throw new DirectoryNotFoundException("Foreword's project folder was not found above the test output.");
+        return directory?.FullName ?? throw new DirectoryNotFoundException("Foreword’s project folder was not found above the test output.");
     }
 
     [GeneratedRegex(@"\.Log(?:Trace|Debug|Information|Warning|Error|Critical)\([^;]*;", RegexOptions.Singleline)]

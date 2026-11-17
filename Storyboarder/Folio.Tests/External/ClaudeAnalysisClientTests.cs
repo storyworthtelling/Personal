@@ -919,7 +919,7 @@ public class ClaudeAnalysisClientTests
     public async Task DeriveArtStyle_ReturnsEmpty_OnAReplyWithoutJson()
     {
         var (client, handler) = Create();
-        handler.EnqueueOk(Reply("I couldn't decide on a style."));
+        handler.EnqueueOk(Reply("I couldn’t decide on a style."));
 
         var style = await client.DeriveArtStyle("sample", new DesignBible([], []), CancellationToken.None);
 
@@ -992,7 +992,7 @@ public class ClaudeAnalysisClientTests
     public async Task AnalyzeChapter_UnparseableReply_StillCarriesItsChapter()
     {
         var (client, handler) = Create();
-        handler.EnqueueOk(Reply("I'm afraid I can't help with that."));
+        handler.EnqueueOk(Reply("I’m afraid I can’t help with that."));
 
         var notes = await client.AnalyzeChapter("excerpt", "Chapter 4", [], string.Empty, CancellationToken.None);
 
@@ -1557,7 +1557,7 @@ public class ClaudeAnalysisClientTests
             + "\"aliases\":[\"the pilot\"],\"era\":\"Year of the flood\",\"text\":\"A ferry pilot.\","
             + "\"quote\":\"Wren held the tiller\"},{\"kind\":\"oddity\",\"name\":\"Gullhaven\",\"text\":\"On stilts.\"},"
             + "{\"kind\":\"thread\",\"name\":\"\",\"text\":\"Nameless.\"}]}"));
-        const string manuscript = "Wren held the tiller and did not look back.";
+        const string manuscript = "Wren held the tiller and didn’t look back.";
         var frame = new ReadingFrame(GenreFrame.Unknown, "SERIES BIBLE: earlier.");
 
         var facts = await client.ReadSeriesBible(manuscript, frame, "The Tide Ledger", "earlier entries", CancellationToken.None);
@@ -1607,20 +1607,20 @@ public class ClaudeAnalysisClientTests
         handler.EnqueueOk(Reply(reply));
 
         var placement = await client.PlaceInSeries(
-            "The Third Tide", ["The Salt Road", "The Tide Ledger"], "SERIES BIBLE ...", "The flood has not come yet.",
+            "The Third Tide", ["The Salt Road", "The Tide Ledger"], "SERIES BIBLE ...", "The flood hasn’t come yet.",
             CancellationToken.None);
 
         Assert.Equal(where, placement.Where);
         Assert.False(placement.Confirmed);
         var user = JsonDocument.Parse(Assert.Single(handler.RequestBodies)).RootElement
             .GetProperty("messages")[0].GetProperty("content").GetString()!;
-        Assert.Contains("The flood has not come yet.", user);
+        Assert.Contains("The flood hasn’t come yet.", user);
         Assert.Contains("SERIES BIBLE", user);
     }
 
     private static readonly IReadOnlyList<Review> RoundTablePanel =
     [
-        new("agent", "I'd take it.", "Strong opening.", ["the hook"], ["the middle"], "a tighter middle") { Score = 8, ScoreReason = "The hook." },
+        new("agent", "I’d take it.", "Strong opening.", ["the hook"], ["the middle"], "a tighter middle") { Score = 8, ScoreReason = "The hook." },
         new("harsh-critic", "Not yet.", "Sags badly.", ["the prose"], ["the plot"], "a new plot") { Score = 3, ScoreReason = "The plot." },
     ];
 
@@ -1708,7 +1708,7 @@ public class ClaudeAnalysisClientTests
     public async Task AHostMoveThatWillNotReadFailsSoTheTurnIsTriedAgain()
     {
         var (client, handler) = Create();
-        handler.EnqueueOk(Reply("Let's begin!"));
+        handler.EnqueueOk(Reply("Let’s begin!"));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             client.RoundTableHost(RoundTablePanel, RoundTable.Empty, [], 15, StoryLength.ShortStory, CancellationToken.None));

@@ -66,7 +66,7 @@ public sealed class HouseholdRecord
         ArgumentOutOfRangeException.ThrowIfLessThan(schemaVersion, 1);
         if (string.IsNullOrWhiteSpace(writer))
         {
-            throw new ArgumentException("A record needs its writer's install id; without it two writers' ties cannot be broken.", nameof(writer));
+            throw new ArgumentException("A record needs its writer’s install id; without it two writers' ties cannot be broken.", nameof(writer));
         }
 
         Key = key;
@@ -211,7 +211,7 @@ public sealed class HouseholdRecord
         if (stamp <= Stamp)
         {
             throw new ArgumentException(
-                $"A change to {Key} stamped {stamp} is not newer than the record's own {Stamp}; it would lose to the version it edits and vanish. Witness the record's stamp before stamping the change.",
+                $"A change to {Key} stamped {stamp} isn’t newer than the record’s own {Stamp}; it would lose to the version it edits and vanish. Witness the record’s stamp before stamping the change.",
                 nameof(stamp));
         }
     }

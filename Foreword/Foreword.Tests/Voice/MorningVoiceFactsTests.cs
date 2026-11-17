@@ -35,7 +35,7 @@ public class MorningVoiceFactsTests
         var agenda = new DayAgenda
         {
             Date = Day,
-            Events = [At(14, 0, "Dentist with Sam"), At(8, 30, "School run"), At(0, 0, "Robin's birthday", allDay: true)],
+            Events = [At(14, 0, "Dentist with Sam"), At(8, 30, "School run"), At(0, 0, "Robin’s birthday", allDay: true)],
         };
 
         var facts = MorningVoiceFacts.Day(agenda);
@@ -65,8 +65,8 @@ public class MorningVoiceFactsTests
     [Fact]
     public void TheChecklistIsToldHowManyTasksAndHidesWithNone()
     {
-        Assert.Equal(["Three tasks are on today's list."], MorningVoiceFacts.Checklist(tasks: 3));
-        Assert.Equal(["One task is on today's list."], MorningVoiceFacts.Checklist(tasks: 1));
+        Assert.Equal(["Three tasks are on today’s list."], MorningVoiceFacts.Checklist(tasks: 3));
+        Assert.Equal(["One task is on today’s list."], MorningVoiceFacts.Checklist(tasks: 1));
         Assert.Empty(MorningVoiceFacts.Checklist(tasks: 0));
     }
 }

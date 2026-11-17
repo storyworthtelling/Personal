@@ -68,7 +68,7 @@ public class DigestTrailTests
     {
         DigestOutcome[] all =
         [
-            new DigestOutcome.NotDue(), new DigestOutcome.AlreadyDelivered(DigestFixture.Saturday), new DigestOutcome.NotReady("The skip ledger could not be read."),
+            new DigestOutcome.NotDue(), new DigestOutcome.AlreadyDelivered(DigestFixture.Saturday), new DigestOutcome.NotReady("The skip ledger couldn’t be read."),
             new DigestOutcome.Delivered("Constitution — Digest — 2026-03-14"), new DigestOutcome.NotDelivered("n", new HttpRequestException("x")),
         ];
         var phrases = all.Select(DigestTrail.LogPhrase).ToList();

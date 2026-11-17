@@ -23,7 +23,7 @@ public static class SeatFacts
     {
         ArgumentNullException.ThrowIfNull(facts);
         ArgumentNullException.ThrowIfNull(facts.Dinner);
-        var kind = SeatWords.Named(facts.WorkoutKind, "the workout's kind");
+        var kind = SeatWords.Named(facts.WorkoutKind, "the workout’s kind");
         if (facts.WorkoutMinutes <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(facts), facts.WorkoutMinutes, "A workout runs for some minutes.");
@@ -51,7 +51,7 @@ public static class SeatFacts
         if (month.SkippedDevice is not null)
         {
             return new SeatRequest(VoiceSeat.BodyMonthly,
-                [$"No {month.SkippedDevice} readings yesterday.", "Today's line has a gap because of that."]);
+                [$"No {month.SkippedDevice} readings yesterday.", "Today’s line has a gap because of that."]);
         }
 
         var told = month.Movers.Select(mover =>

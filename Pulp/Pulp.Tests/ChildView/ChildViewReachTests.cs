@@ -45,7 +45,7 @@ public class ChildViewReachTests
             .Where(file => file.Path.StartsWith("Pulp.Android/Favorites/", StringComparison.Ordinal)
                 || Regex.IsMatch(file.Path, @"^Pulp\.Android/Shell/Child\w*\.cs$"))
             .ToList();
-        Assert.True(pages.Count >= 4, "The child's pages were not found; the guard has nothing to protect: " + string.Join(", ", pages.Select(page => page.Path)));
+        Assert.True(pages.Count >= 4, "The child’s pages weren’t found; the guard has nothing to protect: " + string.Join(", ", pages.Select(page => page.Path)));
         return pages;
     }
 
@@ -104,7 +104,7 @@ public class ChildViewReachTests
             .SelectMany(page => AdultScreen.Matches(page.Text).Select(match => $"{page.Path}: {match.Value}"))
             .ToList();
 
-        Assert.True(offenders.Count == 0, "A child's page names an adult screen:\n" + string.Join("\n", offenders));
+        Assert.True(offenders.Count == 0, "A child’s page names an adult screen:\n" + string.Join("\n", offenders));
     }
 
     // A member of a class (four-space indent): modifiers, a return type, a name, then its parameter list.
@@ -167,8 +167,8 @@ public class ChildViewReachTests
             }
         }
 
-        Assert.True(reads.Count >= 6, "Too few title reads found in the child's pages; the guard has nothing to protect: " + string.Join(", ", reads));
-        Assert.True(offenders.Count == 0, "A child's page reads titles without the child's filter:\n" + string.Join("\n", offenders));
+        Assert.True(reads.Count >= 6, "Too few title reads found in the child’s pages; the guard has nothing to protect: " + string.Join(", ", reads));
+        Assert.True(offenders.Count == 0, "A child’s page reads titles without the child’s filter:\n" + string.Join("\n", offenders));
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public class ChildViewReachTests
     {
         var offenders = ChildPages().Where(page => Regex.IsMatch(page.Text, @"\bThisPhone(Of|Async)?\b")).Select(page => page.Path).ToList();
 
-        Assert.True(offenders.Count == 0, "A child's page reads as the phone's adult: " + string.Join(", ", offenders));
+        Assert.True(offenders.Count == 0, "A child’s page reads as the phone’s adult: " + string.Join(", ", offenders));
     }
 
     [Fact]
@@ -237,8 +237,8 @@ public class ChildViewReachTests
         var requests = pages.SelectMany(page => Regex.Matches(page.Text, @"new\s+HandOffRequest\s*\(\s*(?<who>[^,]+),").Select(match => (page.Path, Who: match.Groups["who"].Value.Trim()))).ToList();
         var sittings = pages.SelectMany(page => Regex.Matches(page.Text, @"new\s+WatchedSitting\s*\(\s*(?<who>[^,]+),").Select(match => (page.Path, Who: match.Groups["who"].Value.Trim()))).ToList();
 
-        Assert.True(requests.Count > 0, "No child's page hands a title off; the guard has nothing to protect.");
-        Assert.True(sittings.Count > 0, "No child's page records a hand-off; the guard has nothing to protect.");
+        Assert.True(requests.Count > 0, "No child’s page hands a title off; the guard has nothing to protect.");
+        Assert.True(sittings.Count > 0, "No child’s page records a hand-off; the guard has nothing to protect.");
         Assert.All(requests, request => Assert.Equal("audience.Watching", request.Who));
         Assert.All(sittings, sitting => Assert.Equal("child", sitting.Who));
         Assert.All(pages.Where(page => page.Text.Contains("new WatchedSitting(", StringComparison.Ordinal)),
@@ -270,7 +270,7 @@ public class ChildViewReachTests
         var resolve = read.IndexOf(".Resolve(", StringComparison.Ordinal);
         var phone = read.IndexOf("ThisPhoneOf(", StringComparison.Ordinal);
         Assert.True(resolve >= 0 && phone >= 0, "The household read has no Resolve or no ThisPhoneOf to order.");
-        Assert.True(resolve < phone, "The title page asks whose phone it is before it resolves the child's session.");
+        Assert.True(resolve < phone, "The title page asks whose phone it is before it resolves the child’s session.");
 
         // Play takes the child's branch (the children's hand-off) before the adult's request and sitting.
         var play = Body(page, "private void Play()");
@@ -279,8 +279,8 @@ public class ChildViewReachTests
         var adultRequest = play.IndexOf("new HandOffRequest(", StringComparison.Ordinal);
         Assert.True(childBranch >= 0 && childStart > childBranch, "Play has no child branch that hands off through ChildPlay.");
         var branchEnd = play.IndexOf("\n        }\n", childBranch, StringComparison.Ordinal);
-        Assert.True(branchEnd > childBranch, "Could not find the end of Play's child branch.");
-        Assert.True(adultRequest > branchEnd, "The adult's hand-off request is built before the child's branch has returned.");
+        Assert.True(branchEnd > childBranch, "Couldn’t find the end of Play’s child branch.");
+        Assert.True(adultRequest > branchEnd, "The adult’s hand-off request is built before the child’s branch has returned.");
 
         // Neither the adult's request nor the phone's-adult question has a second home elsewhere in the page,
         // where it would run with no child branch in front of it.
@@ -290,7 +290,7 @@ public class ChildViewReachTests
         Assert.Contains("return;", play[childBranch..branchEnd], StringComparison.Ordinal);
         var adultSitting = Regex.Matches(play, @"new\s+WatchedSitting\(\s*viewer\b").Select(match => match.Index).ToList();
         Assert.NotEmpty(adultSitting);
-        Assert.All(adultSitting, at => Assert.True(at > adultRequest, "An adult's sitting is recorded before the hand-off it follows."));
+        Assert.All(adultSitting, at => Assert.True(at > adultRequest, "An adult’s sitting is recorded before the hand-off it follows."));
 
         // Everything an adult edits is gated by the affordances or the child flag, and the binder routes through the session.
         Assert.Contains("TitleAffordances.For(", page, StringComparison.Ordinal);

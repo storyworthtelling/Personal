@@ -26,7 +26,7 @@ public class NoConfirmDialogTests
     [Fact]
     public void TheGuardReadsTheTabAndIsNotVacuous()
     {
-        Assert.True(TabFiles().Count >= 6, "The Workouts tab files were not found: " + TabFiles().Count);
+        Assert.True(TabFiles().Count >= 6, "The Workouts tab files weren’t found: " + TabFiles().Count);
     }
 
     [Fact]

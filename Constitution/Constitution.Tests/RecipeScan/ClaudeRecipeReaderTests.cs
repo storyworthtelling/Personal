@@ -174,7 +174,7 @@ public class ClaudeRecipeReaderTests
     [Fact]
     public async Task ASenselessReplyIsUnreadable()
     {
-        var (reader, _, _) = Make(_ => Reply("Sorry, I can't do that."));
+        var (reader, _, _) = Make(_ => Reply("Sorry, I can’t do that."));
 
         Assert.IsType<RecipePhotoRead.Unreadable>(await reader.ReadAsync([Page(1)], CancellationToken.None));
     }

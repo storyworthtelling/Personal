@@ -339,7 +339,7 @@ public class PlacementTests
     public void AnUnreadableCalendarPlacesNothingForItsOwner()
     {
         // Lee has not shared her calendar: nothing is placed on her, and nothing is placed on a guess.
-        var calendars = CalendarsWith(lee: CalendarRead.Unreadable("Lee has not shared her calendar yet."));
+        var calendars = CalendarsWith(lee: CalendarRead.Unreadable("Lee hasn’t shared her calendar yet."));
         var soloLee = Planned(1, (16, 0), (18, 0), Effort(40), Lee);
         var soloSam = Planned(2, (16, 0), (18, 0), Effort(40), Sam);
         var walk = PlannedAt(6, (10, 0), (11, 0), (10, 0), Effort(40, false, SessionKind.GentleWalk), Together.FamilyWalk, Sam, Lee);

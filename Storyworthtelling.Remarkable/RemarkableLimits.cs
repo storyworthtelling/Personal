@@ -41,7 +41,7 @@ public sealed class RemarkableRefusedException(RemarkableRefusal reason, long by
     private static string Describe(RemarkableRefusal reason, long bytes) => reason switch
     {
         RemarkableRefusal.TooLarge =>
-            $"the PDF is {bytes / 1_000_000.0:0} MB, over the tablet's {RemarkableLimits.MaxBytes / 1_000_000.0:0} MB limit",
+            $"the PDF is {bytes / 1_000_000.0:0} MB, over the tablet’s {RemarkableLimits.MaxBytes / 1_000_000.0:0} MB limit",
         _ => $"the phone ran out of memory sending it ({bytes / 1_000_000.0:0} MB)",
     };
 }

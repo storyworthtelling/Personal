@@ -80,7 +80,7 @@ public class MealSheetPageTests
             var no = page.Printed.Single(i => i.OwnerId == MealSheetIds.DinnerReason(day) && i.Text == "No, because");
 
             Assert.True(yes.Bounds.Top > page.Map.ById(MealSheetIds.DinnerYes(day)).Bounds.Bottom, "YES is under its box");
-            Assert.True(no.Bounds.Right <= page.Map.ById(MealSheetIds.DinnerReason(day)).Bounds.Left, "No, because stands at the field's left");
+            Assert.True(no.Bounds.Right <= page.Map.ById(MealSheetIds.DinnerReason(day)).Bounds.Left, "No, because stands at the field’s left");
         }
 
         var text = Rendered(page);
@@ -174,7 +174,7 @@ public class MealSheetPageTests
     public void LeftoversAndNothingPlannedRows()
     {
         var dinners = MealSheetSamples.Dinners().ToList();
-        dinners[5] = DinnerChoice.Leftovers(MealSheetSamples.Sunday.AddDays(5), "Thursday's pan makes enough.");
+        dinners[5] = DinnerChoice.Leftovers(MealSheetSamples.Sunday.AddDays(5), "Thursday’s pan makes enough.");
         dinners[6] = DinnerChoice.NothingPlanned(MealSheetSamples.Sunday.AddDays(6), "Company comes.");
         var page = MealSheetSamples.Page(MealSheetSamples.Model(dinners));
         var text = Rendered(page);

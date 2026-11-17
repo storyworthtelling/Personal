@@ -21,9 +21,9 @@ public class FiVoicemailTests
     private static readonly DateTimeOffset When = new(2026, 8, 30, 9, 0, 0, TimeSpan.Zero);
 
     [Theory]
-    [InlineData("Voicemail from (555) 010-2233: Hi, it's me, call me back.")]
-    [InlineData("New voicemail from +15550102233 — Hi, it's me, call me back.")]
-    [InlineData("Voicemail transcript: Hi, it's me, call me back.")]
+    [InlineData("Voicemail from (555) 010-2233: Hi, it’s me, call me back.")]
+    [InlineData("New voicemail from +15550102233 — Hi, it’s me, call me back.")]
+    [InlineData("Voicemail transcript: Hi, it’s me, call me back.")]
     public void AFiVoicemailBecomesAVoicemail(string body)
     {
         var item = FiVoicemail.TryParse("+15550102233", body, When);
@@ -37,9 +37,9 @@ public class FiVoicemailTests
     public void TheTranscriptIsKeptAndTheWrapperIsNot()
     {
         var item = FiVoicemail.TryParse(
-            "+15550102233", "Voicemail from (555) 010-2233: Hi, it's me, call me back.", When);
+            "+15550102233", "Voicemail from (555) 010-2233: Hi, it’s me, call me back.", When);
 
-        Assert.Equal("Hi, it's me, call me back.", item!.Snippet);
+        Assert.Equal("Hi, it’s me, call me back.", item!.Snippet);
     }
 
     // It threads with the caller, which is the whole point of rendering it as a voicemail
@@ -56,7 +56,7 @@ public class FiVoicemailTests
     // An ordinary text is not a voicemail, however chatty. Getting this wrong would turn
     // real messages into voicemails, which is far worse than missing a transcript.
     [Theory]
-    [InlineData("Hi, it's me, call me back.")]
+    [InlineData("Hi, it’s me, call me back.")]
     [InlineData("Did you get my voicemail?")]
     [InlineData("")]
     [InlineData(null)]
@@ -95,9 +95,9 @@ public class FiVoicemailTests
     public void TheDurationColonIsNotTheWrapperSeparator()
     {
         var item = FiVoicemail.TryParse(
-            "+15550102233", "New voicemail from (555) 010-2233 (0:04): Hi, it's me, call me back.", When);
+            "+15550102233", "New voicemail from (555) 010-2233 (0:04): Hi, it’s me, call me back.", When);
 
-        Assert.Equal("Hi, it's me, call me back.", item!.Snippet);
+        Assert.Equal("Hi, it’s me, call me back.", item!.Snippet);
     }
 
     // Fi appends its own "To listen" line to every voicemail. It is wrapper, not transcript.
@@ -106,10 +106,10 @@ public class FiVoicemailTests
     {
         var item = FiVoicemail.TryParse(
             "+15550102233",
-            "New voicemail from (555) 010-2233 (0:04): Hi, it's me. To listen to this message, call +1 555-010-0100.",
+            "New voicemail from (555) 010-2233 (0:04): Hi, it’s me. To listen to this message, call +1 555-010-0100.",
             When);
 
-        Assert.Equal("Hi, it's me.", item!.Snippet);
+        Assert.Equal("Hi, it’s me.", item!.Snippet);
     }
 
     // Fi's own statement that there is no transcript is not a transcript: it reads as a plain

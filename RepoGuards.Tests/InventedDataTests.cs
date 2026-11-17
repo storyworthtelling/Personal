@@ -70,7 +70,7 @@ public class InventedDataTests
     }
 
     [Theory]
-    [InlineData("Pulp/Pulp.Domain/Household/HouseholdSync.cs", "/// <param name=\"Zone\">The viewer's zone.</param>")]
+    [InlineData("Pulp/Pulp.Domain/Household/HouseholdSync.cs", "/// <param name=\"Zone\">The viewer’s zone.</param>")]
     [InlineData("Pulp/Pulp.Domain/People/HouseholdRoster.cs", "/// <paramref name=\"Viewer\"/>")]
     [InlineData("Ledger/Ledger.Tests/Household/HouseholdV1Fixture.cs", "\"Name\": \"Maple Ridge Mortgage\"")]
     [InlineData("Storyworthtelling.Household.Tests/Household.cs", "\"fields\":{\"child\":\"false\"}")]
@@ -213,8 +213,8 @@ public class InventedDataTests
     [Theory]
     [InlineData("The household (Sam, Lee, Robin, Juniper) shares one fridge.")]
     [InlineData("household (Juniper, Robin and Lee)")]
-    [InlineData("household (read-only on the partner's install, D74)")]
-    [InlineData("the household (Foreword) is not a roster")]
+    [InlineData("household (read-only on the partner’s install, D74)")]
+    [InlineData("the household (Foreword) isn’t a roster")]
     public void AnInventedRosterOrNonRosterInTheDocsIsLeftAlone(string sample)
     {
         Assert.DoesNotContain(InventedShapes.Find("notes.md", sample), finding => finding.Kind.StartsWith("person"));

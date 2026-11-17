@@ -188,9 +188,9 @@ public partial class TaskEditPage : BinderPage
         }
         catch (Exception failure)
         {
-            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write("Tasks", Microsoft.Extensions.Logging.LogLevel.Warning, "The task could not be deleted", failure);
+            Storyworthtelling.Maui.Diagnostics.MauiLog.Current?.Write("Tasks", Microsoft.Extensions.Logging.LogLevel.Warning, "The task couldn’t be deleted", failure);
             StatusLabel.IsVisible = true;
-            StatusLabel.Text = "Could not delete the task: " + Storyworthtelling.Diagnostics.PlainError.Describe(failure, "Google Tasks") + ".";
+            StatusLabel.Text = "Couldn’t delete the task: " + Storyworthtelling.Diagnostics.PlainError.Describe(failure, "Google Tasks") + ".";
         }
     }
 

@@ -12,8 +12,8 @@ namespace Constitution.Infrastructure.Calendar;
 /// </summary>
 public static class GoogleCalendarServices
 {
-    public const string NotSignedIn = "Google is not signed in on this phone.";
-    public const string SignInRefused = "Google would not give Constitution a calendar sign-in.";
+    public const string NotSignedIn = "Google isn’t signed in on this phone.";
+    public const string SignInRefused = "Google wouldn’t give Constitution a calendar sign-in.";
 
     public static Func<CancellationToken, Task<CalendarService>> Create(Func<bool> isSignedIn, Func<CancellationToken, Task<string>> token, string applicationName)
     {

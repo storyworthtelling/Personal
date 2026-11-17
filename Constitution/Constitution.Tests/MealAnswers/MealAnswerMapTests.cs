@@ -79,7 +79,7 @@ public class MealAnswerMapTests
         foreach (var answer in new[]
         {
             Tick(Sam, Tuesday, Before(60)),
-            Deny(Lee, Wednesday, "Robin's swim: back at 7:30 — pasta, please", After(10)),
+            Deny(Lee, Wednesday, "Robin’s swim: back at 7:30 — pasta, please", After(10)),
             Deny(Lee, Thursday, null, Before(5)),
             Silent(Sam, Thursday, Before(75)),
         })

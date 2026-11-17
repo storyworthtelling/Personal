@@ -171,7 +171,7 @@ public class ManageSubscriptionsActivity : Activity
                 var url = text.Trim();
                 if (!Uri.TryCreate(url, UriKind.Absolute, out _))
                 {
-                    return "That is not a web address. A feed's address starts with https://.";
+                    return "That isn’t a web address. A feed’s address starts with https://.";
                 }
 
                 subscriptions.Add(url, url, DateTimeOffset.Now);
@@ -216,8 +216,8 @@ public class ManageSubscriptionsActivity : Activity
         catch (Exception e) when (e is IOException or InvalidOperationException or System.Xml.XmlException)
         {
             DogEar.SetNotice(this, undoHost, OpmlNoticeKey, new DogEar.Notice(
-                "That file is not a feed list.",
-                "It could not be read as OPML, the list of feeds podcast apps export. Nothing was added.",
+                "That file isn’t a feed list.",
+                "It couldn’t be read as OPML, the list of feeds podcast apps export. Nothing was added.",
                 DogEar.Hues.Problem));
         }
     }

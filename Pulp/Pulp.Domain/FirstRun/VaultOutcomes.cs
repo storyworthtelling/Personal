@@ -46,12 +46,12 @@ public static class VaultOutcomes
     public const string SignInKey = "vault:sign-in";
 
     private const string KeysLiveInTheVault =
-        "Pulp keeps its keys only in the vault, so they are not stored until the vault can be written.";
+        "Pulp keeps its keys only in the vault, so they aren’t stored until the vault can be written.";
 
     public static string? Sentence(VaultRestoreOutcome outcome, int keysPresent) => outcome switch
     {
         VaultRestoreOutcome.NotSignedIn => "Sign in with Google so Pulp can find the vault in Drive.",
-        VaultRestoreOutcome.NoPassphrase => "Enter the vault passphrase to bring Pulp's keys back.",
+        VaultRestoreOutcome.NoPassphrase => "Enter the vault passphrase to bring Pulp’s keys back.",
         VaultRestoreOutcome.NoVaultYet => "There is no vault in Drive yet. Add the keys in Vault and Save to make one.",
         VaultRestoreOutcome.Opened when keysPresent >= FirstRunPlan.KeyCount => "The vault is open, and all three keys came with it.",
         VaultRestoreOutcome.Opened => $"The vault is open; {keysPresent} of the three keys came with it. Add the others in Vault.",
@@ -61,34 +61,34 @@ public static class VaultOutcomes
     public static string? Sentence(VaultSaveOutcome outcome) => outcome switch
     {
         VaultSaveOutcome.Saved => "Saved to the vault.",
-        VaultSaveOutcome.ReadOnly => "This phone reads the household's keys; the phone that keeps the vault saves them.",
+        VaultSaveOutcome.ReadOnly => "This phone reads the household’s keys; the phone that keeps the vault saves them.",
         _ => null,
     };
 
     public static WaitingNotice? Notice(VaultRestoreOutcome outcome, DateTimeOffset at) => outcome switch
     {
         VaultRestoreOutcome.WrongPassphrase => Problem(
-            "The vault passphrase does not match", "The vault in Drive did not open with it. Check it against your other apps and enter it again.", at),
+            "The vault passphrase doesn’t match", "The vault in Drive didn’t open with it. Check it against your other apps and enter it again.", at),
         VaultRestoreOutcome.Unreadable => Problem(
-            "The vault in Drive could not be read", "The file is there but could not be opened. Your other apps' copies are untouched.", at),
+            "The vault in Drive couldn’t be read", "The file is there but couldn’t be opened. Your other apps' copies are untouched.", at),
         VaultRestoreOutcome.Failed => Problem(
-            "The vault could not be reached", "Drive did not answer. Pulp keeps the keys it has and tries again next time it opens.", at),
+            "The vault couldn’t be reached", "Drive didn’t answer. Pulp keeps the keys it has and tries again next time it opens.", at),
         _ => null,
     };
 
     public static WaitingNotice? Notice(VaultSaveOutcome outcome, DateTimeOffset at) => outcome switch
     {
-        VaultSaveOutcome.NotSignedIn => Problem("The keys were not saved", "Sign in with Google first. " + KeysLiveInTheVault, at),
-        VaultSaveOutcome.NoPassphrase => Problem("The keys were not saved", "Enter the vault passphrase first. " + KeysLiveInTheVault, at),
+        VaultSaveOutcome.NotSignedIn => Problem("The keys weren’t saved", "Sign in with Google first. " + KeysLiveInTheVault, at),
+        VaultSaveOutcome.NoPassphrase => Problem("The keys weren’t saved", "Enter the vault passphrase first. " + KeysLiveInTheVault, at),
         VaultSaveOutcome.Unreadable => Problem(
-            "The keys were not saved", "The passphrase does not open the vault already in Drive, so nothing was written over it.", at),
+            "The keys weren’t saved", "The passphrase doesn’t open the vault already in Drive, so nothing was written over it.", at),
         VaultSaveOutcome.WriteFailed => Problem(
-            "The keys were not saved", "Drive would not take the vault. Sign in with Google again, then Save.", at),
+            "The keys weren’t saved", "Drive wouldn’t take the vault. Sign in with Google again, then Save.", at),
         _ => null,
     };
 
     public static WaitingNotice SignInFailed(DateTimeOffset at) => new(
-        SignInKey, "Google sign-in did not finish", "Without it Pulp cannot reach the vault in Drive. Try signing in again.",
+        SignInKey, "Google sign-in didn’t finish", "Without it Pulp can’t reach the vault in Drive. Try signing in again.",
         NoticeRole.Problem, WaitingNotices.OpenVaultLabel, NoticeAction.OpenVault, at);
 
     /// <summary>
@@ -96,8 +96,8 @@ public static class VaultOutcomes
     /// register: the package and the suite's signing SHA-1, as an Android OAuth client.
     /// </summary>
     public static WaitingNotice SignInNotRegistered(DateTimeOffset at) => new(
-        SignInKey, "Google does not recognise this build yet",
-        $"Register the package {PulpIdentity.ApplicationId} with the suite's signing SHA-1 as an Android OAuth client "
+        SignInKey, "Google doesn’t recognise this build yet",
+        $"Register the package {PulpIdentity.ApplicationId} with the suite’s signing SHA-1 as an Android OAuth client "
             + "in the Google Cloud project, wait a few minutes, then sign in again.",
         NoticeRole.Problem, WaitingNotices.OpenVaultLabel, NoticeAction.OpenVault, at);
 

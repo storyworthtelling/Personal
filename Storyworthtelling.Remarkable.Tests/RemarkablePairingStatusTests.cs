@@ -28,7 +28,7 @@ public class RemarkablePairingStatusTests
 
         var status = RemarkablePairingStatus.Describe(paired: true, refused, "Not paired yet.");
 
-        Assert.Equal("The reMarkable turned this phone's pairing away. Pair again.", status.Line);
+        Assert.Equal("The reMarkable turned this phone’s pairing away. Pair again.", status.Line);
         Assert.Equal("Pair again", status.Button);
         Assert.True(status.NeedsPairing);
     }

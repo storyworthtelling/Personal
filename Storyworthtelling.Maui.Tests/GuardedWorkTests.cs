@@ -17,7 +17,7 @@ public class GuardedWorkTests
         var folds = new DogEarState();
         folds.SetNotice("remove-account", new DogEarNotice("Old", "old", DogEarHue.Problem));
 
-        var ran = await GuardedWork.Run(folds, "remove-account", "Could not remove the account", () => Task.CompletedTask);
+        var ran = await GuardedWork.Run(folds, "remove-account", "Couldn’t remove the account", () => Task.CompletedTask);
 
         Assert.True(ran);
         Assert.Empty(folds.Notices);
@@ -29,12 +29,12 @@ public class GuardedWorkTests
         var folds = new DogEarState();
         Exception? logged = null;
 
-        var ran = await GuardedWork.Run(folds, "remove-account", "Could not remove the account",
+        var ran = await GuardedWork.Run(folds, "remove-account", "Couldn’t remove the account",
             () => throw new IOException("write failed: ENOSPC (No space left on device)"), failure => logged = failure);
 
         Assert.False(ran);
         var notice = Assert.Single(folds.Notices);
-        Assert.Equal("Could not remove the account", notice.Headline);
+        Assert.Equal("Couldn’t remove the account", notice.Headline);
         Assert.Equal("The phone is out of storage space.", notice.Detail);
         Assert.Equal(DogEarHue.Problem, notice.Hue);
         Assert.IsType<IOException>(logged);

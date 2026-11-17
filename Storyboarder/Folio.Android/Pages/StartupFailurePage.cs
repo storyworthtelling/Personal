@@ -55,7 +55,7 @@ internal sealed class StartupFailurePage : ContentPage
             {
                 // Even this can fail on a device in this state, and silently swallowing it would
                 // leave the owner pressing a button that does nothing.
-                copy.Text = "Could not copy — " + ex.GetType().Name;
+                copy.Text = "Couldn’t copy — " + ex.GetType().Name;
             }
         };
 
@@ -68,7 +68,7 @@ internal sealed class StartupFailurePage : ContentPage
                 {
                     new Label
                     {
-                        Text = "Folio could not start",
+                        Text = "Folio couldn’t start",
                         FontSize = 26,
                         TextColor = Color.FromArgb("#33322B"),
                     },

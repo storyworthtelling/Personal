@@ -262,7 +262,7 @@ public class VaultActivity : Activity
         catch (Exception exception)
         {
             services.Diagnostics.Warn(LogSources.Vault, "Calendar consent did not complete.", exception);
-            calendarProblem = "The calendar could not be connected. Try again.";
+            calendarProblem = "The calendar couldn’t be connected. Try again.";
         }
 
         Paint();

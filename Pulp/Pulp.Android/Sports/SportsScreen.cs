@@ -153,7 +153,7 @@ internal sealed class SportsScreen
                 {
                     if (mine == generation && page is null)
                     {
-                        status = "The leagues couldn't be read just now.";
+                        status = "The leagues couldn’t be read just now.";
                         invalidate();
                     }
                 });
@@ -537,7 +537,7 @@ internal sealed class SportsScreen
 
         // Usage only: the sitting counts the service's openings and never marks the game watched (D312).
         var sitting = GamePlay.UsageSitting(viewer, game.Id, pending);
-        writes.Enqueue("record a game's hand-off", token => services.PutAsync(HouseholdMaps.Watched, sitting, token));
+        writes.Enqueue("record a game’s hand-off", token => services.PutAsync(HouseholdMaps.Watched, sitting, token));
     }
 
     private readonly HighlightVideoCache highlightVideos = new();
@@ -583,11 +583,11 @@ internal sealed class SportsScreen
             catch (CatalogueLookupException exception)
             {
                 services.Diagnostics.Warn("sports", $"No highlights lookup ({exception.Failure}).", exception);
-                host.RunOnUiThread(() => ActionCard.Show(host, overlay(), game.Title, "Highlights couldn't be looked up just now."));
+                host.RunOnUiThread(() => ActionCard.Show(host, overlay(), game.Title, "Highlights couldn’t be looked up just now."));
             }
             catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, CancellationToken.None))
             {
-                services.Diagnostics.Warn("sports", "A game's highlights could not be looked up.", exception);
+                services.Diagnostics.Warn("sports", "A game’s highlights could not be looked up.", exception);
             }
         });
     }
@@ -669,7 +669,7 @@ internal sealed class SportsScreen
                     services.Diagnostics.Warn("sports", "The leagues could not be browsed.", exception);
                     host.RunOnUiThread(() =>
                     {
-                        findStatus = "The leagues couldn't be reached just now.";
+                        findStatus = "The leagues couldn’t be reached just now.";
                         ShowMatches();
                     });
                 }

@@ -101,7 +101,7 @@ public class TransactionRetentionTests
             {
                 AccountId = accountId,
                 PlaidTransactionId = "t-sep-1",
-                MerchantName = "Trader Joe's",
+                MerchantName = "Trader Joe’s",
                 Amount = 30.00m,
                 Date = new DateTimeOffset(2026, 9, 5, 0, 0, 0, TimeSpan.Zero),
                 CategoryId = category.Id,

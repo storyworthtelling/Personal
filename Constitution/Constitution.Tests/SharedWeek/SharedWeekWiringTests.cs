@@ -67,7 +67,7 @@ public class SharedWeekWiringTests
     [Fact]
     public void AFileThatWillNotOpenLeavesThisPhonesKeptWeeksAsTheyAre()
     {
-        var plans = new FakePlans { Answer = new WeekPlansRead.Blocked("The household file cannot be opened.") };
+        var plans = new FakePlans { Answer = new WeekPlansRead.Blocked("The household file can’t be opened.") };
         var local = MealWorkerData.Kept(new DateOnly(2026, 10, 25));
 
         var kept = new KeptWeeksBesideTheHousehold(new LocalWeeks(local), plans);

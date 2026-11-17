@@ -10,7 +10,7 @@ namespace Constitution.Infrastructure.Meals;
 /// </summary>
 public sealed class FileMealPassStamps : IMealPassStamps
 {
-    public const string UnopenableReason = "The meal pass stamp could not be opened.";
+    public const string UnopenableReason = "The meal pass stamp couldn’t be opened.";
 
     private static readonly object FileLock = new();
 

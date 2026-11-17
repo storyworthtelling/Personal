@@ -133,7 +133,7 @@ public class SeriesBiblePage : FolioBinderPage
 
         if (!kept)
         {
-            problem.Text = "The series bible on this phone could not be read, so nothing was changed.";
+            problem.Text = "The series bible on this phone couldn’t be read, so nothing was changed.";
             problem.IsVisible = true;
             return entry;
         }

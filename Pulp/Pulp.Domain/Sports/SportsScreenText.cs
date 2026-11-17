@@ -67,7 +67,7 @@ public static class SportsScreenText
     /// Pulp cannot open it yet. A hand-off needs a service and a link; the sheet carries only a channel.
     /// </summary>
     public static string PlayNote(string? channelLine) =>
-        (channelLine is null ? string.Empty : channelLine + ". ") + "Pulp can't open this game for you yet.";
+        (channelLine is null ? string.Empty : channelLine + ". ") + "Pulp can’t open this game for you yet.";
 
     /// <summary>
     /// What Play says when the channel is a known broadcaster but its service is not ticked (D311): the channel,
