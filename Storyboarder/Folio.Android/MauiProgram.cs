@@ -133,6 +133,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<ReviewProcessor>();
         builder.Services.AddSingleton<IPipelineStep>(sp => sp.GetRequiredService<ReviewProcessor>());
         builder.Services.AddSingleton<PipelineRunner>();
+        // The suite's seat memory (audit W10.3): what each voiced line was last given, kept across a restart.
+        builder.Services.AddSingleton(_ => new Storyworthtelling.CallSheet.SeatMemoryFile(
+            Path.Combine(FileSystem.AppDataDirectory, "voice-seats.json")));
         builder.Services.AddScoped<ProjectService>();
         builder.Services.AddSingleton<ProjectBackupService>();
 

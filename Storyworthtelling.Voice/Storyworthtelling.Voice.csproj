@@ -28,6 +28,7 @@
     <!-- The log loop's pure core. Voice carries it to Drive (IDriveLogFolder, LogUploader) because the
          Drive seam and VaultEnvelope already live here; Diagnostics itself stays dependency-free. -->
     <ProjectReference Include="..\Storyworthtelling.Diagnostics\Storyworthtelling.Diagnostics.csproj" />
+    <ProjectReference Include="..\Storyworthtelling.CallSheet\Storyworthtelling.CallSheet.csproj" />
   </ItemGroup>
 
 </Project>

@@ -54,7 +54,7 @@ internal sealed class DocsRig
 
     public RecordingWeekLog Log { get; } = new();
 
-    public MealDocumentSeams Seams { get; }
+    public MealDocumentSeams Seams { get; set; }
 
     public MealDocumentRequest Request() => new(Week, Box, Rules(), Now, [Person])
     {

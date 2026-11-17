@@ -145,7 +145,7 @@ public class CalendarScreenHeadGuardTests
         Assert.Contains("TitleActivity.For(", text, StringComparison.Ordinal);
         Assert.Contains("AreaRequest.Word(PulpArea.Sports)", text, StringComparison.Ordinal);
         Assert.Contains("CalendarScreen.StatusLine", text, StringComparison.Ordinal);
-        Assert.Contains("VoiceSeat.EmptyCalendar", text, StringComparison.Ordinal);
+        Assert.Contains("VoiceFactBuilder.EmptyCalendar(", text, StringComparison.Ordinal);
     }
 
     [Fact]

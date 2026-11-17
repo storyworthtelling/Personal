@@ -32,7 +32,8 @@ public class VoiceSeatSourceTests
 
         Assert.Single(builders);
         Assert.EndsWith(ComposerPath, builders[0], StringComparison.Ordinal);
-        Assert.Matches(@"new MessageRequest\(\s*prompt\.Occasion\s*,\s*prompt\.Context\s*,\s*prompt\.MaxWords\s*,\s*HighVisibility:\s*true",
+        // The tier is the seat's own, from the suite's voice-line Call Sheet (audit W10.3).
+        Assert.Matches(@"new MessageRequest\(\s*prompt\.Occasion\s*,\s*prompt\.Context\s*,\s*prompt\.MaxWords\s*,\s*VoicedOccasions\.Line\(facts\.Seat\)\.HighVisibility\s*,\s*VoicedOccasions\.Line\(facts\.Seat\)\.Seat",
             Source(ComposerPath));
     }
 

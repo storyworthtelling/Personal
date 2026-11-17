@@ -222,7 +222,7 @@ public static class MauiProgram
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddTransient<VoicedMessenger>();
         // The three voice seats (remediation 3.7): Accounts, Snowball and Savings each ask this ONE composer
-        // for a sentence built from their facts. A singleton so its once-a-day memory outlives any page. The
+        // for a sentence built from their facts. A singleton; its once-a-day memory is the suite's seat memory file, so it outlives the process too. The
         // seat needs the same signed-in Google account the profile and the vault are read with; without one
         // it is hidden rather than asked.
         builder.Services.AddSingleton<VoiceSeatComposer>(sp => new VoiceSeatComposer(
@@ -230,6 +230,7 @@ public static class MauiProgram
             sp.GetRequiredService<DriveVoiceOptions>(),
             sp.GetRequiredService<IClock>(),
             () => !string.IsNullOrEmpty(SettingsStore.GoogleAccountEmail),
+            new Storyworthtelling.CallSheet.SeatMemoryFile(Path.Combine(FileSystem.AppDataDirectory, "voice-seats.json")),
             sp.GetRequiredService<ILogger<VoiceSeatComposer>>()));
 
         // Release F (Index-P11): the worksheet's reMarkable delivery and hand-written read-back.

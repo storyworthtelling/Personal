@@ -289,6 +289,15 @@ public static class MauiProgram
             .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(2))
             .ConfigurePrimaryHttpMessageHandler(AndroidHandler);
         builder.Services.AddTransient<VoicedMessenger>();
+        // The suite's one rule for the welcome and the morning's three printed lines (audit W10.3, W10.4): each seat
+        // on the Call Sheet written once per facts and day, kept across a restart in the seat memory file.
+        builder.Services.AddSingleton(_ => new Storyworthtelling.CallSheet.SeatMemoryFile(
+            Path.Combine(FileSystem.AppDataDirectory, "voice-seats.json")));
+        builder.Services.AddSingleton(sp => new SeatVoice(
+            sp.GetRequiredService<VoicedMessenger>(),
+            cancellationToken => sp.GetRequiredService<DriveVoiceOptions>().RefreshAsync(cancellationToken),
+            sp.GetRequiredService<Storyworthtelling.CallSheet.SeatMemoryFile>()));
+        builder.Services.AddSingleton<Foreword.Infrastructure.Delivery.IMorningVoice, Foreword.Infrastructure.Delivery.SeatMorningVoice>();
 
         builder.Services.AddTransient<Pages.MainPage>();
         builder.Services.AddTransient<Pages.SetupPage>();

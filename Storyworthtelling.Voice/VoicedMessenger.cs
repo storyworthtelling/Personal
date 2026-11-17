@@ -31,6 +31,23 @@ public sealed class VoicedMessenger
         this.warn = warn;
     }
 
+    // The facts check (audit W10.5): a reply that states a number, name or claim its request never gave is logged by
+    // its seat, once a day per process, and still shown. Never the reply, the facts or the words that were flagged.
+    private void CheckGrounded(MessageRequest request, string reply)
+    {
+        var flagged = Groundedness.Ungrounded(reply, request.Purpose + "\n" + request.Context);
+        if (flagged.Count == 0)
+            return;
+
+        var seat = request.Seat ?? request.Purpose;
+        if (Warned.TryAdd(("ungrounded:" + seat, DateOnly.FromDateTime(DateTime.Now)), true))
+        {
+            var line = $"VOICE UNGROUNDED {seat}: {flagged.Count} word(s) not in its facts";
+            logger?.LogWarning("{Line}", line);
+            warn?.Invoke(line);
+        }
+    }
+
     // Composes the message for `request` in the owner's voice, or returns `fallback` (the app's neutral
     // copy) when the voice isn't available or generation fails.
     public async Task<string> ComposeAsync(MessageRequest request, string fallback, CancellationToken cancellationToken)
@@ -42,7 +59,11 @@ public sealed class VoicedMessenger
                 return fallback;
 
             var message = await client.ComposeAsync(profile, request, cancellationToken);
-            return string.IsNullOrWhiteSpace(message) ? fallback : message.Trim();
+            if (string.IsNullOrWhiteSpace(message))
+                return fallback;
+
+            CheckGrounded(request, message.Trim());
+            return message.Trim();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

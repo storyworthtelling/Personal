@@ -30,7 +30,8 @@ public class DailyDeliveryService(
     IRemarkableClient remarkable,
     IPaperDelivery delivery,
     IOptions<AnthropicOptions> anthropicOptions,
-    ILogger<DailyDeliveryService> logger)
+    ILogger<DailyDeliveryService> logger,
+    IMorningVoice? voice = null)
 {
     private const int OutlookDays = 6; // today + 6 = a seven-day window
 
@@ -60,6 +61,8 @@ public class DailyDeliveryService(
             Weather = weather,
             UnreadableCarryovers = carryovers,
             Columns = columnMapper.Layout.Printed,
+            Voice = await LineAsync("day-narrator", Foreword.Domain.Voice.MorningVoiceFacts.Day(agenda)),
+            ChecklistVoice = await LineAsync("checklist-coach", Foreword.Domain.Voice.MorningVoiceFacts.Checklist(tasks.Count)),
         };
 
         var failure = await TryUpload(DayTitles.Document(date), dayComposer.Compose(document));
@@ -69,6 +72,22 @@ public class DailyDeliveryService(
             logger.LogWarning("Skipping trash of yesterday's documents because the upload failed for {Date}", date);
 
         return new DayResult(failure is null, failure, agenda.UnreadableCalendars);
+    }
+
+    // A line in the owner's voice, or nothing (audit W10.4): never a reason The Day does not go.
+    private async Task<string> LineAsync(string seat, IReadOnlyList<string> facts)
+    {
+        if (voice is null)
+            return string.Empty;
+        try
+        {
+            return await voice.LineAsync(seat, facts, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning("The {Seat} line was not written ({Kind})", seat, ex.GetType().Name);
+            return string.Empty;
+        }
     }
 
     // Gives each column whose person has no Google account of their own a calendar to be filled

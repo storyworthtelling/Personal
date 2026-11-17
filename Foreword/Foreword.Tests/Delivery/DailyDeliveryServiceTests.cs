@@ -69,7 +69,54 @@ public class DailyDeliveryServiceTests
             taskReader.Object, dayComposer.Object, weather.Object, routes.Object,
             handwriting.Object, remarkable.Object, new PaperDelivery(remarkable.Object),
             Options.Create(new AnthropicOptions { ConfidenceThreshold = 0.6 }),
-            NullLogger<DailyDeliveryService>.Instance);
+            NullLogger<DailyDeliveryService>.Instance,
+            voice);
+
+    private IMorningVoice? voice;
+
+    /// <summary>Answers each seat with its own name and what it was told, so a test can see who was asked what.</summary>
+    private sealed class NamingVoice : IMorningVoice
+    {
+        public List<(string Seat, IReadOnlyList<string> Facts)> Asked { get; } = [];
+
+        public Task<string> LineAsync(string seat, IReadOnlyList<string> facts, CancellationToken cancellationToken)
+        {
+            Asked.Add((seat, facts));
+            return Task.FromResult(facts.Count == 0 ? string.Empty : $"{seat} line");
+        }
+    }
+
+    /// <summary>
+    /// The day's narrator and the checklist's coach are wired (audit W10.4): The Day carries their lines, each told
+    /// only its facts in words. With no tasks the coach has nothing to say and its line stays empty.
+    /// </summary>
+    [Fact]
+    public async Task TheDayCarriesItsVoicedLines()
+    {
+        var naming = new NamingVoice();
+        voice = naming;
+        DayDocument? composed = null;
+        dayComposer.Setup(c => c.Compose(It.IsAny<DayDocument>())).Callback<DayDocument>(d => composed = d).Returns([1]);
+
+        await CreateService().DeliverDailyDocuments(Date);
+
+        Assert.Equal("day-narrator line", composed!.Voice);
+        Assert.Equal(string.Empty, composed.ChecklistVoice);
+        Assert.Contains(naming.Asked, asked => asked.Seat == "day-narrator"
+            && asked.Facts.SequenceEqual(["Nothing is on the calendar today."]));
+    }
+
+    [Fact]
+    public async Task WithNoVoiceTheDayHasNoLines()
+    {
+        DayDocument? composed = null;
+        dayComposer.Setup(c => c.Compose(It.IsAny<DayDocument>())).Callback<DayDocument>(d => composed = d).Returns([1]);
+
+        await CreateService().DeliverDailyDocuments(Date);
+
+        Assert.Equal(string.Empty, composed!.Voice);
+        Assert.Equal(string.Empty, composed.ChecklistVoice);
+    }
 
     /// <summary>Foreword's own rules. Empty unless a test puts something in it.</summary>
     private sealed class FakeTaskStore : ITaskStore

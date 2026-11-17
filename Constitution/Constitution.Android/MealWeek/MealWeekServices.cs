@@ -308,7 +308,9 @@ public static class MealWeekServices
             new HouseholdMealPantry(household.Service),
             new FileMonthlyBudgets(Path.Combine(NoBackupRoot(appContext), FileMonthlyBudgets.FileName)),
             new UnavailableHolidayCalendar(),
-            new MealsLog(appContext));
+            new MealsLog(appContext),
+            // The sheet's intro in the owner's voice (audit W10.4), by the suite's one rule; hidden with no voice.
+            (request, cancellation) => Constitution.BodyTab.BodySeats.ComposeAsync(appContext, request, cancellation));
     }
 
     /// <summary>The record of decided weeks, a small file beside the kept weeks: the deadline step writes it, and the sheet and the Meals tab's share read the denied evenings' shopping lines from it (D112).</summary>

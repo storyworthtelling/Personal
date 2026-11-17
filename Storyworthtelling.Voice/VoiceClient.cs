@@ -38,7 +38,7 @@ public sealed class VoiceClient : IVoiceClient
 
     private const string ComposeInstruction =
         "You are writing a single situational message inside an app, in the voice described by the PROFILE " +
-        "below. The message is UI copy shown for a specific occasion — write it to sound like the person " +
+        "that follows. The message is UI copy shown for a specific occasion — write it to sound like the person " +
         "the profile describes, honoring their traits, writing in their cadence and punctuation, drawing " +
         "on their " +
         "example phrasings, and avoiding what they'd avoid. PURPOSE names the occasion; CONTEXT gives the " +
@@ -137,7 +137,8 @@ public sealed class VoiceClient : IVoiceClient
                 merged.Add(new VoiceExample(trimmed, projectId));
         }
 
-        return merged;
+        // The cap keeps the newest: the book just read always keeps its anchors.
+        return merged.Count <= VoiceProfile.MaxExamples ? merged : merged[^VoiceProfile.MaxExamples..];
     }
 
     public async Task<string> ComposeAsync(
@@ -146,7 +147,6 @@ public sealed class VoiceClient : IVoiceClient
         var options = optionsAccessor.Value;
         var context = string.IsNullOrWhiteSpace(request.Context) ? "(none)" : request.Context;
         var userContent =
-            $"{VoiceProfilePrompt.Block(profile)}\n\n" +
             $"PURPOSE: {request.Purpose}\n" +
             $"CONTEXT: {context}\n" +
             $"WORD LIMIT: {request.MaxWords}";
@@ -154,8 +154,14 @@ public sealed class VoiceClient : IVoiceClient
         // A message the owner actually reads for its voice runs on the strong model, where cadence and wit
         // survive; the many low-stakes messages stay on the cheap tier.
         var model = request.HighVisibility ? options.Model : options.FastModel;
-        var reply = await SendMessage(
-            ComposeInstruction, userContent, model, options.ComposeMaxTokens, cancellationToken);
+        // The instruction and the profile are the same for every seat, so they are the prompt's cached prefix
+        // (audit W10.6); only the seat's purpose and facts are new on each call.
+        var reply = (await claude.SendAsync(
+            new ClaudeRequest(
+                model, options.ComposeMaxTokens,
+                [ClaudeBlock.Text(ComposeInstruction), ClaudeBlock.Text(VoiceProfilePrompt.Block(profile), cache: true)],
+                [ClaudeBlock.Text(userContent)]),
+            cancellationToken)).Text;
         return reply.Trim();
     }
 

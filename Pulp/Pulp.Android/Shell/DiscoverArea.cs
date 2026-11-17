@@ -300,10 +300,9 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
 
         if (kept.IsUsedUp(book))
         {
-            // D112: the used-up stack's empty state until Friday, no refill. No composer is wired in
-            // this head yet, so the seat shows its neutral line.
-            var empty = new EmptyState(Host, VoiceSeat.StackUsedUp);
-            empty.Present(VoiceLineAction.ShowNeutral, null);
+            // D112: the used-up stack's empty state until Friday, no refill; voiced once composed (audit W10.4).
+            var empty = new Pulp.Watching.SeatSpeaker(Host, PulpServices.For(Host)).Empty(
+                VoiceFactBuilder.StackUsedUp(DateOnly.FromDateTime(DateTime.Now)));
             body.AddView(empty, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
             return;
         }
@@ -330,7 +329,11 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         return status;
     }
 
-    private void Open(DiscoverRow row) => Host.StartActivity(TitleActivity.For(Host, row.Id));
+    // The week's stack is the one place Pulp chose a title from the owner's taste (the why-this line's reason, audit
+    // W10.5); a search result was asked for, so it opens with no reason to give.
+    private void Open(DiscoverRow row) => Host.StartActivity(TitleActivity.For(Host, row.Id, fromTheStack: true));
+
+    private void OpenResult(DiscoverRow row) => Host.StartActivity(TitleActivity.For(Host, row.Id));
 
     private void NotForMe(DiscoverRow row)
     {
@@ -669,7 +672,7 @@ public sealed class DiscoverArea(Activity host) : PulpAreaPage(host, PulpArea.Di
         }
 
         body?.RemoveAllViews();
-        body?.AddView(DiscoverResultsView.Build(Host, page, Open, WantPoster, () =>
+        body?.AddView(DiscoverResultsView.Build(Host, page, OpenResult, WantPoster, () =>
         {
             resultPages++;
             ShowResults(results, none);

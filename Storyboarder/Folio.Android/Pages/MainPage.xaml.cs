@@ -145,30 +145,27 @@ public partial class MainPage : FolioBinderPage
             // An empty desk is the one place in the app with room to speak to the owner directly, and
             // it is not a failure — it is the ordinary first state of a new install.
             //
-            // Written once a day and then kept (EmptyDeskLinePlan): the desk refreshes every few
-            // seconds, and composing on each refresh rewrote the line under the owner's eyes.
+            // Written by the suite's one rule (SeatPlan, audit W10.3): once a day, kept across a restart, and an
+            // empty attempt (no voice yet) asked again after ten minutes. The desk refreshes every few seconds, and
+            // composing on each refresh rewrote the line under the owner's eyes.
             if (list.Count == 0)
             {
-                var line = SettingsStore.EmptyDeskLine;
+                var seat = VoicedOccasions.Empty;
+                var memory = scope.ServiceProvider.GetRequiredService<Storyworthtelling.CallSheet.SeatMemoryFile>();
+                var hash = Storyworthtelling.CallSheet.SeatPlan.Hash(seat, ["no manuscripts yet"]);
                 var now = DateTimeOffset.Now;
-                var today = DateOnly.FromDateTime(now.LocalDateTime);
-                if (EmptyDeskLinePlan.NeedsComposing(line, SettingsStore.EmptyDeskLineDay, SettingsStore.EmptyDeskLineAskedAt, now))
+                var today = Storyworthtelling.CallSheet.SeatPlan.Today(now.LocalDateTime);
+                var remembered = memory.Get(seat);
+                var line = remembered?.Line;
+                if (Storyworthtelling.CallSheet.SeatPlan.Decide(seat, voiceReady: true, hash, hasFacts: true, remembered, now, today)
+                    == Storyworthtelling.CallSheet.SeatAction.Compose)
                 {
-                    SettingsStore.EmptyDeskLineAskedAt = now;
                     var messenger = scope.ServiceProvider.GetRequiredService<VoicedMessenger>();
                     var composed = await messenger.ComposeAsync(
-                        new MessageRequest(VoicedOccasions.EmptyDesk, "no manuscripts yet", VoicedOccasions.Empty.MaxWords, VoicedOccasions.Empty.HighVisibility),
+                        new MessageRequest(VoicedOccasions.EmptyDesk, "no manuscripts yet", seat.MaxWords, seat.HighVisibility, seat.Seat),
                         fallback: string.Empty, CancellationToken.None);
-
-                    // No voice yet (no profile or key) stores nothing, so a later paint can still
-                    // compose today's line once the voice is available. Yesterday's line stands
-                    // meanwhile rather than the desk going blank.
-                    if (!string.IsNullOrWhiteSpace(composed))
-                    {
-                        SettingsStore.EmptyDeskLine = composed;
-                        SettingsStore.EmptyDeskLineDay = today;
-                        line = composed;
-                    }
+                    memory.Put(seat, string.Empty, Storyworthtelling.CallSheet.SeatPlan.Remember(hash, today, composed, now));
+                    line = string.IsNullOrWhiteSpace(composed) ? null : composed.Trim();
                 }
 
                 if (!string.IsNullOrWhiteSpace(line) && line != emptyDeskLine)

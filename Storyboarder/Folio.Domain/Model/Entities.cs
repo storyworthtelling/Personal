@@ -19,10 +19,8 @@ public class Novel
     public string ArtStyle { get; set; } = ArtStyles.Default;
     public ProjectStage Stage { get; set; } = ProjectStage.Created;
 
-    // The Work desk's line about this book, in the owner's voice (D96), and the stage it was written
-    // for. Stored rather than composed on render: the line comes from a model, and the desk is the
-    // screen the app opens on, so composing as it paints would bill a call per book every time the
-    // owner looked at their shelf. VoicedLinePlan decides when it has gone stale.
+    // Unread since audit W10.3: the desk's voiced line now lives in the suite's seat memory file, kept by the
+    // one rule (SeatPlan). The columns stay so an installed database keeps its shape; nothing writes them.
     public string VoicedLine { get; set; } = string.Empty;
     public ProjectStage? VoicedLineStage { get; set; }
 

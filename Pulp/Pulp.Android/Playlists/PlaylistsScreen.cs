@@ -213,7 +213,7 @@ internal sealed class PlaylistsScreen
         switch (data.Me.Status)
         {
             case ThisPhoneStatus.NoRoster:
-                column.AddView(Empty(VoiceSeat.EmptyPlaylists, primary: null));
+                column.AddView(Empty(VoiceFactBuilder.EmptyPlaylists(), primary: null));
                 return scroll;
             case ThisPhoneStatus.Unmatched:
                 column.AddView(PaperUi.Secondary(host, ThisPhone.UnmatchedSentence));
@@ -249,7 +249,7 @@ internal sealed class PlaylistsScreen
         var playlists = data!.Playlists;
         if (playlists.Count == 0 && !naming)
         {
-            column.AddView(Empty(VoiceSeat.EmptyPlaylists, primary: OpenMake));
+            column.AddView(Empty(VoiceFactBuilder.EmptyPlaylists(), primary: OpenMake));
             column.AddView(Centred(PaperUi.SecondaryButton(host, "New playlist…", StartNaming)));
             return;
         }
@@ -359,22 +359,35 @@ internal sealed class PlaylistsScreen
 
         if (playlist.List.Entries.Count == 0)
         {
-            column.AddView(Empty(VoiceSeat.EmptyPlaylist, primary: null));
+            column.AddView(Empty(VoiceFactBuilder.EmptyPlaylist(playlist.List.Name), primary: null));
             return;
         }
 
         var hideWatched = hideWatchedStore.IsOn(playlist.Id);
-        column.AddView(HideWatchedChip(playlist.Id, hideWatched), Spaced());
 
         var view = data!.View;
         var sittings = view.SittingsOf(viewer);
         var now = DateTimeOffset.Now;
         var today = DateOnly.FromDateTime(now.LocalDateTime);
-        var rows = Pulp.Domain.Library.Playlists.Rows(
-            playlist.List,
-            entry => PlaylistPageStanding.For(entry, sittings.Where(s => StringComparer.OrdinalIgnoreCase.Equals(s.Title.Value, entry.Key)).ToList(), TitleOf(entry), now, TimeZoneInfo.Local),
-            today,
-            hideWatched);
+        EntryStanding Standing(PlaylistEntry entry) =>
+            PlaylistPageStanding.For(entry, sittings.Where(s => StringComparer.OrdinalIgnoreCase.Equals(s.Title.Value, entry.Key)).ToList(), TitleOf(entry), now, TimeZoneInfo.Local);
+
+        // The playlist's line in the owner's voice (D38, audit W10.4): hidden until composed, kept per playlist.
+        var watched = Pulp.Domain.Library.Playlists.Rows(playlist.List, Standing, today, hideWatched: false).Count(row => row.Struck);
+        var line = PaperUi.Voice(host, string.Empty);
+        line.Visibility = ViewStates.Gone;
+        column.AddView(line, Spaced());
+        var facts = VoiceFactBuilder.Playlist(playlist.List.Name, playlist.List.Entries.Count, watched) with { Subject = playlist.Id.Value };
+        _ = new Pulp.Watching.SeatSpeaker(host, services).SpeakAsync(facts, (action, said) =>
+        {
+            var shown = Pulp.Watching.SeatSpeaker.Shown(action, said);
+            line.Text = shown ?? string.Empty;
+            line.Visibility = shown is null ? ViewStates.Gone : ViewStates.Visible;
+        }, CancellationToken.None);
+
+        column.AddView(HideWatchedChip(playlist.Id, hideWatched), Spaced());
+
+        var rows = Pulp.Domain.Library.Playlists.Rows(playlist.List, Standing, today, hideWatched);
 
         foreach (var row in rows)
         {
@@ -725,12 +738,10 @@ internal sealed class PlaylistsScreen
 
     // ---- small parts ----
 
-    private EmptyState Empty(VoiceSeat seat, Action? primary)
+    private EmptyState Empty(VoiceFacts facts, Action? primary)
     {
-        var empty = new EmptyState(host, seat, primary);
-
-        // No composer is wired in the head yet, so the seat shows its neutral line (D264).
-        empty.Present(VoiceLineAction.ShowNeutral, null);
+        // The neutral line at once, the owner's line once composed (D264, audit W10.4).
+        var empty = new Pulp.Watching.SeatSpeaker(host, services).Empty(facts, primary);
         empty.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
         return empty;
     }

@@ -35,7 +35,7 @@ public sealed class ChildWatchingPage
     private readonly Action invalidate;
     private readonly Action backToMe;
     private readonly FavoritesPage favorites;
-    private readonly ChildVoice voice;
+    private readonly SeatSpeaker voice;
 
     private CancellationTokenSource? loading;
     private bool showingFavorites;
@@ -57,7 +57,7 @@ public sealed class ChildWatchingPage
         this.invalidate = invalidate;
         this.backToMe = backToMe;
         favorites = new FavoritesPage(host, overlay, session, invalidate);
-        voice = new ChildVoice(host, PulpServices.For(host));
+        voice = new SeatSpeaker(host, PulpServices.For(host));
     }
 
     public string Title => showingFavorites ? FavoritesPage.Title : PulpAreas.For(PulpArea.Watching).Title;
@@ -275,7 +275,7 @@ public sealed class ChildWatchingPage
     {
         if (rows is { Count: > 0 })
         {
-            greeting = ChildVoice.Shown(action, line);
+            greeting = SeatSpeaker.Shown(action, line);
         }
         else
         {

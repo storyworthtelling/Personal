@@ -23,6 +23,8 @@ namespace Constitution.Infrastructure.Meals;
 /// <param name="Budgets">Index's grocery budget by month.</param>
 /// <param name="Holidays">The family calendar's holidays (the default cannot be asked, so no ask-ahead page).</param>
 /// <param name="Log">The Body trail's one-method seam.</param>
+/// <param name="Voice">The sheet's intro in the owner's voice (audit W10.4), or null for none: a seat composer that answers a
+/// line or null, and the sheet goes either way.</param>
 public sealed record MealDocumentSeams(
     DeliveryService Delivery,
     IRemarkableClient Tablet,
@@ -33,4 +35,5 @@ public sealed record MealDocumentSeams(
     IMealPantrySource Pantry,
     IMonthlyBudgets Budgets,
     IHolidayCalendar Holidays,
-    IWorkoutWeekLog Log);
+    IWorkoutWeekLog Log,
+    Func<Constitution.Domain.Voice.SeatRequest, CancellationToken, Task<Constitution.Domain.Voice.SeatLine?>>? Voice = null);

@@ -100,6 +100,10 @@ public class VoiceRecordShapeTests
         Assert.All(after.Examples, example => Assert.Equal(kept, example.ProjectId));
         Assert.Equal(1, after.DocumentsAnalyzed);
         Assert.Equal("Wry", after.Register);
+
+        // The register and habits were learned from both books together, so the voice is marked to be learned
+        // again from the books that remain (audit W10.6) rather than keep what the dropped book taught.
+        Assert.True(after.NeedsRelearn);
     }
 
     /// <summary>

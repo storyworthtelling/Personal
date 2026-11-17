@@ -42,12 +42,16 @@ public static class VoiceFactBuilder
     /// whoever passed them in; the other adult hears no past title at all; a child has no taste
     /// profile (D23), so a child's title page has no why-this and the line is hidden.
     /// </summary>
-    public static VoiceFacts WhyThis(ViewerId viewer, ViewerStanding standing, string titleName, IEnumerable<PastTitle> finishedAlike)
+    /// <param name="fromTheStack">True when the title was opened from the week's stack, the one place Pulp chose it from
+    /// the owner's taste. Any other title (from search, a playlist, the home) was not chosen for anyone, so it has no
+    /// reason to give and the line hides (audit W10.5).</param>
+    public static VoiceFacts WhyThis(
+        ViewerId viewer, ViewerStanding standing, string titleName, bool fromTheStack, IEnumerable<PastTitle> finishedAlike)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(titleName);
         ArgumentNullException.ThrowIfNull(finishedAlike);
 
-        if (standing == ViewerStanding.Child)
+        if (standing == ViewerStanding.Child || !fromTheStack)
         {
             return new VoiceFacts(VoiceSeat.WhyThis, [], null);
         }

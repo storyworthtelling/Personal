@@ -133,6 +133,12 @@ public static class CallSheet
 
         // ── Foreword ────────────────────────────────────────────────────────────────────────────────
         new("Foreword", "welcome", "welcome", 40, VoiceTier.Strong, VoiceFallback.Hide),
+        new("Foreword", "brief-opening", "one line opening the morning brief, before the day's stories", 25,
+            VoiceTier.Strong, VoiceFallback.Hide),
+        new("Foreword", "day-narrator", "one line at the top of the day's calendar page, about the shape of the day", 25,
+            VoiceTier.Strong, VoiceFallback.Hide),
+        new("Foreword", "checklist-coach", "one line at the top of the day's checklist, about the tasks ahead", 25,
+            VoiceTier.Strong, VoiceFallback.Hide),
         new("Foreword", "prayer-line", "one short line at the top of a private prayer page", 25, VoiceTier.Strong,
             VoiceFallback.Hide,
             Guidance:

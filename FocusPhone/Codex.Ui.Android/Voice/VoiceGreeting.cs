@@ -90,7 +90,7 @@ public sealed class VoiceGreeting
         {
             await options.RefreshAsync(cancellationToken);
             return await messenger.ComposeAsync(
-                new MessageRequest(line.Purpose, context, line.MaxWords, line.HighVisibility),
+                new MessageRequest(line.Purpose, context, line.MaxWords, line.HighVisibility, line.Seat),
                 fallback: string.Empty, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
