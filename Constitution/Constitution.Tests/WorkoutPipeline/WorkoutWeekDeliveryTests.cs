@@ -411,8 +411,8 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
         }
 
         rig.Learning.Held = rig.Learning.Held with { Progression = ledger };
-        rig.Encouragement.Answer = "Five pounds more than last time.";
-        rig.Encouragement.Voiced = voiced;
+        // With no voice the seat answers nothing, and the page prints no line (owner's ruling, W10).
+        rig.Encouragement.Answer = voiced ? "Five pounds more than last time." : null;
 
         await rig.PlannedAsync();
 
@@ -426,12 +426,12 @@ public sealed class WorkoutWeekDeliveryTests : IDisposable
     }
 
     [Fact]
-    public async Task APlainFallbackIsNot()
+    public async Task WithNoVoiceThePagePrintsNoLine()
     {
         var pdf = await PageForALiftThatWentUp(voiced: false);
 
         Assert.False(HasTheVoiceHand(pdf));
-        Assert.Contains("Five pounds more", TextOf(pdf), StringComparison.Ordinal);
+        Assert.DoesNotContain("Five pounds more", TextOf(pdf), StringComparison.Ordinal);
     }
 
     [Fact]

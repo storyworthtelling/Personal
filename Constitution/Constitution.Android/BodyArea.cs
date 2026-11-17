@@ -263,14 +263,14 @@ public sealed class BodyArea : ConstitutionAreaBase
 
     // ---- voice ----
 
-    private SeatLine LineFor(SeatRequest request, DateOnly today) =>
-        composed.TryGetValue(SeatLineKey.For(request, today).ToString(), out var line)
-            ? line
-            : new SeatLine(request.Seat, request.Fallback, IsVoiced: false);
+    private SeatLine? LineFor(SeatRequest request, DateOnly today) =>
+        composed.TryGetValue(Key(request, today), out var line) ? line : null;
+
+    private static string Key(SeatRequest request, DateOnly today) => $"{SeatCache.Hash(request)}|{today:yyyy-MM-dd}";
 
     private void Compose(SeatRequest request, DateOnly today, Action<SeatLine> show, CancellationToken token)
     {
-        var key = SeatLineKey.For(request, today).ToString();
+        var key = Key(request, today);
         if (composed.ContainsKey(key))
         {
             return;
@@ -281,7 +281,7 @@ public sealed class BodyArea : ConstitutionAreaBase
             try
             {
                 var line = await BodySeats.ComposeAsync(Host, request, token);
-                if (!line.IsVoiced || token.IsCancellationRequested)
+                if (line is null || token.IsCancellationRequested)
                 {
                     return;
                 }
@@ -291,7 +291,7 @@ public sealed class BodyArea : ConstitutionAreaBase
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                // The page keeps its plain sentence. The trail gets the seat's id and the kind of failure, nothing else.
+                // The seat stays hidden. The trail gets the seat's id and the kind of failure, nothing else.
                 new BodyLog(Host).Outcome($"voice seat {VoicedOccasions.For(request.Seat).Id}: {e.GetType().Name}");
             }
         });

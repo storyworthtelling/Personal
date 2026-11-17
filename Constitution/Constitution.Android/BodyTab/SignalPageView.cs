@@ -23,7 +23,7 @@ internal sealed class SignalPageView : LinearLayout, IFullBleedPage
 {
     private readonly ScrapHost host;
     private readonly LinearLayout notes;
-    private BodySeatNote? note;
+    private SignalPageModel? shown;
 
     public SignalPageView(Context context, BodyWindow window, Color hue, Action<BodyWindow> onWindow) : base(context)
     {
@@ -52,7 +52,7 @@ internal sealed class SignalPageView : LinearLayout, IFullBleedPage
     public void Show(SignalPageModel model, SeatLine? first)
     {
         var scraps = new List<ScrapEntry>();
-        note = null;
+        shown = model;
         if (model.Ask.Kind != AskKind.None)
         {
             scraps.Add(BodyScrapContent.Ask(Context!, model.Signal, model.Ask));
@@ -62,9 +62,7 @@ internal sealed class SignalPageView : LinearLayout, IFullBleedPage
             scraps.Add(BodyScrapContent.Chart(Context!, model.Card, model.Window, model.Today, onOpen: null, large: true));
             if (model.Seat is not null && first is not null)
             {
-                var (entry, leaf) = BodyScrapContent.Leaf(Context!, "body-signal-sentence", first);
-                note = leaf;
-                scraps.Add(entry);
+                scraps.Add(BodyScrapContent.Leaf(Context!, "body-signal-sentence", first).Entry);
             }
         }
 
@@ -87,8 +85,14 @@ internal sealed class SignalPageView : LinearLayout, IFullBleedPage
         }
     }
 
-    /// <summary>Swaps the signal's sentence in place (the voiced one has arrived). UI thread.</summary>
-    public void ShowSentence(SeatLine line) => note?.Show(line);
+    /// <summary>Lays the page out again with the signal's voiced sentence, now it has arrived. UI thread.</summary>
+    public void ShowSentence(SeatLine line)
+    {
+        if (shown is { } model)
+        {
+            Show(model, line);
+        }
+    }
 
     private TextView StatusLine(string text)
     {

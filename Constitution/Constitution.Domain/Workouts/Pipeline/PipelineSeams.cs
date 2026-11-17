@@ -106,15 +106,15 @@ public interface IRecoveryReadSource
 /// <summary>
 /// The encouragement seat for one exercise whose load has gone up since last time. It is asked only when there is news
 /// (<see cref="Constitution.Domain.Voice.SeatFacts.WorkoutEncouragement"/> is null otherwise), and it never fails: a line
-/// that could not be voiced comes back as the plain sentence, and null hides the seat.
+/// that could not be voiced is null, and the seat hides (owner's ruling, W10).
 /// </summary>
 public interface IWorkoutEncouragement
 {
     Task<EncouragementLine?> LineAsync(Constitution.Domain.Voice.ProgressionFacts news, DateTimeOffset now, CancellationToken cancellation);
 }
 
-/// <summary>One encouragement sentence and whether it is the owner's voice (which prints in their hand) or the plain fallback (which does not).</summary>
-public sealed record EncouragementLine(string Text, bool IsVoiced);
+/// <summary>One encouragement sentence in the owner's voice, which prints in their hand.</summary>
+public sealed record EncouragementLine(string Text);
 
 /// <summary>
 /// One workout document as it went to the tablet: its title, whose and when, the slot it was made for, and a fingerprint of

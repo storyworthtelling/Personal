@@ -61,8 +61,8 @@ internal static class BodyScrapContent
     }
 
     /// <summary>
-    /// The notepad leaf the month's sentence is written on. The leaf starts with the line it was handed (the plain
-    /// sentence, or a voiced one already composed) and <see cref="BodySeatNote.Show(SeatLine)"/> swaps it in place.
+    /// The notepad leaf a seat's voiced sentence is written on, in the owner's hand. A seat with no voiced line has no
+    /// leaf: the page lays itself out again when the line arrives.
     /// </summary>
     public static (ScrapEntry Entry, BodySeatNote Note) Leaf(Context context, string id, SeatLine first)
     {
@@ -141,9 +141,8 @@ internal static class BodyScrapContent
 }
 
 /// <summary>
-/// The line written on a notepad leaf, swapped in place when the voiced sentence arrives. Starts as whatever it
-/// was handed, so the page never waits on the voice and never shows a spinner; the calligraphy hand is for a
-/// voiced line only, plain Serif otherwise.
+/// The line written on a notepad leaf: a seat's voiced sentence in the calligraphy hand, or the page's own plain
+/// sentence (nothing to compare yet) in Serif. The page never waits on the voice and never shows a spinner.
 /// </summary>
 internal sealed class BodySeatNote : FrameLayout
 {
@@ -152,12 +151,9 @@ internal sealed class BodySeatNote : FrameLayout
         Show(text, voiced);
     }
 
-    public BodySeatNote(Context context, SeatLine first) : this(context, first.Text, first.IsVoiced)
+    public BodySeatNote(Context context, SeatLine line) : this(context, line.Text, voiced: true)
     {
     }
-
-    /// <summary>Replaces the line on the leaf. Must be called on the UI thread.</summary>
-    public void Show(SeatLine line) => Show(line.Text, line.IsVoiced);
 
     private void Show(string text, bool voiced)
     {

@@ -21,7 +21,7 @@ internal sealed class BodyTabPage : LinearLayout, IFullBleedPage
 {
     private readonly ScrapHost host;
     private readonly Action<BodySignal> onOpen;
-    private BodySeatNote? note;
+    private BodyTabModel? shown;
 
     public BodyTabPage(Context context, BodyWindow window, Color hue, Action<BodyWindow> onWindow, Action<BodySignal> onOpen)
         : base(context)
@@ -41,16 +41,15 @@ internal sealed class BodyTabPage : LinearLayout, IFullBleedPage
     public void Show(BodyTabModel model, SeatLine? first)
     {
         var scraps = new List<ScrapEntry>();
-        if (model.Monthly is not null && first is not null)
+        shown = model;
+        if (model.Monthly is null)
         {
-            var (entry, leaf) = BodyScrapContent.Leaf(Context!, BodyScrapContent.MonthlyScrapId, first);
-            note = leaf;
-            scraps.Add(entry);
-        }
-        else
-        {
-            note = null;
             scraps.Add(BodyScrapContent.PlainLeaf(Context!, BodyScrapContent.MonthlyScrapId, model.NothingToCompare));
+        }
+        else if (first is not null)
+        {
+            // The month's sentence is shown only in the owner's voice; with none, the seat hides (owner's ruling, W10).
+            scraps.Add(BodyScrapContent.Leaf(Context!, BodyScrapContent.MonthlyScrapId, first).Entry);
         }
 
         foreach (var card in model.Cards)
@@ -62,6 +61,12 @@ internal sealed class BodyTabPage : LinearLayout, IFullBleedPage
         host.SetScraps(scraps);
     }
 
-    /// <summary>Swaps the month's sentence in place (the voiced one has arrived). UI thread.</summary>
-    public void ShowSentence(SeatLine line) => note?.Show(line);
+    /// <summary>Lays the page out again with the month's voiced sentence, now it has arrived. UI thread.</summary>
+    public void ShowSentence(SeatLine line)
+    {
+        if (shown is { } model)
+        {
+            Show(model, line);
+        }
+    }
 }

@@ -1,7 +1,7 @@
 namespace Constitution.Domain.Voice;
 
 // Each seat's inputs, checked and reduced once, so the voiced facts and the plain fallback read the
-// same numbers the same way. Internal: the public surface is SeatFacts and SeatFallbacks.
+// same numbers the same way. Internal: the public surface is SeatFacts.
 
 /// <summary>One signal that moved: how it is named, whether it is up or down, and whether that is worse.</summary>
 internal sealed record Mover(string Name, string Verb, string Direction, bool IsWorse, SignalMonth Month);

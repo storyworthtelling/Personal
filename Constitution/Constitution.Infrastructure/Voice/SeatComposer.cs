@@ -6,10 +6,9 @@ using Storyworthtelling.Voice;
 namespace Constitution.Infrastructure.Voice;
 
 /// <summary>
-/// Turns a seat's facts into one sentence in the owner's voice — or into the plain sentence it came
-/// with. <b>Never hidden, never blank, never an exception</b>: with no profile, no key, an unreadable
-/// Drive, a failed call or a reply with nothing in it, the seat shows its fallback and the page has
-/// something to say. It goes through the shared <see cref="VoicedMessenger"/> (the profile from Drive,
+/// Turns a seat's facts into one sentence in the owner's voice, or into nothing. <b>Never an
+/// exception</b>: with no profile, no key, an unreadable Drive, a failed call or a reply with nothing in it,
+/// the answer is null and the seat hides, like every other app's (owner's ruling, W10). It goes through the shared <see cref="VoicedMessenger"/> (the profile from Drive,
 /// the Claude client) and adds what a seat needs that the messenger does not: the closed list's
 /// purpose, the facts as the context, the key refreshed from the vault, and a result that says which
 /// face to set the line in.
@@ -20,7 +19,7 @@ namespace Constitution.Infrastructure.Voice;
 /// than this class builds a model request.</para>
 ///
 /// <para><b>What reaches a log: the seat's id, and the kind of failure, and that is all.</b> Never
-/// the facts, the fallback, the profile or the sentence — the profile is the owner's writing and the
+/// the facts, the profile or the sentence — the profile is the owner's writing and the
 /// facts are their health. A failure message is not repeated either; it is not ours to publish.</para>
 ///
 /// <para>Cancellation is the caller leaving the screen, not a failure, and propagates. Composing at
@@ -39,15 +38,12 @@ public sealed class SeatComposer : ISeatComposer
         this.logger = logger;
     }
 
-    /// <summary>The line for this seat: voiced if it can be, otherwise the request's plain sentence.</summary>
-    public async Task<SeatLine> ComposeAsync(SeatRequest request, CancellationToken cancellationToken)
+    /// <summary>The line for this seat in the owner's voice, or null when there is none to be had.</summary>
+    public async Task<SeatLine?> ComposeAsync(SeatRequest request, CancellationToken cancellationToken)
     {
         var occasion = VoicedOccasions.For(request.Seat);
         var voiced = await TryVoiceAsync(occasion, request, cancellationToken);
-
-        return voiced is null
-            ? new SeatLine(request.Seat, request.Fallback, IsVoiced: false)
-            : new SeatLine(request.Seat, voiced, IsVoiced: true);
+        return voiced is null ? null : new SeatLine(request.Seat, voiced);
     }
 
     private async Task<string?> TryVoiceAsync(VoicedOccasion occasion, SeatRequest request, CancellationToken cancellationToken)
@@ -58,28 +54,28 @@ public sealed class SeatComposer : ISeatComposer
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // The key could not be read from the vault (offline, wrong passphrase). The plain sentence
-            // shows; the log gets the seat's id and the exception's type only.
-            logger?.LogWarning("Voice seat {Seat} shows its plain sentence: the voice settings could not be read ({Kind})",
+            // The key could not be read from the vault (offline, wrong passphrase). The seat hides; the log
+            // gets the seat's id and the exception's type only.
+            logger?.LogWarning("Voice seat {Seat} hides: the voice settings could not be read ({Kind})",
                 occasion.Id, ex.GetType().Name);
             return null;
         }
 
         if (string.IsNullOrWhiteSpace(voiceOptions.Value.ApiKey))
         {
-            logger?.LogDebug("Voice seat {Seat} shows its plain sentence: no key", occasion.Id);
+            logger?.LogDebug("Voice seat {Seat} hides: no key", occasion.Id);
             return null;
         }
 
         // The messenger absorbs no profile, a failed call and an offline device, and logs the cause itself.
-        // An empty fallback is how this tells "voiced" from "fell back": the real fallback is ours to give.
+        // An empty fallback is how this tells "voiced" from "nothing".
         var reply = await messenger.ComposeAsync(
-            new MessageRequest(occasion.Purpose, Context(request), occasion.MaxWords, HighVisibility: true),
+            new MessageRequest(occasion.Purpose, Context(request), occasion.MaxWords, occasion.Line.HighVisibility),
             fallback: string.Empty, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(reply))
         {
-            logger?.LogDebug("Voice seat {Seat} shows its plain sentence: nothing was composed", occasion.Id);
+            logger?.LogDebug("Voice seat {Seat} hides: nothing was composed", occasion.Id);
             return null;
         }
 

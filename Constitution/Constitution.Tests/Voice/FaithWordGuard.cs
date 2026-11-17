@@ -108,7 +108,6 @@ internal static class SeatSweep
         {
             await composer.ComposeAsync(request, default);
             texts.AddRange(request.Facts);
-            texts.Add(request.Fallback);
         }
 
         texts.AddRange(client.Requests.Select(sent => sent.Purpose + "\n" + sent.Context));

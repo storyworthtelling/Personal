@@ -14,15 +14,16 @@ namespace Constitution.Domain.Voice;
 /// <item><b>Meal sheet:</b> the week it is for, its new recipes, its nights out.</item>
 /// </list>
 ///
-/// <para>Each request carries the plain fallback <see cref="SeatFallbacks"/> builds from the same
-/// facts, so the line is never hidden. Errors have no builder here and never will.</para>
+/// <para>With no voice a seat hides (owner's ruling, W10), so a request is its facts alone. Errors have no
+/// builder here and never will.</para>
 /// </summary>
 public static class SeatFacts
 {
     public static SeatRequest Today(TodayFacts facts)
     {
-        var fallback = SeatFallbacks.For(facts);
-        var kind = facts.WorkoutKind.Trim();
+        ArgumentNullException.ThrowIfNull(facts);
+        ArgumentNullException.ThrowIfNull(facts.Dinner);
+        var kind = SeatWords.Named(facts.WorkoutKind, "the workout's kind");
         if (facts.WorkoutMinutes <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(facts), facts.WorkoutMinutes, "A workout runs for some minutes.");
@@ -32,25 +33,25 @@ public static class SeatFacts
         [
             $"Workout today: {kind} at {SeatWords.Clock(facts.WorkoutStart)} {SeatWords.Meridiem(facts.WorkoutStart)}, about {facts.WorkoutMinutes} minutes.",
             SeatWords.DinnerFact(facts.Dinner),
-        ], fallback);
+        ]);
     }
 
     public static SeatRequest RestDay(RestDayFacts facts)
     {
-        var fallback = SeatFallbacks.For(facts);
+        ArgumentNullException.ThrowIfNull(facts);
+        ArgumentNullException.ThrowIfNull(facts.Dinner);
         return new SeatRequest(VoiceSeat.RestDayLine,
-            ["Today is a rest day, with no workout.", SeatWords.DinnerFact(facts.Dinner)], fallback);
+            ["Today is a rest day, with no workout.", SeatWords.DinnerFact(facts.Dinner)]);
     }
 
     public static SeatRequest BodyMonthly(BodyMonthFacts facts)
     {
-        var fallback = SeatFallbacks.For(facts);
         var month = BodyMonth.Read(facts);
 
         if (month.SkippedDevice is not null)
         {
             return new SeatRequest(VoiceSeat.BodyMonthly,
-                [$"No {month.SkippedDevice} readings yesterday.", "Today's line has a gap because of that."], fallback);
+                [$"No {month.SkippedDevice} readings yesterday.", "Today's line has a gap because of that."]);
         }
 
         var told = month.Movers.Select(mover =>
@@ -62,12 +63,11 @@ public static class SeatFacts
             told.Add($"Close to last month: {string.Join(", ", month.Steady.Select(steady => steady.Name))}.");
         }
 
-        return new SeatRequest(VoiceSeat.BodyMonthly, told, fallback);
+        return new SeatRequest(VoiceSeat.BodyMonthly, told);
     }
 
     public static SeatRequest Signal(SignalFacts facts)
     {
-        var fallback = SeatFallbacks.For(facts);
         var reading = SignalReading.Read(facts);
 
         var gap = reading.Gap is null
@@ -81,7 +81,7 @@ public static class SeatFacts
             $"Their own {reading.PastLabel} average: {reading.PastText}.",
             gap,
             "The comparison is with their own past only.",
-        ], fallback);
+        ]);
     }
 
     /// <summary>The encouragement request, or null when the load is not up on last time: no news is no request.</summary>
@@ -98,12 +98,11 @@ public static class SeatFacts
             $"Exercise: {load.Exercise}.",
             $"Load today: {load.Today} {load.Unit}, up from {load.Last} {load.Unit} last time.",
             $"That is {load.Gap} {load.Unit} more.",
-        ], SeatFallbacks.For(facts));
+        ]);
     }
 
     public static SeatRequest MealSheetIntro(MealWeekFacts facts)
     {
-        var fallback = SeatFallbacks.For(facts);
         var week = MealWeek.Read(facts);
 
         var told = new List<string>
@@ -118,6 +117,6 @@ public static class SeatFacts
             told.Add($"Dinner is out on {SeatWords.Days(week.OutDays)}.");
         }
 
-        return new SeatRequest(VoiceSeat.MealSheetIntro, told, fallback);
+        return new SeatRequest(VoiceSeat.MealSheetIntro, told);
     }
 }

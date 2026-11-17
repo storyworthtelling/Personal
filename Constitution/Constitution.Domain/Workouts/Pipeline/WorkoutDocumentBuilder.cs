@@ -86,8 +86,7 @@ public static class WorkoutDocumentBuilder
                 false,
                 ScoreFor(session.Kind, index, count),
                 encouragement?[index]?.Text,
-                substitutions?.FirstOrDefault(item => item.Replacement == exercise.Name)?.Text,
-                encouragement?[index]?.IsVoiced ?? true));
+                substitutions?.FirstOrDefault(item => item.Replacement == exercise.Name)?.Text));
         }
 
         return new WorkoutDocumentModel(

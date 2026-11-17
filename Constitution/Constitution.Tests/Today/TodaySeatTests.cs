@@ -15,14 +15,19 @@ public class TodaySeatTests
 
     private static TodayPlan RestDayDinnerOut() => new(null, null, null, DinnerPlan.Out);
 
+    /// <summary>
+    /// With a plan, the line waits for the voice: it hides until one is composed, like every other app's seats
+    /// (owner's ruling, W10). The request it would be composed from is ready.
+    /// </summary>
     [Fact]
-    public void FallsBackNeverHides()
+    public void AWorkoutDayWaitsForItsVoice()
     {
         var line = TodayModel.TopLine(WorkoutDay());
 
-        Assert.Equal("Strength at 5:30. Lentil soup tonight.", line.Text);
+        Assert.Null(line.Text);
         Assert.Equal(VoiceSeat.TodayTopLine, line.Seat);
-        Assert.False(line.IsVoiced);
+        Assert.NotNull(line.Request);
+        Assert.Equal(line.Seat, line.Request!.Seat);
     }
 
     [Fact]
@@ -30,19 +35,9 @@ public class TodaySeatTests
     {
         var line = TodayModel.TopLine(RestDayDinnerOut());
 
-        Assert.Equal("A rest day. Dinner is out tonight.", line.Text);
+        Assert.Null(line.Text);
         Assert.Equal(VoiceSeat.RestDayLine, line.Seat);
-        Assert.False(line.IsVoiced);
-    }
-
-    [Fact]
-    public void ThePlansRequestCarriesTheSameFallbackItShows()
-    {
-        var line = TodayModel.TopLine(WorkoutDay());
-
-        Assert.NotNull(line.Request);
-        Assert.Equal(line.Text, line.Request!.Fallback);
-        Assert.Equal(line.Seat, line.Request.Seat);
+        Assert.Equal(VoiceSeat.RestDayLine, line.Request!.Seat);
     }
 
     [Fact]
@@ -52,7 +47,6 @@ public class TodaySeatTests
 
         Assert.Equal("Nothing is planned yet.", line.Text);
         Assert.Equal(VoiceSeat.TodayTopLine, line.Seat);
-        Assert.False(line.IsVoiced);
         Assert.Null(line.Request);
     }
 

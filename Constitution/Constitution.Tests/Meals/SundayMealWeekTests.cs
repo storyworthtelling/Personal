@@ -177,7 +177,7 @@ public class SundayMealWeekTests
     {
         var week = new MealWeekFacts(Sunday, [DayOfWeek.Saturday, DayOfWeek.Sunday, DayOfWeek.Tuesday], [DayOfWeek.Saturday, DayOfWeek.Monday]);
 
-        Assert.Equal("Dinners for the week of Oct 25. Three new recipes, Sunday, Tuesday and Saturday.", SeatFacts.MealSheetIntro(week).Fallback);
+        Assert.Contains("Three new recipes, on Sunday, Tuesday and Saturday.", SeatFacts.MealSheetIntro(week).Facts);
         Assert.Contains("Dinner is out on Monday and Saturday.", SeatFacts.MealSheetIntro(week).Facts);
     }
 

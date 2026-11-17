@@ -165,7 +165,7 @@ public static class WorkoutDocument
         }
 
         var labelBaseline = last + 26f;
-        var voiceLines = PageDraft.VoiceLines(exercise.Encouragement, exercise.EncouragementVoiced).Count;
+        var voiceLines = PageDraft.VoiceLines(exercise.Encouragement, true).Count;
         var doctor = sore is { DoctorNoteDue: true } && index == 0;
         if (exercise.ShowFigure)
         {
@@ -187,7 +187,7 @@ public static class WorkoutDocument
             : exercise.ScoreBpm;
         draft.Line(PrintedRole.Label, PageDraft.Left, labelBaseline, PageDraft.ColumnWidth, "SET SCORE TO");
         draft.Line(PrintedRole.Strong, PageDraft.Left, labelBaseline + 20f, PageDraft.ColumnWidth, ScoreLine(bpm));
-        var end = draft.Voice(exercise.Encouragement, labelBaseline + 48f, labelBaseline + 20f, exercise.EncouragementVoiced);
+        var end = draft.Voice(exercise.Encouragement, labelBaseline + 48f, labelBaseline + 20f, true);
 
         if (doctor)
         {

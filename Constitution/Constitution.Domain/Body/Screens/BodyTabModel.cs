@@ -194,12 +194,12 @@ public sealed class BodyTabModel
 
         if (months.Count == 0)
         {
-            return bed.IsOffline ? new SeatRequest(VoiceSeat.BodyMonthly, [BedOffline.Sentence(bed)], BedOffline.Sentence(bed)) : null;
+            return bed.IsOffline ? new SeatRequest(VoiceSeat.BodyMonthly, [BedOffline.Sentence(bed)]) : null;
         }
 
         var request = SeatFacts.BodyMonthly(new BodyMonthFacts(months));
         return bed.IsOffline
-            ? new SeatRequest(VoiceSeat.BodyMonthly, [.. request.Facts, BedOffline.Sentence(bed)], $"{request.Fallback} {BedOffline.Sentence(bed)}")
+            ? new SeatRequest(VoiceSeat.BodyMonthly, [.. request.Facts, BedOffline.Sentence(bed)])
             : request;
     }
 }
