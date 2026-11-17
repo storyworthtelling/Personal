@@ -121,6 +121,12 @@ jobs:
             echo "::endgroup::"
           done
 
+      # Fatal: every package a package depends on is in the graph. Transitive pinning once left
+      # androidx.concurrent.futures out of four heads with no error, and each shipped app died on open
+      # (RepoGuards.Tests/DependencyGraphCheckTests).
+      - name: DEPENDENCY CHECK
+        run: python3 .github/scripts/check-dependency-graph.py .
+
       # Prove the Paper & Ink launcher icons are packaged (same rationale as
       # Storyboarder's ICON CHECK: don't trust "it built"). Print-only /
       # non-fatal; grep the log for "=== ICON CHECK ===".

@@ -111,6 +111,12 @@ jobs:
             -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
           echo "::endgroup::"
 
+      # Fatal: every package a package depends on is in the graph. Transitive pinning once left
+      # androidx.concurrent.futures out of four heads with no error, and each shipped app died on open
+      # (RepoGuards.Tests/DependencyGraphCheckTests).
+      - name: DEPENDENCY CHECK
+        run: python3 .github/scripts/check-dependency-graph.py .
+
       # The APK carries the frozen ApplicationId, not the project name — that is what makes
       # this an in-place upgrade rather than a second app on the phone. The id deliberately
       # still says "camera": renaming it would orphan every installed copy. Fatal, because
