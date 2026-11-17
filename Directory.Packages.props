@@ -1,0 +1,64 @@
+<Project>
+  <!--
+    Every package version in the repository, in one place (audit W12.2). A project names a package; this file
+    says which version. Transitive pinning lets a patched version of a package nobody references directly be
+    chosen here (the security pins below). MAUI's own version comes from its workload, so the four MAUI heads
+    say VersionOverride="$(MauiVersion)".
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="AngleSharp" Version="1.9.1" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="Google.Apis.Auth" Version="1.75.0" />
+    <PackageVersion Include="Google.Apis.Calendar.v3" Version="1.74.0.4154" />
+    <PackageVersion Include="Google.Apis.Docs.v1" Version="1.74.0.4134" />
+    <PackageVersion Include="Google.Apis.Drive.v3" Version="1.74.0.4135" />
+    <PackageVersion Include="Google.Apis.Tasks.v1" Version="1.74.0.3958" />
+    <PackageVersion Include="MailKit" Version="4.18.2" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Microsoft.Playwright" Version="1.49.0" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="PdfPig" Version="0.1.10" />
+    <PackageVersion Include="PDFsharp" Version="6.1.1" />
+    <PackageVersion Include="SkiaSharp" Version="3.119.4" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+    <PackageVersion Include="Square.OkHttp3" Version="5.5.0" />
+    <PackageVersion Include="TagLibSharp" Version="2.3.0" />
+    <PackageVersion Include="Xamarin.AndroidX.AppCompat" Version="1.8.0" />
+    <PackageVersion Include="Xamarin.AndroidX.Camera.Camera2" Version="1.5.1.2" />
+    <PackageVersion Include="Xamarin.AndroidX.Camera.Lifecycle" Version="1.5.1.2" />
+    <PackageVersion Include="Xamarin.AndroidX.Camera.Video" Version="1.5.2.1" />
+    <PackageVersion Include="Xamarin.AndroidX.Camera.View" Version="1.5.1.2" />
+    <PackageVersion Include="Xamarin.AndroidX.Concurrent.Futures" Version="1.3.0.1" />
+    <PackageVersion Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.8.0.2" />
+    <PackageVersion Include="Xamarin.AndroidX.Media3.Session" Version="1.8.0.2" />
+    <PackageVersion Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+    <PackageVersion Include="Xamarin.Google.Dagger" Version="2.57.2.1" />
+    <PackageVersion Include="Xamarin.Google.MLKit.FaceDetection" Version="116.1.7.9" />
+    <PackageVersion Include="Xamarin.Google.MLKit.TextRecognition" Version="116.0.1.9" />
+    <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" Version="118.3.1.6" />
+    <PackageVersion Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" Version="116.0.0.2" />
+    <PackageVersion Include="Xamarin.TensorFlow.Lite" Version="2.16.1.10" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+  <!-- Security pins (audit W12.1): patched versions of packages that arrive transitively. -->
+  <ItemGroup>
+    <PackageVersion Include="MimeKit" Version="4.18.2" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
+    <PackageVersion Include="SQLitePCLRaw.core" Version="2.1.14" />
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.14" />
+    <PackageVersion Include="SQLitePCLRaw.provider.e_sqlite3" Version="2.1.14" />
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
+  </ItemGroup>
+</Project>

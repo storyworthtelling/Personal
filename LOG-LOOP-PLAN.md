@@ -65,6 +65,8 @@ This is a plan only; no application code is written here. Claims about existing 
 
 ### 1.2 Existing logs
 
+> **This table is the inventory as it stood when the plan was written.** Since then (audit W4) the three MAUI heads' `PipelineFileLogger`s and Foreword's `DeliveryFileLogger` have been replaced by the kit's `Storyworthtelling.Maui/Diagnostics/FileLogger`, which keeps their file names, and Constitution has a crash handler; see CLAUDE.md's Log loop section for what exists now.
+
 | App | Log | Where | Captures | Cap | Sensitive? |
 |---|---|---|---|---|---|
 | Shared native | `DiagnosticLog` | `FocusPhone/Codex.Domain/Diagnostics/DiagnosticLog.cs` | Non-fatal failures; rolls to `.1`, **old backup discarded** (`:127-138`) | 128 KB ×2 (`:29`) | Per caller |
@@ -254,7 +256,7 @@ Pulp and Constitution:
 - Guard `EveryActivityIsWatchedTests` (`Codex.Tests/Guard`) scans every `Activity` subclass in the
   six heads for `TapWatch.Attach`. It reads source by content, like the existing guards.
 
-**MAUI hook** (`Storyworthtelling.Maui/Diagnostics/TapWatch`), used by Index, Folio and Foreword:
+**MAUI hook** (`Storyworthtelling.Maui/Diagnostics/MauiTapWatch`), used by Index, Folio and Foreword:
 
 - `ButtonHandler.Mapper.AppendToMapping` and the `TapGestureRecognizer` path wire every `Button`
   and tap gesture to the judge.

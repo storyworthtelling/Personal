@@ -29,12 +29,14 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.dotnet
-        key: dotnet10-${{ runner.os }}-${{ inputs.workload }}-${{ steps.where.outputs.week }}
+        key: dotnet10-${{ runner.os }}-${{ inputs.workload }}-${{ hashFiles('global.json') }}-${{ steps.where.outputs.week }}
 
+    # The SDK and the workload set are both pinned in global.json (audit W12.3), so CI builds with what a
+    # local build has; moving either is one edit there.
     - name: Setup .NET 10
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '10.0.x'
+        global-json-file: global.json
 
     # Keyed by workflow and job, so each keeps the packages it actually restores, and by the
     # project files, so a changed reference saves a new set; the prefix restores the last set.
@@ -49,4 +51,5 @@ runs:
     - name: Install the workload
       if: inputs.workload != '' && steps.sdk.outputs.cache-hit != 'true'
       shell: bash
+      # Installs the workload set global.json names (sdk.workloadVersion), not whatever is newest.
       run: dotnet workload install ${{ inputs.workload }}

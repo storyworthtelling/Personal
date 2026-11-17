@@ -87,7 +87,7 @@ Goal: no failure path can overwrite or lose data.
    - Retention purge runs on approval (03 §32).
    - Offline doesn't spend attempts, and Failed banks come back after 24 h (11 §5).
 
-## W2 · Cross-app contracts — in review
+## W2 · Cross-app contracts — done
 
 1. **Receivers request their own permissions.** Index, Flyleaf, Pulp and Constitution each add a `uses-permission` for the permission they declare, and Post requests `RECEIVE_BALANCE` (09 C1, C2).
    - Fix `BudgetManifestTests` and the 17→18 permission count.
@@ -102,7 +102,7 @@ Goal: no failure path can overwrite or lose data.
 6. **Couriers log their outcome.** Each courier checks that the target is installed and holds the permission, then logs send, refusal and receipt. Payloads stay out of the log.
 7. **Add a `v` extra to every broadcast** (09 L1, L2).
 
-## W3 · Shared libraries (full extraction)
+## W3 · Shared libraries (full extraction) — done
 
 Each item replaces copies in several apps; the source findings are in report 01 unless noted.
 
@@ -119,7 +119,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
 | `IPaperDelivery` as the only reMarkable path (size cap, OOM handling, timeout, cancellation, one client factory) | direct uploads in Foreword, Index, Constitution | 01 §11 |
 | Shared handwriting result shape + one reMarkable page profile | 3 read-back pipelines | 01 §12 |
 
-## W4 · Logging and the log loop (report 08)
+## W4 · Logging and the log loop (report 08) — done
 
 1. **Reader fixes.**
    - Parse both line formats, or have `FileLogger` write the native format; test it with real output.
@@ -148,7 +148,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
 9. **ISO-8601 stamps** in files; ANR trace excerpts; Foreword's HttpClient chatter filtered out; Pulp per-title warnings counted instead of logged one by one (08 §25, §32–33, §36).
 10. **Shared source vocabulary** (`Vault`, `Drive`, `Http:<svc>`, `Worker`, `Contract:<name>`, `Permission`) (08 §31).
 
-## W5 · Errors and offline (report 11)
+## W5 · Errors and offline (report 11) — done
 
 1. **Folio's offline classification everywhere**: Index refresh, Foreword delivery, Plate send, Pulp (which today calls every failure "offline").
 2. **A "Sign in again" row** from a shared `google-account` health entry, with re-consent from the foreground and the token cache invalidated on 401 (11 §4).
@@ -167,7 +167,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
    - Foreword's prayer save reasons (11 §25).
    - `PlainError` replaces every raw `ex.Message` on screen (11 §22, 12 §3).
 
-## W6 · Efficiency (report 05)
+## W6 · Efficiency (report 05) — done
 
 1. **Drive traffic.**
    - A "last backed-up" marker removes the archive download from every Post sync (§1).
@@ -194,7 +194,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
    - Deduplicate `log-loop-guard`.
    - Fix the path-filter gaps (§19–22, 13 B).
 
-## W7 · Orphaned and incomplete code (report 03)
+## W7 · Orphaned and incomplete code (report 03) — done
 
 **Wire up** (these fill real gaps):
 - Plate: face correction (§26).
@@ -213,7 +213,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
 - Unused members and constants.
 - Unused Moq / Logging / Http package references (§47–49).
 
-## W8 · Design kit and cross-app UI (reports 02, 04)
+## W8 · Design kit and cross-app UI (reports 02, 04) — done
 
 1. **MAUI kit token fixes.**
    - Error and problem styles use Problem rose.
@@ -255,7 +255,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
    - The Snowball caption (04 §32).
    - The mark is drawn with `OwnersMark` everywhere (04 §31).
 
-## W9 · Accessibility (report 10, full pass)
+## W9 · Accessibility (report 10, full pass) — done
 
 1. **Flyleaf shelf.** An `ExploreByTouchHelper` with a node per book, a clock node and bookend headings; spine hit targets of at least 48dp; spine ink chosen for contrast; bookmark shape cues (§1, §14–15, §25).
 2. **Kit semantics.**
@@ -283,7 +283,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
 6. **Lockdown.** Accessibility apps in the allowlist; an Accessibility row in Flyleaf's Connectivity settings; the shortcut tested in a locked session (§21).
 7. **PDFs, motion and states.** PDF metadata and a larger minimum type size (§22); a reduced-motion helper (§23); disabled-state dimming (§24).
 
-## W10 · Voice (report 06)
+## W10 · Voice (report 06) — done (last PR #375)
 
 1. **New script face.**
    - I produce a specimen artifact of legible OFL handwriting faces (for example Dancing Script, Caveat, Kalam, Patrick Hand, Satisfy) at the real seat sizes, in ink-blue on paper, including the large and children's cases.
@@ -310,7 +310,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
    - Make `Discard` re-derive from what remains.
    - Encrypt the profile (W1 §6).
 
-## W11 · Fixed wording (report 12)
+## W11 · Fixed wording (report 12) — done (PR #376)
 
 1. Adopt the **glossary** (Vault passphrase, Vault, reMarkable, Delete / Remove from, Undo, Refresh, Connect/Disconnect, admin mode, Claude key, {App} diagnostics, couldn't, …).
 2. American spelling, sentence case, no stray glyphs, no "please" or capitals on printed pages.
@@ -319,7 +319,7 @@ Each item replaces copies in several apps; the source findings are in report 01 
 5. A shared plural/number/size formatter, invariant culture, one duration style (§14).
 6. Stale Storyboarder-era and tray-era copy; Pulp mockup drift; notification channel names and descriptions.
 
-## W12 · Docs and packages (report 13)
+## W12 · Docs and packages (report 13) — done (one PR, owner's choice)
 
 1. **Early, as its own small PR.** Bump MailKit/MimeKit and AngleSharp, and pin patched SQLitePCLRaw and System.Security.Cryptography.Pkcs.
 2. **Central Package Management.**
@@ -339,9 +339,11 @@ Each item replaces copies in several apps; the source findings are in report 01 
 - ~~The gutter beside the pinned bar (W8)~~ Decided: the binder strip always runs to the foot of the screen, and the bar sits under the page only (report 14 §1).
 - ~~Folio's bar order (W8)~~ Decided: follow the suite, with the primary on the right and widest (report 14 §4).
 - ~~The voiced line inside Constitution's never-hidden fallback (W10)~~ Decided: Constitution hides like every other app (no profile or key, no line).
-- Score's unwired device-EQ, sound-check and gesture features: build or delete (W7).
+- ~~Score's unwired device-EQ, sound-check and gesture features: build or delete (W7)~~ Decided: build them (done in W7.3).
 - ~~Whether Pulp's child seats get extra voice guidance beyond reading level (W10)~~ Decided: reading level only.
 - ~~Where the voice-line Call Sheet lives (W10)~~ Decided: one file in the repo, in the shared voice library.
+- ~~The W11 glossary, contractions and apostrophe~~ Decided: the glossary as drafted, "couldn’t", the curly ’ (DESIGN.md §14, §15).
+- ~~Folio's tracked capitals on the printed report (W12)~~ Decided: sentence case, no letterspacing, like every other page.
 
 ## How each PR is checked
 

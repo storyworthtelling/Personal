@@ -16,7 +16,7 @@
   <!-- No player package, ever: Pulp hands off to each service's own app (PlaysNothingTests, G6). -->
   <!-- The nightly calendar write rides a WorkManager worker, as the other heads' background work does. -->
   <ItemGroup>
-    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" />
   </ItemGroup>
 
   <ItemGroup>

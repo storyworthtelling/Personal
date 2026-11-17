@@ -162,6 +162,10 @@ public class MealWeekWorkerGuardTests
         var path = Path.Combine(ConstitutionSource.Root(), "Constitution.Android", "obj", "Release", "net10.0-android", "android", "AndroidManifest.xml");
         if (!File.Exists(path))
         {
+            // CI runs this test again after its Release build (audit W12.3) and says so, so there the file must exist.
+            Assert.True(Environment.GetEnvironmentVariable("CONSTITUTION_RELEASE_BUILT") != "1",
+                "The Release build ran, but its merged manifest is not where this test reads it: " + path);
+
             // No Release build here: the source half above is what runs. The recipe makes one and reads this file.
             return;
         }

@@ -1,6 +1,6 @@
 # DESIGN.md — the Paper & Ink design bible
 
-This file is the single source of truth for the visual and UX design of every project in this repository: FocusPhone / Flyleaf (all heads), Canonizer, Ledger, DailyLoader, and anything built here in the future. Code does not carry design opinions of its own; it carries tokens that mirror this document. **No color or type-size literal may appear outside a project's registered token files** (§19) — leak-guard tests enforce this.
+This file is the single source of truth for the visual and UX design of every project in this repository: Flyleaf, Score, Post and Plate (the FocusPhone heads), Folio, Index, Foreword, Pulp and Constitution, and anything built here in the future. Code does not carry design opinions of its own; it carries tokens that mirror this document. **No color or type-size literal may appear outside a project's registered token files** (§19) — leak-guard tests enforce this.
 
 Reorganized in the P4 design-system expansion: **foundations → materials → color → controls → patterns**. American English throughout (color, gray, favor, organize).
 
@@ -78,7 +78,7 @@ The values below are emitted from the OKLCH source spec (`PaletteSpec` + `Oklch`
 
 Fills (T2): action `#A5C8AD` · positive `#B1C69A` · resolved `#C0BDB9` · reference `#AEC0D5` · caution `#D0BB91` · problem `#E8ACAD` · in-progress `#9BC7CD`. Washes (T1) are the mark hue at the highlighter alpha (~30%). Filled primary buttons use the **deep** tier so `PaperBright` text clears AA.
 
-Terracotta is **retired everywhere** — including documents, where the old "active" accent becomes a **muted pine**; report rules, bullets, and covers regenerate accordingly.
+Terracotta is **retired from every screen and every document**: the old "active" accent is a **muted pine**, and report rules, bullets and covers regenerated accordingly. It survives in exactly two places, both outside any page: `PaperColorTokens.Accent` behind the legacy `PaperRole.Active`, which no renderer asks for (Folio's `ReportPalette` exists so none can), and IconStudio's `Tokens.AccentHex` in the Flyleaf bookplate icon's ornaments.
 
 ### Neutrals & the two inks
 
@@ -128,7 +128,7 @@ Registered ladders (per-app `Design/DesignTokens.cs`, §19):
 | Plate | `#C8B5C8` | `#B69BB6` | `#7A4F7B` | `#613F62` | `#442D44` | — | 326° | problem, 50° |
 | Folio | `#C1C197` | `#919059` | `#6B681E` | `#575410` | `#3B3902` | `#B32738` | 107° | positive, 21° |
 | Index | `#B6C3A9` | `#839372` | `#596C45` | `#475735` | `#2F3C21` | `#4E5F3A` | 129° | positive, 0° |
-| Foreword | `#E8B99A` | `#DFA277` | `#CA662D` | — | — | — | 47° | caution, 29° |
+| Foreword | `#E8B99A` | `#DFA277` | `#CA662D` | — | `#6E3512` | — | 47° | caution, 29° |
 | Pulp | `#CCB8A2` | `#BCA080` | `#835618` | `#684414` | `#493113` | `#F7AC4D` | 70° | caution, 14° (recorded) |
 | Constitution | `#A4C1D0` | `#82ACC1` | `#1B6A89` | `#15546E` | `#143B4C` | `#82ACC1` | 230° | progress and reference, 23° |
 
@@ -190,7 +190,7 @@ Body text ≥ **AA (4.5:1)**; UI/large text ≥ **3:1** — computed against the
 
 Four families, committed as static fonts in `/Fonts` (OFL; see `Fonts/LICENSES.md`):
 
-- **Source Serif 4** (Regular, SemiBold, **Black**) — headings, reading text, PDF body, covers. The literary voice. (Black is new: it anchors the reworked display sizes.)
+- **Source Serif 4** (Regular, SemiBold, Italic, **Black**) — headings, reading text, PDF body, covers. The literary voice. (Black is new: it anchors the reworked display sizes.)
 - **Source Sans 3** (Regular, SemiBold) — UI controls, labels, list rows. The working voice.
 - **Cascadia Code** (Regular) — machine text: keys, SHA-1s, URLs, paths, figures, countdowns.
 - **Italianno** (Regular) — a slender italic **calligraphy** hand, colored ink-blue, used **only** for the owner's voice messages. It replaced Pinyon Script (owner's choice, W10): elegant without the copperplate flourishes that made Pinyon hard to read, especially for children and at large text. It runs small for its size, so the voice is set at 34 on screen and on its own printed rung (`PaperTypeScale.Voice`, 25.5pt) rather than sharing Title.
@@ -203,16 +203,16 @@ than decorative wherever a page quotes something.
 
 ### Type scale (reworked — bigger, more contrast at the top)
 
-| Token | Family/weight | Android sp | Analysis PDF px | Use |
+| Token | Family/weight | Android sp | Printed pt | Use |
 |---|---|---|---|---|
-| `Display` | Serif **Black** | 44 | 72 | Screen headers, chapter openings |
-| `Title` | Serif SemiBold | 28 | 46 | Section heads |
-| `Heading` | Serif SemiBold | 18 | 32 | Card titles, sub-heads |
-| `Body` | Sans Regular (UI) / Serif Regular (reading) | 16 | 30 | Default text |
-| `Secondary` | Sans Regular | 14 | 26 | Supporting text, status lines |
-| `Label` | Sans SemiBold | 13 | 22 | Field labels, buttons, chips, tab labels |
-| `Mono` | Cascadia Regular | 14 | 24 | Technical strings, figures |
-| `Voice` | Italianno | 34 | — | The owner's voice, in ink-blue |
+| `Display` | Serif **Black** | 44 | 33 | Screen headers, chapter openings |
+| `Title` | Serif SemiBold | 28 | 21 | Section heads |
+| `Heading` | Serif SemiBold | 18 | 13.5 | Card titles, sub-heads |
+| `Body` | Sans Regular (UI) / Serif Regular (reading) | 16 | 12 | Default text |
+| `Secondary` | Sans Regular | 14 | 10.5 | Supporting text, status lines |
+| `Label` | Sans SemiBold | 13 | 9.75 | Field labels, buttons, chips, tab labels |
+| `Mono` | Cascadia Regular | 14 | 10.5 | Technical strings, figures |
+| `Voice` | Italianno | 34 | 25.5 | The owner's voice, in ink-blue |
 | `Countdown` | Cascadia Regular | 40 | — | Cutover / unlock timer |
 | `CoverTitle` | Serif SemiBold | 72 | — | Book/report covers |
 
@@ -385,9 +385,9 @@ One noun per concept, everywhere. **The fixed-copy glossary (audit W11, owner-ap
 
 | Term | Meaning |
 |---|---|
-| project | A manuscript being reviewed in Canonizer |
-| scene · evidence image · reference sheet · report | (unchanged Canonizer nouns) |
-| admin mode · block/unblock · cutover · deliver · thread · tile/tray · feed/episode | (unchanged) |
+| project | A manuscript being reviewed in Folio |
+| scene · evidence image · reference sheet · report | (Folio's nouns) |
+| admin mode · block/unblock · cutover · deliver · thread · shelf/bookend · feed/episode | (unchanged; the tray is retired, Flyleaf is one bookcase) |
 | **binder tab** | The right-edge divider navigation to an app area |
 | **dog-ear** | The in-app folded-corner marker: a waiting item / undo |
 | **bookmark** | The launcher ribbon marker: an app has a notification |
@@ -449,7 +449,7 @@ Only these may contain color hex or type-size literals:
 | Shared: printed type | `Storyworthtelling.Paper/PaperTypeScale.cs` — the **printed** ladder, in points, derived from the screen ladder by one registered ratio (D30). Not a second scale: a guard multiplies the native sp ladder, read from its own source, and asserts these are the answers |
 | Shared: printed type, Dose rung | A registered **Dose** rung of **54 pt** (PC5) in `PaperTypeScale` for the one large figure a dose card prints. It lands with C-2.1.1 (Release C) and is now in code. It is the one **printed-only** rung: a number rather than a screen size times the ratio, because the phone never draws a dose that large. The screen-ladder parity guard names it as its sole exception (`PaperTypeScaleTests.TheDoseIsTheOnlyPrintedOnlyRung`), so a second printed-only rung is a decision, not a diff. No composer names 54; Constitution's document painters take the rung |
 | Shared: MAUI kit | `Storyworthtelling.Maui/Resources/Styles/Paper.xaml` — the role table and component styles for the MAUI heads, the counterpart of `Codex.Ui.Android`'s `PaperUi`/`PaperTheme`. Checked against `PaperColorTokens` **by reflection**, not against a second typed copy |
-| Per-app | `*/Design/DesignTokens.cs` + `Resources/Styles/DesignTokens.xaml` — **thin generated re-exports** of the shared tokens (still leak-guard-scanned). **A MAUI head that has adopted the kit above has no token file at all** and is scanned for hexes everywhere; Ledger and Canonizer still carry their own and adopt the kit at their own phases |
+| Per-app | `*/Design/DesignTokens.cs` — **thin re-exports** of the shared tokens (still leak-guard-scanned); the MAUI heads (Foreword, Folio, Index) have adopted the kit above, carry no `DesignTokens.xaml` and no palette, and are scanned for hexes everywhere |
 | Tools | `Tools/IconStudio/Tokens.cs` (kept in parity by test) |
 | Fonts | `/Fonts` — Source Serif 4 (incl. **Black**), Source Sans 3, Cascadia Code, **Italianno** (all OFL). All eight are embedded in `Storyworthtelling.Paper` for the Skia renderers, held by a guard: a face the printing library cannot load is not an error — Skia substitutes one and says nothing, and the page is already printed by the time anyone looks |
 | Branding | `/Branding/owner.png` (owner-supplied) |

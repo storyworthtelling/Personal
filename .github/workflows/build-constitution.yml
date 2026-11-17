@@ -116,6 +116,13 @@ jobs:
             -p:AndroidSigningStorePass=${{ secrets.KEYSTORE_PASSWORD }}
           echo "::endgroup::"
 
+      # The permission test reads the Release build's merged manifest, which exists only now; the test run
+      # before the build skipped it (audit W12.3). The variable makes a missing manifest a failure here.
+      - name: Merged manifest permissions
+        env:
+          CONSTITUTION_RELEASE_BUILT: '1'
+        run: dotnet test Constitution/Constitution.Tests/Constitution.Tests.csproj --filter "FullyQualifiedName~TheMergedReleaseManifestHasSeventeenPermissions"
+
       # The update channel installs by package id, so a wrong one is a second app on the phone.
       # Fatal, because that is invisible until the device has two icons.
       - name: APP ID CHECK

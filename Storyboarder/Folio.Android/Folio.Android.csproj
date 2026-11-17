@@ -16,7 +16,6 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>$([System.DateTime]::UtcNow.ToString('yyyy.MM.dd.HHmm'))</ApplicationDisplayVersion>
     <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
-    <AndroidMinSdkVersion>26</AndroidMinSdkVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -54,14 +53,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.9" />
-    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" Version="2.10.2" />
+    <PackageReference Include="Microsoft.Maui.Controls" VersionOverride="$(MauiVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
+    <PackageReference Include="Xamarin.AndroidX.Work.Runtime" />
     <!-- Pin to resolve a Work.Runtime 2.10.2 transitive conflict under .NET 10 MAUI: AndroidX.Core
          wants Concurrent.Futures >=1.3.0.1 while Concurrent.Futures.Ktx caps it <1.2.1 (NuGet NU1107
          prescribes referencing this directly). -->
-    <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" Version="1.3.0.1" />
-    <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
+    <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" />
+    <PackageReference Include="Google.Apis.Drive.v3" />
   </ItemGroup>
 
   <!-- PdfSharp and SkiaSharp use reflection / native entry points; keep the Release trimmer away. -->

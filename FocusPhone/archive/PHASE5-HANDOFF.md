@@ -1,5 +1,7 @@
 # FocusPhone Audio — Context Handoff
 
+> **Archived (audit W12).** A handoff from before the Audio head became Score; kept for its history, not as a description of the code.
+
 ## What this is
 Redesigning the **FocusPhone Audio app** (distraction-free Pixel launcher project) as a UX designer.
 Two sides: **Podcasts** (north star: Podcast Addict) and **Music** (north star: iPod Classic, streaming

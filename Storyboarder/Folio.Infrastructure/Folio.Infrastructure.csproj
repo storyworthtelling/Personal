@@ -27,29 +27,29 @@
 
   <!-- Cross-target packages. -->
   <ItemGroup>
-    <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
-    <PackageReference Include="Google.Apis.Docs.v1" Version="1.74.0.4134" />
+    <PackageReference Include="Google.Apis.Auth" />
+    <PackageReference Include="Google.Apis.Docs.v1" />
     <!-- Drive is used to read a picked file's type and to download a .docx's bytes (Docs API only
          serves native Google Docs); the text is then extracted by DocxTextExtractor. -->
-    <PackageReference Include="Google.Apis.Drive.v3" Version="1.74.0.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.9" />
+    <PackageReference Include="Google.Apis.Drive.v3" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
     <!-- PdfPig reads PDF content streams (not something to hand-roll); RTF and ePub are pure-BCL. -->
-    <PackageReference Include="PdfPig" Version="0.1.10" />
-    <PackageReference Include="PDFsharp" Version="6.1.1" />
-    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="PdfPig" />
+    <PackageReference Include="PDFsharp" />
+    <PackageReference Include="SkiaSharp" />
   </ItemGroup>
 
   <!-- Desktop-only: design-time EF tooling and the Linux Skia natives used by Tests/CI.
        The Android build packages libSkiaSharp.so per ABI from the base SkiaSharp package. -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
   </ItemGroup>
 
   <!-- The design-time factory depends on the Design package, which is desktop-only. -->

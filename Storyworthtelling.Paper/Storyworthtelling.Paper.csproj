@@ -11,8 +11,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="PDFsharp" Version="6.1.1" />
-    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="PDFsharp" />
+    <PackageReference Include="SkiaSharp" />
   </ItemGroup>
 
   <!-- The reMarkable transport is already its own shared library; the unified IPaperDelivery seam

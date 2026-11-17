@@ -132,7 +132,7 @@ Wait a few minutes for the client to propagate, then sign in again.
 Tests run on the desktop TFM with no device, emulator, or API keys (external services are faked):
 
 ```bash
-dotnet test Storyboarder/Folio.sln -p:FolioTfms=net10.0
+dotnet test Storyboarder/Folio.Tests/Folio.Tests.csproj -p:FolioTfms=net10.0
 ```
 
 The `-p:FolioTfms=net10.0` switch builds `Folio.Infrastructure` for `net10.0` only so

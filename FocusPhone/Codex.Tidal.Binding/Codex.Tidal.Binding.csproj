@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsBindingProject>true</IsBindingProject>
@@ -49,7 +50,7 @@
          the merged library. It also carries the Kotlin runtime and coroutines the SDK
          is written against, so those are left to resolve transitively: pinning them
          here only produces downgrade errors against whatever Media3 asks for. -->
-    <PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" Version="1.8.0.2" />
+    <PackageReference Include="Xamarin.AndroidX.Media3.ExoPlayer" />
 
     <!-- Player's own constructor takes an OkHttpClient — confirmed straight from the
          bytecode (javap), not the generator's own (silent, unlogged) explanation. With
@@ -58,7 +59,7 @@
          erroring — which is why Player had no way to construct one at all until this
          was added. A community binding, not TIDAL's own; the type is otherwise a
          well-known, stable Java networking client. -->
-    <PackageReference Include="Square.OkHttp3" Version="5.5.0" />
+    <PackageReference Include="Square.OkHttp3" />
 
     <!-- The Dagger runtime is NOT packaged here. Referencing it in this binding made the
          generator emit MembersInjector classes that fail to compile (CS0535). It lives in
