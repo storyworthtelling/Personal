@@ -285,7 +285,23 @@ public interface IGeminiImageClient
         IReadOnlyList<byte[]> referenceImages,
         double? aspectRatio,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Submits scenes' pictures to Gemini's batch tier, inline (owner's request: half the price, back
+    /// within a day), each keyed by its scene. Answers the batch's name. Throws on a refused request.
+    /// </summary>
+    Task<string> SubmitSceneImages(
+        IReadOnlyList<Folio.Domain.Pipeline.SceneImageJob> jobs, string artStyle, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Asks whether a batch has ended and, when it has, hands back each scene's picture or why there is
+    /// none. A batch that failed, was cancelled or expired has ended with no pictures.
+    /// </summary>
+    Task<GeminiBatchPoll> PollSceneImages(string batchName, CancellationToken cancellationToken);
 }
+
+/// <summary>Where a Gemini batch of scene pictures stands: ended or not, and each scene's picture or failure.</summary>
+public sealed record GeminiBatchPoll(bool Ended, IReadOnlyList<Folio.Domain.Pipeline.BatchItem<byte[]>> Images);
 
 // Fetches the plain text of a source document (Google Doc or a supported uploaded format) selected via
 // the in-app Drive picker, using the browser-granted OAuth access token.

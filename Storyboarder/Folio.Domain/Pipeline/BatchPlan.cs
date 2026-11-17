@@ -70,6 +70,18 @@ public static class BatchKinds
 
     /// <summary>The reader passes on the strong model, after one direct pass has written the cache.</summary>
     public const string ReadsStrong = "reads-strong";
+
+    /// <summary>
+    /// The scene pictures on Gemini's batch tier, one batch after another ("scene-images-1", "-2", …), each
+    /// within <see cref="ImageBatchPlan.Budget"/>.
+    /// </summary>
+    public const string SceneImagesPrefix = "scene-images-";
+
+    /// <summary>
+    /// Recorded when Gemini refused a batch, or one came back with no pictures at all: the draft's remaining
+    /// pictures go one at a time rather than batch after failing batch.
+    /// </summary>
+    public const string SceneImagesOff = "scene-images-off";
 }
 
 /// <summary>
@@ -77,3 +89,45 @@ public static class BatchKinds
 /// as a direct pass stores it), or why there is none. A reader's short read is a failure here too.
 /// </summary>
 public sealed record PassBatchItem(string PersonaId, string? Json, string? Failure);
+
+/// <summary>One scene's picture, as a batch request: its wordless prompt, the reference sheets of whoever is in it, its shape.</summary>
+public sealed record SceneImageJob(int SceneNumber, string Prompt, IReadOnlyList<byte[]> References, double? AspectRatio)
+{
+    /// <summary>
+    /// About how many bytes this request adds to an inline batch: every reference sheet goes base64, a third
+    /// larger than its bytes, beside the prompt and a little JSON.
+    /// </summary>
+    public long ApproxBytes => References.Sum(reference => ((long)reference.Length + 2) / 3 * 4) + Prompt.Length * 2L + 2_000;
+}
+
+/// <summary>
+/// How a book's scene pictures are split into Gemini batches (owner's request: the batch tier for images too).
+/// An inline batch is capped at about 20 MB and each request carries its reference sheets, so scenes go in
+/// order until the next would pass the budget; a scene too large for any batch on its own goes one at a time.
+/// </summary>
+public static class ImageBatchPlan
+{
+    /// <summary>Under the 20 MB inline limit, with room for the batch's own JSON.</summary>
+    public const long Budget = 18_000_000;
+
+    public static (IReadOnlyList<SceneImageJob> Chunk, IReadOnlyList<SceneImageJob> TooLarge) Chunk(
+        IReadOnlyList<SceneImageJob> jobs, long budget = Budget)
+    {
+        var chunk = new List<SceneImageJob>();
+        var tooLarge = new List<SceneImageJob>();
+        long used = 0;
+        foreach (var job in jobs)
+        {
+            if (job.ApproxBytes > budget)
+            {
+                tooLarge.Add(job);
+                continue;
+            }
+            if (used + job.ApproxBytes > budget)
+                break;
+            chunk.Add(job);
+            used += job.ApproxBytes;
+        }
+        return (chunk, tooLarge);
+    }
+}

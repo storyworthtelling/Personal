@@ -570,8 +570,14 @@ Batch where the calls are independent and nobody is waiting; keep the rest as th
 **What the owner gives up (accepted, R39):** a report that arrives in about fifteen minutes. A batched
 read usually comes back well inside the hour, but may take up to a day.
 
-**Gemini's image generation** is a separate provider. Whether it has an equivalent batch mode is to be
-checked, not assumed.
+**Gemini's image generation** is a separate provider. Whether it has an equivalent batch mode was to be
+checked, not assumed. **Checked and built (owner's request):**
+- **The tier.** Gemini has a batch tier, `batchGenerateContent`, at half price with a 24-hour target. The
+  wire shape was read from Google's own Gen AI .NET SDK.
+- **How images go.** The scene pictures go in batches within an 18 MB inline budget. Scenes a batch didn't
+  paint go one at a time.
+- **Turning it off.** A refused or empty batch turns batching off for the draft.
+- **Unconfirmed.** Whether the image model is accepted on the batch tier awaits the first live run.
 
 ## 4. Open questions for the owner
 All answered (R34–R42). New questions will come up when release B begins: the craft anchors for the

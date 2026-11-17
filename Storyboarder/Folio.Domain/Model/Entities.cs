@@ -349,6 +349,10 @@ public class Scene : IRetryable
     // the scene so the report reads each scene's verdict from the scene itself, never by position in a
     // separate list. Its attempts are counted apart from the image's.
     public string? JudgementJson { get; set; }
+
+    // Whether this scene's picture has been put in a Gemini batch, or set aside from batching (too large, or
+    // alone). A scene a batch did not paint then goes one call at a time, and is never batched twice.
+    public bool ImageBatched { get; set; }
     public int JudgementAttempts { get; set; }
 
     [NotMapped]
@@ -410,6 +414,10 @@ public class BookAnalysis
     // Set once this draft's read has been merged into its series' bible (release G, R20). A series book only;
     // billed once per draft, like the other whole-book calls.
     public bool SeriesBibleUpdated { get; set; }
+
+    // Set once this draft has looked for its series' bible in Drive, when the phone had none (a reset). Once
+    // per draft, so an absent copy is not looked for again on every step.
+    public bool SeriesBibleRestoreChecked { get; set; }
 
     // Set once the series bible, as this draft left it, has been sent to the tablet and Drive (R26), or
     // given up on. Best-effort: the bible is a convenience beside the report, never a reason to hold it.
@@ -500,6 +508,10 @@ public class SeriesBibleRecord
     // history shows each change; null until the first backup. When it was last written, or null.
     public string? DriveDocId { get; set; }
     public DateTimeOffset? BackedUpAtUtc { get; set; }
+
+    // The bible's data as plain JSON in Drive, beside the Doc and rewritten with it: what a new phone restores
+    // from. Null until the first backup, or until a restore finds it.
+    public string? DriveDataId { get; set; }
 }
 
 public class ModelBatch

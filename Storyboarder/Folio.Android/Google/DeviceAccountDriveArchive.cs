@@ -131,6 +131,63 @@ public sealed class DeviceAccountDriveArchive(DeviceAccountTokenProvider tokens)
             ?? throw new InvalidOperationException($"Drive accepted the Google Doc '{name}' but returned no file id.");
     }
 
+    public async Task<string> WriteTextFile(
+        string? fileId, string folderId, string name, string mimeType, string text, CancellationToken cancellationToken)
+    {
+        using var service = await Service();
+        var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+
+        // Rewritten in place, by id; a file deleted by hand is made again rather than failing.
+        if (!string.IsNullOrEmpty(fileId))
+        {
+            try
+            {
+                using var replacement = new MemoryStream(bytes);
+                var update = service.Files.Update(new DriveFile(), fileId, replacement, mimeType);
+                update.Fields = "id";
+                var updated = await update.UploadAsync(cancellationToken);
+                if (updated.Exception is null)
+                    return fileId;
+                if (updated.Exception is not global::Google.GoogleApiException { HttpStatusCode: System.Net.HttpStatusCode.NotFound })
+                    throw updated.Exception;
+            }
+            catch (global::Google.GoogleApiException missing) when (missing.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+            }
+        }
+
+        using var stream = new MemoryStream(bytes);
+        var create = service.Files.Create(new DriveFile { Name = name, Parents = [folderId] }, stream, mimeType);
+        create.Fields = "id";
+        var result = await create.UploadAsync(cancellationToken);
+        if (result.Exception is not null)
+            throw result.Exception;
+        return create.ResponseBody?.Id
+            ?? throw new InvalidOperationException($"Drive accepted the file '{name}' but returned no file id.");
+    }
+
+    public async Task<string?> FindFileByName(string name, CancellationToken cancellationToken)
+    {
+        using var service = await Service();
+        var list = service.Files.List();
+        list.Q = DriveQuery.Name(name);
+        list.Fields = "files(id, modifiedTime)";
+        list.OrderBy = "modifiedTime desc";
+        list.PageSize = 1;
+        var found = await list.ExecuteAsync(cancellationToken);
+        return found.Files is { Count: > 0 } ? found.Files[0].Id : null;
+    }
+
+    public async Task<string> ReadTextFile(string fileId, CancellationToken cancellationToken)
+    {
+        using var service = await Service();
+        using var stream = new MemoryStream();
+        var progress = await service.Files.Get(fileId).DownloadAsync(stream, cancellationToken);
+        if (progress.Exception is not null)
+            throw progress.Exception;
+        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    }
+
     private async Task<DriveService> Service()
     {
         var token = await tokens.GetAccessToken();

@@ -555,17 +555,66 @@ public sealed class ReviewProcessor : IPipelineStep
             return ProcessResult.DidWork(novel.Id);
         }
 
+        // 0c) The pictures go to Gemini's batch tier (owner's request): the fresh scenes whose prompts are back,
+        // in batches within the inline size budget, one batch at a time. While one is out, those scenes wait;
+        // scenes still needing a prompt, and retries after a refusal, go on one at a time. A scene a batch did
+        // not paint goes one at a time afterwards. A refused batch, or one that comes back with no pictures at
+        // all, turns batching off for the draft; an offline phone just waits.
+        var imageBatches = await db.ModelBatches
+            .Where(b => b.NovelId == novel.Id && b.Kind.StartsWith(BatchKinds.SceneImagesPrefix))
+            .ToListAsync(cancellationToken);
+        var batchingOff = imageBatches.Any(b => b.Kind == BatchKinds.SceneImagesOff);
+        var openImages = imageBatches.FirstOrDefault(b => b.Kind != BatchKinds.SceneImagesOff && b.CompletedAtUtc == null);
+        var imagesInFlight = false;
+        var imagesWait = BatchPlan.PollEvery;
+        if (!batchingOff && !promptsInFlight)
+        {
+            var fresh = await db.Scenes
+                .Where(s => s.NovelId == novel.Id && s.ImageStatus == WorkStatus.Pending && !s.ImageBatched
+                            && s.ImagePrompt != null && s.ImagePrompt != "" && s.LastError == null)
+                .OrderBy(s => s.Number)
+                .ToListAsync(cancellationToken);
+            var (imageStep, wait) = BatchPlan.Decide(openImages is null ? fresh.Count : 1, StateOf(openImages), now);
+            switch (imageStep)
+            {
+                case BatchStep.Submit:
+                    return await SubmitImageBatch(db, novel, source, fresh, imageBatches, now, cancellationToken);
+                case BatchStep.Poll:
+                    if (await PollImageBatch(db, novel, openImages!, now, cancellationToken) is { } polled)
+                        return polled;
+                    imagesInFlight = true;
+                    break;
+                case BatchStep.Wait:
+                    imagesInFlight = true;
+                    imagesWait = wait;
+                    break;
+                case BatchStep.Abandon:
+                    openImages!.CompletedAtUtc = now;
+                    logger.LogWarning("Image batch {BatchId} for manuscript {NovelId} outlived its window; its scenes go one at a time",
+                        openImages.BatchId, novel.Id);
+                    await db.SaveChangesAsync(cancellationToken);
+                    return ProcessResult.DidWork(novel.Id);
+            }
+        }
+
         // 1) Render one pending/due scene image. While a prompt batch is in flight, only a scene whose
-        // prompt is already back is taken; with none, wait for the next poll.
+        // prompt is already back is taken; with none, wait for the next poll. While a picture batch is in
+        // flight, a fresh scene waits for it.
         var scene = await db.Scenes
             .Where(s => s.NovelId == novel.Id &&
                         (s.ImageStatus == WorkStatus.Pending ||
                          (s.ImageStatus == WorkStatus.NeedsRetry && s.NextAttemptAtUtc <= now)) &&
-                        (!promptsInFlight || (s.ImagePrompt != null && s.ImagePrompt != "")))
-            .OrderBy(s => s.Number)
+                        (!promptsInFlight || (s.ImagePrompt != null && s.ImagePrompt != "")) &&
+                        (!imagesInFlight || s.ImageBatched || s.LastError != null || s.ImagePrompt == null || s.ImagePrompt == ""))
+            // With batching on, every prompt is derived before any fresh picture is painted, so the fresh scenes
+            // gather for a batch rather than each being painted the moment its own prompt is back.
+            .OrderBy(s => batchingOff || (s.ImagePrompt != null && s.ImagePrompt != "") ? 1 : 0)
+            .ThenBy(s => s.Number)
             .FirstOrDefaultAsync(cancellationToken);
         if (scene is null && promptsInFlight)
             return ProcessResult.Waiting(promptWait, novel.Id);
+        if (scene is null && imagesInFlight)
+            return ProcessResult.Waiting(imagesWait, novel.Id);
 
         if (scene is not null)
         {
@@ -1144,6 +1193,20 @@ public sealed class ReviewProcessor : IPipelineStep
             }
 
             Touch(novel);
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        // 2e1) A phone with no bible for this series (a reset) puts it back from Drive first, so the placement
+        // guess and the continuity read see the owner's corrections. Once per draft; a phone that has its bible
+        // asks Drive nothing. Best-effort: whatever the outcome, the review goes on.
+        if (novel.SeriesId is { } restoreSeries && !analysis.SeriesBibleRestoreChecked)
+        {
+            var restored = await new SeriesBibleBackup(dbContextFactory, delivery, archiveOptions, clock, logger)
+                .RestoreAsync(restoreSeries, cancellationToken);
+            if (restored != BibleRestore.NotNeeded)
+                logger.LogInformation("Series bible restore for manuscript {NovelId}: {Outcome}", novel.Id, restored);
+            analysis.SeriesBibleRestoreChecked = true;
             await db.SaveChangesAsync(cancellationToken);
             return ProcessResult.DidWork(novel.Id);
         }
@@ -2499,6 +2562,120 @@ public sealed class ReviewProcessor : IPipelineStep
     }
 
     // ---- Batches (owner's ruling, R39) ----------------------------------------------------------------
+
+    // Puts the next batch of fresh scenes' pictures on Gemini's batch tier, within the inline size budget. A
+    // scene too large for any batch, or left alone in one, is set aside to go one at a time.
+    private async Task<ProcessResult> SubmitImageBatch(
+        FolioDbContext db, Novel novel, string source, IReadOnlyList<Scene> fresh, IReadOnlyList<ModelBatch> batches,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var jobs = new List<SceneImageJob>();
+        foreach (var candidate in fresh)
+        {
+            var start = Math.Clamp(candidate.StartOffset, 0, source.Length);
+            var text = source[start..Math.Clamp(candidate.EndOffset, start, source.Length)];
+            jobs.Add(new SceneImageJob(candidate.Number, candidate.ImagePrompt!,
+                await LoadSceneReferenceImages(db, novel.Id, text, cancellationToken), PortraitAspectRatio));
+        }
+        var (chunk, tooLarge) = ImageBatchPlan.Chunk(jobs);
+        var byNumber = fresh.ToDictionary(scene => scene.Number);
+        foreach (var job in tooLarge)
+            byNumber[job.SceneNumber].ImageBatched = true;
+        if (chunk.Count < BatchPlan.MinimumItems)
+        {
+            foreach (var job in chunk)
+                byNumber[job.SceneNumber].ImageBatched = true;
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        if (!geminiLimiter.TryAcquire())
+            return ProcessResult.Waiting(geminiLimiter.TimeUntilNext(), novel.Id);
+
+        string? name;
+        try
+        {
+            name = await gemini.SubmitSceneImages(chunk, novel.ArtStyle, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && (NetworkFailure.IsOffline(ex) || ex is RateLimitException))
+        {
+            var delay = ex is RateLimitException limit ? backoff.NextDelay(0, limit.RetryAfter) : TimeSpan.FromSeconds(rateLimits.OfflineRetrySeconds);
+            logger.LogWarning(ex, "Image batch for manuscript {NovelId} not submitted (offline or throttled); trying again later", novel.Id);
+            return ProcessResult.Waiting(delay, novel.Id);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Gemini refused the image batch for manuscript {NovelId}; its pictures go one at a time", novel.Id);
+            name = null;
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            db.ModelBatches.Add(new ModelBatch { NovelId = novel.Id, Kind = BatchKinds.SceneImagesOff, SubmittedAtUtc = now, CompletedAtUtc = now });
+            await db.SaveChangesAsync(cancellationToken);
+            return ProcessResult.DidWork(novel.Id);
+        }
+
+        var number = batches.Count(b => b.Kind != BatchKinds.SceneImagesOff) + 1;
+        db.ModelBatches.Add(new ModelBatch
+        {
+            NovelId = novel.Id, Kind = BatchKinds.SceneImagesPrefix + number, BatchId = name, SubmittedAtUtc = now,
+        });
+        foreach (var job in chunk)
+            byNumber[job.SceneNumber].ImageBatched = true;
+        logger.LogInformation("Image batch {BatchId} submitted for manuscript {NovelId}: {Count} scenes", name, novel.Id, chunk.Count);
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
+    }
+
+    // Asks whether the open picture batch has ended; when it has, each picture lands on its own scene. Null
+    // while it runs. A batch that ended with no pictures at all turns batching off for the draft.
+    private async Task<ProcessResult?> PollImageBatch(
+        FolioDbContext db, Novel novel, ModelBatch batch, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        GeminiBatchPoll poll;
+        try
+        {
+            poll = await gemini.PollSceneImages(batch.BatchId, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Could not ask after image batch {BatchId} for manuscript {NovelId}; asking again later",
+                batch.BatchId, novel.Id);
+            batch.LastPolledAtUtc = now;
+            await db.SaveChangesAsync(cancellationToken);
+            return null;
+        }
+
+        batch.LastPolledAtUtc = now;
+        if (!poll.Ended)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return null;
+        }
+
+        var scenes = await db.Scenes.Where(s => s.NovelId == novel.Id).ToListAsync(cancellationToken);
+        var painted = 0;
+        foreach (var item in poll.Images.Where(item => item.Value is { Length: > 0 }))
+        {
+            if (scenes.FirstOrDefault(s => s.Number == item.SceneNumber && s.ImageStatus != WorkStatus.Completed) is not { } painting)
+                continue;
+            painting.ImagePath = imageStore.Save($"{novel.Id}/scenes/scene-{painting.Number}.png", item.Value!);
+            painting.ImageStatus = WorkStatus.Completed;
+            painting.LastError = null;
+            painted++;
+        }
+        batch.CompletedAtUtc = now;
+        if (painted == 0)
+            db.ModelBatches.Add(new ModelBatch { NovelId = novel.Id, Kind = BatchKinds.SceneImagesOff, SubmittedAtUtc = now, CompletedAtUtc = now });
+        logger.LogInformation(
+            "Image batch {BatchId} for manuscript {NovelId}: {Painted} pictures of {Asked}; the rest go one at a time",
+            batch.BatchId, novel.Id, painted, poll.Images.Count);
+        Touch(novel);
+        await db.SaveChangesAsync(cancellationToken);
+        return ProcessResult.DidWork(novel.Id);
+    }
 
     private static BatchState? StateOf(ModelBatch? batch) =>
         batch is null ? null : new BatchState(batch.SubmittedAtUtc, batch.LastPolledAtUtc, batch.CompletedAtUtc);

@@ -59,6 +59,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<bool>("SeriesBibleDelivered")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("SeriesBibleRestoreChecked")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("SeriesBibleUpdated")
                         .HasColumnType("INTEGER");
 
@@ -519,6 +522,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<int>("EndOffset")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("ImageBatched")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ImagePath")
                         .HasColumnType("TEXT");
 
@@ -569,6 +575,9 @@ namespace Folio.Infrastructure.Migrations
 
                     b.Property<long?>("BackedUpAtUtc")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("DriveDataId")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("DriveDocId")
                         .HasColumnType("TEXT");

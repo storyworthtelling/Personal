@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Folio.Domain.Model;
 using Folio.Domain.Series;
 using Folio.Domain.Time;
 using Folio.Infrastructure.Configuration;
@@ -29,6 +30,12 @@ public sealed class SeriesBibleBackup(
 {
     /// <summary>The doc's name in Drive. Never dated: it is the same document, version after version.</summary>
     public static string DocName(string series) => $"{series} — Series bible";
+
+    /// <summary>
+    /// The bible's own data in Drive, plain JSON beside the Doc and rewritten with it (owner's request): what
+    /// a new phone restores from. The Doc is for reading; this is for putting the bible back whole.
+    /// </summary>
+    public static string DataName(string series) => $"{series} — Series bible (data).json";
 
     /// <summary>
     /// Writes the series' bible to its doc, and answers whether it did. <paramref name="occasion"/> is what
@@ -68,6 +75,9 @@ public sealed class SeriesBibleBackup(
             record.DriveDocId = await delivery.WriteDriveDoc(
                 record.DriveDocId, folder ?? string.Empty, DocName(series),
                 BibleDocumentText.For(series, bible, placements, occasion), cancellationToken);
+            record.DriveDataId = await delivery.WriteDriveText(
+                record.DriveDataId, folder ?? string.Empty, DataName(series), "application/json",
+                SeriesBibleCodec.Write(bible), cancellationToken);
             record.BackedUpAtUtc = clock.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
             logger.LogInformation("Backed up the series bible to its Drive doc ({Occasion})", occasion);
@@ -79,4 +89,82 @@ public sealed class SeriesBibleBackup(
             return false;
         }
     }
+
+    /// <summary>
+    /// Puts a series' bible back from Drive on a phone that has none for it (a reset). Found by its data
+    /// file's name, under the series' name or, failing that, its first book's title; rebound to this phone's
+    /// books by title; the owner's corrections come with it. The Doc and data are remembered so the next
+    /// backup rewrites them. A phone that has its bible asks Drive nothing, and nothing is written from a copy
+    /// that will not read or a Drive that will not answer.
+    /// </summary>
+    public async Task<BibleRestore> RestoreAsync(Guid seriesId, CancellationToken cancellationToken)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var record = await db.SeriesBibles.FirstOrDefaultAsync(bible => bible.SeriesId == seriesId, cancellationToken);
+        if (record is not null && (!SeriesBibleCodec.TryRead(record.Json, out var held) || held.Entries.Count > 0))
+            return BibleRestore.NotNeeded;
+        if (delivery is not { CanArchiveToDrive: true })
+            return BibleRestore.Unavailable;
+
+        var drafts = await db.Novels
+            .Where(novel => novel.SeriesId == seriesId && novel.DeletedAtUtc == null)
+            .Select(novel => new { novel.ProjectId, novel.Title, novel.SeriesName, novel.SeriesSequence, novel.DraftNumber })
+            .ToListAsync(cancellationToken);
+        var local = drafts.GroupBy(draft => draft.ProjectId)
+            .Select(book => book.OrderByDescending(draft => draft.DraftNumber).First())
+            .Select(book => new SeriesBook(book.ProjectId, book.Title, book.SeriesSequence))
+            .OrderBy(book => book.Written).ToList();
+        var names = new[]
+            {
+                drafts.Select(draft => draft.SeriesName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)),
+                local.FirstOrDefault()?.Title,
+            }
+            .Where(name => !string.IsNullOrWhiteSpace(name)).Select(name => name!).Distinct().ToList();
+
+        try
+        {
+            foreach (var series in names)
+            {
+                if (await delivery.FindDriveFile(DataName(series), cancellationToken) is not { } dataId)
+                    continue;
+
+                if (!SeriesBibleCodec.TryRead(await delivery.ReadDriveText(dataId, cancellationToken), out var bible) || bible.Entries.Count == 0)
+                {
+                    logger.LogWarning("The series bible found in Drive would not read; it was left as it is and nothing was restored");
+                    return BibleRestore.Unreadable;
+                }
+
+                var docId = await delivery.FindDriveFile(DocName(series), cancellationToken);
+                if (record is null)
+                {
+                    record = new SeriesBibleRecord { SeriesId = seriesId };
+                    db.SeriesBibles.Add(record);
+                }
+                record.Json = SeriesBibleCodec.Write(bible.Rebind(local));
+                record.UpdatedAtUtc = clock.UtcNow;
+                record.DriveDataId = dataId;
+                record.DriveDocId = docId;
+                await db.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Restored a series bible from Drive: {Entries} entries across {Books} books",
+                    bible.Entries.Count, bible.Books.Count);
+                return BibleRestore.Restored;
+            }
+            return BibleRestore.NotFound;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Drive could not be asked for a series bible to restore");
+            return BibleRestore.Unavailable;
+        }
+    }
+}
+
+/// <summary>What a restore of a series bible from Drive came to.</summary>
+public enum BibleRestore
+{
+    NotNeeded,
+    Restored,
+    NotFound,
+    Unreadable,
+    Unavailable,
 }
