@@ -554,7 +554,7 @@ same hue.
 
 **One place for each build setting (audit W12; `RepoGuards.Tests/OneBuildSettingTests` holds all of it):**
 - **Package versions** live in the root `Directory.Packages.props` (central package management with transitive pinning). A csproj names a package and never its version; the four MAUI heads say `VersionOverride="$(MauiVersion)"`, since MAUI's version comes from its workload. A patched version of a package that only arrives transitively is pinned there too (the security pins: MimeKit, `System.Security.Cryptography.Pkcs`, the `SQLitePCLRaw` family). Check with `dotnet list <tests csproj> package --vulnerable --include-transitive`.
-- **The SDK and the workload set** are pinned in the root `global.json` (`sdk.version`, `sdk.workloadVersion`), and `.github/actions/dotnet` sets up .NET from that file, so CI builds with what a local build has.
+- **The SDK** is pinned in the root `global.json` (`sdk.version`), and `.github/actions/dotnet` sets up .NET from that file, so CI builds with what a local build has. **The workload is deliberately not pinned there:** a `sdk.workloadVersion` makes every `dotnet` command need that workload set installed, so every job that installs none (the guards, the libraries' tests) fails before it builds.
 - **One Android minimum:** every Android project says `SupportedOSPlatformVersion` 34 and nothing else (no `AndroidMinSdkVersion`).
 - **Every test project collects coverage** (`coverlet.collector`), and every Android workflow pins JDK 21.
 

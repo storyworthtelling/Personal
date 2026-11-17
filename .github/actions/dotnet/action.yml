@@ -31,8 +31,9 @@ runs:
         path: ~/.dotnet
         key: dotnet10-${{ runner.os }}-${{ inputs.workload }}-${{ hashFiles('global.json') }}-${{ steps.where.outputs.week }}
 
-    # The SDK and the workload set are both pinned in global.json (audit W12.3), so CI builds with what a
-    # local build has; moving either is one edit there.
+    # The SDK is pinned in global.json (audit W12.3), so CI builds with what a local build has. The workload
+    # is not pinned there: a workloadVersion makes every dotnet command need that workload set installed,
+    # which fails every job that installs none (OneBuildSettingTests).
     - name: Setup .NET 10
       uses: actions/setup-dotnet@v4
       with:
@@ -51,5 +52,4 @@ runs:
     - name: Install the workload
       if: inputs.workload != '' && steps.sdk.outputs.cache-hit != 'true'
       shell: bash
-      # Installs the workload set global.json names (sdk.workloadVersion), not whatever is newest.
       run: dotnet workload install ${{ inputs.workload }}

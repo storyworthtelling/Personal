@@ -5,7 +5,7 @@ namespace RepoGuards.Tests;
 
 /// <summary>
 /// Audit W12: one place for each build setting. Every package version lives in <c>Directory.Packages.props</c> (a
-/// project names a package and nothing more), the SDK and the workload set are pinned in <c>global.json</c>, every
+/// project names a package and nothing more), the SDK is pinned in <c>global.json</c> (and only the SDK), every
 /// Android project has the one minimum (API 34, the suite's phones), and every test project collects coverage.
 /// </summary>
 public partial class OneBuildSettingTests
@@ -45,11 +45,13 @@ public partial class OneBuildSettingTests
     }
 
     [Fact]
-    public void TheSdkAndTheWorkloadSetArePinned()
+    public void TheSdkIsPinnedAndTheWorkloadIsNot()
     {
         var json = File.ReadAllText(Path.Combine(Root, "global.json"));
         Assert.Matches(@"""version"":\s*""10\.0\.\d+""", json);
-        Assert.Matches(@"""workloadVersion"":\s*""10\.0\.\d+""", json);
+        // A workloadVersion in global.json makes every dotnet command resolve that workload set, so every job
+        // that installs no workload (the guards, the libraries' tests) fails before it builds anything.
+        Assert.DoesNotContain("workloadVersion", json, StringComparison.Ordinal);
         Assert.Contains("global-json-file: global.json", File.ReadAllText(Path.Combine(Root, ".github/actions/dotnet/action.yml")), StringComparison.Ordinal);
     }
 
