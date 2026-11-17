@@ -454,6 +454,98 @@ public class ReviewProcessorTests : IDisposable
         Assert.Equal(["Prompt for scene one.", "Prompt for scene two."], prompts);
     }
 
+    // The scene pictures on Gemini's batch tier (owner's request).
+
+    private void PicturesBatchAs(string name, Func<IReadOnlyList<SceneImageJob>, GeminiBatchPoll> result, List<IReadOnlyList<SceneImageJob>> submitted)
+    {
+        IReadOnlyList<SceneImageJob> last = [];
+        gemini.Setup(g => g.SubmitSceneImages(It.IsAny<IReadOnlyList<SceneImageJob>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((IReadOnlyList<SceneImageJob> jobs, string _, CancellationToken _) =>
+            {
+                submitted.Add(jobs);
+                last = jobs;
+                return Task.FromResult(name);
+            });
+        gemini.Setup(g => g.PollSceneImages(name, It.IsAny<CancellationToken>()))
+            .Returns(() => Task.FromResult(result(last)));
+    }
+
+    /// <summary>A book's fresh scenes are painted in a batch, not one call each, and each picture lands on its own scene.</summary>
+    [Fact]
+    public async Task ScenePicturesArePaintedInABatch()
+    {
+        var submitted = new List<IReadOnlyList<SceneImageJob>>();
+        PicturesBatchAs("batches/one", jobs => new GeminiBatchPoll(true,
+            [.. jobs.Select(job => new BatchItem<byte[]>(job.SceneNumber, SampleImages.Png(), null))]), submitted);
+
+        var id = SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal([1, 2], Assert.Single(submitted).Select(job => job.SceneNumber));
+        gemini.Verify(g => g.GenerateSceneImage(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+            It.IsAny<double?>(), It.IsAny<CancellationToken>()), Times.Never());
+        using var context = database.NewContext();
+        Assert.All(context.Scenes.Where(scene => scene.NovelId == id).ToList(), scene =>
+        {
+            Assert.Equal(WorkStatus.Completed, scene.ImageStatus);
+            Assert.True(File.Exists(scene.ImagePath));
+        });
+        var batch = Assert.Single(context.ModelBatches, row => row.Kind.StartsWith(BatchKinds.SceneImagesPrefix));
+        Assert.Equal(BatchKinds.SceneImagesPrefix + "1", batch.Kind);
+        Assert.NotNull(batch.CompletedAtUtc);
+    }
+
+    /// <summary>A scene the batch did not paint (refused or errored) goes one call at a time afterwards.</summary>
+    [Fact]
+    public async Task AScenePictureTheBatchDidNotPaintGoesOneAtATime()
+    {
+        var submitted = new List<IReadOnlyList<SceneImageJob>>();
+        PicturesBatchAs("batches/one", jobs => new GeminiBatchPoll(true,
+        [
+            new BatchItem<byte[]>(1, SampleImages.Png(), null),
+            new BatchItem<byte[]>(2, null, "Gemini batch item failed: internal"),
+        ]), submitted);
+
+        SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Single(submitted);
+        gemini.Verify(g => g.GenerateSceneImage(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+            It.IsAny<double?>(), It.IsAny<CancellationToken>()), Times.Once());
+    }
+
+    /// <summary>
+    /// If Gemini refuses the batch, or a batch comes back with no pictures at all, the draft's pictures go one
+    /// at a time from then on rather than batch after failing batch.
+    /// </summary>
+    [Theory]
+    [InlineData("refused")]
+    [InlineData("empty")]
+    public async Task AFailingBatchTierTurnsBatchingOffForTheDraft(string how)
+    {
+        var submits = 0;
+        gemini.Setup(g => g.SubmitSceneImages(It.IsAny<IReadOnlyList<SceneImageJob>>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                submits++;
+                return how == "refused"
+                    ? Task.FromException<string>(new HttpRequestException("400 model not supported in batch", null, System.Net.HttpStatusCode.BadRequest))
+                    : Task.FromResult("batches/empty");
+            });
+        gemini.Setup(g => g.PollSceneImages("batches/empty", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GeminiBatchPoll(true, []));
+
+        var id = SeedManuscript(TwoScenes);
+        await DriveToCompletion(NewProcessor());
+
+        Assert.Equal(1, submits);
+        gemini.Verify(g => g.GenerateSceneImage(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<byte[]>>(),
+            It.IsAny<double?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        using var context = database.NewContext();
+        Assert.Contains(context.ModelBatches, row => row.NovelId == id && row.Kind == BatchKinds.SceneImagesOff);
+        Assert.Equal(ProjectStage.Completed, context.Novels.Single(n => n.Id == id).Stage);
+    }
+
     [Fact]
     public async Task EveryPassRunsOnceAndTheSynthesisSeesThemAll()
     {

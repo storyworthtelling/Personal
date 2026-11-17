@@ -238,4 +238,87 @@ public class GeminiImageClientTests
 
         Assert.DoesNotContain("imageConfig", handler.RequestBodies[0]);
     }
+
+    // The scene pictures on Gemini's batch tier. Wire names read out of Google's own Gen AI .NET SDK
+    // (Google.GenAI 2.2.0's Batches converters), since the docs host is not reachable from here.
+
+    [Fact]
+    public async Task ABatchOfScenePicturesIsSubmittedInlineWithEachScenesKey()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"name\":\"batches/abc123\",\"metadata\":{\"state\":\"BATCH_STATE_PENDING\"}}");
+
+        var name = await client.SubmitSceneImages(
+        [
+            new SceneImageJob(3, "A knight at the gate.", [PngBytes], 2.0 / 3.0),
+            new SceneImageJob(7, "A boat in fog.", [], null),
+        ], "ink-wash", CancellationToken.None);
+
+        Assert.Equal("batches/abc123", name);
+        var request = handler.Requests[0];
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.EndsWith("/v1beta/models/gemini-2.5-flash-image:batchGenerateContent", request.RequestUri!.GetLeftPart(UriPartial.Path));
+        using var body = JsonDocument.Parse(handler.RequestBodies[0]);
+        var requests = body.RootElement.GetProperty("batch").GetProperty("inputConfig")
+            .GetProperty("requests").GetProperty("requests").EnumerateArray().ToList();
+        Assert.Equal(2, requests.Count);
+        Assert.Equal("scene-3", requests[0].GetProperty("metadata").GetProperty("key").GetString());
+        var first = requests[0].GetProperty("request");
+        Assert.Contains("A knight at the gate.", first.GetProperty("contents")[0].GetProperty("parts")[0].GetProperty("text").GetString());
+        Assert.Equal(Convert.ToBase64String(PngBytes),
+            first.GetProperty("contents")[0].GetProperty("parts")[1].GetProperty("inlineData").GetProperty("data").GetString());
+        Assert.Equal("IMAGE", first.GetProperty("generationConfig").GetProperty("responseModalities")[0].GetString());
+        Assert.Equal("2:3", first.GetProperty("generationConfig").GetProperty("imageConfig").GetProperty("aspectRatio").GetString());
+        Assert.False(requests[1].GetProperty("request").GetProperty("generationConfig").TryGetProperty("imageConfig", out _));
+    }
+
+    [Fact]
+    public async Task ARunningBatchHasNotEnded()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"name\":\"batches/abc123\",\"metadata\":{\"state\":\"BATCH_STATE_RUNNING\"}}");
+
+        var poll = await client.PollSceneImages("batches/abc123", CancellationToken.None);
+
+        Assert.False(poll.Ended);
+        Assert.Equal(HttpMethod.Get, handler.Requests[0].Method);
+        Assert.EndsWith("/v1beta/batches/abc123", handler.Requests[0].RequestUri!.GetLeftPart(UriPartial.Path));
+    }
+
+    /// <summary>Each picture is matched by its key; a refusal or an error is that scene's failure, not the batch's.</summary>
+    [Fact]
+    public async Task AFinishedBatchHandsBackEachScenesPictureOrWhyNot()
+    {
+        var (client, handler) = Create();
+        var ok = ImageReply(PngBytes);
+        handler.EnqueueOk(
+            "{\"name\":\"batches/abc123\",\"metadata\":{\"state\":\"BATCH_STATE_SUCCEEDED\",\"output\":{\"inlinedResponses\":{\"inlinedResponses\":["
+            + "{\"response\":" + ok + ",\"metadata\":{\"key\":\"scene-3\"}},"
+            + "{\"response\":{\"candidates\":[{\"finishReason\":\"IMAGE_SAFETY\"}]},\"metadata\":{\"key\":\"scene-7\"}},"
+            + "{\"error\":{\"code\":500,\"message\":\"internal\"},\"metadata\":{\"key\":\"scene-9\"}}"
+            + "]}}}}");
+
+        var poll = await client.PollSceneImages("batches/abc123", CancellationToken.None);
+
+        Assert.True(poll.Ended);
+        Assert.Equal(PngBytes, poll.Images.Single(item => item.SceneNumber == 3).Value);
+        Assert.Null(poll.Images.Single(item => item.SceneNumber == 7).Value);
+        Assert.NotNull(poll.Images.Single(item => item.SceneNumber == 7).Failure);
+        Assert.Contains("internal", poll.Images.Single(item => item.SceneNumber == 9).Failure);
+    }
+
+    [Theory]
+    [InlineData("BATCH_STATE_FAILED")]
+    [InlineData("BATCH_STATE_EXPIRED")]
+    [InlineData("BATCH_STATE_CANCELLED")]
+    public async Task AFailedOrExpiredBatchHasEndedWithNoPictures(string state)
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk("{\"name\":\"batches/abc123\",\"metadata\":{\"state\":\"" + state + "\"}}");
+
+        var poll = await client.PollSceneImages("batches/abc123", CancellationToken.None);
+
+        Assert.True(poll.Ended);
+        Assert.Empty(poll.Images);
+    }
 }

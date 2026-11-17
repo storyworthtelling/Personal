@@ -522,6 +522,9 @@ namespace Folio.Infrastructure.Migrations
                     b.Property<int>("EndOffset")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("ImageBatched")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ImagePath")
                         .HasColumnType("TEXT");
 

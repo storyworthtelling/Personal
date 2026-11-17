@@ -105,6 +105,119 @@ public sealed class GeminiImageClient : IGeminiImageClient
     private static string NearestAspectRatio(double ratio) =>
         SupportedAspectRatios.MinBy(candidate => Math.Abs(candidate.Ratio - ratio)).Label;
 
+    private const string ApiRoot = "https://generativelanguage.googleapis.com/v1beta";
+
+    // The scene pictures on the batch tier. The wire shape is the Gemini API's own, as Google's Gen AI .NET
+    // SDK writes and reads it: create at models/{model}:batchGenerateContent with the requests under
+    // batch.inputConfig.requests.requests[] (each a request and a metadata key); poll batches/{name}, whose
+    // metadata.state is BATCH_STATE_*; the inline results are at metadata.output.inlinedResponses.inlinedResponses[],
+    // each with its response or error and the metadata it was sent with.
+    public async Task<string> SubmitSceneImages(IReadOnlyList<SceneImageJob> jobs, string artStyle, CancellationToken cancellationToken)
+    {
+        var requests = new JsonArray();
+        foreach (var job in jobs)
+        {
+            requests.Add(new JsonObject
+            {
+                ["request"] = BuildRequest(
+                    BuildSceneImagePrompt(artStyle, job.Prompt, job.References.Count > 0), job.References, job.AspectRatio),
+                ["metadata"] = new JsonObject { ["key"] = $"scene-{job.SceneNumber}" },
+            });
+        }
+        var payload = new JsonObject
+        {
+            ["batch"] = new JsonObject
+            {
+                ["displayName"] = "folio-scene-images",
+                ["inputConfig"] = new JsonObject { ["requests"] = new JsonObject { ["requests"] = requests } },
+            },
+        };
+
+        var url = $"{BaseUrl}/{options.Model}:batchGenerateContent?key={Uri.EscapeDataString(options.ApiKey)}";
+        var body = await Send(HttpMethod.Post, url, payload.ToJsonString(), cancellationToken);
+        using var document = JsonDocument.Parse(body);
+        return document.RootElement.TryGetProperty("name", out var name) && name.GetString() is { Length: > 0 } batch
+            ? batch
+            : throw new InvalidOperationException($"Gemini accepted a batch but named none: {body}");
+    }
+
+    public async Task<GeminiBatchPoll> PollSceneImages(string batchName, CancellationToken cancellationToken)
+    {
+        var url = $"{ApiRoot}/{batchName}?key={Uri.EscapeDataString(options.ApiKey)}";
+        var body = await Send(HttpMethod.Get, url, null, cancellationToken);
+        var root = JsonNode.Parse(body);
+        var state = root?["metadata"]?["state"]?.GetValue<string>() ?? string.Empty;
+        if (state is not ("BATCH_STATE_SUCCEEDED" or "BATCH_STATE_FAILED" or "BATCH_STATE_CANCELLED" or "BATCH_STATE_EXPIRED"))
+            return new GeminiBatchPoll(false, []);
+
+        var responses = (root?["metadata"]?["output"]?["inlinedResponses"]?["inlinedResponses"]
+                         ?? root?["response"]?["inlinedResponses"]?["inlinedResponses"]) as JsonArray;
+        var images = new List<BatchItem<byte[]>>();
+        foreach (var item in responses ?? [])
+        {
+            var key = item?["metadata"]?["key"]?.GetValue<string>();
+            if (key is null || !key.StartsWith("scene-", StringComparison.Ordinal)
+                || !int.TryParse(key["scene-".Length..], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var number))
+                continue;
+
+            if (item?["error"] is { } error)
+            {
+                images.Add(new BatchItem<byte[]>(number, null, $"Gemini batch item failed: {error.ToJsonString()}"));
+                continue;
+            }
+
+            var response = item?["response"]?.ToJsonString() ?? "{}";
+            var image = TryExtractImage(response);
+            images.Add(image is not null
+                ? new BatchItem<byte[]>(number, image, null)
+                : new BatchItem<byte[]>(number, null, ClassifyBlock(response)?.Message ?? "Gemini returned no image for this scene."));
+        }
+        healthSink?.MarkOk(CredentialIds.Gemini);
+        return new GeminiBatchPoll(true, images);
+    }
+
+    private async Task<string> Send(HttpMethod method, string url, string? json, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, url);
+        if (json is not null)
+            request.Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            if (AuthFailure.IsHttpCredentialRejection((int)response.StatusCode, body))
+                healthSink?.MarkFailing(CredentialIds.Gemini, $"{(int)response.StatusCode} {response.StatusCode}");
+            throw ToException(response, body);
+        }
+        return body;
+    }
+
+    // One image request's body: the prompt, the reference sheets, an image back at the slot's shape. The same
+    // for a single call and for an item of a batch.
+    private static JsonObject BuildRequest(string prompt, IReadOnlyList<byte[]> referenceImages, double? aspectRatio)
+    {
+        var parts = new JsonArray { new JsonObject { ["text"] = prompt } };
+        foreach (var referenceImage in referenceImages)
+            parts.Add(new JsonObject
+            {
+                ["inlineData"] = new JsonObject
+                {
+                    ["mimeType"] = "image/png",
+                    ["data"] = Convert.ToBase64String(referenceImage)
+                }
+            });
+
+        var generationConfig = new JsonObject { ["responseModalities"] = new JsonArray("IMAGE") };
+        if (aspectRatio is { } ratio)
+            generationConfig["imageConfig"] = new JsonObject { ["aspectRatio"] = NearestAspectRatio(ratio) };
+
+        return new JsonObject
+        {
+            ["contents"] = new JsonArray(new JsonObject { ["parts"] = parts }),
+            ["generationConfig"] = generationConfig
+        };
+    }
+
     private async Task<byte[]> Generate(
         string prompt, IReadOnlyList<byte[]> referenceImages, double? aspectRatio,
         CancellationToken cancellationToken)

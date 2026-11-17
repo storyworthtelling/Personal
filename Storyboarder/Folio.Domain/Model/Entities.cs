@@ -349,6 +349,10 @@ public class Scene : IRetryable
     // the scene so the report reads each scene's verdict from the scene itself, never by position in a
     // separate list. Its attempts are counted apart from the image's.
     public string? JudgementJson { get; set; }
+
+    // Whether this scene's picture has been put in a Gemini batch, or set aside from batching (too large, or
+    // alone). A scene a batch did not paint then goes one call at a time, and is never batched twice.
+    public bool ImageBatched { get; set; }
     public int JudgementAttempts { get; set; }
 
     [NotMapped]
