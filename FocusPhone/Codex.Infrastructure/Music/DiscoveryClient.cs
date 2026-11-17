@@ -21,7 +21,14 @@ public sealed class DiscoveryClient : IDiscoveryClient
     // The crate can ask for up to forty of each kind; a short reply is cheap, but a reply
     // cut off mid-array would lose the whole crate to a JSON parse, so this is sized to the
     // largest request rather than the usual one.
-    private const int WeeklyMaxTokens = 4_000;
+    //
+    // Raised from 4,000 with web search: the reply now carries the searches' own turns
+    // before the crate, and a crate cut short is a crate lost.
+    private const int WeeklyMaxTokens = 8_000;
+
+    // Each search is billed (and its results are read as input), and the crate is weekly;
+    // a handful is enough to find what came out this season in the listener's corner.
+    private const int WeeklySearches = 5;
 
     private const string PlaylistInstruction =
         "You are a music curator picking a playlist from ONE listener’s own library. You are given their " +
@@ -37,7 +44,14 @@ public sealed class DiscoveryClient : IDiscoveryClient
         "the albums they belong to), and the PODCASTS THEY ALREADY FOLLOW. Both lists are evidence of taste " +
         "and lists of what to AVOID recommending — never pick a track, another release of an album already " +
         "represented in the library, or a podcast already followed. Favour variety and things adjacent to " +
-        "their taste rather than the safest possible match, and honour what the profile says they avoid. The " +
+        "their taste rather than the safest possible match, and honour what the profile says they avoid. " +
+        "You are also given TODAY's date and what RECENT CRATES already offered: never offer any of those again, " +
+        "and lean towards artists, scenes and eras those crates did not visit, so no two weeks look alike. " +
+        "About a third of the music picks should be NEW RELEASES — records released in the three months before " +
+        "today that fit their taste. Your own knowledge stops before today, so use web search to find what " +
+        "has actually come out recently (new album reviews, release roundups for their genres); only name a " +
+        "new release you found or are sure of, and say in its why that it is new. If you cannot search, name " +
+        "the most recent fitting releases you know of instead. The rest of the crate is not new releases. The " +
         "two counts are exact and set separately: MUSIC PICKS is how many songs and albums to give (mix them " +
         "rather than picking songs alone), and PODCAST PICKS is how many shows to give, where zero means no " +
         "shows at all. Give each pick a SHORT reason in one " +
@@ -68,45 +82,78 @@ public sealed class DiscoveryClient : IDiscoveryClient
 
     public async Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
         TasteProfile profile, IReadOnlyList<Track> owned, int music, int podcasts,
-        string? note, IReadOnlyList<string> subscribedShows, CancellationToken cancellationToken)
+        string? note, IReadOnlyList<string> subscribedShows, CrateHistory recent, DateOnly today,
+        CancellationToken cancellationToken)
     {
+        var offered = recent.Offered.Select(pick => new { title = pick.Title, artist = pick.Artist });
         var userContent =
+            $"TODAY: {today:yyyy-MM-dd}\n\n" +
             $"TASTE PROFILE (JSON):\n{ProfileJson(profile)}\n\n" +
             $"PODCASTS THEY ALREADY FOLLOW (JSON):\n{JsonSerializer.Serialize(subscribedShows)}\n\n" +
+            $"RECENT CRATES ALREADY OFFERED (JSON):\n{JsonSerializer.Serialize(offered)}\n\n" +
             $"MUSIC PICKS: {music}\nPODCAST PICKS: {podcasts}" +
             (string.IsNullOrWhiteSpace(note) ? string.Empty : $"\n\nTHE SHELF IS SHORT OF: {note}");
+        var library = CatalogBlock("LIBRARY THEY ALREADY HAVE", CatalogDigest.Sample(owned));
 
-        var reply = await SendMessage(
-            CatalogBlock("LIBRARY THEY ALREADY HAVE", CatalogDigest.Sample(owned)), DiscoveriesInstruction, userContent, WeeklyMaxTokens, cancellationToken);
+        // Searched first. An account without web search refuses the tool outright (a 400), and a
+        // long search can end the turn before the crate is written (pause_turn): either way the
+        // crate is asked for once more without searching, since last season's records are a
+        // better crate than none.
+        string reply;
+        try
+        {
+            reply = await SendMessage(library, DiscoveriesInstruction, userContent, WeeklyMaxTokens, cancellationToken,
+                [ClaudeServerTool.WebSearch(WeeklySearches)]);
+        }
+        catch (ClaudeRequestException e) when (e.Failure == ClaudeFailure.Failed && e.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            reply = string.Empty;
+        }
+
+        var dto = ReadPicks(reply)
+            ?? ReadPicks(await SendMessage(library, DiscoveriesInstruction, userContent, WeeklyMaxTokens, cancellationToken));
+        if (dto is null)
+        {
+            return [];
+        }
+
+        var picks = dto.Picks ?? [];
+
+        // Excluded here as well as asked for in the instruction. Asking is worth
+        // doing and is not worth trusting: a recommender handed someone's
+        // favourite artists will happily name their favourite records back. The counts
+        // are held the same way, and applied after the exclusion so a dropped
+        // duplicate does not use up one of the requested places.
+        var unowned = Discoveries.Unowned(
+            picks.Select(pick => new Recommendation(
+                pick.Title?.Trim() ?? string.Empty,
+                pick.Artist?.Trim() ?? string.Empty,
+                string.IsNullOrWhiteSpace(pick.Why) ? null : pick.Why.Trim(),
+                ParseKind(pick.Kind))),
+            owned,
+            subscribedShows);
+
+        // Last weeks' records are held out the same way, so a repeat that slips past the
+        // instruction does not take a place in the crate.
+        return Discoveries.Shape(recent.Fresh(unowned), music, podcasts);
+    }
+
+    private static DiscoveriesDto? ReadPicks(string reply)
+    {
         var json = ExtractObject(reply);
         if (json is null)
         {
-            return [];
+            return null;
         }
 
         try
         {
             var dto = JsonSerializer.Deserialize<DiscoveriesDto>(json, CaseInsensitive);
-            var picks = dto?.Picks ?? [];
-
-            // Excluded here as well as asked for in the instruction. Asking is worth
-            // doing and is not worth trusting: a recommender handed someone's
-            // favourite artists will happily name their favourite records back. The counts
-            // are held the same way, and applied after the exclusion so a dropped
-            // duplicate does not use up one of the requested places.
-            var unowned = Discoveries.Unowned(
-                picks.Select(pick => new Recommendation(
-                    pick.Title?.Trim() ?? string.Empty,
-                    pick.Artist?.Trim() ?? string.Empty,
-                    string.IsNullOrWhiteSpace(pick.Why) ? null : pick.Why.Trim(),
-                    ParseKind(pick.Kind))),
-                owned,
-                subscribedShows);
-            return Discoveries.Shape(unowned, music, podcasts);
+            return dto?.Picks is null ? null : dto;
         }
         catch (JsonException)
         {
-            return [];
+            return null;
         }
     }
 
@@ -180,11 +227,14 @@ public sealed class DiscoveryClient : IDiscoveryClient
         chosen.Select(value => int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n)
             && n >= 1 && n <= sample.Count ? sample[n - 1].Id : value).ToList();
 
-    private async Task<string> SendMessage(string catalogBlock, string instruction, string userText, int maxTokens, CancellationToken cancellationToken)
+    private async Task<string> SendMessage(
+        string catalogBlock, string instruction, string userText, int maxTokens, CancellationToken cancellationToken,
+        IReadOnlyList<ClaudeServerTool>? tools = null)
     {
         var request = new ClaudeRequest(optionsAccessor.Value.Model, maxTokens,
             System: [ClaudeBlock.Text(catalogBlock, cache: true), ClaudeBlock.Text(instruction)],
-            User: [ClaudeBlock.Text(userText)]);
+            User: [ClaudeBlock.Text(userText)],
+            Tools: tools);
         return (await claude.SendAsync(request, cancellationToken)).Text;
     }
 

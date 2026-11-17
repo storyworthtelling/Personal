@@ -131,4 +131,21 @@ public class DuplicateTracksTests
     {
         Assert.Empty(DuplicateTracks.FindLosingIds([]));
     }
+
+    // The scan sets a losing copy aside against the copy it lost to, so when that copy leaves
+    // Drive the one set aside can come back.
+    [Fact]
+    public void FindLosers_NamesTheCopyEachLoserLostTo()
+    {
+        var tracks = new[]
+        {
+            T("mp3", "Dare You To Move", "Switchfoot", "The Beautiful Letdown", bitrate: 128),
+            T("flac", "Dare You To Move", "Switchfoot", "The Beautiful Letdown", bitrate: 1000),
+            T("ogg", "Dare You To Move", "Switchfoot", "The Beautiful Letdown", bitrate: 256),
+        };
+
+        var losers = DuplicateTracks.FindLosers(tracks);
+
+        Assert.Equal([("ogg", "flac"), ("mp3", "flac")], losers);
+    }
 }

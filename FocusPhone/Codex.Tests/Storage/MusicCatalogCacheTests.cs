@@ -230,6 +230,107 @@ public class MusicCatalogCacheTests : IDisposable
         Assert.Equal(2, new MusicCatalogCache(connection).ReaderVersion);
     }
 
+    // Each row remembers which reader filled it, so a re-read after the reader learns a new
+    // tag is kept file by file: a run that is cut short keeps what it re-read.
+    [Fact]
+    public void StaleFiles_AreThoseReadByAnOlderReader()
+    {
+        cache.Upsert([(Tr("old"), new MusicFileVersion(1, 1))], readerVersion: 3);
+        cache.Upsert([(Tr("new"), new MusicFileVersion(1, 1))], readerVersion: 4);
+
+        Assert.Equal(["old"], cache.StaleFiles(4));
+    }
+
+    [Fact]
+    public void StaleFiles_AnswerToASplitFilesSourceId()
+    {
+        cache.Upsert(
+            [(Tr("file#1") with { SourceFileId = "file", ClipStart = TimeSpan.FromMinutes(4) }, new MusicFileVersion(1, 1))],
+            readerVersion: 3);
+
+        Assert.Equal(["file"], cache.StaleFiles(4));
+    }
+
+    // A cache from before the per-row column: its rows were filled by whichever reader last
+    // finished a pass, so they take that version rather than all being stale at once.
+    [Fact]
+    public void Migration_SeedsEachRowsReaderFromTheLastFinishedPass()
+    {
+        using var older = new SqliteConnection("Data Source=:memory:");
+        older.Open();
+        using (var create = older.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE tracks (
+                    id TEXT NOT NULL PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+                    album TEXT NOT NULL, albumArtist TEXT NOT NULL, trackNumber INTEGER NOT NULL,
+                    discNumber INTEGER NOT NULL, genre TEXT NOT NULL, durationTicks INTEGER NOT NULL,
+                    artRef TEXT);
+                INSERT INTO tracks VALUES ('1','Old','A','Al','A',1,1,'Rock',0,NULL);
+                CREATE TABLE meta (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);
+                INSERT INTO meta VALUES ('readerVersion', '4');
+                """;
+            create.ExecuteNonQuery();
+        }
+
+        var upgraded = new MusicCatalogCache(older);
+
+        Assert.Empty(upgraded.StaleFiles(4));
+        Assert.Equal(["1"], upgraded.StaleFiles(5));
+    }
+
+    // The other half of the report. A duplicate set aside used to be deleted outright while
+    // its file was still in Drive, so the next scan found it "new", read it, and deleted it
+    // again — every scan, for every duplicate. Set aside, it stays known.
+    [Fact]
+    public void ASetAsideDuplicate_StaysKnownButIsNotInTheCatalog()
+    {
+        cache.Upsert([(Tr("keep"), new MusicFileVersion(1, 10)), (Tr("dupe"), new MusicFileVersion(2, 20))], readerVersion: 4);
+
+        cache.SetAside([("dupe", "keep")]);
+
+        Assert.Equal(["keep"], cache.LoadAll().Select(track => track.Id));
+        Assert.Equal(new MusicFileVersion(2, 20), cache.LoadVersions()["dupe"]);
+        Assert.Empty(cache.StaleFiles(4));
+        Assert.Equal(["dupe", "keep"], cache.StaleFiles(5).Order());
+    }
+
+    // When the copy that was kept leaves Drive, the one set aside is the song now: it is
+    // forgotten so the next scan reads it back in.
+    [Fact]
+    public void DeletingTheKeptCopy_ReleasesWhatWasSetAsideForIt()
+    {
+        cache.Upsert([(Tr("keep"), new MusicFileVersion(1, 10)), (Tr("dupe"), new MusicFileVersion(2, 20))], readerVersion: 4);
+        cache.SetAside([("dupe", "keep")]);
+
+        cache.Delete("keep");
+
+        Assert.False(cache.LoadVersions().ContainsKey("dupe"));
+    }
+
+    // Re-reading the kept copy is not losing it: what was set aside for it stays set aside.
+    [Fact]
+    public void ReplacingTheKeptCopysRows_KeepsWhatWasSetAside()
+    {
+        cache.Upsert([(Tr("keep"), new MusicFileVersion(1, 10)), (Tr("dupe"), new MusicFileVersion(2, 20))], readerVersion: 4);
+        cache.SetAside([("dupe", "keep")]);
+
+        cache.Delete("keep", releaseSetAside: false);
+
+        Assert.True(cache.LoadVersions().ContainsKey("dupe"));
+    }
+
+    [Fact]
+    public void DeletingASetAsideFile_ForgetsIt()
+    {
+        cache.Upsert([(Tr("keep"), new MusicFileVersion(1, 10)), (Tr("dupe"), new MusicFileVersion(2, 20))], readerVersion: 4);
+        cache.SetAside([("dupe", "keep")]);
+
+        cache.Delete("dupe");
+
+        Assert.False(cache.LoadVersions().ContainsKey("dupe"));
+    }
+
     [Fact]
     public void Upsert_ThenLoadAll_RoundTripsAHiddenTrackSplitSegment()
     {

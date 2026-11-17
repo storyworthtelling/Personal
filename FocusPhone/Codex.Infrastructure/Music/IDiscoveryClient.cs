@@ -39,7 +39,17 @@ public interface IDiscoveryClient
     /// <paramref name="owned"/>, so a show pick can be excluded the same way a track or album
     /// already on the shelf is.
     /// </param>
+    /// <param name="recent">
+    /// What the last weeks' crates offered. Sent so the recommender looks further afield, and
+    /// held out of the reply — without it the same inputs went in every Friday and the same
+    /// records came out.
+    /// </param>
+    /// <param name="today">
+    /// The day the crate is made, so "new releases" means something: the recommender searches
+    /// the web for records out in the three months before it.
+    /// </param>
     Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
         TasteProfile profile, IReadOnlyList<Track> owned, int music, int podcasts,
-        string? note, IReadOnlyList<string> subscribedShows, CancellationToken cancellationToken);
+        string? note, IReadOnlyList<string> subscribedShows, CrateHistory recent, DateOnly today,
+        CancellationToken cancellationToken);
 }

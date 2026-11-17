@@ -16,7 +16,7 @@ public readonly record struct MusicFileVersion(long ModifiedTimeTicks, long Size
 ///
 /// <see cref="ToRead"/> is the union of <see cref="ToAdd"/> (the cache has never heard
 /// of the id) and <see cref="ToUpdate"/> (the cache has it, under a different version —
-/// or, on a <c>rereadAll</c> pass, unconditionally). The split exists for
+/// or named in <c>reread</c>). The split exists for
 /// <c>RescanOutcome</c>, which needs "new" counted apart from "changed" to describe a
 /// scan's findings in the owner's-voice greeting; <see cref="ToRead"/> alone cannot
 /// tell the two apart.
@@ -25,19 +25,22 @@ public sealed record MusicScanPlan(
     IReadOnlyList<string> ToRead, IReadOnlyList<string> ToDelete,
     IReadOnlyList<string> ToAdd, IReadOnlyList<string> ToUpdate)
 {
-    /// <param name="rereadAll">
-    /// Read every file regardless of whether it changed. What this is for: when the
-    /// reader learns to read a field it did not read before, every cached row is
-    /// missing it and <b>no file has changed to say so</b> — the signatures all still
-    /// match. One forced pass fills the gap; without it the new column would stay
-    /// empty until each file happened to be edited. A file the cache already knows
-    /// under this scheme counts as <see cref="ToUpdate"/> here, not <see cref="ToAdd"/> —
-    /// nothing about it is actually new, it is only being re-read.
+    /// <param name="reread">
+    /// Files to read even though they have not changed: those the cache holds from an
+    /// older reader. When the reader learns to read a field it did not read before,
+    /// every cached row is missing it and <b>no file has changed to say so</b> — the
+    /// signatures all still match. A file the cache already knows counts as
+    /// <see cref="ToUpdate"/> here, not <see cref="ToAdd"/>: nothing about it is new.
+    ///
+    /// It names files rather than being one switch for the whole library. As a switch it
+    /// stayed on until a pass <i>finished</i>, so a library too big for one run re-read
+    /// every file on every run and never reached the end ("1,600 to scan, then 5,000").
+    /// Named, a file re-read in one run is not stale in the next.
     /// </param>
     public static MusicScanPlan Compute(
         IReadOnlyDictionary<string, MusicFileVersion> current,
         IReadOnlyDictionary<string, MusicFileVersion> cached,
-        bool rereadAll = false)
+        IReadOnlySet<string>? reread = null)
     {
         var toAdd = new List<string>();
         var toUpdate = new List<string>();
@@ -48,7 +51,7 @@ public sealed record MusicScanPlan(
             {
                 toAdd.Add(id);
             }
-            else if (rereadAll || !cachedVersion.Equals(version))
+            else if (!cachedVersion.Equals(version) || reread?.Contains(id) == true)
             {
                 toUpdate.Add(id);
             }

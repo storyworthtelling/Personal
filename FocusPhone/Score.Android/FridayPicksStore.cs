@@ -20,6 +20,7 @@ public class FridayPicksStore
     private const string SelectionKey = "selection";
     private const string GeneratedKey = "generatedUtc";
     private const string VetoedKey = "vetoed";
+    private const string HistoryKey = "history";
 
     private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNameCaseInsensitive = true };
 
@@ -63,6 +64,17 @@ public class FridayPicksStore
             }
         }
         set => preferences.Edit()!.PutString(VetoedKey, JsonSerializer.Serialize(value, SerializerOptions))!.Apply();
+    }
+
+    /// <summary>
+    /// What the last weeks' crates offered (<see cref="CrateHistory"/>). Unlike the strikes it
+    /// outlives the crate it came from: it is what keeps next Friday from naming the same
+    /// records again.
+    /// </summary>
+    public CrateHistory History
+    {
+        get => CrateHistoryCodec.Read(preferences.GetString(HistoryKey, null));
+        set => preferences.Edit()!.PutString(HistoryKey, CrateHistoryCodec.Write(value))!.Apply();
     }
 
     /// <summary>

@@ -30,8 +30,21 @@ public sealed record ClaudeBlock(string Kind, string Value, string? MediaType, b
     public static ClaudeBlock Pdf(string base64, bool cache = false) => new("document", base64, "application/pdf", cache);
 }
 
-/// <summary>One request: a model, an output ceiling, a system prompt and the user's turn.</summary>
-public sealed record ClaudeRequest(string Model, int MaxTokens, IReadOnlyList<ClaudeBlock> System, IReadOnlyList<ClaudeBlock> User)
+/// <summary>
+/// A tool Anthropic runs on its own side, so the request names it and the reply already carries its results — no
+/// tool loop on the phone. Only web search today: what a model knows stops where its training did, and some
+/// questions (this month's new records) are only answerable from the web.
+/// </summary>
+public sealed record ClaudeServerTool(string Type, string Name, int? MaxUses)
+{
+    /// <summary>Web search, capped at <paramref name="maxUses"/> searches a request (each search is billed).</summary>
+    public static ClaudeServerTool WebSearch(int maxUses) => new("web_search_20260209", "web_search", maxUses);
+}
+
+/// <summary>One request: a model, an output ceiling, a system prompt, the user's turn and any server tools.</summary>
+public sealed record ClaudeRequest(
+    string Model, int MaxTokens, IReadOnlyList<ClaudeBlock> System, IReadOnlyList<ClaudeBlock> User,
+    IReadOnlyList<ClaudeServerTool>? Tools = null)
 {
     /// <summary>The common case: a plain system prompt and a plain user message, nothing cached.</summary>
     public static ClaudeRequest Plain(string model, int maxTokens, string system, string user) =>
@@ -137,6 +150,23 @@ public sealed class ClaudeMessagesClient(
         }
 
         root["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = Content(request.User) });
+        if (request.Tools is { Count: > 0 } tools)
+        {
+            var array = new JsonArray();
+            foreach (var tool in tools)
+            {
+                var node = new JsonObject { ["type"] = tool.Type, ["name"] = tool.Name };
+                if (tool.MaxUses is { } maxUses)
+                {
+                    node["max_uses"] = maxUses;
+                }
+
+                array.Add(node);
+            }
+
+            root["tools"] = array;
+        }
+
         return root.ToJsonString();
     }
 
@@ -200,13 +230,19 @@ public sealed class ClaudeMessagesClient(
             return new ClaudeReply(string.Empty, null, new ClaudeUsage(0, 0, 0, 0), requestId);
         }
 
+        // Every text block, joined — except that once a server tool has run, the text before its last result is the
+        // model saying what it is about to look up, and the answer is only what it wrote after the results came back.
         var text = new StringBuilder();
         if (root.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
         {
             foreach (var block in content.EnumerateArray())
             {
-                if (block.TryGetProperty("type", out var type) && type.GetString() == "text" &&
-                    block.TryGetProperty("text", out var chunk))
+                var type = block.TryGetProperty("type", out var kind) ? kind.GetString() : null;
+                if (type is not null && type.EndsWith("_tool_result", StringComparison.Ordinal))
+                {
+                    text.Clear();
+                }
+                else if (type == "text" && block.TryGetProperty("text", out var chunk))
                 {
                     text.Append(chunk.GetString());
                 }

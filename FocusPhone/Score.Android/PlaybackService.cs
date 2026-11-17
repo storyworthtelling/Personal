@@ -66,6 +66,8 @@ public class PlaybackService : MediaLibraryService
     private MediaLibrarySession? driveMediaSession;
     private MediaLibrarySession? tidalMediaSession;
     private TidalPlaybackBridge? tidalBridge;
+    private MediaBrowseTree? browseTree;
+    private Task? tidalBuild;
     private IExoPlayer? player;
     private PlaybackProgressStore? progressStore;
     private PlaybackProgressBook book = new();
@@ -134,7 +136,25 @@ public class PlaybackService : MediaLibraryService
         // no stored TIDAL account today (no pairing screen has ever produced one — see
         // TidalAccountStore), so this quietly leaves tidalMediaSession null and the service behaves
         // exactly as it did before tonight.
-        Task.Run(() => BuildTidalSessionAsync(tree));
+        browseTree = tree;
+        EnsureTidalSession();
+    }
+
+    /// <summary>
+    /// Starts building the TIDAL session unless it exists or a build is already running. Called
+    /// at creation and again whenever Score asks for the TIDAL session before it exists — the
+    /// first build can fail for a reason that has since cleared (no network at the moment the
+    /// service started, or no TIDAL sign-in yet: signing in does not restart this service).
+    /// Main thread only, like everything else that touches the session fields.
+    /// </summary>
+    private void EnsureTidalSession()
+    {
+        if (tidalMediaSession is not null || tidalBuild is { IsCompleted: false } || browseTree is not { } tree)
+        {
+            return;
+        }
+
+        tidalBuild = Task.Run(() => BuildTidalSessionAsync(tree));
     }
 
     /// <summary>
@@ -234,13 +254,29 @@ public class PlaybackService : MediaLibraryService
     public override MediaLibrarySession? OnGetSessionFromMediaLibraryService(MediaSession.ControllerInfo? controllerInfo) =>
         ResolveSession(controllerInfo);
 
-    // See ConnectionHintSessionKey: a controller that asked for a specific session by hint gets it
-    // (falling back to Drive if the TIDAL session hasn't finished building yet — Drive always
-    // exists by the time any controller can connect); one that didn't ask gets whichever source is
-    // actually active.
+    // See ConnectionHintSessionKey: a controller that didn't ask gets whichever source is actually
+    // active (Drive while the TIDAL session is not built yet).
+    //
+    // A controller that asked for TIDAL by name is refused (null) until the TIDAL session exists,
+    // and its asking starts a build. It used to be handed the Drive session instead, which is how
+    // Play on a Discover pick "opened the bar but never played": Score connects both controllers
+    // the moment it opens, the TIDAL session takes a network token refresh to build, so on a cold
+    // start Score's "TIDAL" controller was bound to the Drive ExoPlayer for the rest of the run —
+    // and ExoPlayer cannot play a "tidal:" id, so the bar showed the track's name and nothing
+    // played. Refused, ScorePlayback knows it has no TIDAL session and connects again on Play.
     private MediaLibrarySession? ResolveSession(MediaSession.ControllerInfo? controllerInfo)
     {
         var hint = controllerInfo?.ConnectionHints?.GetString(ConnectionHintSessionKey);
+        if (hint == TidalSessionId)
+        {
+            if (tidalMediaSession is null)
+            {
+                EnsureTidalSession();
+            }
+
+            return tidalMediaSession;
+        }
+
         return (hint ?? activeSessionId) switch
         {
             TidalSessionId => tidalMediaSession ?? driveMediaSession,

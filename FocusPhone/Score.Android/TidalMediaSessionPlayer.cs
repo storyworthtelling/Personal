@@ -32,6 +32,12 @@ public sealed class TidalMediaSessionPlayer : SimpleBasePlayer
     private bool playWhenReady;
     private bool ended;
 
+    // The product last handed to the engine. Media3 sends SetMediaItems then Prepare for every
+    // start, and both used to Load: a second Load straight before Play restarts the engine's
+    // load of the very track Play was meant for. Prepare now loads only what is not loaded
+    // (a fresh item, or the same one again after it ended).
+    private string? loadedProductId;
+
     public TidalMediaSessionPlayer(Looper applicationLooper, TidalPlaybackBridge bridge) : base(applicationLooper)
     {
         this.bridge = bridge;
@@ -74,9 +80,9 @@ public sealed class TidalMediaSessionPlayer : SimpleBasePlayer
     protected override IListenableFuture HandlePrepare()
     {
         Android.Util.Log.Debug(LogTag, "HandlePrepare");
-        if (item is { } activeItem)
+        if (item is { } activeItem && loadedProductId != ProductId(activeItem))
         {
-            bridge.Load(ProductId(activeItem));
+            Load(activeItem);
         }
 
         return ImmediateFuture.Instance;
@@ -115,7 +121,7 @@ public sealed class TidalMediaSessionPlayer : SimpleBasePlayer
         Android.Util.Log.Debug(LogTag, $"HandleSetMediaItems: active={item?.MediaId}");
         if (item is { } activeItem)
         {
-            bridge.Load(ProductId(activeItem));
+            Load(activeItem);
         }
 
         InvalidateState();
@@ -138,9 +144,16 @@ public sealed class TidalMediaSessionPlayer : SimpleBasePlayer
         return ImmediateFuture.Instance;
     }
 
+    private void Load(MediaItem activeItem)
+    {
+        loadedProductId = ProductId(activeItem);
+        bridge.Load(loadedProductId);
+    }
+
     private void OnTrackEnded()
     {
         Android.Util.Log.Debug(LogTag, "TrackEnded");
+        loadedProductId = null;
         ended = true;
         playWhenReady = false;
         InvalidateState();
@@ -149,6 +162,7 @@ public sealed class TidalMediaSessionPlayer : SimpleBasePlayer
     private void OnPlaybackError(string message)
     {
         AudioDiagnostics.LogWarning(LogTag, $"PlaybackError: {message}");
+        loadedProductId = null;
         ended = true;
         InvalidateState();
     }
