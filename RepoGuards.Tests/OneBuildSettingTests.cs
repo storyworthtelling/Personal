@@ -44,6 +44,26 @@ public partial class OneBuildSettingTests
         Assert.True(found.Count == 0, string.Join("\n", found));
     }
 
+    /// <summary>
+    /// WorkManager 2.10 needs androidx.concurrent.futures, which reaches a head only through Concurrent.Futures.Ktx's
+    /// exact range [1.2.0.7, 1.2.1). With transitive pinning, the central 1.3.0.1 (which AndroidX.Core and CameraX
+    /// want) sits outside that range, and NuGet then leaves the package out of the graph without an error: the APK
+    /// builds and signs with no androidx.concurrent.futures classes, and the app dies as its process starts, the first
+    /// time WorkManager is asked for anything. That shipped Flyleaf, Post, Pulp and Constitution on 17 Nov 2026, and
+    /// Flyleaf's death took the update channel with it. Naming the package directly keeps it in every APK.
+    /// </summary>
+    [Fact]
+    public void EveryProjectWithWorkManagerNamesConcurrentFuturesItself()
+    {
+        var found = Projects()
+            .Where(project => PackageReference().Matches(project.Text).Any(reference => reference.Groups["name"].Value == "Xamarin.AndroidX.Work.Runtime"))
+            .Where(project => PackageReference().Matches(project.Text).All(reference => reference.Groups["name"].Value != "Xamarin.AndroidX.Concurrent.Futures"))
+            .Select(project => $"{project.Relative} references Work.Runtime without Concurrent.Futures")
+            .ToList();
+
+        Assert.True(found.Count == 0, string.Join("\n", found));
+    }
+
     [Fact]
     public void TheSdkIsPinnedAndTheWorkloadIsNot()
     {

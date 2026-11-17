@@ -27,6 +27,9 @@
        head already references, so nothing new enters any APK. -->
   <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.Work.Runtime" />
+    <!-- WorkManager needs androidx.concurrent.futures; without a direct reference, transitive pinning drops it from
+         the APK and the app dies at start (OneBuildSettingTests.EveryProjectWithWorkManagerNamesConcurrentFuturesItself). -->
+    <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" />
   </ItemGroup>
 
   <ItemGroup>
