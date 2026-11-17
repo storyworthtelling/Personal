@@ -38,6 +38,9 @@ public class ScoreActivity : Activity
     private readonly DeviceAccountTokenProvider musicTokens = new();
     private BackCallback? backCallback;
 
+    // The fold that says a TIDAL start was given up (ScorePlayback.TidalReachable).
+    private const string TidalNoticeKey = "tidal-unavailable"; // not copy: a notice key
+
     private ScorePlayback playback = null!;
     private ListeningLog listening = null!;
 
@@ -121,6 +124,12 @@ public class ScoreActivity : Activity
             musicTokens.GetAccessToken, "Score", Path.Combine(FilesDir!.AbsolutePath, "voice-seats.json"));
         rescanOutcomeStore = new RescanOutcomeStore(this);
         SetContentView(BuildLayout());
+        playback.TidalReachable += reachable => DogEar.SetNotice(this, pageOverlay, TidalNoticeKey, reachable
+            ? null
+            : new DogEar.Notice(
+                "TIDAL didn’t start.",
+                "Score couldn’t reach TIDAL to play that. Check you’re online and signed in to TIDAL in Settings, then try again.",
+                DogEar.Hues.Problem));
         playback.Connect();
         ShowGreetingAsync();
         musicLibrary.RestoreFolderFromVault();

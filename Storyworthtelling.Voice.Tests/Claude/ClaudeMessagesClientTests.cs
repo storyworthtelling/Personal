@@ -146,6 +146,59 @@ public class ClaudeMessagesClientTests
         Assert.Empty(health.Marks);
     }
 
+    // Score's Friday crate searches the web for new releases (Claude cannot know a record
+    // released after it was trained). The server runs the search; the request only names the tool.
+    [Fact]
+    public async Task AWebSearchToolIsDeclaredWithItsUseCap()
+    {
+        var (client, http, _) = Make();
+        http.EnqueueOk(Reply);
+
+        await client.SendAsync(
+            new ClaudeRequest("claude-test", 200, [ClaudeBlock.Text("sys")], [ClaudeBlock.Text("user")],
+                Tools: [ClaudeServerTool.WebSearch(maxUses: 4)]),
+            CancellationToken.None);
+
+        using var body = JsonDocument.Parse(http.RequestBodies.Single());
+        var tool = body.RootElement.GetProperty("tools").EnumerateArray().Single();
+        Assert.Equal("web_search_20260209", tool.GetProperty("type").GetString());
+        Assert.Equal("web_search", tool.GetProperty("name").GetString());
+        Assert.Equal(4, tool.GetProperty("max_uses").GetInt32());
+    }
+
+    [Fact]
+    public async Task ARequestWithoutToolsSendsNoToolsField()
+    {
+        var (client, http, _) = Make();
+        http.EnqueueOk(Reply);
+
+        await client.SendAsync(ClaudeRequest.Plain("claude-test", 200, "s", "u"), CancellationToken.None);
+
+        using var body = JsonDocument.Parse(http.RequestBodies.Single());
+        Assert.False(body.RootElement.TryGetProperty("tools", out _));
+    }
+
+    // With a search in the reply, the text before it is the model saying what it will look
+    // for; the answer is what it wrote after the last result came back.
+    [Fact]
+    public async Task AfterAWebSearchTheReplyIsTheTextWrittenAfterTheLastResult()
+    {
+        var (client, http, _) = Make();
+        http.EnqueueOk("""
+            {"content":[
+              {"type":"text","text":"Let me look {for} new records."},
+              {"type":"server_tool_use","id":"s1","name":"web_search","input":{"query":"new albums"}},
+              {"type":"web_search_tool_result","tool_use_id":"s1","content":[]},
+              {"type":"text","text":"{\"picks\":"},
+              {"type":"text","text":"[]}","citations":[]}
+            ],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}
+            """);
+
+        var reply = await client.SendAsync(ClaudeRequest.Plain("claude-test", 200, "s", "u"), CancellationToken.None);
+
+        Assert.Equal("""{"picks":[]}""", reply.Text);
+    }
+
     [Fact]
     public void TheModelsAreNamedOnce()
     {

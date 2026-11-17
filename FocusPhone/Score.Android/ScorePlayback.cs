@@ -56,8 +56,25 @@ public sealed class ScorePlayback(Activity host)
     /// not a thing anyone wants to set, and a dial for it would be a worse screen.</summary>
     private const int FadeMs = 700;
 
+    // How long a TIDAL start waits for the service to finish building its TIDAL session (a token
+    // refresh over the network) before it is given up and said so: eight tries, two seconds apart.
+    private const int TidalConnectAttempts = 8;
+    private const int TidalRetryMs = 2_000;
+
     private MediaController? driveController;
     private MediaController? tidalController;
+    private bool tidalConnecting;
+    private int tidalAttempts;
+    private readonly List<Action> pendingOnTidal = [];
+
+    private bool released;
+
+    /// <summary>
+    /// Raised (on the main thread) with false when a TIDAL start had to be given up because the
+    /// TIDAL session never came up — so the screen can say so rather than show a bar that never
+    /// plays — and with true when a waiting TIDAL start finally went through.
+    /// </summary>
+    public event Action<bool>? TidalReachable;
 
     /// <summary>
     /// Whichever session last had something started on it — what every read
@@ -108,7 +125,7 @@ public sealed class ScorePlayback(Activity host)
     /// </summary>
     public void Connect()
     {
-        var token = new SessionToken(host, new ComponentName(host, Java.Lang.Class.FromType(typeof(PlaybackService))));
+        var token = Token();
         var executor = AndroidX.Core.Content.ContextCompat.GetMainExecutor(host);
 
         var driveFuture = new MediaController.Builder(host, token)
@@ -120,13 +137,80 @@ public sealed class ScorePlayback(Activity host)
             RunPending();
         }), executor);
 
-        var tidalFuture = new MediaController.Builder(host, token)
+        ConnectTidal();
+    }
+
+    private SessionToken Token() =>
+        new(host, new ComponentName(host, Java.Lang.Class.FromType(typeof(PlaybackService))));
+
+    /// <summary>
+    /// Connects the TIDAL controller. The service refuses it until its TIDAL session exists (see
+    /// <c>PlaybackService.ResolveSession</c>) and starts building one when asked, so a refusal
+    /// with a TIDAL start waiting is retried a few times, two seconds apart; with nothing waiting
+    /// it is left until the next TIDAL start asks again.
+    /// </summary>
+    private void ConnectTidal()
+    {
+        if (tidalConnecting || released)
+        {
+            return;
+        }
+
+        tidalConnecting = true;
+        var executor = AndroidX.Core.Content.ContextCompat.GetMainExecutor(host);
+        var future = new MediaController.Builder(host, Token())
             .SetConnectionHints(SessionHint(PlaybackService.TidalSessionId))!
             .BuildAsync();
-        tidalFuture.AddListener(new Java.Lang.Runnable(() =>
+        future.AddListener(new Java.Lang.Runnable(() =>
         {
-            tidalController = (MediaController)tidalFuture.Get()!;
+            tidalConnecting = false;
+            try
+            {
+                tidalController = (MediaController)future.Get()!;
+                tidalAttempts = 0;
+                if (pendingOnTidal.Count > 0)
+                {
+                    RunPendingTidal();
+                    TidalReachable?.Invoke(true);
+                }
+            }
+            catch (Exception e)
+            {
+                tidalController = null;
+                RetryTidal(e);
+            }
         }), executor);
+    }
+
+    private void RetryTidal(Exception refusal)
+    {
+        if (pendingOnTidal.Count == 0)
+        {
+            tidalAttempts = 0; // nothing waiting: the next TIDAL start asks again from scratch
+            return;
+        }
+
+        if (++tidalAttempts < TidalConnectAttempts)
+        {
+            new global::Android.OS.Handler(global::Android.OS.Looper.MainLooper!).PostDelayed(ConnectTidal, TidalRetryMs);
+            return;
+        }
+
+        AudioDiagnostics.LogWarning("ScorePlayback.Tidal",
+            $"The TIDAL session never came up after {tidalAttempts} tries; dropping {pendingOnTidal.Count} start(s).", refusal);
+        tidalAttempts = 0;
+        pendingOnTidal.Clear();
+        TidalReachable?.Invoke(false);
+    }
+
+    private void RunPendingTidal()
+    {
+        var actions = pendingOnTidal.ToList();
+        pendingOnTidal.Clear();
+        foreach (var action in actions)
+        {
+            action();
+        }
     }
 
     private readonly List<Action> pendingOnConnect = [];
@@ -178,6 +262,8 @@ public sealed class ScorePlayback(Activity host)
 
     public void Release()
     {
+        released = true;
+        pendingOnTidal.Clear();
         driveController?.Release();
         tidalController?.Release();
     }
@@ -201,6 +287,19 @@ public sealed class ScorePlayback(Activity host)
         }
 
         var startingTidal = items[0].MediaId?.StartsWith(TidalIdPrefix, StringComparison.Ordinal) == true;
+
+        // No live TIDAL controller (the session was still building when Score opened, the
+        // service has since restarted, or TIDAL was signed into after it started): connect, and
+        // make this start once it is there rather than dropping it.
+        if (startingTidal && tidalController is not { IsConnected: true })
+        {
+            tidalController?.Release();
+            tidalController = null;
+            pendingOnTidal.Add(() => Start(kind, items, index, startMs, speed, skipSilence, settingsKey));
+            ConnectTidal();
+            return;
+        }
+
         var controller = startingTidal ? tidalController : driveController;
         var idle = startingTidal ? driveController : tidalController;
         if (controller is null)

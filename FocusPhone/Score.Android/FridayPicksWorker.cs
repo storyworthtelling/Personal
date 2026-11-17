@@ -89,12 +89,24 @@ public class FridayPicksWorker : Worker
             return Result.InvokeSuccess();
         }
 
+        // The outgoing crate joins the history before the new one is asked for, so the
+        // recommender is told — and held to — what it has already offered. Without this the
+        // same profile and library went in every Friday and the same records came out.
+        var now = DateTimeOffset.Now;
+        var history = store.History;
+        if (store.GeneratedUtc is { } generated)
+        {
+            history = history.Remember(store.LoadPicks(), DateOnly.FromDateTime(generated.LocalDateTime));
+            store.History = history;
+        }
+
         var picks = taste.WeeklyDiscoveriesAsync(
-            catalog, music, podcasts, gap, subscribedShows, CancellationToken.None)
+            catalog, music, podcasts, gap, subscribedShows, history, DateOnly.FromDateTime(now.LocalDateTime),
+            CancellationToken.None)
             .GetAwaiter().GetResult();
         if (picks.Count > 0)
         {
-            store.Save(picks, DateTimeOffset.Now);
+            store.Save(picks, now);
         }
 
         return Result.InvokeSuccess();

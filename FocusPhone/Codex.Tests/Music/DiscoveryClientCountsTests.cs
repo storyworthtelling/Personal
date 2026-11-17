@@ -34,7 +34,7 @@ public class DiscoveryClientCountsTests
         var handler = new QueuedHttpMessageHandler().EnqueueOk(MessageResponse("""{"picks":[]}"""));
 
         await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: [], CancellationToken.None);
+            Profile(), Catalog, music: 10, podcasts: 4, note: null, subscribedShows: [], CrateHistory.Empty, new DateOnly(2026, 11, 13), CancellationToken.None);
 
         var body = handler.RequestBodies.Single();
         Assert.Contains("MUSIC PICKS: 10", body);
@@ -50,7 +50,7 @@ public class DiscoveryClientCountsTests
             """{"picks":[{"title":"One","artist":"X","kind":"song"},{"title":"Two","artist":"X","kind":"song"},{"title":"Three","artist":"X","kind":"song"},{"title":"Show","artist":"","kind":"podcast"}]}"""));
 
         var picks = await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, music: 2, podcasts: 1, note: null, subscribedShows: [], CancellationToken.None);
+            Profile(), Catalog, music: 2, podcasts: 1, note: null, subscribedShows: [], CrateHistory.Empty, new DateOnly(2026, 11, 13), CancellationToken.None);
 
         Assert.Equal(["One", "Two", "Show"], picks.Select(pick => pick.Title));
     }
@@ -62,7 +62,7 @@ public class DiscoveryClientCountsTests
             """{"picks":[{"title":"Show","artist":"","kind":"podcast"}]}"""));
 
         var picks = await Client(handler).WeeklyDiscoveriesAsync(
-            Profile(), Catalog, music: 5, podcasts: 0, note: null, subscribedShows: [], CancellationToken.None);
+            Profile(), Catalog, music: 5, podcasts: 0, note: null, subscribedShows: [], CrateHistory.Empty, new DateOnly(2026, 11, 13), CancellationToken.None);
 
         Assert.Empty(picks);
     }

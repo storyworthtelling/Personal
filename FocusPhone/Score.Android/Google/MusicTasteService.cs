@@ -141,7 +141,7 @@ public sealed class MusicTasteService
     /// </summary>
     public async Task<IReadOnlyList<Recommendation>> WeeklyDiscoveriesAsync(
         IReadOnlyList<Track> owned, int music, int podcasts, string? note,
-        IReadOnlyList<string> subscribedShows, CancellationToken cancellationToken)
+        IReadOnlyList<string> subscribedShows, CrateHistory recent, DateOnly today, CancellationToken cancellationToken)
     {
         try
         {
@@ -153,7 +153,7 @@ public sealed class MusicTasteService
             }
 
             return await discovery.WeeklyDiscoveriesAsync(
-                profile, owned, music, podcasts, note, subscribedShows, cancellationToken);
+                profile, owned, music, podcasts, note, subscribedShows, recent, today, cancellationToken);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
