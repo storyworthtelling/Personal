@@ -61,15 +61,19 @@ public sealed class MusicScanner
         string folderId, MusicCatalogCache cache, Action<int, int> onProgress, CancellationToken cancellationToken,
         TimeSpan? timeBudget = null)
     {
-        var files = await driveClient.ListAudioRecursiveAsync(folderId, cancellationToken);
+        // A Drive file can sit in two folders under the music folder, and is then listed once
+        // per folder; read it once (a repeated id would also throw building the lookup below).
+        var files = (await driveClient.ListAudioRecursiveAsync(folderId, cancellationToken))
+            .DistinctBy(file => file.Id)
+            .ToList();
         var filesById = files.ToDictionary(file => file.Id);
         var current = files.ToDictionary(
             file => file.Id, file => new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size));
 
-        // A cache filled by an older reader is missing whatever this one learned to
-        // read since; nothing about the files says so, so the scan is told directly.
-        var rereadAll = cache.ReaderVersion < MusicTagReader.Version;
-        var plan = MusicScanPlan.Compute(current, cache.LoadVersions(), rereadAll);
+        // A row filled by an older reader is missing whatever this one learned to read
+        // since; nothing about the files says so, so the scan is told directly — file by
+        // file, so what one run re-reads stays done when the next run starts.
+        var plan = MusicScanPlan.Compute(current, cache.LoadVersions(), cache.StaleFiles(MusicTagReader.Version));
 
         // Named apart from ToRead so a successfully-processed id can be classified back
         // into "added" or "changed" for the RescanOutcome the greeting reads.
@@ -121,18 +125,22 @@ public sealed class MusicScanner
             // not at all any more) — clear its old row(s), split or not, before
             // writing the fresh ones, but only once the read actually succeeded; a
             // failed read leaves whatever was cached for it alone.
+            // Duplicates set aside in this file's favour stay set aside: it is being re-read,
+            // not leaving Drive.
             foreach (var (file, result) in batch.Zip(results))
             {
                 if (result.Tracks.Count > 0)
                 {
-                    cache.Delete(file.Id);
+                    cache.Delete(file.Id, releaseSetAside: false);
                 }
             }
 
             // ...then write them in one serialized transaction (SQLite single-writer).
-            cache.Upsert(results
-                .Where(result => result.Tracks.Count > 0)
-                .SelectMany(result => result.Tracks.Select(track => (track, result.Version))));
+            cache.Upsert(
+                results
+                    .Where(result => result.Tracks.Count > 0)
+                    .SelectMany(result => result.Tracks.Select(track => (track, result.Version))),
+                MusicTagReader.Version);
 
             // Only a file that actually succeeded counts toward the outcome — a read
             // exhausted after every retry (see ReadFileAsync) left the cache untouched
@@ -168,10 +176,11 @@ public sealed class MusicScanner
         // Runs over the WHOLE current catalog, not just what this pass touched, since
         // a duplicate can be introduced by any new file matching any track already
         // cached, not only ones against each other within the same batch.
-        foreach (var id in DuplicateTracks.FindLosingIds(cache.LoadAll()))
-        {
-            cache.Delete(id);
-        }
+        //
+        // Set aside, not deleted: the losing copy's file is still in Drive, and a cache that
+        // forgot it found it "new" on the next scan, read it, and dropped it again — every
+        // scan, for every duplicate, so the scan never came back with nothing to do.
+        cache.SetAside(DuplicateTracks.FindLosers(cache.LoadAll()));
 
         // Only once the pass finished. A partial scan has read part of the library, and
         // marking it done would leave the rest missing the new field for good.

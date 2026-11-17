@@ -122,15 +122,15 @@ public class MusicScanPlanTests
             plan.ToAdd.Concat(plan.ToUpdate).OrderBy(id => id));
     }
 
-    // A rereadAll pass re-reads a file already in the cache to backfill a new column, not
-    // because anything about it changed — that is a re-read of a known file, not a new one.
+    // A re-read backfills a new column on a file already in the cache, not because anything
+    // about it changed — that is a re-read of a known file, not a new one.
     [Fact]
-    public void Compute_RereadAll_ClassifiesKnownFilesAsUpdated()
+    public void Compute_Reread_ClassifiesKnownFilesAsUpdated()
     {
         var version = new MusicFileVersion(10, 100);
         var current = new Dictionary<string, MusicFileVersion> { ["a"] = version };
 
-        var plan = MusicScanPlan.Compute(current, current, rereadAll: true);
+        var plan = MusicScanPlan.Compute(current, current, reread: new HashSet<string> { "a" });
 
         Assert.Empty(plan.ToAdd);
         Assert.Equal(["a"], plan.ToUpdate);
@@ -141,14 +141,29 @@ public class MusicScanPlanTests
     // fills it in; without this the new column would stay empty until each file
     // happened to be edited.
     [Fact]
-    public void Compute_RereadsEverythingWhenAsked()
+    public void Compute_RereadsWhatItIsTold()
     {
         var version = new MusicFileVersion(10, 100);
         var current = new Dictionary<string, MusicFileVersion> { ["a"] = version, ["b"] = version };
 
-        var plan = MusicScanPlan.Compute(current, current, rereadAll: true);
+        var plan = MusicScanPlan.Compute(current, current, reread: new HashSet<string> { "a", "b" });
 
         Assert.Equal(["a", "b"], plan.ToRead.OrderBy(id => id));
+    }
+
+    // The owner's report: "1,600 to scan, then 5,000 the next time — it never finishes." A
+    // reread used to be all-or-nothing (rereadAll until a pass FINISHED), so a library too big
+    // for one run re-read every file on every run and never reached the end. A re-read now
+    // names only the files still stale, so each run's work stays done.
+    [Fact]
+    public void Compute_RereadsOnlyTheFilesStillStale()
+    {
+        var version = new MusicFileVersion(10, 100);
+        var current = new Dictionary<string, MusicFileVersion> { ["done"] = version, ["left"] = version };
+
+        var plan = MusicScanPlan.Compute(current, current, reread: new HashSet<string> { "left" });
+
+        Assert.Equal(["left"], plan.ToRead);
     }
 
     // A forced pass is still a scan: files that are gone still go.
@@ -159,7 +174,7 @@ public class MusicScanPlanTests
         var cached = new Dictionary<string, MusicFileVersion> { ["a"] = version, ["gone"] = version };
 
         var plan = MusicScanPlan.Compute(
-            new Dictionary<string, MusicFileVersion> { ["a"] = version }, cached, rereadAll: true);
+            new Dictionary<string, MusicFileVersion> { ["a"] = version }, cached, reread: new HashSet<string> { "a", "gone" });
 
         Assert.Equal(["gone"], plan.ToDelete);
     }

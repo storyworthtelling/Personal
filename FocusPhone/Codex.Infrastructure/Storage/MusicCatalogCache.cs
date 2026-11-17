@@ -36,10 +36,34 @@ public class MusicCatalogCache
                 sourceId TEXT,
                 clipStartTicks INTEGER NOT NULL DEFAULT 0,
                 bitrate INTEGER NOT NULL DEFAULT 0,
-                replayGain REAL
+                replayGain REAL,
+                readerVersion INTEGER NOT NULL DEFAULT 0
             )
             """;
         create.ExecuteNonQuery();
+
+        using (var meta = connection.CreateCommand())
+        {
+            meta.CommandText = "CREATE TABLE IF NOT EXISTS meta (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)";
+            meta.ExecuteNonQuery();
+        }
+
+        // Duplicates set aside by the scan: files still in Drive, so the scan must keep knowing
+        // them (or it reads them as new every time), but not songs in the catalog. Keyed by file
+        // id, with the copy each lost to, so losing that copy brings the duplicate back.
+        using (var setAside = connection.CreateCommand())
+        {
+            setAside.CommandText = """
+                CREATE TABLE IF NOT EXISTS setAside (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    winnerId TEXT NOT NULL,
+                    modifiedTimeTicks INTEGER NOT NULL,
+                    sizeBytes INTEGER NOT NULL,
+                    readerVersion INTEGER NOT NULL
+                )
+                """;
+            setAside.ExecuteNonQuery();
+        }
 
         // Older caches predate the change-signature columns the incremental scan needs; add them in place so
         // an upgrade keeps its rows (they read as version 0, i.e. "unknown", so the next scan re-reads once).
@@ -64,9 +88,16 @@ public class MusicCatalogCache
         // the reader's version bump re-reads every file once.
         EnsureColumn("replayGain", "REAL");
 
-        using var meta = connection.CreateCommand();
-        meta.CommandText = "CREATE TABLE IF NOT EXISTS meta (key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)";
-        meta.ExecuteNonQuery();
+        // Which reader filled each row, so a re-read after the reader learns a new tag is kept
+        // row by row (see StaleFiles). An older cache's rows were filled by whichever reader last
+        // finished a whole pass, which is what the meta row recorded, so they take that.
+        if (EnsureColumn("readerVersion"))
+        {
+            using var seed = connection.CreateCommand();
+            seed.CommandText = "UPDATE tracks SET readerVersion = $version";
+            seed.Parameters.AddWithValue("$version", ReaderVersion);
+            seed.ExecuteNonQuery();
+        }
     }
 
     /// <summary>
@@ -96,7 +127,8 @@ public class MusicCatalogCache
         }
     }
 
-    private void EnsureColumn(string name, string sqlType = "INTEGER NOT NULL DEFAULT 0")
+    // True when the column was missing and has just been added.
+    private bool EnsureColumn(string name, string sqlType = "INTEGER NOT NULL DEFAULT 0")
     {
         var present = false;
         using (var info = connection.CreateCommand())
@@ -115,12 +147,13 @@ public class MusicCatalogCache
 
         if (present)
         {
-            return;
+            return false;
         }
 
         using var alter = connection.CreateCommand();
         alter.CommandText = $"ALTER TABLE tracks ADD COLUMN {name} {sqlType}";
         alter.ExecuteNonQuery();
+        return true;
     }
 
     /// <summary>Upserts tracks without change signatures (version 0) — used by tests and callers that don't scan.</summary>
@@ -130,9 +163,9 @@ public class MusicCatalogCache
     /// <summary>
     /// Upserts each track together with its file's change signature, so a later scan can tell what is
     /// unchanged. One transaction per call, so the scanner can batch a chunk of parallel reads into a
-    /// single serialized write.
+    /// single serialized write. <paramref name="readerVersion"/> is the tag reader that read them.
     /// </summary>
-    public void Upsert(IEnumerable<(Track Track, MusicFileVersion Version)> entries)
+    public void Upsert(IEnumerable<(Track Track, MusicFileVersion Version)> entries, int readerVersion = 0)
     {
         using var transaction = connection.BeginTransaction();
         using var upsert = connection.CreateCommand();
@@ -140,10 +173,10 @@ public class MusicCatalogCache
         upsert.CommandText = """
             INSERT INTO tracks (
                 id, title, artist, album, albumArtist, trackNumber, discNumber, genre, durationTicks, artRef,
-                modifiedTimeTicks, sizeBytes, bpm, sourceId, clipStartTicks, bitrate, replayGain)
+                modifiedTimeTicks, sizeBytes, bpm, sourceId, clipStartTicks, bitrate, replayGain, readerVersion)
             VALUES (
                 $id, $title, $artist, $album, $albumArtist, $trackNumber, $discNumber, $genre, $durationTicks, $artRef,
-                $modifiedTimeTicks, $sizeBytes, $bpm, $sourceId, $clipStartTicks, $bitrate, $replayGain)
+                $modifiedTimeTicks, $sizeBytes, $bpm, $sourceId, $clipStartTicks, $bitrate, $replayGain, $readerVersion)
             ON CONFLICT (id) DO UPDATE SET
                 title = excluded.title,
                 artist = excluded.artist,
@@ -160,7 +193,8 @@ public class MusicCatalogCache
                 sourceId = excluded.sourceId,
                 clipStartTicks = excluded.clipStartTicks,
                 bitrate = excluded.bitrate,
-                replayGain = excluded.replayGain
+                replayGain = excluded.replayGain,
+                readerVersion = excluded.readerVersion
             """;
 
         var parameters = new Dictionary<string, SqliteParameter>();
@@ -169,6 +203,7 @@ public class MusicCatalogCache
             "$id", "$title", "$artist", "$album", "$albumArtist",
             "$trackNumber", "$discNumber", "$genre", "$durationTicks", "$artRef",
             "$modifiedTimeTicks", "$sizeBytes", "$bpm", "$sourceId", "$clipStartTicks", "$bitrate", "$replayGain",
+            "$readerVersion",
         })
         {
             var parameter = upsert.CreateParameter();
@@ -196,6 +231,7 @@ public class MusicCatalogCache
             parameters["$clipStartTicks"].Value = track.ClipStart?.Ticks ?? 0L;
             parameters["$bitrate"].Value = track.Bitrate;
             parameters["$replayGain"].Value = (object?)track.ReplayGainDb ?? DBNull.Value;
+            parameters["$readerVersion"].Value = readerVersion;
             upsert.ExecuteNonQuery();
         }
 
@@ -213,7 +249,13 @@ public class MusicCatalogCache
     public IReadOnlyDictionary<string, MusicFileVersion> LoadVersions()
     {
         using var select = connection.CreateCommand();
-        select.CommandText = "SELECT COALESCE(sourceId, id), modifiedTimeTicks, sizeBytes FROM tracks";
+        // Set-aside duplicates are files the scan has read too: without them here, each one was
+        // "new" again on every scan, read, and set aside again, so the scan never settled.
+        select.CommandText = """
+            SELECT id, modifiedTimeTicks, sizeBytes FROM setAside
+            UNION ALL
+            SELECT COALESCE(sourceId, id), modifiedTimeTicks, sizeBytes FROM tracks
+            """;
         using var reader = select.ExecuteReader();
 
         // Every split row from the same source file was written with that file's own version
@@ -229,22 +271,82 @@ public class MusicCatalogCache
     }
 
     /// <summary>
+    /// The files (by Drive file id) last read by a tag reader older than
+    /// <paramref name="readerVersion"/> — what a re-read still has to cover. Kept per row so a
+    /// scan cut short by its time budget keeps every file it re-read; the next run picks up
+    /// only what is left rather than the whole library again.
+    /// </summary>
+    public IReadOnlySet<string> StaleFiles(int readerVersion)
+    {
+        using var select = connection.CreateCommand();
+        select.CommandText = """
+            SELECT COALESCE(sourceId, id) FROM tracks WHERE readerVersion < $version
+            UNION
+            SELECT id FROM setAside WHERE readerVersion < $version
+            """;
+        select.Parameters.AddWithValue("$version", readerVersion);
+        using var reader = select.ExecuteReader();
+        var stale = new HashSet<string>(StringComparer.Ordinal);
+        while (reader.Read())
+        {
+            stale.Add(reader.GetString(0));
+        }
+
+        return stale;
+    }
+
+    /// <summary>
+    /// Takes duplicate copies out of the catalog while keeping their files known to the scan,
+    /// each against the copy it lost to (see <see cref="DuplicateTracks.FindLosers"/>).
+    /// </summary>
+    public void SetAside(IEnumerable<(string LosingId, string WinnerId)> losers)
+    {
+        using var transaction = connection.BeginTransaction();
+        foreach (var (losingId, winnerId) in losers)
+        {
+            using var move = connection.CreateCommand();
+            move.Transaction = transaction;
+            move.CommandText = """
+                INSERT OR REPLACE INTO setAside (id, winnerId, modifiedTimeTicks, sizeBytes, readerVersion)
+                SELECT COALESCE(sourceId, id),
+                       COALESCE((SELECT COALESCE(sourceId, id) FROM tracks WHERE id = $winner), $winner),
+                       modifiedTimeTicks, sizeBytes, readerVersion
+                FROM tracks WHERE id = $loser;
+                DELETE FROM tracks WHERE id = $loser;
+                """;
+            move.Parameters.AddWithValue("$loser", losingId);
+            move.Parameters.AddWithValue("$winner", winnerId);
+            move.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
+    /// <summary>
     /// Deletes by physical file id — which is all a scan ever names, since it diffs
     /// Drive listings, not cache rows. A hidden-track split leaves two rows under
     /// their own ids sharing that file as <c>sourceId</c>, so both have to go with it.
+    /// A set-aside record of the file goes too. With <paramref name="releaseSetAside"/>
+    /// (the file has left Drive) the duplicates set aside in its favour are forgotten as
+    /// well, so the next scan reads one back in as the song; a scan that is only replacing
+    /// the file's rows with a fresh read passes false and keeps them set aside.
     /// </summary>
-    public void Delete(string id)
+    public void Delete(string id, bool releaseSetAside = true)
     {
         using var delete = connection.CreateCommand();
-        delete.CommandText = "DELETE FROM tracks WHERE id = $id OR sourceId = $id";
+        delete.CommandText = """
+            DELETE FROM tracks WHERE id = $id OR sourceId = $id;
+            DELETE FROM setAside WHERE id = $id OR ($release AND winnerId = $id);
+            """;
         delete.Parameters.AddWithValue("$id", id);
+        delete.Parameters.AddWithValue("$release", releaseSetAside ? 1 : 0);
         delete.ExecuteNonQuery();
     }
 
     public void Clear()
     {
         using var clear = connection.CreateCommand();
-        clear.CommandText = "DELETE FROM tracks";
+        clear.CommandText = "DELETE FROM tracks; DELETE FROM setAside;";
         clear.ExecuteNonQuery();
     }
 

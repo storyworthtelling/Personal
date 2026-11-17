@@ -24,15 +24,26 @@ public static class DuplicateTracks
     /// same two duplicates must not appear to swap places on every rescan.
     /// </summary>
     public static IReadOnlyList<string> FindLosingIds(IReadOnlyList<Track> tracks) =>
+        [.. FindLosers(tracks).Select(loser => loser.LosingId)];
+
+    /// <summary>
+    /// Each losing copy with the copy it lost to. The scan sets a loser aside against its
+    /// winner rather than forgetting it — its file is still in Drive — so that when the
+    /// winner leaves Drive the loser can come back as the song.
+    /// </summary>
+    public static IReadOnlyList<(string LosingId, string WinnerId)> FindLosers(IReadOnlyList<Track> tracks) =>
         [.. tracks
             .GroupBy(track => (Key(track.ArtistName), Key(track.AlbumName), Key(track.Title)))
             .Where(group => group.Count() > 1)
-            .SelectMany(group => group
-                .OrderByDescending(track => track.Bitrate)
-                .ThenByDescending(track => track.Duration)
-                .ThenBy(track => track.Id, StringComparer.Ordinal)
-                .Skip(1)
-                .Select(track => track.Id))];
+            .SelectMany(group =>
+            {
+                var ranked = group
+                    .OrderByDescending(track => track.Bitrate)
+                    .ThenByDescending(track => track.Duration)
+                    .ThenBy(track => track.Id, StringComparer.Ordinal)
+                    .ToList();
+                return ranked.Skip(1).Select(track => (track.Id, ranked[0].Id));
+            })];
 
     private static string Key(string value) => value.Trim().ToLowerInvariant();
 }
