@@ -59,26 +59,25 @@ public class DeliverySeamsTests
         Assert.Same(viaStatic, viaAccess);
     }
 
+    /// <summary>No voice, no encouragement on the page (owner's ruling, W10): the plain sentence is gone.</summary>
     [Fact]
-    public async Task ThePlainLineIsKeptWhenNotVoiced()
+    public async Task NoVoiceMeansNoLine()
     {
-        var seat = new SeatLineEncouragement((request, _) => Task.FromResult(new SeatLine(request.Seat, request.Fallback, IsVoiced: false)));
+        var seat = new SeatLineEncouragement((_, _) => Task.FromResult<SeatLine?>(null));
 
         var line = await seat.LineAsync(new ProgressionFacts("Squat holding a weight at your chest", 15, 10), Est(11, 3, 6), CancellationToken.None);
 
-        Assert.Equal("15 lb today, up from 10.", line!.Text);
-        Assert.False(line.IsVoiced);
+        Assert.Null(line);
     }
 
     [Fact]
-    public async Task AVoicedLineCarriesItsFlag()
+    public async Task AVoicedLineIsPrinted()
     {
-        var seat = new SeatLineEncouragement((request, _) => Task.FromResult(new SeatLine(request.Seat, "well done", IsVoiced: true)));
+        var seat = new SeatLineEncouragement((request, _) => Task.FromResult<SeatLine?>(new SeatLine(request.Seat, "well done")));
 
         var line = await seat.LineAsync(new ProgressionFacts("Squat holding a weight at your chest", 15, 10), Est(11, 3, 6), CancellationToken.None);
 
         Assert.Equal("well done", line!.Text);
-        Assert.True(line.IsVoiced);
     }
 
     [Fact]
@@ -88,7 +87,7 @@ public class DeliverySeamsTests
         var seat = new SeatLineEncouragement((request, _) =>
         {
             asked = true;
-            return Task.FromResult(new SeatLine(request.Seat, request.Fallback, IsVoiced: false));
+            return Task.FromResult<SeatLine?>(new SeatLine(request.Seat, "well done"));
         });
 
         var line = await seat.LineAsync(new ProgressionFacts("Squat holding a weight at your chest", 10, 10), Est(11, 3, 6), CancellationToken.None);

@@ -37,32 +37,7 @@ public class SeatFactsTests
     private static MealWeekFacts NovemberWeek() =>
         new(new DateOnly(2026, 11, 15), [DayOfWeek.Thursday], [DayOfWeek.Friday]);
 
-    [Fact]
-    public void FallbacksMatchPageEighteen()
-    {
-        Assert.Equal("Strength at 5:30. Lentil soup tonight.", SeatFacts.Today(SlowStart()).Fallback);
-        Assert.Equal("A rest day. Dinner is out tonight.", SeatFacts.RestDay(RestDay()).Fallback);
-        Assert.Equal("Sleep is down this month. The other signals are close to last month.",
-            SeatFacts.BodyMonthly(SleepSlipped()).Fallback);
-        Assert.Equal("No watch readings yesterday.", SeatFacts.BodyMonthly(SleepSlipped("watch")).Fallback);
-        Assert.Equal("Sleep: 6.2 hours last night, 40 minutes less than October's average.",
-            SeatFacts.Signal(SleepSignal()).Fallback);
-        Assert.Equal("25 lb today, up from 20.", SeatFacts.WorkoutEncouragement(SquatUp())!.Fallback);
-        Assert.Equal("Dinners for the week of Nov 15. One new recipe, Thursday.",
-            SeatFacts.MealSheetIntro(NovemberWeek()).Fallback);
-    }
 
-    [Fact]
-    public void TheFallbackFunctionAndTheRequestAgree()
-    {
-        // The request carries the fallback SeatFallbacks builds from the same facts: one source.
-        Assert.Equal(SeatFallbacks.For(SlowStart()), SeatFacts.Today(SlowStart()).Fallback);
-        Assert.Equal(SeatFallbacks.For(RestDay()), SeatFacts.RestDay(RestDay()).Fallback);
-        Assert.Equal(SeatFallbacks.For(SleepSlipped()), SeatFacts.BodyMonthly(SleepSlipped()).Fallback);
-        Assert.Equal(SeatFallbacks.For(SleepSignal()), SeatFacts.Signal(SleepSignal()).Fallback);
-        Assert.Equal(SeatFallbacks.For(SquatUp()), SeatFacts.WorkoutEncouragement(SquatUp())!.Fallback);
-        Assert.Equal(SeatFallbacks.For(NovemberWeek()), SeatFacts.MealSheetIntro(NovemberWeek()).Fallback);
-    }
 
     [Fact]
     public void EachBuilderNamesItsOwnSeat()
@@ -76,14 +51,8 @@ public class SeatFactsTests
         Assert.Equal(VoiceSeat.MealSheetIntro, SeatFacts.MealSheetIntro(NovemberWeek()).Seat);
     }
 
-    // ---- the fallbacks, beyond the one example per row ----
+    // ---- the words the facts use ----
 
-    [Fact]
-    public void TodayWithADinnerOutSaysSo()
-    {
-        var request = SeatFacts.Today(new TodayFacts(new TimeOnly(17, 30), "intervals", 30, DinnerPlan.Out));
-        Assert.Equal("Intervals at 5:30. Dinner is out tonight.", request.Fallback);
-    }
 
     [Theory]
     [InlineData(0, 5, "12:05")]
@@ -93,14 +62,14 @@ public class SeatFactsTests
     public void TodayTellsTimeOnTheTwelveHourClock(int hour, int minute, string expected)
     {
         var request = SeatFacts.Today(new TodayFacts(new TimeOnly(hour, minute), "strength", 40, DinnerPlan.At("lentil soup")));
-        Assert.StartsWith($"Strength at {expected}.", request.Fallback, StringComparison.Ordinal);
+        Assert.Contains($"strength at {expected} ", request.Facts[0], StringComparison.Ordinal);
     }
 
     [Fact]
     public void ARestDayWithADinnerAtHomeNamesTheDish()
     {
-        Assert.Equal("A rest day. Roast chicken tonight.",
-            SeatFacts.RestDay(new RestDayFacts(DinnerPlan.At("roast chicken"))).Fallback);
+        Assert.Contains(SeatFacts.RestDay(new RestDayFacts(DinnerPlan.At("roast chicken"))).Facts,
+            fact => fact.Contains("roast chicken", StringComparison.Ordinal));
     }
 
     public static IEnumerable<object[]> NewRecipeWeeks()
@@ -119,7 +88,11 @@ public class SeatFactsTests
     {
         var week = new MealWeekFacts(new DateOnly(2026, 11, 15), days, []);
 
-        Assert.Equal($"Dinners for the week of Nov 15. {expected}", SeatFacts.MealSheetIntro(week).Fallback);
+        // The facts say the days after "on": "Two new recipes, on Tuesday and Thursday."
+        var told = expected.Contains(", ", StringComparison.Ordinal)
+            ? expected[..(expected.IndexOf(", ", StringComparison.Ordinal) + 2)] + "on " + expected[(expected.IndexOf(", ", StringComparison.Ordinal) + 2)..]
+            : expected;
+        Assert.Equal(told, SeatFacts.MealSheetIntro(week).Facts[1]);
     }
 
     [Fact]
@@ -134,24 +107,26 @@ public class SeatFactsTests
     [Fact]
     public void ALoadWithAHalfPoundKeepsIt()
     {
-        Assert.Equal("27.5 lb today, up from 25.",
-            SeatFacts.WorkoutEncouragement(new ProgressionFacts("press", 27.5, 25))!.Fallback);
+        Assert.Contains("27.5 lb, up from 25 lb",
+            SeatFacts.WorkoutEncouragement(new ProgressionFacts("press", 27.5, 25))!.Facts[1], StringComparison.Ordinal);
     }
 
     [Fact]
     public void ASignalWithNoChangeSaysSo()
     {
         var facts = new SignalFacts("Sleep", SignalUnit.Hours, 6.87, "last night", 6.87, "October", RisingIsWorse: false);
-        Assert.Equal("Sleep: 6.9 hours last night, about the same as October's average.",
-            SeatFacts.Signal(facts).Fallback);
+        var told = SeatFacts.Signal(facts).Facts;
+        Assert.Contains("6.9 hours last night", told[0], StringComparison.Ordinal);
+        Assert.Contains("about the same", told[2], StringComparison.Ordinal);
     }
 
     [Fact]
     public void ASignalAboveItsOwnPastSaysMore()
     {
         var facts = new SignalFacts("Steps", SignalUnit.Steps, 9200, "yesterday", 8000, "October", RisingIsWorse: false);
-        Assert.Equal("Steps: 9,200 steps yesterday, 1,200 steps more than October's average.",
-            SeatFacts.Signal(facts).Fallback);
+        var told = SeatFacts.Signal(facts).Facts;
+        Assert.Contains("9,200 steps yesterday", told[0], StringComparison.Ordinal);
+        Assert.Contains("1,200 steps more", told[2], StringComparison.Ordinal);
     }
 
     // ---- what each seat is told ----
@@ -253,7 +228,7 @@ public class SeatFactsTests
         var request = SeatFacts.BodyMonthly(SleepSlipped());
 
         Assert.Contains("worse", request.Facts[0], StringComparison.Ordinal);
-        Assert.StartsWith("Sleep is down this month.", request.Fallback, StringComparison.Ordinal);
+        Assert.StartsWith("Sleep is down this month", request.Facts[0], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -264,7 +239,6 @@ public class SeatFactsTests
         var request = SeatFacts.BodyMonthly(new BodyMonthFacts([weight]));
 
         Assert.Equal("Weight is up this month, which is worse: 184 lb on average, against 181 lb last month.", request.Facts[0]);
-        Assert.Equal("Weight is up this month.", request.Fallback);
     }
 
     [Fact]
@@ -289,7 +263,7 @@ public class SeatFactsTests
 
         Assert.StartsWith("Weight is up", request.Facts[0], StringComparison.Ordinal);
         Assert.StartsWith("Steps are up", request.Facts[1], StringComparison.Ordinal);
-        Assert.Equal("Weight is up this month. Steps are up this month. The other signals are close to last month.", request.Fallback);
+        Assert.Equal("Close to last month: Resting heart rate.", request.Facts[2]);
     }
 
     [Theory]
@@ -306,7 +280,7 @@ public class SeatFactsTests
         var request = SeatFacts.BodyMonthly(new BodyMonthFacts(
             [new SignalMonth("Weight", SignalUnit.Pounds, 182, 181, RisingIsWorse: true)]));
 
-        Assert.DoesNotContain(softener, string.Join(" ", request.Facts) + " " + request.Fallback, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(softener, string.Join(" ", request.Facts), StringComparison.OrdinalIgnoreCase);
         Assert.Contains("worse", request.Facts[0], StringComparison.Ordinal);
     }
 
@@ -318,10 +292,10 @@ public class SeatFactsTests
             new SignalMonth("Steps", SignalUnit.Steps, 8000, 8100, RisingIsWorse: false),
             new SignalMonth("Weight", SignalUnit.Pounds, 181, 181, RisingIsWorse: true),
         ]));
-        Assert.Equal("All signals are close to last month.", all.Fallback);
+        Assert.Equal(["Close to last month: Steps, Weight."], all.Facts);
 
         var single = SeatFacts.BodyMonthly(new BodyMonthFacts([new SignalMonth("Steps", SignalUnit.Steps, 8000, 8100, false, NamePlural: true)]));
-        Assert.Equal("Steps are close to last month.", single.Fallback);
+        Assert.Equal(["Close to last month: Steps."], single.Facts);
     }
 
     // ---- a signal is set against the owner's own past, only ----

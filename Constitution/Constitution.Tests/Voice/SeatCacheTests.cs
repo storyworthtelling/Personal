@@ -1,28 +1,31 @@
 using Constitution.Domain.Voice;
 using Constitution.Infrastructure.Voice;
+using Storyworthtelling.CallSheet;
 
 namespace Constitution.Tests.Voice;
 
 /// <summary>
-/// C-9.2.3 — a seat is composed at most once per facts and day (Index's seat rule, mirrored): the
-/// pages ask on every appearance and every re-render, and the line only has something new to say when
-/// the facts change or the day turns. Everything is faked; time is passed in.
+/// C-9.2.3 — a seat is composed by the suite's one rule (<see cref="SeatPlan"/>, audit W10.3): at most once per
+/// facts and day, kept across a restart in the seat memory file, and an attempt that came back empty believed only
+/// for <see cref="SeatPlan.RetryAfter"/>. Everything is faked; time is passed in.
 ///
-/// <para>The bugs these reintroduce: a model call on every tab switch (the voice stops costing
-/// pennies); a line that flickers between two phrasings of the same facts; and the quieter opposite —
-/// a plain fallback remembered all day, so the voice never comes back after a key arrives.</para>
+/// <para>The bugs these reintroduce: a model call on every tab switch; a line that flickers between two phrasings
+/// of the same facts; and the quieter opposite — an empty attempt remembered all day, so the voice never comes back
+/// after a key arrives.</para>
 /// </summary>
-public class SeatCacheTests
+public sealed class SeatCacheTests : IDisposable
 {
     private static readonly DateTimeOffset Morning = new(2026, 10, 17, 7, 0, 0, TimeSpan.FromHours(-5));
 
+    private readonly string folder = Directory.CreateTempSubdirectory("constitution-seats-").FullName;
     private readonly CountingComposer inner = new();
-    private readonly InMemorySeatLineStore store = new();
 
-    private SeatCache Cache() => new(inner, store);
+    public void Dispose() => Directory.Delete(folder, recursive: true);
+
+    private SeatCache Cache() => new(inner, new SeatMemoryFile(Path.Combine(folder, "voice-seats.json")));
 
     private static SeatRequest Today(params string[] facts) =>
-        new(VoiceSeat.TodayTopLine, facts.Length == 0 ? ["strength at 5:30", "lentil soup tonight"] : facts, "Strength at 5:30. Lentil soup tonight.");
+        new(VoiceSeat.TodayTopLine, facts.Length == 0 ? ["strength at 5:30", "lentil soup tonight"] : facts);
 
     // ---- reuse ----
 
@@ -35,19 +38,19 @@ public class SeatCacheTests
         var second = await cache.ComposeAsync(Today(), Morning.AddHours(9), default);
 
         Assert.Equal(1, inner.Calls);
-        Assert.True(first.IsVoiced);
+        Assert.NotNull(first);
         Assert.Equal(first, second);
     }
 
     [Fact]
     public async Task TheStoredLineSurvivesANewCache()
     {
-        // The store is the memory: a fresh cache over the same store (a process restart) does not ask again.
+        // The file is the memory: a fresh cache over the same file (a process restart) does not ask again.
         await Cache().ComposeAsync(Today(), Morning, default);
         var again = await Cache().ComposeAsync(Today(), Morning.AddMinutes(5), default);
 
         Assert.Equal(1, inner.Calls);
-        Assert.True(again.IsVoiced);
+        Assert.Equal("voiced line 1", again!.Text);
     }
 
     [Fact]
@@ -59,7 +62,7 @@ public class SeatCacheTests
         var changed = await cache.ComposeAsync(Today("strength at 6:00", "lentil soup tonight"), Morning, default);
 
         Assert.Equal(2, inner.Calls);
-        Assert.Equal("voiced line 2", changed.Text);
+        Assert.Equal("voiced line 2", changed!.Text);
     }
 
     [Fact]
@@ -84,6 +87,7 @@ public class SeatCacheTests
         Assert.Equal(1, inner.Calls);
     }
 
+    /// <summary>Each set of facts keeps its own line: every signal's page has its own sentence.</summary>
     [Fact]
     public async Task ChangingTheFactsAndChangingBackReusesTheFirstLine()
     {
@@ -101,8 +105,8 @@ public class SeatCacheTests
     public async Task TheSameFactsOnADifferentSeatAreAnotherLine()
     {
         var cache = Cache();
-        await cache.ComposeAsync(new SeatRequest(VoiceSeat.TodayTopLine, ["a quiet day"], "A quiet day."), Morning, default);
-        await cache.ComposeAsync(new SeatRequest(VoiceSeat.RestDayLine, ["a quiet day"], "A quiet day."), Morning, default);
+        await cache.ComposeAsync(new SeatRequest(VoiceSeat.TodayTopLine, ["a quiet day"]), Morning, default);
+        await cache.ComposeAsync(new SeatRequest(VoiceSeat.RestDayLine, ["a quiet day"]), Morning, default);
 
         Assert.Equal(2, inner.Calls);
     }
@@ -113,90 +117,57 @@ public class SeatCacheTests
     public async Task ANextDayComposesAgainEvenWithTheSameFacts()
     {
         var cache = Cache();
-        var lateTonight = new DateTimeOffset(2026, 10, 17, 23, 59, 0, TimeSpan.FromHours(-5));
 
-        await cache.ComposeAsync(Today(), lateTonight, default);
-        var tomorrow = await cache.ComposeAsync(Today(), lateTonight.AddMinutes(2), default);
+        await cache.ComposeAsync(Today(), Morning, default);
+        var tomorrow = await cache.ComposeAsync(Today(), Morning.AddDays(1), default);
 
         Assert.Equal(2, inner.Calls);
-        Assert.Equal("voiced line 2", tomorrow.Text);
+        Assert.Equal("voiced line 2", tomorrow!.Text);
     }
 
     [Fact]
-    public async Task TheDayIsTheCallersOwnLocalDateNotUtc()
+    public async Task ALateEveningIsStillTheDayItBegan()
     {
-        // 07:00 and 23:30 on the 17th at -5 are on one local day, though 23:30 at -5 is already the 18th in UTC.
-        // The date is the wall clock that was passed in, so the day turns at the owner's midnight.
+        // The suite's one day (SeatPlan.Today): it turns at five in the morning, on the wall clock passed in.
         var cache = Cache();
 
-        await cache.ComposeAsync(Today(), new DateTimeOffset(2026, 10, 17, 7, 0, 0, TimeSpan.FromHours(-5)), default);
-        await cache.ComposeAsync(Today(), new DateTimeOffset(2026, 10, 17, 23, 30, 0, TimeSpan.FromHours(-5)), default);
+        await cache.ComposeAsync(Today(), new DateTimeOffset(2026, 10, 17, 22, 0, 0, TimeSpan.FromHours(-5)), default);
+        await cache.ComposeAsync(Today(), new DateTimeOffset(2026, 10, 18, 1, 30, 0, TimeSpan.FromHours(-5)), default);
 
         Assert.Equal(1, inner.Calls);
     }
 
-    [Fact]
-    public async Task YesterdaysLinesAreForgotten()
-    {
-        var cache = Cache();
-        await cache.ComposeAsync(Today(), Morning, default);
-        await cache.ComposeAsync(Today("strength at 6:00", "lentil soup tonight"), Morning, default);
-        Assert.Equal(2, store.Count);
-
-        await cache.ComposeAsync(Today(), Morning.AddDays(1), default);
-
-        Assert.Equal(1, store.Count);
-    }
-
-    // ---- what is not remembered ----
+    // ---- no voice ----
 
     [Fact]
-    public async Task AFallbackIsNeverStoredAsTheDaysLine()
+    public async Task NoVoiceHidesTheSeat()
     {
         inner.Voiced = false;
 
-        var line = await Cache().ComposeAsync(Today(), Morning, default);
-
-        Assert.False(line.IsVoiced);
-        Assert.Equal("Strength at 5:30. Lentil soup tonight.", line.Text);
-        Assert.Equal(0, store.Count);
+        Assert.Null(await Cache().ComposeAsync(Today(), Morning, default));
     }
 
     [Fact]
-    public async Task AFailureIsNotRetriedStraightAwayButIsTriedAgainSoon()
+    public async Task AnEmptyAttemptIsNotRetriedStraightAwayButIsTriedAgainSoon()
     {
         var cache = Cache();
         inner.Voiced = false;
         await cache.ComposeAsync(Today(), Morning, default);
 
         // A tab switch a minute later is not a retry storm...
-        await cache.ComposeAsync(Today(), Morning.AddMinutes(1), default);
+        Assert.Null(await cache.ComposeAsync(Today(), Morning.AddMinutes(1), default));
         Assert.Equal(1, inner.Calls);
 
         // ...but the voice must not stay away all day because one call failed.
         inner.Voiced = true;
-        var later = await cache.ComposeAsync(Today(), Morning.AddMinutes(SeatCache.FailureMemoryMinutes), default);
+        var later = await cache.ComposeAsync(Today(), Morning + SeatPlan.RetryAfter, default);
 
         Assert.Equal(2, inner.Calls);
-        Assert.True(later.IsVoiced);
+        Assert.NotNull(later);
     }
 
     [Fact]
-    public async Task WhileAFailureIsRememberedTheCallersOwnFallbackShows()
-    {
-        var cache = Cache();
-        inner.Voiced = false;
-        await cache.ComposeAsync(Today(), Morning, default);
-
-        var again = await cache.ComposeAsync(Today(), Morning.AddMinutes(1), default);
-
-        Assert.False(again.IsVoiced);
-        Assert.Equal("Strength at 5:30. Lentil soup tonight.", again.Text);
-        Assert.Equal(VoiceSeat.TodayTopLine, again.Seat);
-    }
-
-    [Fact]
-    public async Task ACallerWhoLeavesStoresNothingAndRemembersNoFailure()
+    public async Task ACallerWhoLeavesStoresNothing()
     {
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync();
@@ -204,55 +175,30 @@ public class SeatCacheTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cache.ComposeAsync(Today(), Morning, cancelled.Token));
 
-        Assert.Equal(0, store.Count);
-        // Leaving is not a failure: the very next ask composes at once rather than waiting out a failure's memory.
+        // Leaving is not an empty attempt: the very next ask composes at once.
         var next = await cache.ComposeAsync(Today(), Morning, default);
-        Assert.True(next.IsVoiced);
+        Assert.NotNull(next);
         Assert.Equal(1, inner.Calls);
     }
 
-    // ---- the keys ----
+    // ---- the seat ----
 
     [Fact]
-    public void TheKeyIsTheStoredSeatIdThenAHashOfTheOrderedFactsThenTheDay()
+    public void EverySeatIsItsCallSheetLine()
     {
-        var key = SeatLineKey.For(Today(), new DateOnly(2026, 10, 17));
-
-        Assert.Equal("today-top-line", key.SeatId);
-        Assert.Equal(new DateOnly(2026, 10, 17), key.Day);
-        Assert.Matches("^[0-9a-f]{16}$", key.FactsHash);
-        Assert.Equal($"today-top-line|{key.FactsHash}|2026-10-17", key.ToString());
+        foreach (var occasion in VoicedOccasions.All)
+        {
+            Assert.Equal("Constitution", occasion.Line.App);
+            Assert.Equal(occasion.Id, occasion.Line.Seat);
+        }
     }
 
     [Fact]
     public void TheHashIsAFixedFingerprintNotStringGetHashCode()
     {
         // string.GetHashCode is randomised per process and would orphan every stored line on each launch,
-        // so the expectation is a literal: SHA-256 of the seat id, a newline and the facts joined by newlines.
-        var key = SeatLineKey.For(new SeatRequest(VoiceSeat.RestDayLine, ["a rest day"], "A rest day."), new DateOnly(2026, 10, 17));
-
-        Assert.Equal("6582dd1d6aeb3381", key.FactsHash);
-    }
-
-    [Fact]
-    public void TheFallbackIsNotPartOfTheKeyButEveryFactIs()
-    {
-        var day = new DateOnly(2026, 10, 17);
-        var key = SeatLineKey.For(new SeatRequest(VoiceSeat.RestDayLine, ["a rest day"], "A rest day."), day);
-
-        Assert.Equal(key.FactsHash,
-            SeatLineKey.For(new SeatRequest(VoiceSeat.RestDayLine, ["a rest day"], "Another fallback."), day).FactsHash);
-        Assert.NotEqual(key.FactsHash,
-            SeatLineKey.For(new SeatRequest(VoiceSeat.RestDayLine, ["a rest day", "dinner is out"], "A rest day."), day).FactsHash);
-    }
-
-    [Fact]
-    public void EveryKeyUsesTheClosedListsStoredId()
-    {
-        foreach (var occasion in VoicedOccasions.All)
-        {
-            Assert.Equal(occasion.Id, SeatLineKey.For(new SeatRequest(occasion.Seat, ["a fact"], "A plain sentence."), new DateOnly(2026, 10, 17)).SeatId);
-        }
+        // so the expectation is a literal: SHA-256 of the app and seat, a newline and the facts joined by newlines.
+        Assert.Equal("27afbe1ec8a578b0", SeatCache.Hash(new SeatRequest(VoiceSeat.RestDayLine, ["a rest day"])));
     }
 
     // ---- two pages ask at once ----
@@ -274,7 +220,7 @@ public class SeatCacheTests
     }
 }
 
-/// <summary>Stands in for <c>SeatComposer</c>: counts the calls and answers voiced or not, as told.</summary>
+/// <summary>Stands in for <c>SeatComposer</c>: counts the calls and answers with a line or with nothing, as told.</summary>
 internal sealed class CountingComposer : ISeatComposer
 {
     public int Calls { get; private set; }
@@ -283,7 +229,7 @@ internal sealed class CountingComposer : ISeatComposer
 
     public Task? Hold { get; set; }
 
-    public async Task<SeatLine> ComposeAsync(SeatRequest request, CancellationToken cancellationToken)
+    public async Task<SeatLine?> ComposeAsync(SeatRequest request, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Calls++;
@@ -293,28 +239,6 @@ internal sealed class CountingComposer : ISeatComposer
             await Hold;
         }
 
-        return Voiced
-            ? new SeatLine(request.Seat, $"voiced line {call}", IsVoiced: true)
-            : new SeatLine(request.Seat, request.Fallback, IsVoiced: false);
-    }
-}
-
-/// <summary>The in-memory stand-in for the on-device store (preferences, a later Android concern).</summary>
-internal sealed class InMemorySeatLineStore : ISeatLineStore
-{
-    private readonly Dictionary<SeatLineKey, SeatLine> lines = [];
-
-    public int Count => lines.Count;
-
-    public SeatLine? Find(SeatLineKey key) => lines.GetValueOrDefault(key);
-
-    public void Save(SeatLineKey key, SeatLine line) => lines[key] = line;
-
-    public void DropBefore(DateOnly day)
-    {
-        foreach (var key in lines.Keys.Where(key => key.Day < day).ToList())
-        {
-            lines.Remove(key);
-        }
+        return Voiced ? new SeatLine(request.Seat, $"voiced line {call}") : null;
     }
 }

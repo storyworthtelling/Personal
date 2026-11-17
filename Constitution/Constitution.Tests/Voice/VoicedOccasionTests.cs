@@ -191,13 +191,13 @@ public class VoicedOccasionTests
         }
     }
 
-    // ---- fallbacks never hide ----
+    // ---- with no voice, every seat hides ----
 
     [Fact]
-    public async Task FallbackNeverHides()
+    public async Task WithNoVoiceEverySeatHides()
     {
-        // With no profile and no key, every one of the six answers with its plain sentence: none is
-        // hidden, none is blank, and none reaches the model.
+        // With no profile and no key, every one of the six has nothing to show (owner's ruling, W10: Constitution
+        // hides like every other app), and none reaches the model.
         foreach (var occasion in VoicedOccasions.All)
         {
             var client = new RecordingVoiceClient();
@@ -208,25 +208,18 @@ public class VoicedOccasionTests
                     new FakeConfigStore(Storyworthtelling.Voice.VoiceConfig.Empty)));
 
             var line = await composer.ComposeAsync(
-                new SeatRequest(occasion.Seat, ["Strength at 5:30", "lentil soup tonight"], "Strength at 5:30. Lentil soup tonight."),
-                default);
+                new SeatRequest(occasion.Seat, ["Strength at 5:30", "lentil soup tonight"]), default);
 
-            Assert.False(string.IsNullOrWhiteSpace(line.Text), occasion.Id);
-            Assert.Equal("Strength at 5:30. Lentil soup tonight.", line.Text);
-            Assert.False(line.IsVoiced, occasion.Id);
+            Assert.Null(line);
             Assert.Empty(client.Requests);
         }
     }
 
     [Fact]
-    public void TheListCarriesNoHideOption()
+    public void EverySeatHidesOnTheCallSheet()
     {
-        Assert.DoesNotContain(
-            typeof(VoicedOccasion).GetProperties().Select(property => property.Name),
-            name => name.Contains("Hide", StringComparison.OrdinalIgnoreCase)
-                || name.Contains("Fallback", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(
-            Enum.GetNames<VoiceSeat>(), name => name.Contains("Hide", StringComparison.OrdinalIgnoreCase));
+        Assert.All(VoicedOccasions.All,
+            occasion => Assert.Equal(Storyworthtelling.CallSheet.VoiceFallback.Hide, occasion.Line.Fallback));
     }
 
     // ---- helpers ----

@@ -13,7 +13,7 @@ public sealed class ConnectionNoticeBoardAccess : INoticeBoardAccess
 }
 
 /// <summary>The encouragement seat over any composer of seat lines; the head hands it the voice it already has.</summary>
-public sealed class SeatLineEncouragement(Func<SeatRequest, CancellationToken, Task<SeatLine>> compose) : IWorkoutEncouragement
+public sealed class SeatLineEncouragement(Func<SeatRequest, CancellationToken, Task<SeatLine?>> compose) : IWorkoutEncouragement
 {
     public async Task<EncouragementLine?> LineAsync(ProgressionFacts news, DateTimeOffset now, CancellationToken cancellation)
     {
@@ -23,7 +23,8 @@ public sealed class SeatLineEncouragement(Func<SeatRequest, CancellationToken, T
             return null;
         }
 
+        // No voice, no line: the seat hides on the page (owner's ruling, W10).
         var line = await compose(request, cancellation);
-        return new EncouragementLine(line.Text, line.IsVoiced);
+        return line is null ? null : new EncouragementLine(line.Text);
     }
 }

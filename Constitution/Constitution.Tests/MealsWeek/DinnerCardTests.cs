@@ -88,7 +88,7 @@ public class DinnerCardTests
         Assert.Null(TodayModel.Dinner(null));
         Assert.Equal(132, withDinner.ScoreBpm);
         Assert.Equal("Strength, 40 minutes", TodayModel.Clipping(withDinner)!.Headline);
-        Assert.Contains("Sheet-pan chicken", TodayModel.TopLine(withDinner).Text, StringComparison.Ordinal);
+        Assert.Contains(TodayModel.TopLine(withDinner).Request!.Facts, fact => fact.Contains("Sheet-pan chicken", StringComparison.Ordinal));
     }
 
     [Fact]

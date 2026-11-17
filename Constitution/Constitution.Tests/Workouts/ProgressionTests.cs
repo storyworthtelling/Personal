@@ -467,7 +467,7 @@ public class ProgressionTests
 
         var seat = SeatFacts.WorkoutEncouragement(goblet.News!);
         Assert.NotNull(seat);
-        Assert.Equal("15 lb today, up from 10.", seat!.Fallback);
+        Assert.Equal("Load today: 15 lb, up from 10 lb last time.", seat!.Facts[1]);
         Assert.Null(prescriptions[1].News);
     }
 
@@ -479,7 +479,7 @@ public class ProgressionTests
         var prescription = ProgressionPlan.Prescribe(up, Sam, new Session(SessionKind.Strength, TimeSpan.FromMinutes(40), false, [Wall])).Single();
 
         Assert.Equal(new ProgressionFacts(Wall.Name, 16, 12, "reps"), prescription.News);
-        Assert.Equal("16 reps today, up from 12.", SeatFacts.WorkoutEncouragement(prescription.News!)!.Fallback);
+        Assert.Equal("Load today: 16 reps, up from 12 reps last time.", SeatFacts.WorkoutEncouragement(prescription.News!)!.Facts[1]);
     }
 
     [Fact]

@@ -67,7 +67,6 @@ public class BodyTabSettledTests
 
         Assert.NotNull(morning.Monthly);
         Assert.Equal(morning.Monthly!.Facts, evening.Monthly!.Facts);
-        Assert.Equal(morning.Monthly.Fallback, evening.Monthly.Fallback);
     }
 
     [Fact]

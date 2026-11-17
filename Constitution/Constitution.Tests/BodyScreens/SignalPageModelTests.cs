@@ -65,7 +65,7 @@ public class SignalPageModelTests
 
         Assert.NotNull(page.Seat);
         Assert.Equal(VoiceSeat.SignalSentence, page.Seat!.Seat);
-        Assert.Equal("Sleep: 6.2 hours last night, 40 minutes less than October's average.", page.Seat.Fallback);
+        Assert.Equal("Sleep: 6.2 hours last night.", page.Seat.Facts[0]);
         Assert.Contains(page.Seat.Facts, fact => fact.Contains("their own October average", StringComparison.Ordinal));
         Assert.Contains("The comparison is with their own past only.", page.Seat.Facts);
     }
@@ -78,7 +78,7 @@ public class SignalPageModelTests
 
         var page = SignalPageModel.Build(ScreenData.Inputs(readings, BodyWindow.Quarter), BodySignal.Sleep);
 
-        Assert.Equal("Sleep: 6.2 hours last night, 40 minutes less than last quarter's average.", page.Seat!.Fallback);
+        Assert.Contains(page.Seat!.Facts, fact => fact.Contains("their own last quarter average", StringComparison.Ordinal));
     }
 
     [Fact]

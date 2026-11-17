@@ -170,13 +170,10 @@ internal sealed class FakeEncouragement : IWorkoutEncouragement
 
     public string? Answer { get; set; } = "A little more than last time.";
 
-    /// <summary>Whether the answer is the owner's voice; false is the plain sentence the seat falls back to.</summary>
-    public bool Voiced { get; set; } = true;
-
     public Task<EncouragementLine?> LineAsync(ProgressionFacts news, DateTimeOffset now, CancellationToken cancellation)
     {
         Asked.Add(news);
-        return Task.FromResult(Answer is null ? null : new EncouragementLine(Answer, Voiced));
+        return Task.FromResult(Answer is null ? null : new EncouragementLine(Answer));
     }
 }
 

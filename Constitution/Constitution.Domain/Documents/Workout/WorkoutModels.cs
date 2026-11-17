@@ -21,9 +21,8 @@ public sealed record Soreness(string Place, string Since, int DaysSore, bool Doc
 /// <param name="Dose">The dose as printed large: "3 × 10", "5 min".</param>
 /// <param name="ShowFigure">True while the exercise is new (C-2.3.3's policy decides); room is kept for the figure.</param>
 /// <param name="ScoreBpm">The one recommended setting, printed with its band name (D25).</param>
-/// <param name="Encouragement">The one voiced line, or null when the seat is hidden.</param>
+/// <param name="Encouragement">The one voiced line, printed in the owner's hand, or null when the seat is hidden.</param>
 /// <param name="Substitution">On an injury day, what stands in for the usual exercise, in plain words.</param>
-/// <param name="EncouragementVoiced">True when the line is the owner's voice, which prints in their hand; false for the plain sentence the seat falls back to, which prints in the plain body face.</param>
 public sealed record ExercisePageModel(
     string Name,
     string Dose,
@@ -32,8 +31,7 @@ public sealed record ExercisePageModel(
     bool ShowFigure,
     int ScoreBpm,
     string? Encouragement,
-    string? Substitution = null,
-    bool EncouragementVoiced = true);
+    string? Substitution = null);
 
 /// <summary>A workout: a cover and one page per exercise, with soreness carried onto every page when open.</summary>
 public sealed record WorkoutDocumentModel(

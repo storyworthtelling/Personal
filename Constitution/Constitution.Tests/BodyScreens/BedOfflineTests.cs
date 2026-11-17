@@ -80,20 +80,19 @@ public class BedOfflineTests
     }
 
     [Fact]
-    public void TheBodySentenceSaysSoCalmly()
+    public void TheBodySeatIsToldTheBedWaitsSinceThursday()
     {
         var readings = SleepThenSilence();
         var model = BodyTabModel.Build(ScreenData.Inputs(readings, bedChosen: true));
 
-        Assert.Contains("The bed hasn’t reported since Thursday, so that line waits.", model.Monthly!.Fallback, StringComparison.Ordinal);
-        Assert.Contains(model.Monthly.Facts, fact => fact.Contains("Thursday", StringComparison.Ordinal));
+        Assert.Contains(model.Monthly!.Facts, fact => fact.Contains("Thursday", StringComparison.Ordinal));
     }
 
     [Fact]
     public void ErrorIsNotVoiced()
     {
         var model = BodyTabModel.Build(ScreenData.Inputs(SleepThenSilence(), bedChosen: true));
-        var spoken = model.Monthly!.Facts.Append(model.Monthly.Fallback);
+        var spoken = model.Monthly!.Facts;
 
         // Whatever the voice is handed is calm fact about a line waiting; nothing in it is a failure.
         string[] errorWords = ["error", "failed", "failure", "refused", "rejected", "sign-in", "sign in", "login", "offline", "couldn"];

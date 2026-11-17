@@ -14,7 +14,6 @@ namespace Constitution.Tests.Voice;
 /// </summary>
 public class SeatComposerTests
 {
-    private const string PlainSentence = "Strength at 5:30. Lentil soup tonight.";
 
     private readonly RecordingVoiceClient client = new();
     private readonly FakeProfileStore profileStore = new(VoiceTestSupport.Profile());
@@ -27,7 +26,7 @@ public class SeatComposerTests
         logger);
 
     private static SeatRequest Today() =>
-        new(VoiceSeat.TodayTopLine, ["strength at 5:30", "lentil soup tonight"], PlainSentence);
+        new(VoiceSeat.TodayTopLine, ["strength at 5:30", "lentil soup tonight"]);
 
     // ---- the voiced line ----
 
@@ -36,8 +35,7 @@ public class SeatComposerTests
     {
         var line = await Composer().ComposeAsync(Today(), default);
 
-        Assert.Equal(VoiceTestSupport.Reply, line.Text);
-        Assert.True(line.IsVoiced);
+        Assert.Equal(VoiceTestSupport.Reply, line!.Text);
         Assert.Equal(VoiceSeat.TodayTopLine, line.Seat);
     }
 
@@ -45,7 +43,7 @@ public class SeatComposerTests
     public async Task TheReplyIsTrimmed()
     {
         client.Reply = "  Strength at five-thirty.\n";
-        Assert.Equal("Strength at five-thirty.", (await Composer().ComposeAsync(Today(), default)).Text);
+        Assert.Equal("Strength at five-thirty.", (await Composer().ComposeAsync(Today(), default))!.Text);
     }
 
     [Fact]
@@ -62,7 +60,6 @@ public class SeatComposerTests
         var first = sent.Context.IndexOf("strength at 5:30", StringComparison.Ordinal);
         var second = sent.Context.IndexOf("lentil soup tonight", StringComparison.Ordinal);
         Assert.True(first >= 0 && second > first, "both facts, in order");
-        Assert.DoesNotContain(PlainSentence, sent.Context, StringComparison.Ordinal);
         Assert.DoesNotContain(VoiceTestSupport.Sentinel, sent.Context + sent.Purpose, StringComparison.Ordinal);
     }
 
@@ -72,7 +69,7 @@ public class SeatComposerTests
         var composer = Composer();
         foreach (var occasion in VoicedOccasions.All)
         {
-            await composer.ComposeAsync(new SeatRequest(occasion.Seat, ["a fact"], "A plain sentence."), default);
+            await composer.ComposeAsync(new SeatRequest(occasion.Seat, ["a fact"]), default);
         }
 
         Assert.Equal(VoicedOccasions.All.Select(occasion => occasion.Purpose).ToArray(),
@@ -82,7 +79,7 @@ public class SeatComposerTests
     // ---- the plain sentence, never hidden ----
 
     [Fact]
-    public async Task WithNoProfileTheSeatShowsItsPlainSentence()
+    public async Task WithNoProfileTheSeatHides()
     {
         var composer = new SeatComposer(
             new VoicedMessenger(new FakeProfileStore(VoiceProfile.Empty), client),
@@ -90,13 +87,12 @@ public class SeatComposerTests
 
         var line = await composer.ComposeAsync(Today(), default);
 
-        Assert.Equal(PlainSentence, line.Text);
-        Assert.False(line.IsVoiced);
+        Assert.Null(line);
         Assert.Empty(client.Requests);
     }
 
     [Fact]
-    public async Task WithNoKeyTheSeatShowsItsPlainSentenceWithoutAModelCall()
+    public async Task WithNoKeyTheSeatHidesWithoutAModelCall()
     {
         var composer = new SeatComposer(
             new VoicedMessenger(profileStore, client),
@@ -104,43 +100,39 @@ public class SeatComposerTests
 
         var line = await composer.ComposeAsync(Today(), default);
 
-        Assert.Equal(PlainSentence, line.Text);
-        Assert.False(line.IsVoiced);
+        Assert.Null(line);
         Assert.Empty(client.Requests);
     }
 
     [Fact]
-    public async Task AFailingClientGivesThePlainSentence()
+    public async Task AFailingClientHidesTheSeat()
     {
         client.Failure = new HttpRequestException("503 from the model");
 
         var line = await Composer().ComposeAsync(Today(), default);
 
-        Assert.Equal(PlainSentence, line.Text);
-        Assert.False(line.IsVoiced);
+        Assert.Null(line);
     }
 
     [Fact]
-    public async Task AnUnreadableProfileGivesThePlainSentence()
+    public async Task AnUnreadableProfileHidesTheSeat()
     {
         profileStore.Failure = new IOException("Drive is offline");
 
         var line = await Composer().ComposeAsync(Today(), default);
 
-        Assert.Equal(PlainSentence, line.Text);
-        Assert.False(line.IsVoiced);
+        Assert.Null(line);
         Assert.Empty(client.Requests);
     }
 
     [Fact]
-    public async Task UnreadableVoiceSettingsGiveThePlainSentence()
+    public async Task UnreadableVoiceSettingsHideTheSeat()
     {
         configStore.Failure = new UnauthorizedAccessException("wrong passphrase");
 
         var line = await Composer().ComposeAsync(Today(), default);
 
-        Assert.Equal(PlainSentence, line.Text);
-        Assert.False(line.IsVoiced);
+        Assert.Null(line);
         Assert.Empty(client.Requests);
     }
 
@@ -148,14 +140,13 @@ public class SeatComposerTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("\n")]
-    public async Task ABlankReplyGivesThePlainSentence(string reply)
+    public async Task ABlankReplyHidesTheSeat(string reply)
     {
         client.Reply = reply;
 
         var line = await Composer().ComposeAsync(Today(), default);
 
-        Assert.Equal(PlainSentence, line.Text);
-        Assert.False(line.IsVoiced);
+        Assert.Null(line);
     }
 
     [Fact]
@@ -172,7 +163,7 @@ public class SeatComposerTests
     // ---- what reaches a log ----
 
     [Fact]
-    public async Task AFallbackIsLoggedBySeatIdAndKindOfFailureAndNothingElse()
+    public async Task AHiddenSeatIsLoggedBySeatIdAndKindOfFailureAndNothingElse()
     {
         client.Failure = new HttpRequestException("secret detail the model said");
         configStore.Failure = new IOException("drive detail");
@@ -205,6 +196,6 @@ public class SeatComposerTests
     public async Task TheComposerWorksWithNoLogger()
     {
         var composer = new SeatComposer(new VoicedMessenger(profileStore, client), new DriveVoiceOptions(configStore));
-        Assert.True((await composer.ComposeAsync(Today(), default)).IsVoiced);
+        Assert.NotNull(await composer.ComposeAsync(Today(), default));
     }
 }

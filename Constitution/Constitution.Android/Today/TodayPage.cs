@@ -33,7 +33,12 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
         ate ??= new Dictionary<AteMeal, AteLine>();
 
         var host = new ScrapHost(context);
-        var scraps = new List<ScrapEntry> { new(ScrapKind.NotepadLeaf, TopLineScrapId, Line(context, topLine)) };
+        // The top line shows only when there is one: the neutral sentence with no plan, or the seat's voiced line.
+        var scraps = new List<ScrapEntry>();
+        if (topLine.Text is { } text)
+        {
+            scraps.Add(new(ScrapKind.NotepadLeaf, TopLineScrapId, Line(context, text, voiced: topLine.Request is not null)));
+        }
         if (clipping is not null)
         {
             // The workout, as one magazine clipping (C-4.1.2). On a rest day there is none: its absence is the signal.
@@ -95,14 +100,14 @@ public sealed class TodayPage : LinearLayout, IFullBleedPage
         return card;
     }
 
-    private static TextView Line(Context context, TodayTopLine topLine)
+    private static TextView Line(Context context, string text, bool voiced)
     {
-        if (topLine.IsVoiced)
+        if (voiced)
         {
-            return ScrapContent.Voice(context, topLine.Text);
+            return ScrapContent.Voice(context, text);
         }
 
-        var plain = new TextView(context) { Text = topLine.Text };
+        var plain = new TextView(context) { Text = text };
         plain.SetTextSize(Android.Util.ComplexUnitType.Sp, DesignTokens.TypeSp.Body);
         plain.SetTextColor(PaperTheme.Ink);
         plain.Typeface = PaperTheme.SerifRegular(context);

@@ -234,7 +234,8 @@ public class BodyTabModelTests
 
         var model = BodyTabModel.Build(ScreenData.Inputs(readings));
 
-        Assert.Equal("Sleep is down this month. The other signals are close to last month.", model.Monthly!.Fallback);
+        Assert.StartsWith("Sleep is down this month", model.Monthly!.Facts[0], StringComparison.Ordinal);
+        Assert.Equal("Close to last month: Resting heart rate, Steps.", model.Monthly.Facts[1]);
     }
 
     [Fact]
@@ -253,7 +254,7 @@ public class BodyTabModelTests
 
         var model = BodyTabModel.Build(ScreenData.Inputs(readings));
 
-        Assert.Equal("Weight is up this month.", model.Monthly!.Fallback);
+        Assert.StartsWith("Weight is up this month", model.Monthly!.Facts[0], StringComparison.Ordinal);
         Assert.Contains(model.Monthly.Facts, fact => fact.Contains("which is worse", StringComparison.Ordinal));
     }
 

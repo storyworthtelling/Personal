@@ -58,11 +58,11 @@ public class DeviceReminderTests
     }
 
     [Fact]
-    public void TheNeutralSentenceIsPageEighteens()
+    public void TheSeatIsToldWhichDeviceSkipped()
     {
         var model = BodyTabModel.Build(ScreenData.Inputs(WatchOn(2, 3, 4)));
 
-        Assert.Equal("No watch readings yesterday.", model.Monthly!.Fallback);
+        Assert.Equal("No watch readings yesterday.", model.Monthly!.Facts[0]);
     }
 
     [Fact]
@@ -73,7 +73,7 @@ public class DeviceReminderTests
 
         var model = BodyTabModel.Build(ScreenData.Inputs(readings));
 
-        Assert.Equal("No watch readings yesterday.", model.Monthly!.Fallback);
+        Assert.Equal("No watch readings yesterday.", model.Monthly!.Facts[0]);
         Assert.DoesNotContain(model.Monthly.Facts, fact => fact.Contains("Sleep", StringComparison.Ordinal));
     }
 
