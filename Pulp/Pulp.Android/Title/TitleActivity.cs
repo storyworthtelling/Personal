@@ -88,11 +88,15 @@ public class TitleActivity : Activity
     private string? posterShown;
     private bool extrasAsked;
 
-    public static Intent For(Context context, TitleId title)
+    /// <summary>Whether the title was opened from the week's stack, the one place Pulp chose it (the why-this line's reason).</summary>
+    public const string ExtraFromStack = "fromStack";
+
+    public static Intent For(Context context, TitleId title, bool fromTheStack = false)
     {
         ArgumentNullException.ThrowIfNull(context);
         var intent = new Intent(context, typeof(TitleActivity));
         intent.PutExtra(ExtraTitleId, title.Value);
+        intent.PutExtra(ExtraFromStack, fromTheStack);
         return intent;
     }
 
@@ -459,7 +463,10 @@ public class TitleActivity : Activity
             var line = await Task.Run(async () =>
             {
                 var past = WhyThisPast.Alike(viewer, title, sittings, services.CachedCopy);
-                var facts = VoiceFactBuilder.WhyThis(viewer, ViewerStanding.DeviceOwner, title.Name, past);
+                // The phone's own adult, looking at their own history (D41). Only a title from the week's stack has a reason to
+                // give (audit W10.5); any other has none, and the line hides.
+                var fromTheStack = Intent?.GetBooleanExtra(ExtraFromStack, false) ?? false;
+                var facts = VoiceFactBuilder.WhyThis(viewer, ViewerStanding.DeviceOwner, title.Name, fromTheStack, past);
                 return await new TitleVoiceLine(this).LineAsync(title.Id.Value, facts, token);
             }, token);
             Post(() =>

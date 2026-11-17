@@ -24,12 +24,15 @@ public class VoiceSeatComposerTests
     private VoiceProfile profile = VoiceTestSupport.Profile();
     private VoiceConfig config = new("not-a-real-key");
     private bool signedIn = true;
+    private readonly string memoryFile =
+        Path.Combine(Directory.CreateTempSubdirectory("index-seats-").FullName, "voice-seats.json");
 
     private VoiceSeatComposer Composer() => new(
         new VoicedMessenger(new FakeProfileStore(profile), client),
         new DriveVoiceOptions(new FakeConfigStore(config)),
         clock,
         () => signedIn,
+        new Storyworthtelling.CallSheet.SeatMemoryFile(memoryFile),
         logger);
 
     private static VoiceFacts Snowball() => VoiceFactBuilder.Snowball(VoiceTestSupport.TwelvePercentDown());
@@ -172,6 +175,17 @@ public class VoiceSeatComposerTests
         Assert.Single(client.Requests);
     }
 
+    /// <summary>The suite's one rule (audit W10.3): a line is kept across a restart, not only for the process.</summary>
+    [Fact]
+    public async Task ALineSurvivesARestart()
+    {
+        var first = await Composer().ComposeAsync(Snowball(), default);
+        var afterRestart = await Composer().ComposeAsync(Snowball(), default);
+
+        Assert.Equal(first, afterRestart);
+        Assert.Single(client.Requests);
+    }
+
     [Fact]
     public async Task TheNextDayComposesAgain()
     {
@@ -203,7 +217,7 @@ public class VoiceSeatComposerTests
         var composer = Composer();
 
         await composer.ComposeAsync(Snowball(), default);
-        clock.Advance(TimeSpan.FromMinutes(VoiceSeatComposer.FailureMemoryMinutes - 1));
+        clock.Advance(Storyworthtelling.CallSheet.SeatPlan.RetryAfter - TimeSpan.FromMinutes(1));
         await composer.ComposeAsync(Snowball(), default);
         Assert.Single(client.Requests);            // a tab switch right after a failure is not a retry storm
 

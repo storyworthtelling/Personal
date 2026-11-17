@@ -794,10 +794,8 @@ internal sealed class SportsScreen
 
     private EmptyState Empty(Action? primary)
     {
-        var empty = new EmptyState(host, VoiceSeat.EmptySports, primary);
-
-        // No composer is wired in the head yet, so the seat shows its neutral line (D264).
-        empty.Present(VoiceLineAction.ShowNeutral, null);
+        // The neutral line at once, the owner's line once composed (D264, audit W10.4).
+        var empty = new Pulp.Watching.SeatSpeaker(host, services).Empty(VoiceFactBuilder.EmptySports(), primary);
         empty.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
         return empty;
     }

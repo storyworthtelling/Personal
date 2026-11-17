@@ -187,4 +187,54 @@ public class VoiceClientTests
 
         Assert.Contains("401", ex.Message);
     }
+
+    /// <summary>
+    /// The profile is the prompt's prefix, cached (audit W10.6): it is the same for every seat in a day, so each
+    /// compose after the first reads it from the cache. The seat's own purpose and facts come after it.
+    /// </summary>
+    [Fact]
+    public async Task ComposeAsync_CachesTheProfileAsThePromptsPrefix()
+    {
+        var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse("At last."));
+
+        await Client(handler).ComposeAsync(
+            Learned("Wry and warm.", "At last, the gate."),
+            new MessageRequest("welcome", "returning user"), CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.RequestBodies.Single());
+        var system = body.RootElement.GetProperty("system");
+        Assert.Equal(2, system.GetArrayLength());
+        Assert.False(system[0].TryGetProperty("cache_control", out _));
+        Assert.StartsWith("PROFILE (JSON):", system[1].GetProperty("text").GetString());
+        Assert.True(system[1].TryGetProperty("cache_control", out _));
+
+        var user = body.RootElement.GetProperty("messages")[0].GetRawText();
+        Assert.DoesNotContain("PROFILE", user);
+        Assert.Contains("PURPOSE: welcome", user);
+    }
+
+    /// <summary>
+    /// Examples are capped (audit W10.6): the profile rides in every compose, so it cannot grow a few lines a
+    /// book forever. The oldest go first; the newest book's anchors always stay.
+    /// </summary>
+    [Fact]
+    public async Task RefineAsync_KeepsAtMostTheCapOfExamples_DroppingTheOldest()
+    {
+        var earlier = Guid.NewGuid();
+        var existing = VoiceProfile.Empty with
+        {
+            Register = "old",
+            Examples = Enumerable.Range(1, VoiceProfile.MaxExamples)
+                .Select(n => new VoiceExample($"anchor {n}", earlier)).ToList(),
+            DocumentsAnalyzed = 8,
+        };
+        var handler = new FakeHttpMessageHandler().EnqueueOk(MessageResponse(
+            """{"register":"s","examples":["fresh one","fresh two"]}"""));
+
+        var updated = await Client(handler).RefineAsync(existing, "another book", Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Equal(VoiceProfile.MaxExamples, updated.Examples.Count);
+        Assert.DoesNotContain(updated.Examples, example => example.Text is "anchor 1" or "anchor 2");
+        Assert.Equal(["fresh one", "fresh two"], updated.Examples.TakeLast(2).Select(example => example.Text));
+    }
 }

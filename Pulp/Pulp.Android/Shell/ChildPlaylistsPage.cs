@@ -18,6 +18,8 @@ using Pulp.Domain.Title;
 using Pulp.Domain.Voice;
 using Pulp.Favorites;
 
+using Pulp.Watching;
+
 namespace Pulp.Shell;
 
 /// <summary>
@@ -29,7 +31,7 @@ namespace Pulp.Shell;
 /// </summary>
 public sealed class ChildPlaylistsPage(Activity host, Func<FrameLayout> overlay, ChildViewSession session, Action invalidate)
 {
-    private readonly ChildVoice voice = new(host, PulpServices.For(host));
+    private readonly SeatSpeaker voice = new(host, PulpServices.For(host));
     private CancellationTokenSource? loading;
     private bool unreadable;
     private string? problem;

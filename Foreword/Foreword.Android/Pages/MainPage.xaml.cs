@@ -22,18 +22,16 @@ public partial class MainPage : BinderPage
     private static string DeliveryLogPath =>
         System.IO.Path.Combine(FileSystem.AppDataDirectory, "delivery.log");
 
-    private readonly DriveVoiceOptions voiceOptions;
-    private readonly VoicedMessenger voice;
+    private readonly SeatVoice voice;
 
     private readonly Button deliverNow = new() { Text = "Deliver now" };
 
     private readonly DogEarState dogEarState = new();
     private readonly DogEar dogEar;
 
-    public MainPage(DriveVoiceOptions voiceOptions, VoicedMessenger voice)
+    public MainPage(SeatVoice voice)
     {
         InitializeComponent();
-        this.voiceOptions = voiceOptions;
         this.voice = voice;
 
         dogEar = new DogEar(dogEarState);
@@ -94,18 +92,8 @@ public partial class MainPage : BinderPage
             return;
         }
 
-        string message;
-        try
-        {
-            await voiceOptions.RefreshAsync(CancellationToken.None);
-            message = await voice.ComposeAsync(
-                new MessageRequest(Welcome.Purpose, "the owner is checking their morning brief", Welcome.MaxWords, Welcome.HighVisibility),
-                fallback: string.Empty, CancellationToken.None);
-        }
-        catch
-        {
-            message = string.Empty;
-        }
+        // The welcome on the suite's one rule (audit W10.3): written once a day and kept, not on every appearance.
+        var message = await voice.ComposeAsync(Welcome, ["the owner is checking their morning brief"], CancellationToken.None);
 
         WelcomeLabel.Text = message;
         WelcomeLabel.IsVisible = !string.IsNullOrWhiteSpace(message);

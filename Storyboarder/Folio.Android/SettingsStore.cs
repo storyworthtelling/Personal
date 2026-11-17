@@ -31,9 +31,6 @@ public static class SettingsStore
         internal const string SchemaResetGeneration = "SchemaResetGeneration";
 
         // The empty desk's voiced line and the local day it was written, so it is composed once a day.
-        internal const string EmptyDeskLine = "EmptyDeskLine";
-        internal const string EmptyDeskLineDay = "EmptyDeskLineDay";
-        internal const string EmptyDeskLineAskedAt = "EmptyDeskLineAskedAt";
     }
 
     public static string ClaudeApiKey
@@ -136,30 +133,6 @@ public static class SettingsStore
             ? stored
             : Preferences.Get(Keys.PivotSchemaReset, false) ? 1 : 0;
         set => Preferences.Set(Keys.SchemaResetGeneration, value);
-    }
-
-    // The empty desk's line in the owner's voice, kept with the local day it was written so the desk
-    // shows the same line all day instead of composing a new one on every refresh.
-    public static string EmptyDeskLine
-    {
-        get => Preferences.Get(Keys.EmptyDeskLine, string.Empty);
-        set => Preferences.Set(Keys.EmptyDeskLine, value);
-    }
-
-    public static DateOnly? EmptyDeskLineDay
-    {
-        get => DateOnly.TryParseExact(Preferences.Get(Keys.EmptyDeskLineDay, string.Empty), "yyyy-MM-dd", out var day)
-            ? day
-            : null;
-        set => Preferences.Set(Keys.EmptyDeskLineDay, value?.ToString("yyyy-MM-dd") ?? string.Empty);
-    }
-
-    // When the empty desk last asked for a line, so an attempt that came back empty waits an hour (efficiency §6).
-    public static DateTimeOffset? EmptyDeskLineAskedAt
-    {
-        get => DateTimeOffset.TryParse(Preferences.Get(Keys.EmptyDeskLineAskedAt, string.Empty),
-            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out var at) ? at : null;
-        set => Preferences.Set(Keys.EmptyDeskLineAskedAt, value?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty);
     }
 
     public static bool SchemaResetIsDue => SchemaResetGeneration < CurrentSchemaResetGeneration;

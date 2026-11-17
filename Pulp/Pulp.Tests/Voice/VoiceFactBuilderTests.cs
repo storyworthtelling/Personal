@@ -22,7 +22,7 @@ public class VoiceFactBuilderTests
     [Fact]
     public void WhyThisNamesOnePastTitleTheOwnerFinishedTheMostRecentOne()
     {
-        var facts = VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights",
+        var facts = VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights", fromTheStack: true,
         [
             new PastTitle(Rowan, "The Copper Kettle", Evening.AddDays(-40)),
             new PastTitle(Rowan, "The Brass Lantern Mysteries", Evening.AddDays(-3)),
@@ -39,7 +39,7 @@ public class VoiceFactBuilderTests
     [Fact]
     public void WhyThisNeverNamesAnotherViewersHistory()
     {
-        var facts = VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights",
+        var facts = VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights", fromTheStack: true,
         [
             new PastTitle(Ash, "Ash's Secret Show", Evening.AddDays(-1)),
             new PastTitle(Pip, "Pip's Cartoon", Evening.AddHours(-2)),
@@ -55,17 +55,38 @@ public class VoiceFactBuilderTests
     [Fact]
     public void WhyThisForTheOtherAdultNamesNoPastTitleAtAll()
     {
-        var facts = VoiceFactBuilder.WhyThis(Ash, ViewerStanding.OtherAdult, "Harbour Lights",
+        var facts = VoiceFactBuilder.WhyThis(Ash, ViewerStanding.OtherAdult, "Harbour Lights", fromTheStack: true,
             [new PastTitle(Ash, "Saltmarsh", Evening.AddDays(-2))]);
 
         Assert.True(facts.HasFacts);
         Assert.DoesNotContain("Saltmarsh", string.Join(" ", facts.Lines));
     }
 
+    /// <summary>
+    /// A title opened from search, a playlist or the home was not chosen for anyone (audit W10.5): the line used to say
+    /// it was "chosen from the owner's own taste" whatever brought it there. Now only a title from the week's stack is
+    /// told it, and any other has no reason to give, so its line hides.
+    /// </summary>
+    [Fact]
+    public void ATitleNotFromTheStackHasNoReasonToGive()
+    {
+        var facts = VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights", fromTheStack: false, []);
+
+        Assert.False(facts.HasFacts);
+    }
+
+    [Fact]
+    public void ATitleFromTheStackIsToldItWasChosenFromTaste()
+    {
+        var facts = VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights", fromTheStack: true, []);
+
+        Assert.Contains("It was chosen from the owner's own taste.", facts.Lines);
+    }
+
     [Fact]
     public void WhyThisForAChildHasNoFactsSoTheLineIsHidden()
     {
-        var facts = VoiceFactBuilder.WhyThis(Pip, ViewerStanding.Child, "Harbour Lights",
+        var facts = VoiceFactBuilder.WhyThis(Pip, ViewerStanding.Child, "Harbour Lights", fromTheStack: true,
             [new PastTitle(Pip, "Pip's Cartoon", Evening.AddDays(-1))]);
 
         Assert.False(facts.HasFacts);
@@ -224,7 +245,7 @@ public class VoiceFactBuilderTests
     private static List<VoiceFacts> AdultFacts() =>
     [
         VoiceFactBuilder.Greeting(Evening, firstOpenOfDay: false, inProgress: 2, arrivedFriday: 0),
-        VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights", []),
+        VoiceFactBuilder.WhyThis(Rowan, ViewerStanding.DeviceOwner, "Harbour Lights", fromTheStack: true, []),
         VoiceFactBuilder.Playlist("Rainy Sundays", entries: 6, watched: 2),
         VoiceFactBuilder.EmptyContinueWatching(arrivedFriday: 5),
         VoiceFactBuilder.EmptyPlaylists(),

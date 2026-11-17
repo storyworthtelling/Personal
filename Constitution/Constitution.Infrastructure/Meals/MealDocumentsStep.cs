@@ -140,8 +140,46 @@ public static class MealDocumentsStep
             return new MealDocumentOutcome(name, DeliveryKind.Meals, person, day, MealDocumentVerdict.NotBuilt, failure);
         }
 
-        var current = new CurrentMealDocument(DocumentFingerprint.Of(pdf), model.Deadline, null);
+        // What decides a resend is the sheet without its voiced line, so a fresh wording on another day sends nothing.
+        var fingerprint = DocumentFingerprint.Of(pdf);
+        if (await IntroAsync(request, seams, model, cancellation) is { } intro)
+        {
+            model = model with { Voice = intro };
+            pdf = ConstitutionDocumentRenderer.Render(MealSheetDocument.Build(model));
+        }
+
+        var current = new CurrentMealDocument(fingerprint, model.Deadline, null);
         return await DeliverAsync(seams, DeliveryKind.Meals, day, null, person, pdf, current, expected, request.Now, cancellation);
+    }
+
+    // The sheet's opening line in the owner's voice (audit W10.4), told the week, its new recipes and its nights out in
+    // words; null when there is no voice, and the sheet goes without it. Never a reason the sheet does not go.
+    private static async Task<string?> IntroAsync(
+        MealDocumentRequest request, MealDocumentSeams seams, MealSheetModel model, CancellationToken cancellation)
+    {
+        if (seams.Voice is not { } voice)
+        {
+            return null;
+        }
+
+        var dinners = request.Week.Dinners;
+        var newDays = dinners
+            .Where(dinner => dinner.Kind == DinnerKind.Cooked && dinner.Recipe is { } recipe
+                && model.Dishes.TryGetValue(recipe, out var dish) && dish.Marker == MealMarker.NewRecipe)
+            .Select(dinner => dinner.Day.DayOfWeek)
+            .ToList();
+        var outDays = dinners.Where(dinner => dinner.Kind == DinnerKind.EatOut).Select(dinner => dinner.Day.DayOfWeek).ToList();
+        var seat = Constitution.Domain.Voice.SeatFacts.MealSheetIntro(
+            new Constitution.Domain.Voice.MealWeekFacts(request.Week.WeekStart, newDays, outDays));
+        try
+        {
+            return (await voice(seat, cancellation))?.Text;
+        }
+        catch (Exception failure) when (failure is not OperationCanceledException)
+        {
+            seams.Log.Outcome($"meal sheet voice: {failure.GetType().Name}");
+            return null;
+        }
     }
 
     private static async Task<MealDocumentOutcome> RecipeAsync(

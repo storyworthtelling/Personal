@@ -14,6 +14,8 @@ using Pulp.Domain.Household.Records;
 using Pulp.Domain.Title;
 using Pulp.Domain.Voice;
 
+using Pulp.Watching;
+
 namespace Pulp.Favorites;
 
 /// <summary>
@@ -28,7 +30,7 @@ namespace Pulp.Favorites;
 /// </summary>
 public sealed class FavoritesPage(Activity host, Func<FrameLayout> overlay, ChildViewSession session, Action invalidate)
 {
-    private readonly ChildVoice voice = new(host, PulpServices.For(host));
+    private readonly SeatSpeaker voice = new(host, PulpServices.For(host));
     private CancellationTokenSource? loading;
     private string? problem;
     private bool unreadable;
@@ -182,7 +184,7 @@ public sealed class FavoritesPage(Activity host, Func<FrameLayout> overlay, Chil
     {
         if (cells is { Count: > 0 })
         {
-            greeting = ChildVoice.Shown(action, line);
+            greeting = SeatSpeaker.Shown(action, line);
         }
         else
         {

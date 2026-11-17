@@ -53,7 +53,46 @@ public class CrosswordDeliveryServiceTests
     private CrosswordDeliveryService CreateService() =>
         new(nytClient.Object, new PaperDelivery(remarkableClient.Object), topStoriesClient.Object,
             articleClient.Object, pdfComposer.Object, preferences, comics.Object, history.Object,
-            NullLogger<CrosswordDeliveryService>.Instance);
+            NullLogger<CrosswordDeliveryService>.Instance, voice);
+
+    private IMorningVoice? voice;
+
+    private sealed class BriefVoice : IMorningVoice
+    {
+        public IReadOnlyList<string>? Told { get; private set; }
+
+        public Task<string> LineAsync(string seat, IReadOnlyList<string> facts, CancellationToken cancellationToken)
+        {
+            Assert.Equal("brief-opening", seat);
+            Told = facts;
+            return Task.FromResult("A short brief this morning.");
+        }
+    }
+
+    /// <summary>The brief's opening is wired (audit W10.4): told the story count and the crossword, in words.</summary>
+    [Fact]
+    public async Task TheBriefOpensInTheOwnersVoice()
+    {
+        var date = new DateOnly(2025, 4, 14);
+        var briefVoice = new BriefVoice();
+        voice = briefVoice;
+        string? printed = null;
+        nytClient.Setup(c => c.DownloadDailyPuzzle(date)).ReturnsAsync([1]);
+        topStoriesClient.Setup(c => c.GetTopNewsStories(5)).ReturnsAsync([FakeNewsStory]);
+        topStoriesClient.Setup(c => c.GetTopOpinionArticles(3)).ReturnsAsync([]);
+        articleClient.Setup(c => c.GetArticle(FakeNewsStory.Url)).ReturnsAsync(FakeArticle);
+        pdfComposer.Setup(c => c.Compose(
+                It.IsAny<IReadOnlyList<ArticleContent>>(), It.IsAny<byte[]>(), It.IsAny<DateOnly>(),
+                It.IsAny<string>(), It.IsAny<IReadOnlyList<ComicStrip>?>(), It.IsAny<HistoryNote?>()))
+            .Callback<IReadOnlyList<ArticleContent>, byte[], DateOnly, string, IReadOnlyList<ComicStrip>?, HistoryNote?>(
+                (_, _, _, line, _, _) => printed = line)
+            .Returns([9]);
+
+        await CreateService().DeliverDailyPuzzle(date);
+
+        Assert.Equal("A short brief this morning.", printed);
+        Assert.Equal(["One story in the brief this morning.", "The crossword is at the back."], briefVoice.Told);
+    }
 
     /// <summary>The Sources screen's values, at their defaults.</summary>
     private sealed class FakePreferences : IBriefPreferences

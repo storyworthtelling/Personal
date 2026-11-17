@@ -74,17 +74,13 @@ public sealed class CalendarArea(Activity host) : PulpAreaPage(host, PulpArea.Ca
 
         if (page.IsEmpty && !adding && me is null)
         {
-            var empty = new EmptyState(Host, VoiceSeat.EmptyCalendar);
-            empty.Present(VoiceLineAction.ShowNeutral, null);
-            return empty;
+            return new Pulp.Watching.SeatSpeaker(Host, PulpServices.For(Host)).Empty(VoiceFactBuilder.EmptyCalendar(Pulp.Domain.Calendar.CalendarItems.DaysAhead));
         }
 
         var list = new LinearLayout(Host) { Orientation = Orientation.Vertical };
         if (page.IsEmpty)
         {
-            var empty = new EmptyState(Host, VoiceSeat.EmptyCalendar);
-            empty.Present(VoiceLineAction.ShowNeutral, null);
-            list.AddView(empty);
+            list.AddView(new Pulp.Watching.SeatSpeaker(Host, PulpServices.For(Host)).Empty(VoiceFactBuilder.EmptyCalendar(Pulp.Domain.Calendar.CalendarItems.DaysAhead)));
         }
         else
         {

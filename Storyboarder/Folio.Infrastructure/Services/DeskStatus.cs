@@ -35,7 +35,7 @@ public static class DeskStatus
 
     /// <summary>
     /// What the owner's voice is told about the book, or null when it should say nothing at all (the book
-    /// has stopped, and the desk is showing why). The model is told in words whether the book is finished,
+    /// has stopped or failed, and the desk is showing why). The model is told in words whether the book is finished,
     /// because given only a stage's name it guesses — and guessed "complete".
     /// </summary>
     public static string? VoiceFacts(NovelStatus s)
@@ -45,8 +45,8 @@ public static class DeskStatus
             case "Completed":
                 return "The revision report is finished and delivered.";
             case "Failed":
-                return "The review stopped with an error and did not finish. " +
-                       "Do not say or imply that it is complete.";
+                // Errors are never voiced (audit W10.5): the desk shows why in plain words where the line would go.
+                return null;
             case "Cancelled":
                 return "The owner stopped this review before it finished. " +
                        "Do not say or imply that it is complete.";

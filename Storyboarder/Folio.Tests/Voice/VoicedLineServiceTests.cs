@@ -52,10 +52,11 @@ public class VoicedLineServiceTests : IDisposable
 
         Assert.Equal("Four readers in, and two of them are arguing.", line);
 
-        using var context = database.NewContext();
-        var novel = context.Novels.Single(n => n.Id == id);
-        Assert.Equal(line, novel.VoicedLine);
-        Assert.Equal(ProjectStage.ComposingAnalysis, novel.VoicedLineStage);
+        // Kept in the seat memory file (the suite's one rule, audit W10.3): a restart asks nothing again.
+        var again = await NewService().VoicedLineAsync(id, "Working on it.", CancellationToken.None);
+        Assert.Equal(line, again);
+        client.Verify(c => c.ComposeAsync(
+            It.IsAny<VoiceProfile>(), It.IsAny<MessageRequest>(), It.IsAny<CancellationToken>()), Times.Once());
     }
 
     [Fact]
@@ -99,9 +100,6 @@ public class VoicedLineServiceTests : IDisposable
         var line = await NewService().VoicedLineAsync(id, "Working on it.", CancellationToken.None);
 
         Assert.Equal("Working on it.", line);
-
-        using var context = database.NewContext();
-        Assert.Empty(context.Novels.Single(n => n.Id == id).VoicedLine);
     }
 
     [Fact]
@@ -132,7 +130,8 @@ public class VoicedLineServiceTests : IDisposable
         new FakeClock(DateTimeOffset.UnixEpoch),
         Options.Create(new RateLimitOptions()),
         withVoice ? store.Object : null,
-        withVoice ? client.Object : null);
+        withVoice ? client.Object : null,
+        seatMemory: new Storyworthtelling.CallSheet.SeatMemoryFile(Path.Combine(outputRoot, "voice-seats.json")));
 
     private Guid Seed(ProjectStage stage)
     {
@@ -189,14 +188,12 @@ public class VoicedLineServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task AStoppedBookGetsNoVoicedLine_EvenOneRememberedFromBefore()
+    public async Task AStoppedBookGetsNoVoicedLine()
     {
         var id = Seed(ProjectStage.ComposingAnalysis);
         using (var context = database.NewContext())
         {
             var novel = context.Novels.Single(n => n.Id == id);
-            novel.VoicedLine = "Draft 1 is complete.";
-            novel.VoicedLineStage = ProjectStage.ComposingAnalysis;
             novel.LastError = "Reading pass 'x': truncated";
             novel.StageAttempts = new RateLimitOptions().MaxAttempts;
             context.SaveChanges();

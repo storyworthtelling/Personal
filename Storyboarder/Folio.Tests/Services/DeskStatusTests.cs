@@ -139,10 +139,21 @@ public class DeskStatusTests
         Assert.Null(DeskStatus.VoiceFacts(Status(lastError: "x", needsAttention: true, attempts: 6)));
     }
 
+    /// <summary>
+    /// A failed review is never voiced, at any attempt count (audit W10.5): errors are never voiced, and the desk
+    /// shows why in plain words where the line would go.
+    /// </summary>
     [Fact]
-    public void AFailedOrCancelledBookIsToldItDidNotFinish()
+    public void AFailedReviewIsNeverVoiced()
     {
-        Assert.Contains("did not finish", DeskStatus.VoiceFacts(Status(stage: "Failed", step: null))!);
+        Assert.Null(DeskStatus.VoiceFacts(Status(stage: "Failed", step: null)));
+        Assert.Null(DeskStatus.VoiceFacts(Status(stage: "Failed", step: null, lastError: "x", attempts: 1)));
+    }
+
+    [Fact]
+    public void ACancelledBookIsToldItDidNotFinish()
+    {
+        // The owner's own choice, not trouble: the line may speak of it.
         Assert.Contains("stopped this review", DeskStatus.VoiceFacts(Status(stage: "Cancelled", step: null))!);
     }
 }

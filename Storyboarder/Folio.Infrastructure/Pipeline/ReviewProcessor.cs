@@ -77,11 +77,6 @@ public sealed class ReviewProcessor : IPipelineStep
     // without paying for the whole book on a one-off, best-effort call.
     private const int ArtStyleSampleChars = 6000;
 
-    // How much manuscript the voice refinement reads. Voice is about HOW the owner writes — cadence,
-    // register, attitude — which a generous opening sample captures without paying to send a whole novel
-    // to Claude just to distil a short profile.
-    private const int VoiceSampleChars = 12000;
-
     // How much of each chapter the voice-consistency read samples. One representative opening passage per
     // chapter is enough to characterise that chapter's register and cadence and to catch a chapter that
     // drifts from the book's voice, while keeping the whole book's samples inside a single Claude call.
@@ -233,26 +228,45 @@ public sealed class ReviewProcessor : IPipelineStep
         // Learn the owner's voice from this manuscript into the shared profile every com.storyworthtelling
         // app reads. Best-effort and guarded by VoiceAnalyzed, so it runs once per draft and never fails or
         // stalls the review. Persisted with the stage change below.
-        await RefineOwnerVoice(novel, source.FullText, cancellationToken);
+        await RefineOwnerVoice(db, novel, source.FullText, cancellationToken);
 
         SetStage(novel, ProjectStage.BuildingDesignBible);
         await db.SaveChangesAsync(cancellationToken);
         return ProcessResult.DidWork(novel.Id);
     }
 
-    // Folds this draft's manuscript into the owner's shared voice profile. No-op when no voice client/store
-    // is wired or the draft has already been analyzed. A failure is swallowed (logged) and leaves
-    // VoiceAnalyzed false so a later ingest can retry — voiced messaging is a nicety, never a gate on a review.
-    private async Task RefineOwnerVoice(Novel novel, string manuscript, CancellationToken cancellationToken)
+    // Folds this draft's manuscript into the owner's shared voice profile, read through a sample spread across the
+    // whole book (VoiceSample, audit W10.6). A profile marked to be learned again (a discarded book took its anchors
+    // but not what it taught the register, or the profile was in an older shape) is rebuilt instead, from every
+    // project's latest draft, this one included, and each of those drafts is marked analysed. No-op when no voice
+    // client/store is wired or the draft has already been analysed. A failure is logged and leaves VoiceAnalyzed
+    // false so a later ingest can retry — voiced messaging is a nicety, never a gate on a review.
+    private async Task RefineOwnerVoice(FolioDbContext db, Novel novel, string manuscript, CancellationToken cancellationToken)
     {
         if (voiceClient is null || voiceStore is null || novel.VoiceAnalyzed)
             return;
 
         try
         {
-            var sample = manuscript.Length > VoiceSampleChars ? manuscript[..VoiceSampleChars] : manuscript;
             var existing = await voiceStore.LoadAsync(cancellationToken);
-            var refined = await voiceClient.RefineAsync(existing, sample, novel.ProjectId, cancellationToken);
+            if (existing.NeedsRelearn)
+            {
+                var drafts = await LatestDrafts(db, novel, cancellationToken);
+                var books = drafts.Select(draft => new VoiceSource(
+                    draft.ProjectId, draft.Id == novel.Id ? manuscript : draft.Source?.FullText ?? string.Empty))
+                    .Where(book => book.Text.Length > 0)
+                    .ToList();
+                var rebuilt = await VoiceRelearn.RebuildAsync(voiceClient, books, cancellationToken);
+                await voiceStore.SaveAsync(rebuilt, cancellationToken);
+                foreach (var draft in drafts)
+                    draft.VoiceAnalyzed = true;
+                novel.VoiceAnalyzed = true;
+                logger.LogInformation(
+                    "Relearned owner voice from {Books} book(s) at manuscript {NovelId}", books.Count, novel.Id);
+                return;
+            }
+
+            var refined = await voiceClient.RefineAsync(existing, VoiceSample.Of(manuscript), novel.ProjectId, cancellationToken);
             await voiceStore.SaveAsync(refined, cancellationToken);
             novel.VoiceAnalyzed = true;
             logger.LogInformation(
@@ -263,6 +277,23 @@ public sealed class ReviewProcessor : IPipelineStep
         {
             logger.LogWarning(ex, "Owner voice refinement failed for manuscript {NovelId}; continuing without it", novel.Id);
         }
+    }
+
+    // Each project's latest live draft, oldest project first, with this draft standing for its own project.
+    private static async Task<List<Novel>> LatestDrafts(FolioDbContext db, Novel novel, CancellationToken cancellationToken)
+    {
+        var all = await db.Novels
+            .Where(n => n.DeletedAtUtc == null && n.Stage != ProjectStage.Cancelled)
+            .Include(n => n.Source)
+            .ToListAsync(cancellationToken);
+
+        return all
+            .Where(n => n.ProjectId != novel.ProjectId)
+            .GroupBy(n => n.ProjectId)
+            .Select(project => project.OrderByDescending(n => n.CreatedAtUtc).First())
+            .Append(novel)
+            .OrderBy(n => n.CreatedAtUtc)
+            .ToList();
     }
 
     private async Task<ProcessResult> BuildDesignBible(FolioDbContext db, Novel novel, CancellationToken cancellationToken)

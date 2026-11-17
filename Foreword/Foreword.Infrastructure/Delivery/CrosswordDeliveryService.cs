@@ -15,7 +15,8 @@ public class CrosswordDeliveryService(
     IBriefPreferences preferences,
     IComicClient comics,
     IHistoryClient history,
-    ILogger<CrosswordDeliveryService> logger)
+    ILogger<CrosswordDeliveryService> logger,
+    IMorningVoice? voice = null)
 {
     // Returns a human-readable summary of what was delivered, e.g. "8 articles + puzzle"
     // or "puzzle only — <reason>" so callers can surface it to the user.
@@ -152,8 +153,10 @@ public class CrosswordDeliveryService(
             var strips = await ReadComics();
             var factoid = await ReadHistory(date);
 
+            // The brief's opening in the owner's voice (audit W10.4): told the story count and the crossword, in words.
+            var opening = await OpeningAsync(Foreword.Domain.Voice.MorningVoiceFacts.Brief(articles.Count, crosswordBytes.Length > 0));
             var composed = pdfComposer.Compose(
-                articles, crosswordBytes, date, voice: string.Empty, strips, factoid);
+                articles, crosswordBytes, date, voice: opening, strips, factoid);
 
             // The status sentence counts the ones that fell back, so a morning of failed fetches is
             // visible on the Settings screen rather than only in a log nobody opens.
@@ -165,6 +168,22 @@ public class CrosswordDeliveryService(
         {
             logger.LogWarning(ex, "PDF composition failed for {Date}", date);
             return (crosswordBytes, $"crossword only — PDF composition error: {ex.Message}");
+        }
+    }
+
+    // A line in the owner's voice, or nothing: never a reason the brief does not go.
+    private async Task<string> OpeningAsync(IReadOnlyList<string> facts)
+    {
+        if (voice is null)
+            return string.Empty;
+        try
+        {
+            return await voice.LineAsync("brief-opening", facts, CancellationToken.None);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning("The brief's opening was not written ({Kind})", ex.GetType().Name);
+            return string.Empty;
         }
     }
 }

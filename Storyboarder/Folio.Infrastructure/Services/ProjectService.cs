@@ -41,11 +41,15 @@ public sealed class ProjectService
     private readonly IVoiceProfileStore? voiceStore;
     private readonly IVoiceClient? voiceClient;
 
+    private readonly Storyworthtelling.CallSheet.SeatMemoryFile? seatMemory;
+
     public ProjectService(
         IDbContextFactory<FolioDbContext> dbContextFactory, IGoogleDocsClient docs,
         IImageStore imageStore, IClock clock, IOptions<RateLimitOptions> rateLimitOptions,
-        IVoiceProfileStore? voiceStore = null, IVoiceClient? voiceClient = null)
+        IVoiceProfileStore? voiceStore = null, IVoiceClient? voiceClient = null,
+        Storyworthtelling.CallSheet.SeatMemoryFile? seatMemory = null)
     {
+        this.seatMemory = seatMemory;
         this.voiceClient = voiceClient;
         this.dbContextFactory = dbContextFactory;
         this.docs = docs;
@@ -392,13 +396,12 @@ public sealed class ProjectService
     ///
     /// <para><b>Composed when the book has moved, remembered when it has not.</b> The line comes from
     /// a model and the shelf is the screen the app opens on, painting again on every return to it, so
-    /// composing on each ask would be a call per book per glance. <see cref="VoicedLinePlan"/> makes
-    /// the cost one call per book per state change, which is the rate at which the line has anything
-    /// new to say.</para>
+    /// composing on each ask would be a call per book per glance. The suite's one rule (<c>SeatPlan</c>, audit
+    /// W10.3) makes the cost one call per book per stage and day, kept across a restart in the seat memory file
+    /// (the book's id is the subject); an empty attempt is tried again after ten minutes.</para>
     ///
-    /// <para>The neutral <paramref name="fallback"/> is returned but never <i>stored</i>: remembering
-    /// it would leave the desk holding today's wording as though it were the owner's, and never
-    /// trying again once a voice had been learned.</para>
+    /// <para>The neutral <paramref name="fallback"/> is returned but never <i>stored</i> as the book's line: an
+    /// empty attempt is remembered only as empty, and asked again soon.</para>
     /// </summary>
     public async Task<string> VoicedLineAsync(Guid id, string fallback, CancellationToken cancellationToken)
     {
@@ -416,17 +419,26 @@ public sealed class ProjectService
         if (facts is null)
             return fallback;
 
-        if (!VoicedLinePlan.NeedsComposing(novel.VoicedLine, novel.VoicedLineStage, novel.Stage))
-            return novel.VoicedLine;
+        // The line is about the book's stage: the step inside a stage moves every few minutes and is no reason to
+        // write again. The facts the model is told are fuller than the facts the memory keys on.
+        var line = VoicedOccasions.Desk;
+        var subject = novel.Id.ToString("N");
+        var hash = Storyworthtelling.CallSheet.SeatPlan.Hash(line, [novel.Stage.ToString(), novel.DraftNumber.ToString(System.Globalization.CultureInfo.InvariantCulture)]);
+        var now = clock.UtcNow;
+        var today = Storyworthtelling.CallSheet.SeatPlan.Today(now.LocalDateTime);
+        var remembered = seatMemory?.Get(line, subject);
+        var voiceReady = voiceStore is not null && voiceClient is not null;
+        switch (Storyworthtelling.CallSheet.SeatPlan.Decide(line, voiceReady, hash, hasFacts: true, remembered, now, today))
+        {
+            case Storyworthtelling.CallSheet.SeatAction.Reuse:
+                return remembered!.Line!;
+            case Storyworthtelling.CallSheet.SeatAction.Fallback:
+                return fallback;
+        }
 
         var composed = await ComposeLine(novel, facts, cancellationToken);
-        if (string.IsNullOrWhiteSpace(composed))
-            return fallback;
-
-        novel.VoicedLine = composed;
-        novel.VoicedLineStage = novel.Stage;
-        await db.SaveChangesAsync(cancellationToken);
-        return composed;
+        seatMemory?.Put(line, subject, Storyworthtelling.CallSheet.SeatPlan.Remember(hash, today, composed, now));
+        return string.IsNullOrWhiteSpace(composed) ? fallback : composed;
     }
 
     /// <summary>
@@ -451,7 +463,8 @@ public sealed class ProjectService
                     VoicedOccasions.DeskLine,
                     $"Title: {novel.Title}. Draft {novel.DraftNumber}. {facts}",
                     VoicedOccasions.Desk.MaxWords,
-                    VoicedOccasions.Desk.HighVisibility),
+                    VoicedOccasions.Desk.HighVisibility,
+                    VoicedOccasions.Desk.Seat),
                 cancellationToken);
 
             return string.IsNullOrWhiteSpace(message) ? null : message.Trim();
@@ -463,7 +476,9 @@ public sealed class ProjectService
     }
 
     /// <summary>
-    /// Takes one book's anchors out of the shared voice profile.
+    /// Takes one book's anchors out of the shared voice profile, and marks it to be learned again from the books
+    /// that remain; the next ingestion does that (<c>ReviewProcessor.RefineOwnerVoice</c>, audit W10.6), and the
+    /// voice speaks as it was until then.
     ///
     /// <para>Best-effort and silent on failure: the delete is the owner's instruction and has already
     /// happened, so an unreachable Drive must not throw out of it or leave the book in the library.

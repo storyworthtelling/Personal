@@ -306,6 +306,78 @@ public class ReviewProcessorTests : IDisposable
     /// the other fourteen, which is the only thing that makes them synthesis rather than a
     /// fifteenth opinion.
     /// </summary>
+    private sealed class HeldProfile : Storyworthtelling.Voice.IVoiceProfileStore
+    {
+        public Storyworthtelling.Voice.VoiceProfile Profile { get; set; } = Storyworthtelling.Voice.VoiceProfile.Empty;
+
+        public int Saves { get; private set; }
+
+        public Task<Storyworthtelling.Voice.VoiceProfile> LoadAsync(CancellationToken cancellationToken) => Task.FromResult(Profile);
+
+        public Task SaveAsync(Storyworthtelling.Voice.VoiceProfile profile, CancellationToken cancellationToken)
+        {
+            Profile = profile;
+            Saves++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private static Mock<Storyworthtelling.Voice.IVoiceClient> RefiningVoice(List<(string Text, Guid Project)> refined)
+    {
+        var voice = new Mock<Storyworthtelling.Voice.IVoiceClient>();
+        voice.Setup(client => client.RefineAsync(
+                It.IsAny<Storyworthtelling.Voice.VoiceProfile>(), It.IsAny<string>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Storyworthtelling.Voice.VoiceProfile existing, string text, Guid project, CancellationToken _) =>
+            {
+                refined.Add((text, project));
+                return existing with { Register = "plain", DocumentsAnalyzed = existing.DocumentsAnalyzed + 1, NeedsRelearn = false };
+            });
+        return voice;
+    }
+
+    /// <summary>
+    /// The voice is learned from a sample spread across the whole manuscript, not its opening (audit W10.6).
+    /// </summary>
+    [Fact]
+    public async Task TheVoiceIsLearnedFromTheWholeBooksSample()
+    {
+        var text = string.Join(" ", Enumerable.Range(1, 6000).Select(n => $"word{n}")) + " The hero knocked on the gate.";
+        SeedManuscript(text);
+        var refined = new List<(string Text, Guid Project)>();
+
+        await DriveToCompletion(NewProcessor(voiceClient: RefiningVoice(refined).Object, voiceStore: new HeldProfile()));
+
+        Assert.Equal(Storyworthtelling.Voice.VoiceSample.Of(text), Assert.Single(refined).Text);
+    }
+
+    /// <summary>
+    /// A profile marked to be learned again (a discarded book, or an older shape) is rebuilt from every book that
+    /// remains at the next ingest, from nothing (audit W10.6), and no book is then refined a second time.
+    /// </summary>
+    [Fact]
+    public async Task AProfileMarkedToRelearnIsRebuiltFromEveryBookThatRemains()
+    {
+        var first = SeedManuscript("The first book. The hero walked to the castle and knocked on the gate.");
+        clock.Advance(TimeSpan.FromMinutes(1));
+        var second = SeedManuscript("The second book. The heroine rode to the tower and called up.");
+        var store = new HeldProfile
+        {
+            Profile = Storyworthtelling.Voice.VoiceProfile.Empty with
+            {
+                Register = "stale", DocumentsAnalyzed = 3, NeedsRelearn = true,
+            },
+        };
+        var refined = new List<(string Text, Guid Project)>();
+
+        await DriveToCompletion(NewProcessor(voiceClient: RefiningVoice(refined).Object, voiceStore: store));
+
+        Assert.Equal([first, second], refined.Select(refine => refine.Project));
+        Assert.Equal(2, store.Profile.DocumentsAnalyzed);
+        Assert.False(store.Profile.NeedsRelearn);
+        using var context = database.NewContext();
+        Assert.All(context.Novels, novel => Assert.True(novel.VoiceAnalyzed));
+    }
+
     /// <summary>
     /// Every reader is told the genre the consolidation read out of the text, and the length its
     /// market expects — the frame a length judgement, and the genre fan, both need.

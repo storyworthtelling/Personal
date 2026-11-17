@@ -70,7 +70,7 @@ public sealed class SeatComposer : ISeatComposer
         // The messenger absorbs no profile, a failed call and an offline device, and logs the cause itself.
         // An empty fallback is how this tells "voiced" from "nothing".
         var reply = await messenger.ComposeAsync(
-            new MessageRequest(occasion.Purpose, Context(request), occasion.MaxWords, occasion.Line.HighVisibility),
+            new MessageRequest(occasion.Purpose, Context(request), occasion.MaxWords, occasion.Line.HighVisibility, occasion.Id),
             fallback: string.Empty, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(reply))

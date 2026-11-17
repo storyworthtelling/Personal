@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Index.Domain.Time;
 using Index.Domain.Voice;
+using Storyworthtelling.CallSheet;
 using Storyworthtelling.Voice;
 
 namespace Index.Infrastructure.Voice;
@@ -14,11 +15,11 @@ namespace Index.Infrastructure.Voice;
 /// <list type="bullet">
 /// <item>It checks, before any call, that there is something to say it with — facts, a signed-in account and
 /// a key. A missing key is a hidden line, not a rejected request.</item>
-/// <item>It composes at most once per (seat, facts, day). The pages ask on every appearance, every side
-/// switch and every re-render; the line only has anything new to say when the facts change or the day
-/// turns, which is the rate Folio's desk line is composed at for the same reason. A failure is remembered
-/// for <see cref="FailureMemoryMinutes"/> so a tab switch straight after one is not a retry storm, and then
-/// tried again — a transient outage must not hide the line until tomorrow.</item>
+/// <item>It composes by the suite's one rule (<see cref="SeatPlan"/>, audit W10.3): at most once per (seat, facts,
+/// day), kept across a restart in the seat memory file. The pages ask on every appearance, every side switch and
+/// every re-render; the line only has anything new to say when the facts change or the day turns. An empty
+/// attempt is believed for <see cref="SeatPlan.RetryAfter"/> so a tab switch straight after one is not a retry
+/// storm, and then tried again — a transient outage must not hide the line until tomorrow.</item>
 /// <item>It checks the reply (<see cref="VoiceReplyCheck"/>) before returning it.</item>
 /// </list>
 ///
@@ -30,21 +31,20 @@ namespace Index.Infrastructure.Voice;
 /// </summary>
 public sealed class VoiceSeatComposer
 {
-    public const int FailureMemoryMinutes = 10;
-
     private readonly VoicedMessenger messenger;
     private readonly DriveVoiceOptions voiceOptions;
     private readonly IClock clock;
     private readonly Func<bool> isSignedIn;
+    private readonly SeatMemoryFile memory;
     private readonly ILogger<VoiceSeatComposer>? logger;
 
     private readonly SemaphoreSlim gate = new(1, 1);
-    private readonly Dictionary<string, Remembered> remembered = [];
 
     public VoiceSeatComposer(
         VoicedMessenger messenger, DriveVoiceOptions voiceOptions, IClock clock, Func<bool> isSignedIn,
-        ILogger<VoiceSeatComposer>? logger = null)
+        SeatMemoryFile memory, ILogger<VoiceSeatComposer>? logger = null)
     {
+        this.memory = memory;
         this.messenger = messenger;
         this.voiceOptions = voiceOptions;
         this.clock = clock;
@@ -67,20 +67,24 @@ public sealed class VoiceSeatComposer
             return null;
         }
 
-        var key = $"{facts.Seat}|{facts.Hash}|{Today()}";
+        var line = VoicedOccasions.Line(facts.Seat);
+        var now = clock.UtcNow;
+        var today = SeatPlan.Today(now.LocalDateTime);
         await gate.WaitAsync(cancellationToken);
         try
         {
-            if (remembered.TryGetValue(key, out var seen) && seen.StillStands(clock.UtcNow))
+            var remembered = memory.Get(line, facts.Hash);
+            switch (SeatPlan.Decide(line, voiceReady: true, facts.Hash, hasFacts: true, remembered, now, today))
             {
-                return seen.Line;
+                case SeatAction.Reuse:
+                    return remembered!.Line;
+                case SeatAction.Fallback:
+                    return null;
             }
 
-            var line = await ComposeUncachedAsync(facts, prompt, cancellationToken);
-            remembered[key] = line is null
-                ? Remembered.Failed(clock.UtcNow.AddMinutes(FailureMemoryMinutes))
-                : Remembered.Composed(line);
-            return line;
+            var composed = await ComposeUncachedAsync(facts, prompt, cancellationToken);
+            memory.Put(line, facts.Hash, SeatPlan.Remember(facts.Hash, today, composed, now));
+            return composed;
         }
         finally
         {
@@ -101,7 +105,7 @@ public sealed class VoiceSeatComposer
             }
 
             var reply = await messenger.ComposeAsync(
-                new MessageRequest(prompt.Occasion, prompt.Context, prompt.MaxWords, HighVisibility: true),
+                new MessageRequest(prompt.Occasion, prompt.Context, prompt.MaxWords, VoicedOccasions.Line(facts.Seat).HighVisibility, VoicedOccasions.Line(facts.Seat).Seat),
                 fallback: string.Empty, cancellationToken);
 
             var line = VoiceReplyCheck.Accept(facts.Seat, reply);
@@ -122,16 +126,5 @@ public sealed class VoiceSeatComposer
                 facts.Seat, ex.GetType().Name);
             return null;
         }
-    }
-
-    private string Today() => DateOnly.FromDateTime(clock.UtcNow.LocalDateTime).ToString("yyyy-MM-dd");
-
-    private readonly record struct Remembered(string? Line, DateTimeOffset? RetryAfter)
-    {
-        public static Remembered Composed(string line) => new(line, null);
-
-        public static Remembered Failed(DateTimeOffset retryAfter) => new(null, retryAfter);
-
-        public bool StillStands(DateTimeOffset now) => Line is not null || now < RetryAfter;
     }
 }

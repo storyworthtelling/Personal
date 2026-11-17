@@ -193,10 +193,8 @@ public class RecentlyWatchedActivity : Activity
 
     private void ShowEmpty()
     {
-        var empty = new EmptyState(this, VoiceSeat.EmptyRecentlyWatched);
-
-        // No composer is wired in the head yet, so the seat shows its neutral line (D264).
-        empty.Present(VoiceLineAction.ShowNeutral, null);
+        // The neutral line at once, the owner's line once composed (D264, audit W10.4).
+        var empty = new Pulp.Watching.SeatSpeaker(this, PulpServices.For(this)).Empty(VoiceFactBuilder.EmptyRecentlyWatched());
         column.AddView(empty, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
     }
 

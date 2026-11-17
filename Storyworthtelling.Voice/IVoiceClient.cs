@@ -6,8 +6,11 @@ namespace Storyworthtelling.Voice;
 // HighVisibility marks the message as one the owner actually reads for its voice (a landing-screen
 // greeting), routing it to the strong model where cadence and wit land better; the many low-stakes
 // messages stay on the cheap tier.
+//
+// Seat names the line on the suite's voice-line Call Sheet, when there is one: it is what a log line names (the
+// facts check's VOICE UNGROUNDED, a failure), never the purpose's words or the reply.
 public sealed record MessageRequest(
-    string Purpose, string Context = "", int MaxWords = 40, bool HighVisibility = false);
+    string Purpose, string Context = "", int MaxWords = 40, bool HighVisibility = false, string? Seat = null);
 
 // The model-backed half of the voice feature: learning the voice from documents, and writing messages in
 // it. Implemented by a Claude client; kept an interface so apps can fake it in tests and so a keyless app

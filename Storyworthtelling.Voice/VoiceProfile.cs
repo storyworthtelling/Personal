@@ -47,6 +47,12 @@ public sealed record VoiceProfile(
     public static VoiceProfile Empty { get; } = new(string.Empty, [], [], [], [], [], 0);
 
     /// <summary>
+    /// The most examples a profile keeps (audit W10.6). The whole profile rides in every compose, so the anchors
+    /// cannot grow by a few each book forever; past this the oldest go first.
+    /// </summary>
+    public const int MaxExamples = 24;
+
+    /// <summary>
     /// Nothing has been learned yet, so there is no voice to write in and the caller falls back to
     /// its neutral copy. Every consumer already honours this.
     /// </summary>
@@ -66,8 +72,10 @@ public sealed record VoiceProfile(
     ///
     /// <para>The register, traits and habits are not re-derived — they were learned from every book
     /// together and this cannot un-learn them — so what a discard actually removes is that book's
-    /// anchors and its place in the count. When it was the only book, the profile empties: a
-    /// register with no writing behind it is a description of nobody.</para>
+    /// anchors and its place in the count, and it marks the voice to be learned again from the books
+    /// that remain (<see cref="NeedsRelearn"/>, acted on by <see cref="VoiceRelearn"/>; audit W10.6) — until
+    /// then the voice still speaks. When it was the only book, the profile empties: a register with no
+    /// writing behind it is a description of nobody.</para>
     /// </summary>
     public VoiceProfile Discard(Guid projectId)
     {
@@ -80,6 +88,6 @@ public sealed record VoiceProfile(
         var remaining = Math.Max(DocumentsAnalyzed - 1, 0);
         return remaining == 0
             ? Empty
-            : this with { Examples = kept, DocumentsAnalyzed = remaining };
+            : this with { Examples = kept, DocumentsAnalyzed = remaining, NeedsRelearn = true };
     }
 }
