@@ -4,7 +4,7 @@
 
 This plan builds what three approved records already decided, and reopens none of them:
 
-- the **UX design brief**, Claude Docs `https://claude.ai/artifact/74ihasgrUPeiMy6imZsyao` (cited **brief §…**);
+- the **UX design brief**, Claude Docs `https://claude.ai/artifact/74ihasgrUPeiMy6imZsyao` (cited **brief §…**; retired with the dated artifacts in audit W12, the link no longer opens);
 - the **design book**, 19 approved pages, `https://claude.ai/artifact/8unyM17kLRiTzCP9ipfzsb` (cited **p.N**),
   with its decisions **D1–D95** in [`CONSTITUTION-P13-DESIGN-NOTES.md`](CONSTITUTION-P13-DESIGN-NOTES.md);
 - the **technical finding**, [`CONSTITUTION-P13-TECHNICAL-FINDING.md`](CONSTITUTION-P13-TECHNICAL-FINDING.md)

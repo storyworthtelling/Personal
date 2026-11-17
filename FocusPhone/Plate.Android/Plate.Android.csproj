@@ -45,7 +45,7 @@
     <PackageReference Include="Xamarin.AndroidX.Camera.Video" />
     <!-- 1.8.0 is a floor, not a preference: ML Kit's Common package requires >= 1.8.0, and
          NuGet treats the downgrade as an error rather than resolving it quietly. -->
-    <PackageReference Include="Xamarin.AndroidX.AppCompat" />
+    <PackageReference Include="Xamarin.AndroidX.AppCompat" VersionOverride="1.8.0" />
     <PackageReference Include="Xamarin.GooglePlayServices.MLKit.BarcodeScanning" />
     <PackageReference Include="Xamarin.GooglePlayServices.MLKit.DocumentScanner" />
     <!-- Reading a card or a statement when another app asks. On-device OCR: nothing Plate

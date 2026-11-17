@@ -442,7 +442,7 @@ names what was reintroduced. G1–G6 come from the finding; G7 onward from Gate 
   detection against real deposits; her install reading the household file; the uninstall of Ledger
   once Index is confirmed (D02).
 - The unused canvas artifact from Gate 3 (`9hhmuGy7oq5CGXG6KBXDvH`) deleted **only if the owner says
-  so**.
+  so**. The owner said so in audit W12, and it is deleted.
 
 ---
 

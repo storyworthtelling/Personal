@@ -34,6 +34,8 @@ public partial class OneBuildSettingTests
                 var include = reference.Groups["name"].Value;
                 if (reference.Value.Contains(" Version=", StringComparison.Ordinal))
                     found.Add($"{relative}: {include} names its own version");
+                else if (reference.Value.Contains("VersionOverride=", StringComparison.Ordinal) && !AllowedOverrides.Contains(include))
+                    found.Add($"{relative}: {include} names its own version");
                 else if (!named.Contains(include) && !reference.Value.Contains("VersionOverride=\"$(MauiVersion)\"", StringComparison.Ordinal))
                     found.Add($"{relative}: {include} has no central version");
             }
@@ -76,6 +78,10 @@ public partial class OneBuildSettingTests
 
         Assert.True(found.Count == 0, string.Join("\n", found));
     }
+
+    // The overrides that are decisions: MAUI's version comes from its workload, and Plate's AppCompat sits above MAUI's
+    // (a pin of 1.8.0 for everyone breaks the MAUI heads' Lifecycle graph).
+    private static readonly HashSet<string> AllowedOverrides = ["Microsoft.Maui.Controls", "Xamarin.AndroidX.AppCompat"];
 
     [GeneratedRegex(@"<PackageReference\s+Include=""(?<name>[^""]+)""[^>]*>")]
     private static partial Regex PackageReference();
