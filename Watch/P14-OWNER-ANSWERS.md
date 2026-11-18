@@ -192,3 +192,15 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   nothing arrives until it is back on. So A15's "phone off" case cannot be met on Fi by any app design,
   S1b (the watch as its own SMS app) is dropped, and **the Post relay is Dash's route for texts**.
   Only S2 (device owner) remains to spike.
+
+## 15. No lockdown on the watch
+
+- **A68 — No device owner on the watch.** The watch runs stock Pixel Watch software: Point is the watch
+  face, and Dash, Wave and Beat are ordinary apps with standard tiles. Supersedes A30 (the face
+  enforcing a lockdown), A31 (the allowlist) and A63 (the device-owner spike, now cancelled).
+- **A69** — The curation rules are dropped too: no blocked browser or Play Store, no suite-only
+  notifications, and Fitbit is not hidden (it still serves as the sleep pipe, A65).
+- **A70** — Dash, Wave and Beat stay full apps that their tiles open. Updates come **from the phone**:
+  Flyleaf sends watch APKs over the Data Layer to a small Point installer on the watch, which asks once
+  per app and then updates silently as installer of record (unverified on Wear OS).
+- **A71** — The spike app, its workflow and the `watch-spike` pre-release are removed.
