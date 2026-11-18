@@ -1,0 +1,272 @@
+<title>Watch Screens, Round 1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Familjen+Grotesk:wght@400;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one section per app (Point, Dash, Wave, Beat), each a grid of round screens drawn in the
+   approved watch language, with a caption naming what the screen answers. Single dark theme on purpose. */
+:root {
+  --ground: #101418;
+  --slab: #171d23;
+  --rule: #26303a;
+  --ink: #dfe6ec;
+  --muted: #8a98a6;
+  --glass: #9fd3e6;
+  --font-body: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-label: "Spline Sans Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--ground); color: var(--ink); font-family: var(--font-body); }
+body { padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 24px; }
+h1 { font-weight: 600; font-size: 30px; margin: 0 0 6px; text-wrap: balance; }
+header p, .note { margin: 0; color: var(--muted); max-width: 74ch; line-height: 1.5; }
+section { padding: 22px; background: var(--slab); border: 1px solid var(--rule); border-radius: 10px; display: grid; gap: 14px; min-width: 0; }
+section h2 { margin: 0; font-size: 21px; font-weight: 600; }
+.tag { font-family: var(--font-label); font-size: 12px; color: var(--glass); letter-spacing: 0.04em; }
+section > p { margin: 0; line-height: 1.5; max-width: 80ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 20px 16px; }
+.cell { display: grid; justify-items: center; align-content: start; gap: 8px; min-width: 0; }
+.cell canvas { width: 100%; max-width: 200px; aspect-ratio: 1; display: block; }
+.cell b { font-size: 14px; font-weight: 600; text-align: center; }
+.cell span { font-family: var(--font-label); font-size: 11px; color: var(--muted); text-align: center; line-height: 1.45; max-width: 26ch; }
+.sys { color: var(--glass); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Watch screens, round 1</h1>
+    <p>Every screen of Point, Dash, Wave and Beat on the round display, drawn in the approved watch language:
+    true black, IBM Plex Mono, one short sentence at most, and each app in its day colour (drawn here at
+    4:20 pm). Each caption names the answer it follows (A#). Screens the watch itself draws (the call screen,
+    the install prompt) are marked <span class="sys">system</span>. People, messages, music and workouts are
+    invented.</p>
+  </header>
+  <main class="wrap" id="sections"></main>
+  <p class="note">The time on every app screen is drawn at the top, where Wear OS puts it. Colours follow the
+  design book's day ranges at 4:20 pm, so at night Dash turns navy and Beat forest green. Album art is an
+  invented gradient.</p>
+</div>
+
+<script>
+"use strict";
+const TAU = Math.PI * 2;
+const HOURS = 16 + 20 / 60;
+const MONO = '"IBM Plex Mono", ui-monospace, monospace';
+const APPS = {
+  Point: { night: [0.62, 0.19, 300], day: [0.82, 0.10, 170] },
+  Dash: { night: [0.30, 0.10, 262], day: [0.32, 0.12, 15] },
+  Wave: { night: [0.62, 0.03, 250], day: [0.80, 0.16, 75] },
+  Beat: { night: [0.38, 0.09, 150], day: [0.63, 0.24, 27] },
+};
+function day(app, alpha = 1, lift = 0) {
+  const a = APPS[app], p = (1 - Math.cos((HOURS / 24) * TAU)) / 2;
+  let dh = a.day[2] - a.night[2]; if (dh > 180) dh -= 360; if (dh < -180) dh += 360;
+  const l = a.night[0] + (a.day[0] - a.night[0]) * p + lift, c = a.night[1] + (a.day[1] - a.night[1]) * p, h = (a.night[2] + dh * p + 360) % 360;
+  return `oklch(${l.toFixed(3)} ${c.toFixed(3)} ${h.toFixed(1)} / ${alpha})`;
+}
+const INK = "hsl(205 25% 94%)", SOFT = "hsl(205 10% 64%)", FAINT = "hsl(205 10% 30%)", CARD = "hsl(210 10% 11%)";
+
+function t(c, s, x, y, size, col = INK, w = 400, align = "center") {
+  c.font = `${w} ${size}px ${MONO}`; c.fillStyle = col; c.textAlign = align; c.textBaseline = "middle"; c.fillText(s, x, y);
+}
+function fit(c, s, max, size, w = 400) { c.font = `${w} ${size}px ${MONO}`; if (c.measureText(s).width <= max) return s;
+  let out = s; while (out.length > 1 && c.measureText(out + "…").width > max) out = out.slice(0, -1); return out + "…"; }
+function wrap(c, s, max, size, w = 400) { c.font = `${w} ${size}px ${MONO}`; const words = s.split(" "), lines = []; let line = "";
+  for (const word of words) { const next = line ? line + " " + word : word; if (c.measureText(next).width > max && line) { lines.push(line); line = word; } else line = next; }
+  if (line) lines.push(line); return lines; }
+function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function pill(c, R, y, w, label, col, filled = true) {
+  const h = R * 0.2, x = R - w / 2; rr(c, x, y - h / 2, w, h, h / 2);
+  if (filled) { c.fillStyle = col; c.fill(); t(c, label, R, y, R * 0.085, "hsl(0 0% 4%)", 600); }
+  else { c.strokeStyle = col; c.lineWidth = R * 0.012; c.stroke(); t(c, label, R, y, R * 0.085, col, 500); }
+}
+function glyph(c, S, name, col, x = 0, y = 0) {
+  c.save(); c.translate(x, y); c.strokeStyle = col; c.fillStyle = col; c.lineCap = "round"; c.lineJoin = "round";
+  c.shadowColor = col; c.shadowBlur = S * 0.12;
+  if (name === "Point") { c.beginPath(); c.arc(S / 2, S / 2, S * 0.14, 0, TAU); c.fill(); }
+  if (name === "Dash") { c.lineWidth = S * 0.14; c.beginPath(); c.moveTo(S * 0.3, S / 2); c.lineTo(S * 0.7, S / 2); c.stroke(); }
+  if (name === "Wave") { c.lineWidth = S * 0.08; c.beginPath(); for (let i = 0; i <= 40; i++) { const px = S * 0.24 + (i / 40) * S * 0.52, py = S / 2 - Math.sin((i / 40) * TAU) * S * 0.14; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke(); }
+  if (name === "Beat") { c.lineWidth = S * 0.075; c.beginPath(); [[0.22, 0.52], [0.4, 0.52], [0.47, 0.32], [0.55, 0.7], [0.61, 0.52], [0.78, 0.52]].forEach(([px, py], i) => i ? c.lineTo(S * px, S * py) : c.moveTo(S * px, S * py)); c.stroke(); }
+  c.restore();
+}
+function topTime(c, R) { t(c, "4:20", R, R * 0.13, R * 0.075, SOFT); }
+function head(c, R, app, title) { topTime(c, R);
+  const g = R * 0.18; glyph(c, g, app, day(app, 1, app === "Dash" ? 0.08 : 0), R - g / 2, R * 0.2);
+  if (title) t(c, title, R, R * 0.45, R * 0.095, INK, 600); }
+function row(c, R, y, name, line, when, col, unread = false) {
+  const x = R * 0.24, w = R * 1.52, h = R * 0.3; rr(c, x, y - h / 2, w, h, R * 0.08); c.fillStyle = CARD; c.fill();
+  t(c, fit(c, name, w * 0.62, R * 0.085, 600), x + R * 0.06, y - h * 0.18, R * 0.085, unread ? INK : SOFT, 600, "left");
+  t(c, when, x + w - R * 0.06, y - h * 0.18, R * 0.065, SOFT, 400, "right");
+  t(c, fit(c, line, w - R * 0.12, R * 0.075), x + R * 0.06, y + h * 0.2, R * 0.075, SOFT, 400, "left");
+  if (unread) { c.fillStyle = col; c.fillRect(x, y - h / 2 + R * 0.06, R * 0.014, h - R * 0.12); }
+}
+function ring(c, R, frac, col, r = 0.93, w = 0.03) {
+  c.lineCap = "round"; c.lineWidth = R * w; c.strokeStyle = FAINT; c.beginPath(); c.arc(R, R, R * r, 0, TAU); c.stroke();
+  c.strokeStyle = col; c.beginPath(); c.arc(R, R, R * r, -Math.PI / 2, -Math.PI / 2 + frac * TAU); c.stroke();
+}
+function bigNum(c, R, s, y, col = INK, size = 0.32) { t(c, s, R, y, R * size, col, 500); }
+
+// ---- the face (study 1b, approved) ----
+const ang = f => f * TAU - Math.PI / 2, pt = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+function face(c, R, h, m, amb) {
+  const n = (h % 12) || 12, pm = h >= 12, hue = (m / 60) * 360, r = R * (pm ? 0.42 : 0.5);
+  c.beginPath();
+  if (n === 1) c.arc(R, R, R * 0.1, 0, TAU); else if (n === 2) { c.moveTo(R, R - r); c.lineTo(R, R + r); }
+  else { for (let i = 0; i < n; i++) { const [x, y] = pt(R, R, r, ang(i / n)); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.closePath(); }
+  c.lineJoin = "round"; c.lineCap = "round";
+  if (amb) { c.strokeStyle = `hsl(${hue} 35% 32%)`; c.lineWidth = R * 0.022; c.stroke(); }
+  else { const g = c.createRadialGradient(R - r * 0.35, R - r * 0.45, r * 0.05, R, R, r * 1.1);
+    g.addColorStop(0, `hsl(${hue} 90% 82%)`); g.addColorStop(0.55, `hsl(${hue} 75% 52%)`); g.addColorStop(1, `hsl(${hue} 70% 30%)`); c.fillStyle = g; c.fill();
+    c.strokeStyle = `hsl(${hue} 90% 85%)`; c.lineWidth = R * 0.018; c.stroke(); }
+  if (pm) { c.beginPath(); for (let i = 0; i <= n; i++) { const [x, y] = pt(R, R, R * 0.62, ang(i / n)); i ? c.lineTo(x, y) : c.moveTo(x, y); }
+    c.strokeStyle = amb ? `hsl(${hue} 30% 28%)` : `hsla(${hue} 85% 80% / 0.7)`; c.lineWidth = R * 0.012; c.stroke(); }
+  if (!amb) t(c, "TUE 17", R, R * 1.76, R * 0.08, `hsl(${hue} 18% 62%)`, 500);
+}
+
+// ---- the screens ----
+const SECTIONS = [
+  { tag: "Point", title: "The face and the tiles", about: "Point is only the face (A46, A68). Swiping left from it reaches the standard tiles, Wave's Now playing and Dash's People waiting (A35). Nothing on the face changes when something arrives (A34).",
+    screens: [
+      { name: "The face, 4:20 pm", note: "Four sides for four o'clock, the after-noon ring, the minute's colour (A46)", draw(c, R) { face(c, R, 16, 20, false); } },
+      { name: "The face, always-on", note: "Outline only, no date (design book §2)", draw(c, R) { face(c, R, 16, 20, true); } },
+      { name: "Tile: Now playing", note: "Wave's tile: track, artist, play and skip (A35)", draw(c, R) { topTime(c, R);
+        const col = day("Wave"); glyph(c, R * 0.22, "Wave", col, R - R * 0.11, R * 0.24);
+        t(c, "Field Notes", R, R * 0.72, R * 0.11, INK, 600); t(c, "The Juniper Trio", R, R * 0.9, R * 0.075, SOFT);
+        c.fillStyle = col; c.beginPath(); c.arc(R, R * 1.3, R * 0.17, 0, TAU); c.fill();
+        c.fillStyle = "hsl(0 0% 6%)"; c.fillRect(R - R * 0.06, R * 1.22, R * 0.04, R * 0.16); c.fillRect(R + R * 0.02, R * 1.22, R * 0.04, R * 0.16);
+        [[-1, "prev"], [1, "next"]].forEach(([s]) => { const x = R + s * R * 0.48; c.fillStyle = SOFT; c.beginPath(); c.moveTo(x - s * R * 0.05, R * 1.22); c.lineTo(x - s * R * 0.05, R * 1.38); c.lineTo(x + s * R * 0.07, R * 1.3); c.closePath(); c.fill(); }); } },
+      { name: "Tile: People waiting", note: "Dash's tile: who has written, no counts (A11, A34)", draw(c, R) { topTime(c, R);
+        const col = day("Dash", 1, 0.08); glyph(c, R * 0.2, "Dash", col, R - R * 0.1, R * 0.22);
+        t(c, "People waiting", R, R * 0.58, R * 0.085, SOFT, 500);
+        ["Lee", "Robin", "Juniper's school"].forEach((p, i) => t(c, p, R, R * (0.86 + i * 0.24), R * 0.11, INK, 600)); } },
+    ] },
+  { tag: "Dash", title: "Calls, texts and mail", about: "Dash opens on People waiting (A14). Texts go out through Post on the phone (A67). Replies are by voice or keyboard (A10). A call is the system's own Phone screen, and Dash asks for the call note afterwards (A13).",
+    screens: [
+      { name: "People waiting", note: "Newest first; a rule in Dash's colour marks the unread (A14)", draw(c, R) { head(c, R, "Dash", "");
+        const col = day("Dash", 1, 0.08);
+        row(c, R, R * 0.62, "Lee", "Running late. I'll be at the field by four.", "2 min", col, true);
+        row(c, R, R * 0.98, "Robin", "Photo", "1 h", col, true);
+        row(c, R, R * 1.34, "Juniper's school", "Pickup moves to 3:15 on Friday.", "3 h", col, false);
+        t(c, "Mail", R, R * 1.7, R * 0.08, SOFT, 500); } },
+      { name: "A conversation", note: "The last few messages; Reply is the one action (A10)", draw(c, R) { topTime(c, R);
+        t(c, "Lee", R, R * 0.3, R * 0.1, INK, 600);
+        const col = day("Dash", 1, 0.08);
+        const bubble = (y, s, mine) => { const lines = wrap(c, s, R * 1.0, R * 0.075); const h = lines.length * R * 0.11 + R * 0.08, w = R * 1.12, x = mine ? R * 1.68 - w : R * 0.32;
+          rr(c, x, y, w, h, R * 0.07); c.fillStyle = mine ? day("Dash", 0.35, 0.08) : CARD; c.fill();
+          lines.forEach((ln, i) => t(c, ln, x + R * 0.06, y + R * 0.09 + i * R * 0.11, R * 0.075, INK, 400, "left")); return y + h + R * 0.05; };
+        let y = R * 0.44; y = bubble(y, "Are you bringing the oranges?", true); y = bubble(y, "Running late. I'll be at the field by four.", false);
+        pill(c, R, R * 1.62, R * 0.8, "Reply", col); } },
+      { name: "Replying by voice", note: "Speak, read it back, send; the keyboard is one tap away (A10)", draw(c, R) { topTime(c, R);
+        t(c, "To Lee", R, R * 0.32, R * 0.085, SOFT, 500);
+        wrap(c, "No rush, I'll save you a spot by the bench.", R * 1.3, R * 0.1).forEach((ln, i) => t(c, ln, R, R * (0.62 + i * 0.16), R * 0.1, INK));
+        const col = day("Dash", 1, 0.08); pill(c, R, R * 1.32, R * 0.7, "Send", col);
+        t(c, "Keyboard", R - R * 0.34, R * 1.62, R * 0.075, SOFT); t(c, "Again", R + R * 0.34, R * 1.62, R * 0.075, SOFT); } },
+      { name: "A group text with a photo", note: "Read and reply to everyone; photos shown (A10)", draw(c, R) { topTime(c, R);
+        t(c, "Team snacks", R, R * 0.3, R * 0.095, INK, 600); t(c, "Lee, Robin, Sam", R, R * 0.43, R * 0.065, SOFT);
+        const g = c.createLinearGradient(R * 0.5, R * 0.55, R * 1.5, R * 1.15); g.addColorStop(0, "hsl(160 30% 35%)"); g.addColorStop(1, "hsl(40 55% 50%)");
+        rr(c, R * 0.5, R * 0.54, R * 1.0, R * 0.6, R * 0.06); c.fillStyle = g; c.fill();
+        t(c, "Robin · 1 h", R, R * 1.24, R * 0.065, SOFT);
+        pill(c, R, R * 1.52, R * 0.9, "Reply to all", day("Dash", 1, 0.08)); } },
+      { name: "Filed, with Undo", note: "Six seconds to take it back (A14, O5)", draw(c, R) { topTime(c, R);
+        const col = day("Dash", 1, 0.08), g = R * 0.5; glyph(c, g, "Dash", col, R - g / 2, R * 0.62 - g / 2);
+        c.strokeStyle = FAINT; c.lineWidth = R * 0.014; c.beginPath(); c.arc(R, R * 0.62, g * 0.62, 0, TAU); c.stroke();
+        c.strokeStyle = col; c.beginPath(); c.arc(R, R * 0.62, g * 0.62, -Math.PI / 2, -Math.PI / 2 + 0.6 * TAU); c.stroke();
+        t(c, "Lee filed", R, R * 1.18, R * 0.11, INK, 600); t(c, "Tap to undo", R, R * 1.4, R * 0.085, col); } },
+      { name: "A call", note: "system · the watch's own Phone app rings (A13, A59)", draw(c, R) { t(c, "Calling", R, R * 0.48, R * 0.08, SOFT);
+        t(c, "Robin", R, R * 0.7, R * 0.17, INK, 600); t(c, "Mobile", R, R * 0.9, R * 0.07, SOFT);
+        [[R * 0.6, "hsl(355 55% 62%)", "Decline"], [R * 1.4, "hsl(140 45% 55%)", "Answer"]].forEach(([x, f, w]) => { c.fillStyle = f; c.beginPath(); c.arc(x, R * 1.32, R * 0.2, 0, TAU); c.fill(); t(c, w, x, R * 1.33, R * 0.065, "hsl(0 0% 6%)", 600); }); } },
+      { name: "After the call", note: "Dash asks for the call note, dictated (A13)", draw(c, R) { head(c, R, "Dash", "");
+        t(c, "Call with Robin", R, R * 0.66, R * 0.1, INK, 600); t(c, "6 min, just now", R, R * 0.84, R * 0.075, SOFT);
+        pill(c, R, R * 1.18, R * 1.0, "Add a note", day("Dash", 1, 0.08)); t(c, "Not now", R, R * 1.48, R * 0.08, SOFT); } },
+      { name: "Mail", note: "Subject and sender only, people only, never a buzz (A11)", draw(c, R) { topTime(c, R);
+        t(c, "Mail", R, R * 0.3, R * 0.095, INK, 600);
+        [["Sam", "Saturday plans", "20 min"], ["Robin", "Photos from the game", "2 h"], ["Lee", "Dentist moved to Thursday", "Yesterday"]].forEach(([who, sub, when], i) => {
+          const y = R * (0.6 + i * 0.36); t(c, fit(c, sub, R * 1.4, R * 0.085, 500), R, y - R * 0.05, R * 0.085, INK, 500); t(c, `${who} · ${when}`, R, y + R * 0.1, R * 0.065, SOFT); }); } },
+      { name: "First run: Vault passphrase", note: "Entered once, shown in the clear, kept in the watch's Keystore (A38)", draw(c, R) { head(c, R, "Dash", "");
+        t(c, "Vault passphrase", R, R * 0.66, R * 0.09, INK, 600);
+        rr(c, R * 0.34, R * 0.84, R * 1.32, R * 0.24, R * 0.06); c.strokeStyle = SOFT; c.lineWidth = R * 0.01; c.stroke();
+        t(c, "ember-tide-orchard", R, R * 0.96, R * 0.08, INK); t(c, "Shown so you can check it", R, R * 1.26, R * 0.065, SOFT);
+        pill(c, R, R * 1.54, R * 0.7, "Unlock", day("Dash", 1, 0.08)); } },
+    ] },
+  { tag: "Wave", title: "Music and podcasts", about: "Wave opens on Now playing (A19). Everything streams over LTE, nothing downloads (A17). Whoever starts playback owns it, with one line to switch (A20). Cadence sets the tempo on runs and walks (A21). TIDAL is a remote for Score on the phone, only while the phone is nearby (A62).",
+    screens: [
+      { name: "Now playing", note: "Small square of art (O6); the crown is volume (A19)", draw(c, R) { topTime(c, R);
+        const a = R * 0.36, g = c.createLinearGradient(R - a / 2, R * 0.44 - a / 2, R + a / 2, R * 0.44 + a / 2); g.addColorStop(0, "hsl(200 30% 40%)"); g.addColorStop(1, "hsl(30 50% 45%)");
+        rr(c, R - a / 2, R * 0.46 - a / 2, a, a, R * 0.04); c.fillStyle = g; c.fill();
+        t(c, "Field Notes", R, R * 0.8, R * 0.11, INK, 600); t(c, "The Juniper Trio", R, R * 0.96, R * 0.075, SOFT);
+        const col = day("Wave"); c.fillStyle = col; c.beginPath(); c.arc(R, R * 1.3, R * 0.15, 0, TAU); c.fill();
+        c.fillStyle = "hsl(0 0% 6%)"; c.fillRect(R - R * 0.055, R * 1.23, R * 0.035, R * 0.14); c.fillRect(R + R * 0.02, R * 1.23, R * 0.035, R * 0.14);
+        [-1, 1].forEach(s => { const x = R + s * R * 0.45; c.fillStyle = SOFT; c.beginPath(); c.moveTo(x - s * R * 0.05, R * 1.23); c.lineTo(x - s * R * 0.05, R * 1.37); c.lineTo(x + s * R * 0.06, R * 1.3); c.closePath(); c.fill(); });
+        t(c, "Play on phone", R, R * 1.62, R * 0.07, SOFT);
+        c.lineCap = "round"; c.lineWidth = R * 0.03; c.strokeStyle = FAINT; c.beginPath(); c.arc(R, R, R * 0.93, -0.5, 0.5); c.stroke();
+        c.strokeStyle = col; c.beginPath(); c.arc(R, R, R * 0.93, 0.2, 0.5); c.stroke(); } },
+      { name: "Browse", note: "Artists, albums, playlists, genres, songs, voice (A19)", draw(c, R) { topTime(c, R);
+        ["Search by voice", "Playlists", "Artists", "Albums", "Genres", "Songs"].forEach((s, i) => { const y = R * (0.4 + i * 0.22);
+          t(c, s, R, y, R * (i === 0 ? 0.085 : 0.095), i === 0 ? day("Wave") : INK, i === 0 ? 500 : 400); }); } },
+      { name: "Podcasts", note: "The list you curate on either device, synced (A18)", draw(c, R) { topTime(c, R);
+        t(c, "Up next", R, R * 0.3, R * 0.095, INK, 600);
+        [["The Long Field", "Episode 42 · 38 min left"], ["Kitchen Science", "Bread, again · 51 min"], ["Small Towns", "Harbor days · 1 h 4 min"]].forEach(([show, ep], i) => {
+          const y = R * (0.62 + i * 0.36); t(c, show, R, y - R * 0.06, R * 0.09, INK, 500); t(c, fit(c, ep, R * 1.4, R * 0.065), R, y + R * 0.09, R * 0.065, SOFT); }); } },
+      { name: "Running to cadence", note: "Steps per minute set the tempo, crossfading over 5–6 s (A21)", draw(c, R) { topTime(c, R);
+        const col = day("Wave"); ring(c, R, 168 / 200, col);
+        t(c, "steps per minute", R, R * 0.48, R * 0.065, SOFT); bigNum(c, R, "168", R * 0.76);
+        t(c, "Music at 168", R, R * 1.06, R * 0.08, col, 500); t(c, fit(c, "Low Tide · The Juniper Trio", R * 1.4, R * 0.07), R, R * 1.36, R * 0.07, SOFT); } },
+      { name: "TIDAL on the phone", note: "A remote for Score's TIDAL, only with the phone nearby (A62)", draw(c, R) { topTime(c, R);
+        t(c, "Playing on phone", R, R * 0.42, R * 0.07, SOFT);
+        t(c, "Harbor Lights", R, R * 0.66, R * 0.11, INK, 600); t(c, "Robin Hale · TIDAL", R, R * 0.84, R * 0.075, SOFT);
+        const col = day("Wave"); c.strokeStyle = col; c.lineWidth = R * 0.02; c.beginPath(); c.arc(R, R * 1.2, R * 0.15, 0, TAU); c.stroke();
+        c.fillStyle = col; c.fillRect(R - R * 0.055, R * 1.13, R * 0.035, R * 0.14); c.fillRect(R + R * 0.02, R * 1.13, R * 0.035, R * 0.14);
+        t(c, "Play here instead", R, R * 1.55, R * 0.07, SOFT); } },
+    ] },
+  { tag: "Beat", title: "Workouts and the day", about: "Beat records. It does not plan or show plans beyond the session in hand (A25). You tap Start on today's workout (A25). Live heart rate is the only Body value the watch ever shows (A29). Only worrying exertion buzzes, with the words \"Ease off\" (A24). Everything else goes to the phone and the Saturday digest.",
+    screens: [
+      { name: "Today's workout", note: "From the plan, with any morning swap (A25); Start is the one action", draw(c, R) { head(c, R, "Beat", "");
+        t(c, "Strength", R, R * 0.64, R * 0.12, INK, 600); t(c, "35 min · 5 exercises", R, R * 0.84, R * 0.075, SOFT);
+        pill(c, R, R * 1.2, R * 0.7, "Start", day("Beat")); t(c, "Swapped from a run", R, R * 1.5, R * 0.065, SOFT); } },
+      { name: "A set", note: "Tap anywhere when the set is done (A23)", draw(c, R) { topTime(c, R);
+        t(c, "Goblet squat", R, R * 0.4, R * 0.1, INK, 600); t(c, "Set 2 of 3", R, R * 0.58, R * 0.075, SOFT);
+        bigNum(c, R, "10", R * 0.92); t(c, "reps", R, R * 1.16, R * 0.07, SOFT);
+        t(c, "Tap anywhere when done", R, R * 1.48, R * 0.065, day("Beat")); t(c, "112 bpm", R, R * 1.7, R * 0.065, SOFT); } },
+      { name: "Rest", note: "Its own buzz at the end (O4); texts arrive now (A26)", draw(c, R) { topTime(c, R);
+        const col = day("Beat"); ring(c, R, 0.45, col);
+        t(c, "Rest", R, R * 0.52, R * 0.08, SOFT); bigNum(c, R, "0:27", R * 0.82); t(c, "Next: push-up", R, R * 1.14, R * 0.075, INK);
+        t(c, "Lee · 1 text", R, R * 1.44, R * 0.065, SOFT); } },
+      { name: "A run", note: "Cadence, live heart rate and distance; no route kept (A23)", draw(c, R) { topTime(c, R);
+        t(c, "24:10", R, R * 0.38, R * 0.11, INK, 500);
+        [["168", "spm"], ["142", "bpm"], ["3.6", "km"]].forEach(([v, u], i) => { const x = R * (0.5 + i * 0.5);
+          t(c, v, x, R * 0.86, R * 0.14, i === 1 ? day("Beat") : INK, 500); t(c, u, x, R * 1.06, R * 0.065, SOFT); });
+        t(c, "Steady, as planned", R, R * 1.4, R * 0.07, SOFT); } },
+      { name: "Ease off", note: "Above the maximum zone, or not recovering in rest (A24)", draw(c, R) { topTime(c, R);
+        const col = day("Beat"); c.strokeStyle = col; c.lineWidth = R * 0.05; c.beginPath(); c.arc(R, R, R * 0.9, 0, TAU); c.stroke();
+        t(c, "Ease off", R, R * 0.92, R * 0.2, INK, 600); t(c, "176 bpm", R, R * 1.2, R * 0.09, col, 500); } },
+      { name: "Done", note: "It goes to the phone; nothing to praise or score (A29)", draw(c, R) { head(c, R, "Beat", "");
+        t(c, "Strength", R, R * 0.66, R * 0.1, INK, 600); t(c, "38 min · 5 exercises", R, R * 0.84, R * 0.075, SOFT);
+        t(c, "Sent to your phone", R, R * 1.18, R * 0.075, SOFT); } },
+      { name: "Eating out", note: "A silent card at the dinner hour when away (A28)", draw(c, R) { head(c, R, "Beat", "");
+        wrap(c, "Eating out tonight? Log it in Plate when you're home.", R * 1.3, R * 0.09).forEach((ln, i) => t(c, ln, R, R * (0.68 + i * 0.15), R * 0.09, INK));
+        t(c, "Dismiss", R, R * 1.5, R * 0.08, SOFT); } },
+    ] },
+];
+
+const root = document.getElementById("sections"); const views = [];
+SECTIONS.forEach(sec => {
+  const el = document.createElement("section");
+  el.innerHTML = `<div><div class="tag">${sec.tag}</div><h2>${sec.title}</h2></div><p>${sec.about}</p><div class="grid"></div>`;
+  root.appendChild(el);
+  const grid = el.querySelector(".grid");
+  sec.screens.forEach(s => { const cell = document.createElement("div"); cell.className = "cell";
+    const note = s.note.startsWith("system") ? `<span class="sys">system</span>${s.note.slice(6)}` : s.note;
+    cell.innerHTML = `<canvas role="img" aria-label="${sec.tag}: ${s.name}"></canvas><b>${s.name}</b><span>${note}</span>`;
+    grid.appendChild(cell); views.push([cell.querySelector("canvas"), s]); });
+});
+function paint() { views.forEach(([cv, s]) => { const dpr = window.devicePixelRatio || 1, W = Math.round(cv.clientWidth * dpr);
+  if (cv.width !== W) { cv.width = W; cv.height = W; } const c = cv.getContext("2d"); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, W, W);
+  const R = W / 2; c.fillStyle = "#000"; c.beginPath(); c.arc(R, R, R, 0, TAU); c.fill();
+  c.save(); c.beginPath(); c.arc(R, R, R, 0, TAU); c.clip(); s.draw(c, R); c.restore(); }); }
+window.addEventListener("resize", paint);
+paint();
+if (document.fonts) document.fonts.ready.then(paint);
+</script>
