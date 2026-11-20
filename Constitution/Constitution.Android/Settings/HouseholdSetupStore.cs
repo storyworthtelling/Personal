@@ -1,5 +1,6 @@
 using Android.Content;
 using Constitution.Domain.Calendar;
+using Constitution.Domain.Household;
 using Constitution.Domain.Settings;
 using Constitution.Infrastructure.Workouts;
 using Constitution.WorkoutDelivery;
@@ -12,7 +13,7 @@ namespace Constitution.Settings;
 /// Household group reads it to show what is set and writes it when a choice changes. Every ending is a plain sentence for the group
 /// to show inline; nothing here throws for an expected failure and nothing is written over a file that cannot be read.
 /// </summary>
-public sealed class HouseholdSetupStore(Context context)
+public sealed class HouseholdSetupStore(Context context, Func<RosterView?> roster)
 {
     private readonly string path = Path.Combine(
         WorkoutWeekPaths.Folder(
@@ -22,15 +23,19 @@ public sealed class HouseholdSetupStore(Context context)
 
     public HouseholdSetupRead Read() => PlanningSetupFile.Read(path);
 
-    /// <summary>Applies the choices to the adults the saved setup names, and writes it. Returns what to say.</summary>
+    /// <summary>
+    /// Applies the choices to the household file's adults (or, with no household file, the adults the saved setup names), and writes it.
+    /// Returns what to say.
+    /// </summary>
     public string Save(HouseholdChoices choices)
     {
-        if (Read() is not HouseholdSetupRead.Configured configured)
+        var build = PlanningSetupFromRoster.ForSave(roster(), Read(), choices);
+        if (!build.CanWrite)
         {
             return "There is no adult to plan for yet. Add one below, or wait for the household file.";
         }
 
-        return Write(PlanningSetupFromRoster.Apply(configured.Setup, choices));
+        return Write(build);
     }
 
     /// <summary>
@@ -53,6 +58,29 @@ public sealed class HouseholdSetupStore(Context context)
 
         var adults = existing.Adults.Append(new HouseholdAdult(trimmed, null, null, null, null, DeliversHere: existing.Adults.Count == 0)).ToList();
         return Write(PlanningSetupFromRoster.Apply(existing with { Adults = adults }, HouseholdChoices.From(existing with { Adults = adults })));
+    }
+
+    /// <summary>
+    /// Makes this phone's setup the household's (Foreword's): its adults, pickup, calendars, dinner and bedtime, keeping who this phone
+    /// delivers for. Written only when something differs; nothing when the household is empty. Returns what to say, or null.
+    /// </summary>
+    public string? FollowHousehold(Storyworthtelling.People.HouseholdPeople household)
+    {
+        if (household.People.Count == 0)
+        {
+            return null;
+        }
+
+        var thisPhone = Read() is HouseholdSetupRead.Configured configured ? HouseholdChoices.From(configured.Setup) : new HouseholdChoices();
+        var roster = new RosterView(HouseholdMirror.Roster(household).Select(RosterEntry.From).ToList(), []);
+        var build = PlanningSetupFromRoster.Build(roster, HouseholdMirror.Choices(household, thisPhone));
+        if (build.Setup is null
+            || (Read() is HouseholdSetupRead.Configured same && PlanningSetupCodec.Write(same.Setup) == PlanningSetupCodec.Write(build.Setup)))
+        {
+            return null;
+        }
+
+        return Write(build);
     }
 
     private string Write(PlanningSetupBuild build)

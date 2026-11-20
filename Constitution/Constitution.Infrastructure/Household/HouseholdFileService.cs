@@ -135,6 +135,13 @@ public sealed class HouseholdFileService
             var state = install.Load();
             var clock = new HybridLogicalClock(state.LastStamp);
             var changed = edit(document, clock, state.InstallId);
+            if (ReferenceEquals(changed, document))
+            {
+                // Nothing to write (the household mirror, most passes): no save and no pass asked for, or each pass would ask for the next.
+                Volatile.Write(ref latest, document);
+                return;
+            }
+
             await local.SaveAsync(changed, cancellationToken);
             install.SaveClock(clock.Last);
             Volatile.Write(ref latest, changed);

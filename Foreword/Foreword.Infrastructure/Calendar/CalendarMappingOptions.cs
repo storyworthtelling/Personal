@@ -90,4 +90,8 @@ public class ColumnChoice
     // can route an event to them. A column for somebody without one is filled by the calendar an
     // event came from instead, and Foreword makes that calendar for them (EnsureColumnCalendars).
     public bool HasAccount { get; set; }
+
+    // The household person this column is (Storyworthtelling.People), so a rename in the household follows the column and its rules.
+    // Empty on a column this phone made before the household was shared.
+    public string HouseholdId { get; set; } = string.Empty;
 }

@@ -76,10 +76,10 @@ public partial class CalendarsPage : BinderPage
         var arrived = NewCalendars.Since(calendars.Keys, settings.SeenCalendarIds);
         var known = calendars.Keys.Where(id => !arrived.Contains(id)).ToList();
 
-        // The columns come first: every calendar below is answered with one of them. They are this
-        // account's own, set up here rather than written into the app.
-        var columns = Row("Columns", string.Join(" · ", settings.Layout.Printed), string.Empty);
-        Tap(columns, async () => await Navigation.PushAsync(new CalendarColumnsPage()));
+        // The columns come first: every calendar below is answered with one of them. They are the
+        // household's people (Foreword owns the household every app reads), one column each.
+        var columns = Row("Household", string.Join(" · ", settings.Layout.Printed), string.Empty);
+        Tap(columns, async () => await Navigation.PushAsync(new HouseholdPage()));
         Groups.Add(GroupLabel("Your columns"));
         Groups.Add(Card([columns]));
 

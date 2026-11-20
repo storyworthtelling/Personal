@@ -18,6 +18,7 @@ on:
       - 'Storyworthtelling.Google/**'
       - 'Storyworthtelling.Google.Android/**'
       - 'Storyworthtelling.Household/**'
+      - 'Storyworthtelling.People/**'
       - 'Storyworthtelling.Updates/**'
       - 'Tools/IconStudio/**'
       - 'Fonts/**'

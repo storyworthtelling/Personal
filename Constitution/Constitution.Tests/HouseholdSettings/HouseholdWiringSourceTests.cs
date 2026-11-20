@@ -41,10 +41,20 @@ public class HouseholdWiringSourceTests
         var store = Source("Constitution.Android/Settings/HouseholdSetupStore.cs");
 
         Assert.Contains("store.Save", view);
-        Assert.Contains("PlanningSetupFromRoster.Apply", store);
+        Assert.Contains("PlanningSetupFromRoster.ForSave", store);
         Assert.Contains("PlanningSetupFile.Write", store);
         Assert.DoesNotContain("Toast", view + store);
         Assert.DoesNotContain("AlertDialog", view + store);
+    }
+
+    [Fact]
+    public void TheStoreSavesForTheHouseholdFilesRoster()
+    {
+        // The roster is the household's list of adults; a store that saved only for the setup file's own adults refused every choice on
+        // a phone whose setup file named nobody, and the page redrew blank.
+        var area = Source("Constitution.Android/SettingsArea.cs");
+
+        Assert.Contains("new HouseholdSetupStore(host, () => ConstitutionHousehold.For(host).Service.Roster)", area);
     }
 
     [Fact]

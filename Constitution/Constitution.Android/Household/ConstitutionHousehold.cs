@@ -67,7 +67,13 @@ public sealed class ConstitutionHousehold
 
         // The loop outlives any one pass: a failure is logged by type and backed off, never fatal.
         loop = new HouseholdSyncLoop(
-            async token => await Service.SyncAsync(token),
+            async token =>
+            {
+                await Service.SyncAsync(token);
+
+                // Foreword's household follows every pass: the people, pickup, calendars, dinner and bedtime.
+                await ConstitutionPeople.For(context).RefreshAsync(token);
+            },
             exception => HeadLog.Warn(LogTag, "A household pass failed unexpectedly: " + exception.GetType().Name),
             () => DateTimeOffset.UtcNow);
         Service.SyncWanted += loop.Edited;

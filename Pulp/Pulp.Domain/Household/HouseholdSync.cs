@@ -42,9 +42,20 @@ public sealed record HouseholdPermissions(
 {
     public const string OwnerOnlyNote = "Services, and adding or removing people, are the owner’s to change, on their phone.";
 
+    public const string ForewordOwnsNote = "Who lives here is changed in Foreword, for every app. A child’s viewing rules stay here.";
+
     public static HouseholdPermissions For(HouseholdFileRole role) => role == HouseholdFileRole.SharedWith
         ? new HouseholdPermissions(false, false, true, true, OwnerOnlyNote)
         : new HouseholdPermissions(true, true, true, true, null);
+
+    /// <summary>
+    /// Once Foreword holds the household (<paramref name="forewordOwns"/>), the people — who they are, their names, a child or not, an
+    /// adult's Google address — are changed there and mirrored here, so nothing here adds, removes or renames anyone. Services and a
+    /// child's rules are still Pulp's.
+    /// </summary>
+    public static HouseholdPermissions For(HouseholdFileRole role, bool forewordOwns) => forewordOwns
+        ? For(role) with { CanAddOrRemoveViewers = false, CanRenameOwnViewer = false, Note = ForewordOwnsNote }
+        : For(role);
 }
 
 /// <summary>When a screen showing the household reads it again: a pass brought records home, or the status moved.</summary>

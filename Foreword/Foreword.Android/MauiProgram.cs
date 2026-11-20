@@ -264,6 +264,26 @@ public static class MauiProgram
                 MauiLog.Trail(LogSources.Vault)));
         builder.Services.AddSingleton<VaultSync>();
 
+        // The household Foreword owns (Storyworthtelling.People): one encrypted, merge-safe file every app reads. This phone's copy
+        // lives in its own folder; only the owner's account creates the Drive file.
+        builder.Services.AddSingleton(sp =>
+        {
+            var role = () => ForewordHousehold.Role;
+            return new Storyworthtelling.People.HouseholdPeopleFile(
+                new Storyworthtelling.Household.LocalHouseholdStore(ForewordHousehold.Folder, "people.json"),
+                new Storyworthtelling.Household.DriveHouseholdStore(
+                    new DriveTextFile(VoiceDriveFactory(sp), Storyworthtelling.People.PeopleFile.FileName, sp.GetRequiredService<InMemoryDriveFileIdStore>(), readCache: DriveReadCache.Shared),
+                    Storyworthtelling.People.PeopleFile.FileName,
+                    () => CredentialStore.VaultPassphrase,
+                    () => Storyworthtelling.Household.HouseholdSync.MayCreateFile(role())),
+                new Storyworthtelling.People.PeopleInstallStore(ForewordHousehold.Folder),
+                new Storyworthtelling.People.PeopleFileSeams(
+                    () => CredentialStore.VaultPassphrase.Length > 0,
+                    () => CredentialStore.GoogleAccountEmail.Length > 0,
+                    role,
+                    () => DateTimeOffset.UtcNow));
+        });
+
         // The private prayer archive: its own Drive file, encrypted with the same passphrase the
         // vault uses. A separate file rather than a section of the vault, because the vault is read
         // by every app in the suite and this is read by one.

@@ -72,6 +72,9 @@ public sealed class PulpServices
     private readonly DriveHouseholdStore sharedHousehold;
     private readonly IndexUsageFilePublisher usageFile;
     private readonly HouseholdSyncLoop syncLoop;
+
+    // The household Foreword owns (Storyworthtelling.People): Pulp's viewers are a mirror of it.
+    private readonly Storyworthtelling.People.HouseholdPeopleFile people;
     private readonly SemaphoreSlim passGate = new(1, 1);
     private RememberedRole? rememberedRole;
     private HouseholdSyncStatus syncStatus = HouseholdSyncStatus.LocalOnly("The household hasn’t been compared with Drive yet.");
@@ -160,6 +163,17 @@ public sealed class PulpServices
             PulpIdentity.HouseholdFileName,
             () => VaultPassphraseStore.Passphrase,
             () => SharedHouseholdSync.MayCreateFile(HouseholdFileRole));
+        var peopleFolder = Path.Combine(files, "household-people"); // not copy: a folder on the phone
+        people = new Storyworthtelling.People.HouseholdPeopleFile(
+            new LocalHouseholdStore(peopleFolder, "people.json"),
+            new DriveHouseholdStore(
+                new DriveTextFile(DriveFactory(account), Storyworthtelling.People.PeopleFile.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared),
+                Storyworthtelling.People.PeopleFile.FileName,
+                () => VaultPassphraseStore.Passphrase,
+                () => SharedHouseholdSync.MayCreateFile(HouseholdFileRole)),
+            new Storyworthtelling.People.PeopleInstallStore(peopleFolder),
+            new Storyworthtelling.People.PeopleFileSeams(
+                () => VaultPassphraseStore.IsSet, () => VoiceGoogleAccount.IsSignedIn, () => HouseholdFileRole, () => DateTimeOffset.UtcNow));
         usageFile = new IndexUsageFilePublisher(
             new DriveIndexUsageStore(
                 new DriveTextFile(DriveFactory(account), IndexUsageFile.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared),
@@ -171,7 +185,13 @@ public sealed class PulpServices
 
         // The loop outlives any one pass: a failure is logged and backed off, never fatal (see HouseholdSyncLoop).
         syncLoop = new HouseholdSyncLoop(
-            RunPassAsync,
+            async token =>
+            {
+                await RunPassAsync(token);
+
+                // Foreword's household follows every pass: who the viewers are, their names, a child or not, an adult's account.
+                await FollowHouseholdAsync(token);
+            },
             exception => Diagnostics.Warn("household", "A sync pass failed unexpectedly; the loop carries on and tries again later.", exception),
             () => DateTimeOffset.UtcNow);
         syncLoop.Opened();
@@ -246,7 +266,49 @@ public sealed class PulpServices
         HouseholdRoleMemory.Effective(Keys.HouseholdRole, Volatile.Read(ref rememberedRole), VoiceGoogleAccount.Email);
 
     /// <summary>What this phone may change in the household (D166).</summary>
-    public HouseholdPermissions Rights => HouseholdPermissions.For(HouseholdFileRole);
+    public HouseholdPermissions Rights => HouseholdPermissions.For(HouseholdFileRole, ForewordOwns);
+
+    /// <summary>True once Foreword's household has people: Pulp's viewers are then a mirror of it and changed there.</summary>
+    public bool ForewordOwns => people.People.People.Count > 0;
+
+    /// <summary>
+    /// One round with the household Foreword owns: meet it in Drive; on the owner's phone bring Pulp's own viewers into it once (linked
+    /// by name, or kept under their viewer ids); then make Pulp's viewers its mirror (<see cref="HouseholdMirror"/>). Never throws.
+    /// </summary>
+    public async Task FollowHouseholdAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await people.ReadAsync(cancellationToken);
+            var standing = await people.SyncAsync(cancellationToken);
+            if (people.CanEdit && standing.State == Storyworthtelling.People.PeopleFileState.Synced)
+            {
+                var mine = HouseholdMirror.ForImport(await HouseholdAsync(cancellationToken));
+                var wrote = false;
+                await people.EditAsync((editor, document, next, writer) =>
+                {
+                    var changed = editor.Import(document, Storyworthtelling.People.PeopleApps.Pulp, mine, next, writer).Document;
+                    wrote = !changed.ContentEquals(document);
+                    return new Storyworthtelling.People.PeopleEdit(changed, null);
+                }, cancellationToken);
+                if (wrote)
+                {
+                    await people.SyncAsync(cancellationToken);
+                }
+            }
+
+            var household = people.People;
+            if (household.People.Count > 0 && HouseholdFileRole != HouseholdFileRole.SharedWith)
+            {
+                // One stamp serves the whole mirror: it never writes one record twice, as PersonEdits.ApplyAll relies on too.
+                await EditAsync((document, stamp, writer) => HouseholdMirror.Apply(document, household, () => stamp, writer), cancellationToken);
+            }
+        }
+        catch (Exception exception) when (!CancellationVerdict.IsUserCancel(exception, cancellationToken))
+        {
+            Diagnostics.Warn("household", "The household Foreword keeps couldn’t be followed this time; Pulp keeps its viewers as they are.", exception);
+        }
+    }
 
     public VaultPulpKeySource Keys { get; }
 
@@ -557,7 +619,14 @@ public sealed class PulpServices
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             clock.Witness(document.MaxStamp, now);
             var stamp = clock.Now(now);
-            await household.SaveAsync(edit(document, stamp, state.InstallId), cancellationToken);
+            var changed = edit(document, stamp, state.InstallId);
+            if (ReferenceEquals(changed, document))
+            {
+                // Nothing to write (the household mirror, most passes): no save and no pass asked for, or each pass would ask for the next.
+                return;
+            }
+
+            await household.SaveAsync(changed, cancellationToken);
             install.SaveClock(clock.Last);
         }
         finally
