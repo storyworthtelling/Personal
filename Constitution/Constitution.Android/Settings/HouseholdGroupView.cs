@@ -61,13 +61,13 @@ public static class HouseholdGroupView
 
         AddPickup(context, body, model, choices, store, onSaved, Gap);
         AddTime(context, body, model.Bedtime, choices.Bedtime ?? BedtimeRoutine.Assumed.Bedtime,
-            time => HouseholdGroupModel.CheckBedtime(time) ?? store.Save(choices with { Bedtime = time }), onSaved, Gap);
+            time => HouseholdGroupModel.CheckBedtime(time) ?? store.Save(choices with { Bedtime = time }), onSaved, Gap, !model.ForewordOwns);
         AddTime(context, body, model.Dinner, choices.DinnerStart ?? FamilyDinner.Assumed.Start,
             time => HouseholdGroupModel.CheckDinner(time, choices.DinnerLength ?? TimeSpan.FromMinutes(60))
-                ?? store.Save(choices with { DinnerStart = time }), onSaved, Gap);
+                ?? store.Save(choices with { DinnerStart = time }), onSaved, Gap, !model.ForewordOwns);
         AddCalendars(context, body, model, choices, store, onSaved, Gap);
 
-        if (model.RosterStatus is not null)
+        if (model.RosterStatus is not null && !model.ForewordOwns)
         {
             // No household file: the adults can only be named here, and live in the setup file alone.
             var name = PaperUi.Field(context, "Add an adult (kept on this phone)");
@@ -129,10 +129,16 @@ public static class HouseholdGroupView
 
     private static void AddTime(
         Context context, LinearLayout body, HouseholdTimeRow row, TimeOnly current, Func<TimeOnly, string> change,
-        Action<string> onSaved, Func<int, LinearLayout.LayoutParams> gap)
+        Action<string> onSaved, Func<int, LinearLayout.LayoutParams> gap, bool editable)
     {
         body.AddView(PaperUi.Label(context, row.Label), gap(DesignTokens.Space.X4));
         body.AddView(PaperUi.Secondary(context, row.Helper));
+        if (!editable)
+        {
+            // Foreword holds the household's dinner and bedtime; here they are shown.
+            body.AddView(PaperUi.Mono(context, row.IsAssumed ? row.Value + " (assumed)" : row.Value), gap(DesignTokens.Space.X1));
+            return;
+        }
 
         var line = new LinearLayout(context) { Orientation = Orientation.Horizontal };
         line.SetGravity(GravityFlags.CenterVertical);
@@ -152,6 +158,13 @@ public static class HouseholdGroupView
         foreach (var row in model.Calendars)
         {
             body.AddView(PaperUi.Body(context, row.Label), gap(DesignTokens.Space.X2));
+            if (model.ForewordOwns)
+            {
+                // Foreword holds each person's calendar and the family calendar; here they are shown.
+                body.AddView(PaperUi.Mono(context, row.StatusText), gap(DesignTokens.Space.X1));
+                continue;
+            }
+
             var field = PaperUi.MonoField(context, "Calendar address");
             field.Text = row.Id ?? string.Empty;
             body.AddView(field, gap(DesignTokens.Space.X1));

@@ -32,6 +32,10 @@ public sealed class HouseholdGroupModel
     public const string NoHouseholdFileSentence =
         "The household file isn’t set up on this phone yet, so the people aren’t listed. The choices below are kept on this phone.";
 
+    /// <summary>Said in place of the editing once Foreword holds the household (it owns who lives here, for every app).</summary>
+    public const string ForewordOwnsSentence =
+        "The household is changed in Foreword: the people, pickup, calendars, dinner and bedtime. Who this phone delivers for stays here.";
+
     private const string ChildTag = "child";
     private const string AdultTag = "adult";
     private const int LongestDinnerMinutes = 240;
@@ -55,6 +59,9 @@ public sealed class HouseholdGroupModel
 
     public bool CanAddPerson { get; private init; }
 
+    /// <summary>True once Foreword holds the household: everything but who this phone delivers for is shown, not edited.</summary>
+    public bool ForewordOwns { get; private init; }
+
     public string AddLabel => "Add a person";
 
     public IReadOnlyList<HouseholdPickupRow> Pickup { get; private init; } = [];
@@ -66,11 +73,13 @@ public sealed class HouseholdGroupModel
     public IReadOnlyList<HouseholdCalendarRow> Calendars { get; private init; } = [];
 
     public static HouseholdGroupModel Build(
-        RosterView? roster, RosterRole role, HouseholdSetupRead setup, IReadOnlyDictionary<PersonId, string>? dislikeLines = null)
+        RosterView? roster, RosterRole role, HouseholdSetupRead setup, IReadOnlyDictionary<PersonId, string>? dislikeLines = null,
+        bool forewordOwns = false)
     {
         ArgumentNullException.ThrowIfNull(setup);
 
-        var editor = new RosterEditor(role);
+        // Foreword's household is changed in Foreword, so here it reads like the partner's: shown, not edited.
+        var editor = new RosterEditor(forewordOwns ? RosterRole.Partner : role);
         var saved = (setup as HouseholdSetupRead.Configured)?.Setup;
 
         var people = (roster?.Entries ?? [])
@@ -101,7 +110,8 @@ public sealed class HouseholdGroupModel
         {
             Summary = string.Join(" · ", parts),
             RosterStatus = roster is null ? NoHouseholdFileSentence : null,
-            ReadOnlyNote = roster is null ? null : editor.ReadOnlyNote,
+            ReadOnlyNote = forewordOwns ? ForewordOwnsSentence : roster is null ? null : editor.ReadOnlyNote,
+            ForewordOwns = forewordOwns,
             People = people,
             CanAddPerson = roster is not null && editor.CanEdit,
             Pickup = pickup,

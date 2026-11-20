@@ -16,5 +16,6 @@
     <!-- The household file engine (PC4): clock, records with tombstones, merge. Constitution's kinds and
          typed record maps sit on it; the library itself knows no kind. -->
     <ProjectReference Include="..\..\Storyworthtelling.Household\Storyworthtelling.Household.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.People\Storyworthtelling.People.csproj" />
   </ItemGroup>
 </Project>

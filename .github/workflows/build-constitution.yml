@@ -22,6 +22,7 @@ on:
       - 'Fonts/**'
       # Everything the head and its tests build from (CiHygieneTests reads the ProjectReference closure).
       - 'Storyworthtelling.Household/**'
+      - 'Storyworthtelling.People/**'
       - 'Storyworthtelling.Handwriting/**'
       - 'Storyworthtelling.Remarkable/**'
       - 'Storyworthtelling.Pipeline/**'

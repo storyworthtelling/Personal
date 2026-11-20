@@ -118,7 +118,8 @@ public sealed class SettingsArea(Activity host)
         // The roster is the household file's, as the phone's copy last read it; with none (the file has not opened, or this phone has
         // not met one) the group says so and the choices stay editable in the setup file. What the file is doing is said beneath.
         var householdFile = ConstitutionHousehold.For(Host).Service;
-        var household = HouseholdGroupModel.Build(householdFile.Roster, householdFile.RosterRole, householdStore.Read());
+        var household = HouseholdGroupModel.Build(
+            householdFile.Roster, householdFile.RosterRole, householdStore.Read(), forewordOwns: ConstitutionPeople.For(Host).ForewordOwns);
         var householdChoices = householdStore.Read() is HouseholdSetupRead.Configured saved ? HouseholdChoices.From(saved.Setup) : new HouseholdChoices();
 
         // The suite's anatomy (audit W8.4b): Connections, Vault, Constitution's own, Diagnostics, then the build line.

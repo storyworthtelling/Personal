@@ -60,6 +60,29 @@ public sealed class HouseholdSetupStore(Context context, Func<RosterView?> roste
         return Write(PlanningSetupFromRoster.Apply(existing with { Adults = adults }, HouseholdChoices.From(existing with { Adults = adults })));
     }
 
+    /// <summary>
+    /// Makes this phone's setup the household's (Foreword's): its adults, pickup, calendars, dinner and bedtime, keeping who this phone
+    /// delivers for. Written only when something differs; nothing when the household is empty. Returns what to say, or null.
+    /// </summary>
+    public string? FollowHousehold(Storyworthtelling.People.HouseholdPeople household)
+    {
+        if (household.People.Count == 0)
+        {
+            return null;
+        }
+
+        var thisPhone = Read() is HouseholdSetupRead.Configured configured ? HouseholdChoices.From(configured.Setup) : new HouseholdChoices();
+        var roster = new RosterView(HouseholdMirror.Roster(household).Select(RosterEntry.From).ToList(), []);
+        var build = PlanningSetupFromRoster.Build(roster, HouseholdMirror.Choices(household, thisPhone));
+        if (build.Setup is null
+            || (Read() is HouseholdSetupRead.Configured same && PlanningSetupCodec.Write(same.Setup) == PlanningSetupCodec.Write(build.Setup)))
+        {
+            return null;
+        }
+
+        return Write(build);
+    }
+
     private string Write(PlanningSetupBuild build)
     {
         if (build.Setup is null)

@@ -42,6 +42,8 @@ public class MealWeekWorker : Worker
     {
         var context = ApplicationContext!;
         Constitution.Waiting.NoticePoster.Attach(context);
+        // The household Foreword owns is met first, so the week is planned for who lives here now (never throws).
+        Constitution.Household.ConstitutionPeople.For(ApplicationContext!).RefreshAsync(CancellationToken.None).GetAwaiter().GetResult();
         try
         {
             // WorkManager calls this on its own background thread, so waiting here blocks nothing the owner sees.
