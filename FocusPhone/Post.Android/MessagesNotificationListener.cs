@@ -6,7 +6,9 @@ using Codex.Domain.Timeline;
 namespace Post;
 
 /// <summary>
-/// Google Messages' notifications, read for three jobs. It is the bridge's doorbell: a
+/// Google Messages' notifications, read for four jobs. Each new incoming message becomes
+/// Post's own notification and buzz (<see cref="TextAlerts"/>), since Messages' cannot be
+/// seen or felt on the locked phone. It is the bridge's doorbell: a
 /// Messages notification reconnects the Messages-for-Web bridge if it was down (Android keeps
 /// Post's process alive while this listener is bound, which is what lets the bridge stay up
 /// without a notification of its own). It is the backup copy of a message caught while the
@@ -88,6 +90,7 @@ public class MessagesNotificationListener : NotificationListenerService
 
         var items = MessagingNoticeMapper.Map(notice, ContactKey);
         Cache(items.ToList());
+        Alert(notice, items);
 
         var groupId = items.FirstOrDefault(item => item.IsGroup)?.GroupId;
         if (groupId is not null)
@@ -102,6 +105,37 @@ public class MessagesNotificationListener : NotificationListenerService
             }
         }
         return true;
+    }
+
+    // Messages' own notification cannot be seen or felt on the locked phone (the status bar
+    // is disabled, which silences every app's alerts, and Messages is off the shelf), so a
+    // new incoming message here becomes Post's notification and buzz.
+    private void Alert(MessagingNotice notice, IReadOnlyList<TimelineItem> items)
+    {
+        try
+        {
+            var conversation = TextAlerts.ConversationOf(notice);
+            var heardThrough = conversation is null ? null : TextAlertMemory.HeardThrough(this, conversation);
+            var alert = TextAlerts.Decide(notice, ContactKey, heardThrough, DateTimeOffset.UtcNow);
+            if (alert is null)
+            {
+                return;
+            }
+            if (conversation is not null)
+            {
+                TextAlertMemory.Remember(this, conversation, alert.HeardThrough);
+            }
+            var latest = items.LastOrDefault(item => item.Incoming && item.TimestampUtc == alert.HeardThrough);
+            if (latest is not null)
+            {
+                SmsNotifications.NotifyIncoming(this, alert, latest);
+                PostDiagnostics.LogText("Notifications", $"Alerted for an arriving text; new messages {alert.Count}");
+            }
+        }
+        catch (Exception e)
+        {
+            PostDiagnostics.LogWarning("Notifications", "Could not alert for an arriving text", e);
+        }
     }
 
     private void Cache(List<TimelineItem> items)

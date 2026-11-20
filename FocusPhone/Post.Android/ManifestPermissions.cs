@@ -13,6 +13,9 @@ using Android;
 [assembly: UsesPermission(Manifest.Permission.CallPhone)]
 [assembly: UsesPermission(Manifest.Permission.ReadContacts)]
 [assembly: UsesPermission(Manifest.Permission.PostNotifications)]
+// Post buzzes for an arriving text itself: the locked phone's disabled status bar silences
+// every notification's own vibration (SmsNotifications). A normal permission, granted at install.
+[assembly: UsesPermission(Manifest.Permission.Vibrate)]
 [assembly: UsesPermission(Manifest.Permission.Internet)]
 
 // The unified inbox's destructive writes: WRITE_CALL_LOG deletes a call/voicemail
