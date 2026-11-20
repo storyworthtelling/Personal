@@ -52,7 +52,7 @@ public sealed class SettingsArea(Activity host)
 
     private readonly PillarStore pillarStore = new(host);
     private readonly EquipmentStore equipmentStore = new(host);
-    private readonly HouseholdSetupStore householdStore = new(host);
+    private readonly HouseholdSetupStore householdStore = new HouseholdSetupStore(host, () => ConstitutionHousehold.For(host).Service.Roster);
     private readonly ConstitutionConnections connections = new(host);
     private readonly VoiceGoogleAccount googleAccount = ConstitutionGoogle.Create();
 

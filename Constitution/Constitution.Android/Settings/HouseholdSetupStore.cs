@@ -1,5 +1,6 @@
 using Android.Content;
 using Constitution.Domain.Calendar;
+using Constitution.Domain.Household;
 using Constitution.Domain.Settings;
 using Constitution.Infrastructure.Workouts;
 using Constitution.WorkoutDelivery;
@@ -12,7 +13,7 @@ namespace Constitution.Settings;
 /// Household group reads it to show what is set and writes it when a choice changes. Every ending is a plain sentence for the group
 /// to show inline; nothing here throws for an expected failure and nothing is written over a file that cannot be read.
 /// </summary>
-public sealed class HouseholdSetupStore(Context context)
+public sealed class HouseholdSetupStore(Context context, Func<RosterView?> roster)
 {
     private readonly string path = Path.Combine(
         WorkoutWeekPaths.Folder(
@@ -22,15 +23,19 @@ public sealed class HouseholdSetupStore(Context context)
 
     public HouseholdSetupRead Read() => PlanningSetupFile.Read(path);
 
-    /// <summary>Applies the choices to the adults the saved setup names, and writes it. Returns what to say.</summary>
+    /// <summary>
+    /// Applies the choices to the household file's adults (or, with no household file, the adults the saved setup names), and writes it.
+    /// Returns what to say.
+    /// </summary>
     public string Save(HouseholdChoices choices)
     {
-        if (Read() is not HouseholdSetupRead.Configured configured)
+        var build = PlanningSetupFromRoster.ForSave(roster(), Read(), choices);
+        if (!build.CanWrite)
         {
             return "There is no adult to plan for yet. Add one below, or wait for the household file.";
         }
 
-        return Write(PlanningSetupFromRoster.Apply(configured.Setup, choices));
+        return Write(build);
     }
 
     /// <summary>

@@ -46,6 +46,26 @@ public static class PlanningSetupFromRoster
         return Compose(adults, roster.Children.Count == 0, choices);
     }
 
+    /// <summary>
+    /// What the Household group writes when a choice is saved: the household file's roster names the adults whenever there is one (so a
+    /// setup file that names nobody yet never refuses a save), else the adults the saved setup names take the choices, else there is no
+    /// adult and nothing can be written.
+    /// </summary>
+    public static PlanningSetupBuild ForSave(RosterView? roster, HouseholdSetupRead saved, HouseholdChoices choices)
+    {
+        ArgumentNullException.ThrowIfNull(saved);
+        ArgumentNullException.ThrowIfNull(choices);
+
+        if (roster is not null && roster.Adults.Any())
+        {
+            return Build(roster, choices);
+        }
+
+        return saved is HouseholdSetupRead.Configured configured
+            ? Apply(configured.Setup, choices)
+            : new PlanningSetupBuild(null, [SetupGap.NoAdults]);
+    }
+
     /// <summary>With no roster to read, the adults a saved setup already names take the new choices.</summary>
     public static PlanningSetupBuild Apply(PlanningSetup existing, HouseholdChoices choices)
     {
