@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Storyworthtelling.People\Storyworthtelling.People.csproj" />
     <ProjectReference Include="..\Storyworthtelling.Household\Storyworthtelling.Household.csproj" />
+    <ProjectReference Include="..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
   </ItemGroup>
 
 </Project>

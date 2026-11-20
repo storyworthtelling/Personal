@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:BinderPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:kit="clr-namespace:Storyworthtelling.Maui.Views;assembly=Storyworthtelling.Maui"
+             xmlns:pages="clr-namespace:Foreword.Android.Pages"
+             x:Class="Foreword.Android.Pages.HouseholdPage"
+             Title="Household">
+    <!--
+        The household every app reads (Storyworthtelling.People): who lives here, their Google accounts, pickup, birthdays and
+        calendars, and the family calendar, dinner and bedtime. Foreword owns it; on the owner's phone it is edited here, on the
+        partner's it is read. NOT IN THE APPROVED MOCKUP SET: it grew out of the Columns screen (one column per person), in that
+        screen's grammar: one card of rows, Move rather than drag, segmented controls rather than switches (§8), a pinned bottom
+        bar, and no Save. Removing a person is undo-first (§5).
+    -->
+    <Grid RowDefinitions="*,Auto">
+
+        <ScrollView Grid.Row="0">
+            <VerticalStackLayout Padding="{StaticResource ScreenPadding}" Spacing="0">
+
+                <Label Text="Everyone in the household, for every app. One column each on The Day, left to right as they print; Watch always prints last."
+                       Style="{StaticResource CardCaption}" />
+
+                <Label x:Name="StatusLabel" Style="{StaticResource StatusLine}" IsVisible="False" />
+                <Button x:Name="UndoButton" Text="Put it back" IsVisible="False"
+                        Style="{StaticResource QuietButton}" HorizontalOptions="Start"
+                        Clicked="OnUndoClicked" />
+
+                <Border Style="{StaticResource GroupCard}" Margin="0,16,0,0">
+                    <VerticalStackLayout x:Name="People" />
+                </Border>
+                <Label Text="An own Google account means they can be invited, so an invitation to their address puts the event in their column. Anyone without one gets a calendar of their own, made for them."
+                       Style="{StaticResource CardCaption}" />
+
+                <Border Style="{StaticResource GroupCard}" Margin="0,24,0,0">
+                    <VerticalStackLayout x:Name="Rhythm" />
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <kit:PaperBar Grid.Row="1">
+                <Button x:Name="AddButton" Text="Add a person" Clicked="OnAddClicked" />
+        </kit:PaperBar>
+    </Grid>
+</pages:BinderPage>

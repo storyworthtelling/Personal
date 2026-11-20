@@ -28,6 +28,8 @@ internal static class Morning
                 : null),
             new(MorningDocument.Day, daily is null ? null : async () =>
             {
+                // The household's people are the columns: meet it first, so a person added or renamed yesterday prints today.
+                await ForewordHousehold.RefreshAsync(services, CancellationToken.None);
                 await daily.EnsureColumnCalendars();
                 var day = await daily.DeliverDailyDocuments(today);
                 CredentialStore.UnreadableCalendars = UnreadableCalendarNotice.Store(day.UnreadableCalendars);

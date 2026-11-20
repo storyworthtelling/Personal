@@ -41,6 +41,8 @@ public class MainActivity : MauiAppCompatActivity
         {
             var sync = IPlatformApplication.Current!.Services.GetRequiredService<VaultSync>();
             sync.RestoreAtLaunchAsync(CancellationToken.None).GetAwaiter().GetResult();
+            // The vault's owner is known now, so whose household this is: meet the household and bring the columns in step.
+            ForewordHousehold.RefreshAsync(IPlatformApplication.Current!.Services, CancellationToken.None).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
