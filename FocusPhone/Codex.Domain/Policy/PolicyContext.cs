@@ -22,7 +22,9 @@ public record PolicyContext(
     // The package that runs the swipe-up gesture and recents (SystemRecents). It is usually also an
     // "other home", but it must stay runnable or leaving an app opens the suspension dialog instead
     // of Flyleaf. Null when the platform names none.
-    string? SystemRecentsPackage = null)
+    string? SystemRecentsPackage = null,
+    // Every account type the device knows, with the package that registers it (AccountLock).
+    IReadOnlyCollection<AccountAuthenticator>? Authenticators = null)
 {
     // Every first-party app the owner ships lives under this namespace. Anything
     // matching it is known-good: the categorizer clears it outright so a

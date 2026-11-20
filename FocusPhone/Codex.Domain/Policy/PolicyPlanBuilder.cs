@@ -29,8 +29,10 @@ public static class PolicyPlanBuilder
 
         // Accounts are added and removed only inside the owner's Admin session (owner's ruling, audit W7).
         // A token refresh or a consent screen for an existing account is not a modification, so the apps'
-        // sign-ins keep working; adding a new account waits for Admin mode.
-        if (!context.AdminModeActive)
+        // sign-ins keep working; adding a new account waits for Admin mode. An app that signs in by adding
+        // an account of its own (Cigna) is the exception: AccountLock locks every other type instead.
+        var accounts = AccountLock.Decide(context.AdminModeActive, context.Authenticators ?? []);
+        if (accounts.RestrictAll)
         {
             restrictions.Add(AndroidUserRestrictions.NoModifyAccounts);
         }
@@ -111,6 +113,7 @@ public static class PolicyPlanBuilder
             // LoginBrowserUrlAllowlist whenever Chrome is allowed to run at all.
             LoginBrowser: new LoginBrowserPolicy(
                 PolicyContext.LoginBrowserPackage, PolicyContext.LoginBrowserUrlAllowlist,
-                BlockNonAllowlisted: context.AdminModeActive));
+                BlockNonAllowlisted: context.AdminModeActive),
+            LockedAccountTypes: accounts.LockedTypes);
     }
 }
