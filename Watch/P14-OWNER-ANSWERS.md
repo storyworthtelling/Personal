@@ -212,3 +212,7 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   along its length as the track plays, its height the volume, flat when paused; tap the wave to pause,
   the left or right edge to go back or skip), and Dash's tile is the dash glyph with the newest name in
   full and earlier names fading, no count. Everything else in round 1 stands.
+- **A73 — TIDAL looks no different on the watch, as on the phone (the merged-library rule).** A streamed
+  track uses the same wave, words and controls as an owned one and names no service; only the quiet
+  line says where it is playing ("Playing on phone"). With the phone away, a streamed track stays in
+  the library and says "Needs your phone nearby" (A62).

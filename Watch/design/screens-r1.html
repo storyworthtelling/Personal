@@ -210,7 +210,7 @@ const SECTIONS = [
         t(c, "ember-tide-orchard", R, R * 0.96, R * 0.08, INK); t(c, "Shown so you can check it", R, R * 1.26, R * 0.065, SOFT);
         pill(c, R, R * 1.54, R * 0.7, "Unlock", day("Dash", 1, 0.08)); } },
     ] },
-  { tag: "Wave", title: "Music and podcasts", about: "Wave opens on Now playing (A19), which in round 2 is the wave itself, with no play or skip buttons: tap the wave to pause or play, tap the left or right edge to go back or skip, and turn the crown to make the wave taller or shallower. Everything streams over LTE, nothing downloads (A17). Whoever starts playback owns it, with one line to switch (A20). Cadence sets the tempo on runs and walks (A21). TIDAL is a remote for Score on the phone, only while the phone is nearby (A62).",
+  { tag: "Wave", title: "Music and podcasts", about: "Wave opens on Now playing (A19), which in round 2 is the wave itself, with no play or skip buttons: tap the wave to pause or play, tap the left or right edge to go back or skip, and turn the crown to make the wave taller or shallower. Everything streams over LTE, nothing downloads (A17). Whoever starts playback owns it, with one line to switch (A20). Cadence sets the tempo on runs and walks (A21). As on the phone, a streamed TIDAL track looks no different from your own: same wave, no service named. It plays through the phone, so it needs the phone nearby (A62, A73).",
     screens: [
       { name: "Now playing", note: "Round 2: the wave fills the screen and brightens as the track plays; its height is the volume (A19)", draw(c, R) { topTime(c, R);
         waveLine(c, R, { progress: 0.38, amp: 0.2, y: R * 0.9, span: 1.6, width: 0.055 });
@@ -240,12 +240,16 @@ const SECTIONS = [
         const col = day("Wave"); ring(c, R, 168 / 200, col);
         t(c, "steps per minute", R, R * 0.48, R * 0.065, SOFT); bigNum(c, R, "168", R * 0.76);
         t(c, "Music at 168", R, R * 1.06, R * 0.08, col, 500); t(c, fit(c, "Low Tide · The Juniper Trio", R * 1.4, R * 0.07), R, R * 1.36, R * 0.07, SOFT); } },
-      { name: "TIDAL on the phone", note: "A remote for Score's TIDAL, only with the phone nearby (A62)", draw(c, R) { topTime(c, R);
-        t(c, "Playing on phone", R, R * 0.42, R * 0.07, SOFT);
-        t(c, "Harbor Lights", R, R * 0.66, R * 0.11, INK, 600); t(c, "Robin Hale · TIDAL", R, R * 0.84, R * 0.075, SOFT);
-        const col = day("Wave"); c.strokeStyle = col; c.lineWidth = R * 0.02; c.beginPath(); c.arc(R, R * 1.2, R * 0.15, 0, TAU); c.stroke();
-        c.fillStyle = col; c.fillRect(R - R * 0.055, R * 1.13, R * 0.035, R * 0.14); c.fillRect(R + R * 0.02, R * 1.13, R * 0.035, R * 0.14);
-        t(c, "Play here instead", R, R * 1.55, R * 0.07, SOFT); } },
+      { name: "Playing on the phone", note: "Any track playing on the phone, owned or streamed, looks the same; only the quiet line says where (A20, A62)", draw(c, R) { topTime(c, R);
+        waveLine(c, R, { progress: 0.55, amp: 0.2, y: R * 0.9, span: 1.6, width: 0.055 });
+        edgeMarks(c, R, R * 0.9);
+        t(c, "Harbor Lights", R, R * 1.34, R * 0.1, INK, 600); t(c, "Robin Hale", R, R * 1.5, R * 0.07, SOFT);
+        t(c, "Playing on phone", R, R * 1.74, R * 0.06, "hsla(205 10% 64% / 0.6)"); } },
+      { name: "A streamed track, phone away", note: "It stays in the library; it needs the phone nearby, said as a quiet line (A62)", draw(c, R) { topTime(c, R);
+        waveLine(c, R, { progress: 0, paused: true, y: R * 0.9, span: 1.6, width: 0.055, alpha: 0.6 });
+        edgeMarks(c, R, R * 0.9);
+        t(c, "Harbor Lights", R, R * 1.34, R * 0.1, SOFT, 600); t(c, "Robin Hale", R, R * 1.5, R * 0.07, SOFT);
+        t(c, "Needs your phone nearby", R, R * 1.74, R * 0.06, "hsla(205 10% 64% / 0.8)"); } },
     ] },
   { tag: "Beat", title: "Workouts and the day", about: "Beat records. It does not plan or show plans beyond the session in hand (A25). You tap Start on today's workout (A25). Live heart rate is the only Body value the watch ever shows (A29). Only worrying exertion buzzes, with the words \"Ease off\" (A24). Everything else goes to the phone and the Saturday digest.",
     screens: [
