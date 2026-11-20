@@ -153,20 +153,23 @@ Four **load-bearing principles** survive from the pivot: **nudge never write** (
   - **Not yet run against the live model or a device.**
 - **The round table (release H, R28–R33, R40–R41).** After the reads, the seven readers talk about the book as a podcast hosted by Tae Boll.
   - **The rules** (`Folio.Domain/Reading/RoundTable.cs`, `RoundTablePlan`) decide who speaks and when it ends; the model decides only what is said.
-    - The host opens and hands the floor to whom it names (the quietest reader when it names nobody on the panel).
+    - **The show runs in rounds (owner's ruling, Nov 20).** The host speaks and hands the floor to whom it names (the quietest reader when it names nobody on the panel). Then every other reader gets a chance to come in (`RoundTable.Waiting`): first a reader who owes a rebuttal to someone who has spoken, then a reader the last line named, then the panel in order. A reader only offered a chance may pass (`RoundTableCue.MayPass`; the model replies `PASS`) when they would only echo; a pass leaves no line. A reader the host asked directly, or one owing a rebuttal, may not pass.
     - Every pair of scored readers three or more apart owes a rebuttal each way, and the host cannot close while one is owed.
-    - The cap is 15, 30 or 50 turns by length, host's included, a ceiling not a target. Past it, owed rebuttals are cued straight, then it closes.
+    - The cap is 15, 30 or 50 **rounds** by length (`RoundCap`, `RoundTable.Rounds`), a ceiling not a target. Past it, owed rebuttals are cued straight, then it closes.
     - A silent host still takes a turn, so it cannot loop.
+    - **One goodbye.** The host is told never to thank the panel or say time is up. A close the rules refuse has its words replaced by a plain hand-on ("Before we wrap up, pacing."), and an accepted close's words are dropped, so the closing step's words are the only farewell. (The Draft 4 show printed six sign-offs: the host thought time was up while the rules kept raising topics.)
+    - **The opening.** The first host move is told the show is starting. With no splits, it is told the panel landed close together and to go straight into the first topic, never "we've aired the splits".
     - **Two parts, in order (owner's ruling): the disagreements, then an open discussion through an agenda** (`RoundTableAgenda`).
       - The agenda always has structure, themes and characters, then every other topic a section read had something to say about (story integrity, setup and payoff, pacing, voice, series continuity, length), each with that section's summary as its why.
       - The agenda and cap are fixed when the show begins (`RoundTablePlan.Begin`). A topic counts only once the disagreements are done.
-      - The host may not close while a topic is unraised. An early close raises the next topic itself and cues the quietest reader to answer.
-      - Running long is accepted (owner's ruling): past the cap every unraised topic still gets a host turn and an answer.
+      - The host may not close while a topic is unraised. An early close raises the next topic itself and cues the quietest reader to start the round.
+      - The host is told the rounds left and how many topics remain, and to stay on a topic while the panel still has something to say.
+      - Running long is accepted (owner's ruling): past the cap every unraised topic still gets its round.
       - Host turns carry their part (`RoundTableTurn.Topic`), and the page heads each part ("Where they split", then each topic).
-  - **The calls** (`RoundTableHost`, `RoundTableSpeak`, `RoundTableClose`, strong model, `ClaudeOptions.RoundTableMaxTokens`) open with one cached block, the panel's reads, then the speaker's cached instruction; the transcript is the message.
+  - **The calls** (`RoundTableHost`, `RoundTableSpeak`, `RoundTableClose`, strong model, `ClaudeOptions.RoundTableMaxTokens`) all open with the same two cached system blocks: the panel's reads and the rules of the show (`RoundTableRules`, which asks for loose, quick talk). Then comes the transcript, one block per line with the cache mark on the last, so each call reads the call before it from the cache. The speaker's role and question come last, uncached. A round is up to eight calls against Folio's limiter of 5 a minute and 500 a day, so a novel's show can run into a second day.
     - Readers keep their scores and may concede in words.
     - The host never rules.
-  - **In the pipeline** it runs one turn a cycle, saved after each (`BookAnalysis.RoundTableJson`, migration `RoundTable`). It is the one unattended step not batched. The desk says "Round table — turn n of about N".
+  - **In the pipeline** it runs one line a cycle, saved after each (`BookAnalysis.RoundTableJson`, migration `RoundTable`). It is the one unattended step not batched. The desk says "Round table — round n of about N".
   - **It replaces the verdict.** The verdict synthesis pass is gone (sixteen passes), and the report prints a **Round table** section and tab (`FolioSheet.RoundTable`): the transcript by speaker name, then "Where they agree" and "Where they still differ". A report from before it keeps its verdict.
   - **Not yet run against the live model.**
 - **Regenerating reviewed books (release R).** Settings → Reports → *Regenerate reviewed books* opens a paper card (`RegenerationCard`) before anything is spent. It lists each project's latest finished draft with a rough cost (`RegenerationCost`: the measured $3.38 reads per 90k words plus an estimate, batched).

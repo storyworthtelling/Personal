@@ -1628,35 +1628,36 @@ public class ClaudeAnalysisClientTests
         [.. JsonDocument.Parse(body).RootElement.GetProperty("system").EnumerateArray()
             .Select(block => (block.GetProperty("text").GetString()!, block.TryGetProperty("cache_control", out _)))];
 
-    private static string UserOf(string body) =>
-        JsonDocument.Parse(body).RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
+    private static List<(string Text, bool Cached)> UserBlocksOf(string body) =>
+        [.. JsonDocument.Parse(body).RootElement.GetProperty("messages")[0].GetProperty("content").EnumerateArray()
+            .Select(block => (block.GetProperty("text").GetString()!, block.TryGetProperty("cache_control", out _)))];
+
+    private static string UserOf(string body) => string.Concat(UserBlocksOf(body).Select(block => block.Text));
 
     /// <summary>
-    /// Every round-table call opens with the same cached block, the panel's reads, so a show's thirty
-    /// calls share one prefix; the speaker's own instruction follows, and the transcript is the message.
+    /// Every round-table call, host's and readers' alike, opens with the same two cached blocks, the panel's
+    /// reads and the rules of the show; who is speaking comes last, after the transcript.
     /// </summary>
     [Fact]
-    public async Task EveryRoundTableCallOpensWithTheSameCachedPanel()
+    public async Task EveryRoundTableCallOpensWithTheSameCachedPanelAndRules()
     {
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"says\":\"Welcome.\",\"next\":\"agent\",\"ask\":\"What sold you?\",\"answering\":\"\",\"close\":false}"));
         handler.EnqueueOk(Reply("Hugo Hook: The opening line sold me."));
-        var table = RoundTable.Empty;
 
-        var move = await client.RoundTableHost(RoundTablePanel, table, [], 15, StoryLength.ShortStory, CancellationToken.None);
-        table = RoundTablePlan.Spoken(RoundTablePlan.Apply(RoundTable.Empty, move, RoundTablePanel) with { }, "x");
-        var said = await client.RoundTableSpeak(PersonaCatalogue.ById("agent"), RoundTablePanel, table,
-            new RoundTableCue("agent", "What sold you?"), CancellationToken.None);
+        var move = await client.RoundTableHost(RoundTablePanel, RoundTable.Empty, [], 15, StoryLength.ShortStory, CancellationToken.None);
+        var table = RoundTablePlan.Apply(RoundTable.Empty, move, RoundTablePanel);
+        var said = await client.RoundTableSpeak(PersonaCatalogue.ById("agent"), RoundTablePanel, table, table.Next!, CancellationToken.None);
 
         var host = SystemOf(handler.RequestBodies[0]);
         var speaker = SystemOf(handler.RequestBodies[1]);
-        Assert.Equal(host[0], speaker[0]);
-        Assert.True(host[0].Cached);
+        Assert.Equal(host, speaker);
+        Assert.All(host, block => Assert.True(block.Cached));
         Assert.Contains("Hugo Hook", host[0].Text);
         Assert.Contains("8/10", host[0].Text);
-        Assert.Contains("Tae Boll", host[1].Text);
-        Assert.Contains("You are Hugo Hook", speaker[1].Text);
-        Assert.Contains("score stays", speaker[1].Text);
+        Assert.Contains("score stays", host[1].Text);
+        Assert.Contains("You are Tae Boll", UserBlocksOf(handler.RequestBodies[0])[^1].Text);
+        Assert.Contains("You are Hugo Hook", UserBlocksOf(handler.RequestBodies[1])[^1].Text);
         Assert.Contains("Tae Boll: Welcome.", UserOf(handler.RequestBodies[1]));
         Assert.Contains("What sold you?", UserOf(handler.RequestBodies[1]));
 
@@ -1665,8 +1666,54 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("The opening line sold me.", said);
     }
 
+    /// <summary>
+    /// The transcript is one block per line, the last marked for the cache, so each call reads everything
+    /// before its newest line from the call before it.
+    /// </summary>
     [Fact]
-    public async Task TheHostIsToldTheTurnsLeftAndTheRebuttalsStillOwed()
+    public async Task TheTranscriptIsOneBlockPerLineAndEachCallExtendsTheLast()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("I liked it."));
+        handler.EnqueueOk(Reply("Me too, Hugo."));
+        var table = RoundTablePlan.Apply(RoundTable.Empty, new HostMove("Welcome.", "agent", "Hugo?", "", false), RoundTablePanel);
+
+        await client.RoundTableSpeak(PersonaCatalogue.ById("agent"), RoundTablePanel, table, table.Next!, CancellationToken.None);
+        table = RoundTablePlan.Spoken(table, "I liked it.");
+        await client.RoundTableSpeak(PersonaCatalogue.ById("harsh-critic"), RoundTablePanel, table,
+            new RoundTableCue("harsh-critic", "Come in.") { MayPass = true }, CancellationToken.None);
+
+        var first = UserBlocksOf(handler.RequestBodies[0]);
+        var second = UserBlocksOf(handler.RequestBodies[1]);
+        Assert.Equal(2, first.Count);
+        Assert.Equal(3, second.Count);
+        Assert.Equal(first[0].Text, second[0].Text);
+        Assert.True(second[1].Cached);
+        Assert.False(second[0].Cached);
+        Assert.False(second[^1].Cached);
+        Assert.Contains("Hugo Hook: I liked it.", second[1].Text);
+    }
+
+    /// <summary>A reader offered a chance to come in may pass; a reader asked directly may not.</summary>
+    [Fact]
+    public async Task AReaderOfferedAChanceMayPassButOneAskedDirectlyMayNot()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("PASS"));
+        handler.EnqueueOk(Reply("Pass."));
+        var table = RoundTablePlan.Apply(RoundTable.Empty, new HostMove("Welcome.", "agent", "Hugo?", "", false), RoundTablePanel);
+
+        var passed = await client.RoundTableSpeak(PersonaCatalogue.ById("harsh-critic"), RoundTablePanel, table,
+            new RoundTableCue("harsh-critic", "Come in.") { MayPass = true }, CancellationToken.None);
+
+        Assert.Equal(string.Empty, passed);
+        Assert.Contains("PASS", UserBlocksOf(handler.RequestBodies[0])[^1].Text);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.RoundTableSpeak(
+            PersonaCatalogue.ById("agent"), RoundTablePanel, table, table.Next!, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TheHostIsToldTheRoundsLeftAndTheRebuttalsStillOwed()
     {
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"says\":\"Nick?\",\"next\":\"harsh-critic\",\"ask\":\"Answer Hugo.\",\"answering\":\"agent\",\"close\":false}"));
@@ -1675,9 +1722,30 @@ public class ClaudeAnalysisClientTests
             RoundTablePlan.Owed(RoundTable.Empty, RoundTablePanel), 9, StoryLength.ShortStory, CancellationToken.None);
 
         var user = UserOf(handler.RequestBodies[0]);
-        Assert.Contains("9", user);
+        Assert.Contains("ROUNDS LEFT: about 9", user);
         Assert.Contains("Nick Picker should answer Hugo Hook", user);
         Assert.Equal("agent", move.Answering);
+    }
+
+    /// <summary>
+    /// The first move opens the show: a welcome, and, where the panel landed close together, saying so and
+    /// going into the first topic — never "we've aired the splits" when there were none.
+    /// </summary>
+    [Fact]
+    public async Task TheFirstMoveOpensTheShowAndSaysWhenThereWereNoSplits()
+    {
+        var (client, handler) = Create();
+        handler.EnqueueOk(Reply("{\"says\":\"Welcome!\",\"next\":\"agent\",\"ask\":\"Hugo?\",\"answering\":\"\",\"close\":false,\"topic\":\"Structure\"}"));
+        var agreeing = new[] { RoundTablePanel[0], RoundTablePanel[1] with { Score = 7 } };
+        var table = RoundTablePlan.Begin([new AgendaItem("Structure", "The middle sags.")], 15);
+
+        await client.RoundTableHost(agreeing, table, [], 15, StoryLength.ShortStory, CancellationToken.None);
+
+        var user = UserOf(handler.RequestBodies[0]);
+        Assert.Contains("THE SHOW IS STARTING", user);
+        Assert.Contains("landed close together", user);
+        Assert.Contains("no wide score splits", user);
+        Assert.DoesNotContain("have been aired", user);
     }
 
     /// <summary>
@@ -1692,14 +1760,17 @@ public class ClaudeAnalysisClientTests
         var agreeing = new[] { RoundTablePanel[0], RoundTablePanel[1] with { Score = 7 } };
         var table = RoundTablePlan.Begin(
             [new AgendaItem("Structure", "The middle sags."), new AgendaItem("Themes", ""), new AgendaItem("Characters", "")], 15)
-            with { Covered = ["Themes"] };
+            with { Covered = ["Themes"], Turns = [new RoundTableTurn(RoundTablePlan.HostId, "Hello.")] };
 
         var move = await client.RoundTableHost(agreeing, table, [], 15, StoryLength.ShortStory, CancellationToken.None);
 
         var user = UserOf(handler.RequestBodies[0]);
         Assert.Contains("OPEN DISCUSSION", user);
+        Assert.DoesNotContain("THE SHOW IS STARTING", user);
         Assert.Contains("Structure (still to raise): The middle sags.", user);
         Assert.Contains("Themes (raised)", user);
+        Assert.Contains("2 agenda topics still to raise", user);
+        Assert.Contains("Never thank the panel", user);
         Assert.Contains("disagreements", SystemOf(handler.RequestBodies[0])[1].Text);
         Assert.Equal("Structure", move.Topic);
     }
@@ -1715,7 +1786,7 @@ public class ClaudeAnalysisClientTests
     }
 
     [Fact]
-    public async Task TheCloseSaysGoodbyeAndSummarisesWithoutRuling()
+    public async Task TheCloseSaysTheOnlyGoodbyeAndSummarisesWithoutRuling()
     {
         var (client, handler) = Create();
         handler.EnqueueOk(Reply("{\"says\":\"Thanks, both.\",\"agreed\":[\"The prose sings\"],\"stillDiffer\":[\"Whether the plot holds\"]}"));
@@ -1725,6 +1796,8 @@ public class ClaudeAnalysisClientTests
         Assert.Equal("Thanks, both.", closing.Says);
         Assert.Equal(["The prose sings"], closing.Summary.Agreed);
         Assert.Equal(["Whether the plot holds"], closing.Summary.StillDiffer);
-        Assert.Contains("never", SystemOf(handler.RequestBodies[0])[1].Text);
+        var role = UserBlocksOf(handler.RequestBodies[0])[^1].Text;
+        Assert.Contains("only goodbye", role);
+        Assert.Contains("never", role);
     }
 }

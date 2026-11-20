@@ -12,8 +12,8 @@ public sealed record ReportProgress(
     public int ScenesJudged { get; init; }
     public int ScenesTotal { get; init; }
 
-    /// <summary>The round table's turns so far and its cap (release H); a cap of zero means it is not tracked.</summary>
-    public int RoundTableTurns { get; init; }
+    /// <summary>The round table's rounds so far and its cap (release H); a cap of zero means it is not tracked.</summary>
+    public int RoundTableRounds { get; init; }
     public int RoundTableCap { get; init; }
     public bool RoundTableClosed { get; init; }
 }
@@ -45,7 +45,10 @@ public static class ReportStep
 
         // Past the cap the owed rebuttals still run, so "about" is honest and the number never runs backwards.
         if (progress.RoundTableCap > 0 && !progress.RoundTableClosed)
-            return $"Round table — turn {progress.RoundTableTurns + 1} of about {Math.Max(progress.RoundTableCap, progress.RoundTableTurns + 1)}";
+        {
+            var round = Math.Max(1, progress.RoundTableRounds);
+            return $"Round table — round {round} of about {Math.Max(progress.RoundTableCap, round)}";
+        }
 
         return progress.JacketPending ? "Painting the jacket" : "Composing the report";
     }

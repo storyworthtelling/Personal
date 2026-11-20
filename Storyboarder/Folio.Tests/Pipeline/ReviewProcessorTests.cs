@@ -664,12 +664,14 @@ public class ReviewProcessorTests : IDisposable
 
         // The panel agrees (every reader scored 7), so the show goes straight to the open discussion. The host
         // asks to close early on every move after the first; each early close raises the next agenda topic
-        // instead, a reader answers it, and only once every topic has had its exchange does the show close.
+        // instead, and every reader has their chance in that round, so only once every topic has had its
+        // round does the show close.
         var agenda = table.Agenda.Select(item => item.Topic).ToList();
         Assert.Equal(["Structure", "Themes", "Characters"], agenda.Take(3));
         Assert.Contains("Pacing", agenda);
         Assert.Equal(agenda, table.Covered);
-        Assert.Equal(1 + agenda.Count, speakCalls);
+        Assert.Equal(PersonaCatalogue.Readers.Count * (1 + agenda.Count), speakCalls);
+        Assert.Equal(1 + agenda.Count, table.Rounds);
         Assert.Equal(agenda, table.Turns.Where(turn => turn.Speaker == RoundTablePlan.HostId && turn.Topic.Length > 0)
             .Select(turn => turn.Topic).Distinct());
         Assert.Equal("Goodnight, everyone.", table.Turns[^1].Words);
@@ -708,7 +710,8 @@ public class ReviewProcessorTests : IDisposable
         using var context = database.NewContext();
         var table = RoundTableCodec.Read(context.BookAnalyses.Single(a => a.NovelId == id).RoundTableJson);
         Assert.True(table.Closed);
-        Assert.Equal(hostCalls, table.Turns.Count(turn => turn.Speaker == RoundTablePlan.HostId) - 1);
+        // The host's last call asked to close and left no line; the closing words are the last host line.
+        Assert.Equal(hostCalls, table.Turns.Count(turn => turn.Speaker == RoundTablePlan.HostId));
         Assert.Equal(speakCalls - 1, table.Turns.Count(turn => turn.Speaker != RoundTablePlan.HostId));
         Assert.Equal("Second time lucky.", table.Turns.First(turn => turn.Speaker != RoundTablePlan.HostId).Words);
     }
@@ -859,9 +862,10 @@ public class ReviewProcessorTests : IDisposable
         Assert.Empty(await Projects().RegenerationCandidatesAsync(CancellationToken.None));
     }
 
+    // A round table is a round per agenda topic with every reader in each, so a show alone is dozens of cycles.
     private async Task DriveToCompletion(ReviewProcessor processor)
     {
-        for (var cycle = 0; cycle < 200; cycle++)
+        for (var cycle = 0; cycle < 1000; cycle++)
         {
             var result = await processor.ProcessNextAsync(CancellationToken.None);
             if (result.Outcome == ProcessOutcome.Idle)
