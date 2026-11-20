@@ -216,3 +216,4 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   track uses the same wave, words and controls as an owned one and names no service; only the quiet
   line says where it is playing ("Playing on phone"). With the phone away, a streamed track stays in
   the library and says "Needs your phone nearby" (A62).
+- **A74 — The screens are approved** (round 2 with A73). Next: the P14 plan.
