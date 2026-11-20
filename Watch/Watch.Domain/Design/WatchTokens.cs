@@ -1,0 +1,97 @@
+namespace Watch.Domain.Design;
+
+/// <summary>The four watch apps (WD §3). Each is its own shape and its own day colour.</summary>
+public enum WatchApp
+{
+    Point,
+    Dash,
+    Wave,
+    Beat,
+}
+
+/// <summary>An app's day range (WD §4.2): <see cref="Night"/> at midnight, <see cref="Day"/> at noon.</summary>
+public readonly record struct DayRange(Oklch Night, Oklch Day);
+
+/// <summary>
+/// A haptic shape (WD §7): <see cref="Timings"/> alternate on, off, on … in milliseconds, starting
+/// with an on; <see cref="Strengths"/> give each segment's strength, 0–255 (an off segment is 0).
+/// </summary>
+public sealed record HapticPattern(string Name, IReadOnlyList<int> Timings, IReadOnlyList<int> Strengths, bool Repeats);
+
+/// <summary>
+/// The watch's design language in one place (WD §13, P14 W-1.1.1): the day colour ranges, the three
+/// type sizes, the four haptic shapes, the motion durations and the typeface. No other file in
+/// <c>Watch/</c> may hold a colour or a type size (<c>WatchLeakGuardTests</c>).
+/// </summary>
+public static class WatchTokens
+{
+    /// <summary>IBM Plex Mono, the one family for words and numerals (WD §5, O3).</summary>
+    public const string Typeface = "IBM Plex Mono";
+
+    private static readonly DayRange PointRange = new(new Oklch(0.62, 0.19, 300), new Oklch(0.82, 0.10, 170));
+    private static readonly DayRange DashRange = new(new Oklch(0.30, 0.10, 262), new Oklch(0.32, 0.12, 15));
+    private static readonly DayRange WaveRange = new(new Oklch(0.62, 0.03, 250), new Oklch(0.80, 0.16, 75));
+    private static readonly DayRange BeatRange = new(new Oklch(0.38, 0.09, 150), new Oklch(0.63, 0.24, 27));
+
+    /// <summary>
+    /// The app's day range: Point violet to seafoam, Dash navy to maroon, Wave slate to amber, Beat
+    /// forest green to bright red (WD §4.2). Dark ends are drawn as named, with no lightness floor (O2).
+    /// </summary>
+    public static DayRange RangeOf(WatchApp app) => app switch
+    {
+        WatchApp.Point => PointRange,
+        WatchApp.Dash => DashRange,
+        WatchApp.Wave => WaveRange,
+        WatchApp.Beat => BeatRange,
+        _ => throw new ArgumentOutOfRangeException(nameof(app), app, "Not one of the four watch apps."),
+    };
+
+    /// <summary>
+    /// The three type sizes, in sp (WD §5). These are first values, to be settled on the wrist.
+    /// </summary>
+    public static class Type
+    {
+        /// <summary>A name or a time: the largest.</summary>
+        public const float Glance = 20f;
+
+        /// <summary>The one short sentence.</summary>
+        public const float Line = 15f;
+
+        /// <summary>Relative times and the date.</summary>
+        public const float Small = 12f;
+    }
+
+    /// <summary>The four haptic shapes, one meaning each (WD §7, A35, O4); settled on the wrist.</summary>
+    public static class Haptics
+    {
+        /// <summary>A call is ringing: long, gap, long, repeating while it rings.</summary>
+        public static HapticPattern Call { get; } = new("Call", [500, 250, 500], [192, 0, 192], Repeats: true);
+
+        /// <summary>A text arrived: two short taps.</summary>
+        public static HapticPattern Text { get; } = new("Text", [80, 120, 80], [160, 0, 160], Repeats: false);
+
+        /// <summary>A workout rest is over: one long press.</summary>
+        public static HapticPattern RestEnd { get; } = new("RestEnd", [900], [192], Repeats: false);
+
+        /// <summary>Worrying exertion: three slow pulses at full strength, the strongest shape.</summary>
+        public static HapticPattern EaseOff { get; } = new("EaseOff", [300, 300, 300, 300, 300], [255, 0, 255, 0, 255], Repeats: false);
+
+        public static IReadOnlyList<HapticPattern> All { get; } = [Call, Text, RestEnd, EaseOff];
+    }
+
+    /// <summary>Motion durations in milliseconds (WD §8). Reduced motion and always-on remove all of it.</summary>
+    public static class Motion
+    {
+        /// <summary>A fade in or out.</summary>
+        public const int FadeMs = 250;
+
+        /// <summary>The face's shape changing on the hour.</summary>
+        public const int HourCrossfadeMs = 1000;
+
+        /// <summary>Wave's tempo crossfade, shortest (A21).</summary>
+        public const int TempoCrossfadeMinMs = 5000;
+
+        /// <summary>Wave's tempo crossfade, longest (A21).</summary>
+        public const int TempoCrossfadeMaxMs = 6000;
+    }
+}
