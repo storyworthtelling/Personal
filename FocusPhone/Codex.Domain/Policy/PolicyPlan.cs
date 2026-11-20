@@ -13,7 +13,11 @@ public record PolicyPlan(
     bool EnforceAutoTime,
     string PrivateDnsHost,
     bool DisableStatusBar,
-    LoginBrowserPolicy LoginBrowser);
+    LoginBrowserPolicy LoginBrowser,
+    // Account types locked one by one (setAccountManagementDisabled) in place of the device-wide
+    // no_modify_accounts restriction, while an exempt app is installed (AccountLock). Every other
+    // type the device knows is unlocked, so a type locked by an earlier pass is released.
+    IReadOnlySet<string> LockedAccountTypes);
 
 /// <summary>
 /// Chrome's managed configuration for the login browser. Incognito is always disabled. When

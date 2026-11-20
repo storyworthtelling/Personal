@@ -59,7 +59,33 @@ public static class PolicyManager
             DebuggingLockedDown: store.DebuggingLockedDown,
             NeverVisiblePackages: QueryNeverVisiblePackages(context),
             AdminModeActive: adminModeActive,
-            SystemRecentsPackage: QuerySystemRecentsPackage(context));
+            SystemRecentsPackage: QuerySystemRecentsPackage(context),
+            Authenticators: QueryAuthenticators(context));
+    }
+
+    // Every account type the device knows and the package registering it, for AccountLock.
+    private static IReadOnlyCollection<AccountAuthenticator> QueryAuthenticators(Context context) =>
+        Android.Accounts.AccountManager.Get(context)!.GetAuthenticatorTypes()
+            .Where(d => !string.IsNullOrEmpty(d.Type) && !string.IsNullOrEmpty(d.PackageName))
+            .Select(d => new AccountAuthenticator(d.Type!, d.PackageName!))
+            .ToList();
+
+    // Locks each account type the plan names and unlocks every other the device knows, so a type an
+    // earlier pass locked is released when the plan drops it (Admin mode, or the exempt app removed).
+    private static void ApplyAccountLocks(Context context, DevicePolicyManager dpm, ComponentName admin, PolicyPlan plan, List<PolicyEvent> events)
+    {
+        foreach (var authenticator in QueryAuthenticators(context).Select(a => a.Type).Distinct())
+        {
+            try
+            {
+                dpm.SetAccountManagementDisabled(admin, authenticator, plan.LockedAccountTypes.Contains(authenticator));
+            }
+            catch (Java.Lang.Exception e)
+            {
+                HeadLog.Warn(Tag, $"Could not set the account lock on {authenticator}: {DescribeThrowable(e)}");
+                events.Add(Event(PolicyEventKind.ConfigFailed, $"Couldn’t set the account lock on {authenticator}: {DescribeThrowable(e)}"));
+            }
+        }
     }
 
     /// <summary>
@@ -74,6 +100,10 @@ public static class PolicyManager
         var dpm = (DevicePolicyManager)context.GetSystemService(Context.DevicePolicyService)!;
         var admin = AdminComponent(context);
         var events = new List<PolicyEvent>();
+
+        // Per-type account locks go on before the device-wide restriction can be cleared below, so
+        // there is no moment with neither in force.
+        ApplyAccountLocks(context, dpm, admin, plan, events);
 
         foreach (var restriction in plan.UserRestrictions)
         {
