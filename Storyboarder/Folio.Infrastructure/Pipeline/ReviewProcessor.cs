@@ -2177,7 +2177,7 @@ public sealed class ReviewProcessor : IPipelineStep
         // The agenda and cap are fixed as the show begins (owner's ruling: disagreements first, then structure,
         // themes, characters and whatever else the reads raised).
         if (table.Turns.Count == 0 && table.Agenda.Count == 0)
-            table = RoundTablePlan.Begin(RoundTableAgenda.For(await ReadSections(db, novel.Id, cancellationToken)), RoundTablePlan.TurnCap(length));
+            table = RoundTablePlan.Begin(RoundTableAgenda.For(await ReadSections(db, novel.Id, cancellationToken)), RoundTablePlan.RoundCap(length));
         var step = RoundTablePlan.Next(table, reviews, length);
         if (reviews.Count == 0 || step.Kind == RoundTableStepKind.Done)
         {
@@ -2197,7 +2197,7 @@ public sealed class ReviewProcessor : IPipelineStep
                 case RoundTableStepKind.HostTurn:
                     var move = await claude.RoundTableHost(
                         reviews, table, RoundTablePlan.Owed(table, reviews),
-                        Math.Max(0, table.Cap - table.Turns.Count), length, cancellationToken);
+                        RoundTablePlan.RoundsLeft(table, length), length, cancellationToken);
                     table = RoundTablePlan.Apply(table, move, reviews);
                     break;
                 case RoundTableStepKind.ReaderTurn:

@@ -68,6 +68,12 @@ public static class RoundTableAgenda
 public sealed record RoundTableCue(string Speaker, string Ask)
 {
     public string Answering { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Whether the reader may pass: true when they are only offered a chance to come in on the round, false
+    /// when the host asked them directly or they owe a rebuttal.
+    /// </summary>
+    public bool MayPass { get; init; }
 }
 
 /// <summary>Where the readers ended up (R32): what they agreed on, and where they still differ. No ruling.</summary>
@@ -121,8 +127,14 @@ public sealed record RoundTable(IReadOnlyList<RoundTableTurn> Turns)
     /// <summary>The agenda topics raised in the open discussion so far.</summary>
     public IReadOnlyList<string> Covered { get; init; } = [];
 
-    /// <summary>The turn cap, fixed when the show begins; zero when it was not (a table from before the agenda).</summary>
+    /// <summary>The round cap, fixed when the show begins; zero when it was not (a table from before the agenda).</summary>
     public int Cap { get; init; }
+
+    /// <summary>The rounds held so far: each opens with a host turn.</summary>
+    public int Rounds { get; init; }
+
+    /// <summary>The readers still to have their chance in this round, in panel order.</summary>
+    public IReadOnlyList<string> Waiting { get; init; } = [];
 
     [JsonIgnore]
     public bool Closed => Summary is not null;
@@ -132,14 +144,17 @@ public sealed record RoundTable(IReadOnlyList<RoundTableTurn> Turns)
 /// The rules of the round table (release H, R28–R33, R40). The model decides what is said; these decide
 /// who may say it, what is owed, and when it ends:
 /// <list type="bullet">
-/// <item>The host opens, and speaks between readers, handing to whom it names.</item>
+/// <item>The show runs in rounds (owner's ruling). The host opens each, handing to whom it names; then every
+/// other reader gets a chance to come in, a reader named in the last line first, and may pass when they
+/// would only echo what has been said. The host speaks again once the round is done.</item>
 /// <item>Every split owes two rebuttals, one each way (R30); the host may not close while one is owed.</item>
 /// <item>The show runs in two parts (owner's ruling): the disagreements while any rebuttal is owed, then an
 /// open discussion through the agenda. The host may not close while a topic is unraised; a close it asks
 /// for early raises the next topic instead.</item>
-/// <item>The show is capped by the manuscript's length (R33, R40) — a cap, not a quota, and the agenda wins
-/// over it (owner's ruling: running long is fine). Past it, owed rebuttals are cued straight, every unraised
-/// topic still gets a host turn and a reader's answer, and then the show closes.</item>
+/// <item>The show is capped in rounds by the manuscript's length (R33, R40) — a cap, not a quota, and the
+/// agenda wins over it (owner's ruling: running long is fine). Past it, owed rebuttals are cued straight,
+/// every unraised topic still gets its round, and then the show closes.</item>
+/// <item>A close the rules refuse is not a goodbye: the host's words are replaced by a plain hand-on.</item>
 /// </list>
 /// </summary>
 public static class RoundTablePlan
@@ -153,8 +168,8 @@ public static class RoundTablePlan
         "warm, curious and quick; a podcast host who keeps the conversation moving, hands the floor to whoever was just "
         + "named or disagreed with, asks the follow-up a listener would, and never says who is right";
 
-    /// <summary>The most turns, host's included, for a manuscript of this length (R40).</summary>
-    public static int TurnCap(StoryLength length) => length switch
+    /// <summary>The most rounds for a manuscript of this length (R40): a round is the host and every reader.</summary>
+    public static int RoundCap(StoryLength length) => length switch
     {
         StoryLength.ShortStory => 15,
         StoryLength.Novella => 30,
@@ -226,8 +241,9 @@ public static class RoundTablePlan
             return new RoundTableStep(RoundTableStepKind.ReaderTurn, cue);
         if (table.CloseAsked)
             return new RoundTableStep(RoundTableStepKind.Close);
-        var cap = table.Cap > 0 ? table.Cap : TurnCap(length);
-        if (table.Turns.Count >= cap)
+        if (table.Waiting.Count > 0)
+            return new RoundTableStep(RoundTableStepKind.ReaderTurn, NextInRound(table, reviews));
+        if (RoundsLeft(table, length) == 0)
         {
             if (Owed(table, reviews) is { Count: > 0 } owed)
                 return new RoundTableStep(RoundTableStepKind.ReaderTurn, owed[0]);
@@ -237,6 +253,38 @@ public static class RoundTablePlan
         }
         return new RoundTableStep(RoundTableStepKind.HostTurn);
     }
+
+    /// <summary>The rounds left under the cap; zero once it is reached.</summary>
+    public static int RoundsLeft(RoundTable table, StoryLength length) =>
+        Math.Max(0, (table.Cap > 0 ? table.Cap : RoundCap(length)) - table.Rounds);
+
+    // Who comes in next in this round: a reader owing an answer to someone who has spoken, then a reader the
+    // last line named, then the panel in order.
+    private static RoundTableCue NextInRound(RoundTable table, IReadOnlyList<Review> reviews)
+    {
+        var spoken = table.Turns.Select(turn => turn.Speaker).ToHashSet();
+        if (Owed(table, reviews).FirstOrDefault(cue => table.Waiting.Contains(cue.Speaker) && spoken.Contains(cue.Answering)) is { } owed)
+            return owed;
+        var last = table.Turns.Count > 0 ? table.Turns[^1].Words : string.Empty;
+        var speaker = table.Waiting.FirstOrDefault(id => Mentions(last, id)) ?? table.Waiting[0];
+        return new RoundTableCue(speaker,
+            "Come in on what’s being said: reply to whoever you like, by name. If you would only be echoing what "
+            + "someone has already said, pass.")
+        {
+            MayPass = true,
+        };
+    }
+
+    // Whether these words name the reader: their full name, or their first name unless it is a title.
+    private static bool Mentions(string words, string speaker)
+    {
+        var name = Name(speaker);
+        var first = name.Split(' ')[0];
+        return NamedIn(words, name) || (!first.EndsWith('.') && NamedIn(words, first));
+    }
+
+    private static bool NamedIn(string words, string name) =>
+        System.Text.RegularExpressions.Regex.IsMatch(words, $@"(?<![\p{{L}}]){System.Text.RegularExpressions.Regex.Escape(name)}(?![\p{{L}}])");
 
     /// <summary>
     /// The table after the host's move: its words in the transcript, then the cue it asked for — or, when it
@@ -248,7 +296,7 @@ public static class RoundTablePlan
         ArgumentNullException.ThrowIfNull(move);
         var panel = reviews.Select(review => review.PersonaId).ToList();
         var phase = Phase(table, reviews);
-        var pastCap = table.Cap > 0 && table.Turns.Count >= table.Cap;
+        var pastCap = table.Cap > 0 && table.Rounds >= table.Cap;
         string Quietest(RoundTable at) =>
             panel.OrderBy(id => at.Turns.Count(turn => turn.Speaker == id)).ThenBy(panel.IndexOf).First();
 
@@ -273,16 +321,24 @@ public static class RoundTablePlan
         if (move.Close)
         {
             var owed = Owed(spoken, reviews);
-            if (owed.Count > 0)
-                return spoken with { Next = owed[0] };
-            if (raised is null)
-                return spoken with { CloseAsked = true, Next = null };
+            // The host's words on a close are dropped: the closing step says the show's only goodbye.
+            if (owed.Count == 0 && raised is null)
+                return table with { Covered = covered, CloseAsked = true, Next = null, Waiting = [] };
 
-            // A close asked for with a topic still unraised raises it instead, and a reader answers.
-            var answerer = Quietest(spoken);
-            if (string.IsNullOrWhiteSpace(move.Says))
-                spoken = spoken with { Turns = [.. spoken.Turns, new RoundTableTurn(HostId, $"Before we wrap up: {raised.Topic.ToLowerInvariant()}.") { Topic = raised.Topic }] };
-            return spoken with { Next = new RoundTableCue(answerer, TopicAsk(raised)) };
+            // A close the rules refuse is not a goodbye: the host's words are dropped and a plain hand-on
+            // takes their place, then the round runs as any other.
+            var refused = table with { Covered = covered };
+            if (owed.Count > 0)
+            {
+                var cue = owed[0];
+                refused = refused with { Turns = [.. refused.Turns, new RoundTableTurn(HostId,
+                    $"Before we go on: {Name(cue.Speaker)}, {Name(cue.Answering)} is waiting on your answer.") { Topic = topic }] };
+                return StartRound(refused, cue, panel);
+            }
+            var answerer = Quietest(refused);
+            refused = refused with { Turns = [.. refused.Turns, new RoundTableTurn(HostId,
+                $"Before we wrap up, {raised!.Topic.ToLowerInvariant()}. {Name(answerer)}, start us off?") { Topic = raised.Topic }] };
+            return StartRound(refused, new RoundTableCue(answerer, TopicAsk(raised)), panel);
         }
 
         var speaker = panel.Contains(move.Speaker?.Trim() ?? string.Empty) ? move.Speaker!.Trim() : Quietest(spoken);
@@ -291,27 +347,44 @@ public static class RoundTablePlan
         if (string.IsNullOrWhiteSpace(move.Says))
             spoken = spoken with { Turns = [.. spoken.Turns, new RoundTableTurn(HostId, $"Over to you, {Name(speaker)}.") { Topic = topic }] };
         var forced = raised is not null && !string.Equals(raised.Topic, move.Topic?.Trim(), StringComparison.OrdinalIgnoreCase);
-        return spoken with
+        return StartRound(spoken, new RoundTableCue(speaker, forced ? TopicAsk(raised!) : move.Ask?.Trim() ?? string.Empty)
         {
-            Next = new RoundTableCue(speaker, forced ? TopicAsk(raised!) : move.Ask?.Trim() ?? string.Empty)
-            {
-                Answering = !forced && panel.Contains(answering) && answering != speaker ? answering : string.Empty,
-            },
-        };
+            Answering = !forced && panel.Contains(answering) && answering != speaker ? answering : string.Empty,
+        }, panel);
     }
+
+    // A round opens: the host's cue goes first, and every other reader waits for their chance.
+    private static RoundTable StartRound(RoundTable table, RoundTableCue first, IReadOnlyList<string> panel) =>
+        table with
+        {
+            Next = first,
+            Rounds = table.Rounds + 1,
+            Waiting = [.. panel.Where(id => id != first.Speaker)],
+        };
 
     private static string TopicAsk(AgendaItem item) =>
         $"What did you make of the book’s {item.Topic.ToLowerInvariant()}?"
         + (item.Why.Length > 0 ? $" The reads said: {item.Why}" : string.Empty);
 
-    /// <summary>The table after the cued reader has spoken.</summary>
+    /// <summary>
+    /// The table after the cued reader has spoken, or passed: a pass, allowed only when the cue offered it,
+    /// leaves no line.
+    /// </summary>
     public static RoundTable Spoken(RoundTable table, string words)
     {
         var cue = table.Next ?? throw new InvalidOperationException("No reader was cued to speak.");
+        var waiting = table.Waiting.Where(id => id != cue.Speaker).ToList();
+        if (string.IsNullOrWhiteSpace(words))
+        {
+            return cue.MayPass
+                ? table with { Next = null, Waiting = waiting }
+                : throw new InvalidOperationException($"{Name(cue.Speaker)} was asked directly and may not pass.");
+        }
         return table with
         {
             Turns = [.. table.Turns, new RoundTableTurn(cue.Speaker, words.Trim()) { Answering = cue.Answering }],
             Next = null,
+            Waiting = waiting,
         };
     }
 
@@ -319,7 +392,7 @@ public static class RoundTablePlan
     public static RoundTable Closed(RoundTable table, string says, RoundTableSummary summary)
     {
         var turns = string.IsNullOrWhiteSpace(says) ? table.Turns : [.. table.Turns, new RoundTableTurn(HostId, says.Trim())];
-        return table with { Turns = turns, Next = null, CloseAsked = true, Summary = summary };
+        return table with { Turns = turns, Next = null, Waiting = [], CloseAsked = true, Summary = summary };
     }
 }
 

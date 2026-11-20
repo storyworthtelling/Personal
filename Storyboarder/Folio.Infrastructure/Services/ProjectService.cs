@@ -1282,8 +1282,8 @@ public sealed class ProjectService
         {
             ScenesJudged = await db.Scenes.CountAsync(s => s.NovelId == novel.Id && s.JudgementJson != null, cancellationToken),
             ScenesTotal = await db.Scenes.CountAsync(s => s.NovelId == novel.Id, cancellationToken),
-            RoundTableTurns = table.Turns.Count,
-            RoundTableCap = table.Cap > 0 ? table.Cap : RoundTablePlan.TurnCap(ManuscriptLength.Classify(novel.WordCount)),
+            RoundTableRounds = table.Rounds,
+            RoundTableCap = table.Cap > 0 ? table.Cap : RoundTablePlan.RoundCap(ManuscriptLength.Classify(novel.WordCount)),
             RoundTableClosed = table.Closed,
         });
         return (reads, step);

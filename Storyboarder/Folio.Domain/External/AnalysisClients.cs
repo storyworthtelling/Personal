@@ -180,20 +180,21 @@ public interface IClaudeAnalysisClient
     // where this book sits; while it is a guess, the result says what it assumed.
     /// <summary>
     /// The round table's host (release H, R40) makes its next move: what it says aloud, whom it hands to and
-    /// what it asks, whom they are to answer, or that it would close. Told the turns left and the rebuttals
+    /// what it asks, whom they are to answer, or that it would close. Told the rounds left and the rebuttals
     /// still owed (R30). Throws on a reply it cannot read, so the turn is tried again.
     /// </summary>
     Task<Folio.Domain.Reading.HostMove> RoundTableHost(
         IReadOnlyList<Review> reviews,
         Folio.Domain.Reading.RoundTable table,
         IReadOnlyList<Folio.Domain.Reading.RoundTableCue> owed,
-        int turnsLeft,
+        int roundsLeft,
         Folio.Domain.Text.StoryLength length,
         CancellationToken cancellationToken);
 
     /// <summary>
     /// One reader's turn at the round table (R40): in its own voice, from its own read, replying to what was
-    /// said. It may concede in words; its score stays the independent one (R31).
+    /// said. It may concede in words; its score stays the independent one (R31). When the cue let it pass
+    /// and it would only have echoed what was said, it returns an empty string.
     /// </summary>
     Task<string> RoundTableSpeak(
         Folio.Domain.Reading.Persona persona,

@@ -23,8 +23,8 @@ public class RoundTablePlanTests
     [InlineData(StoryLength.ShortStory, 15)]
     [InlineData(StoryLength.Novella, 30)]
     [InlineData(StoryLength.Novel, 50)]
-    public void TheTurnCapScalesWithTheManuscript(StoryLength length, int cap) =>
-        Assert.Equal(cap, RoundTablePlan.TurnCap(length));
+    public void TheRoundCapScalesWithTheManuscript(StoryLength length, int cap) =>
+        Assert.Equal(cap, RoundTablePlan.RoundCap(length));
 
     [Fact]
     public void ASplitIsTwoScoredReadersThreeOrMoreApart()
@@ -77,7 +77,6 @@ public class RoundTablePlanTests
         Assert.Equal("harsh-critic", turn.Speaker);
         Assert.Equal("agent", turn.Answering);
         Assert.Null(table.Next);
-        Assert.Equal(RoundTableStepKind.HostTurn, RoundTablePlan.Next(table, Panel, StoryLength.Novel).Kind);
     }
 
     /// <summary>A speaker the host made up, or the host itself, is not a reader: the quietest reader is cued.</summary>
@@ -123,6 +122,8 @@ public class RoundTablePlanTests
         table = RoundTablePlan.Apply(table, new HostMove("Thanks, all.", "", "", "", Close: true), panel);
 
         Assert.True(table.CloseAsked);
+        // The host's farewell is not printed: the closing step says the show's one goodbye.
+        Assert.DoesNotContain(table.Turns, turn => turn.Words == "Thanks, all.");
         Assert.Equal(RoundTableStepKind.Close, RoundTablePlan.Next(table, panel, StoryLength.Novel).Kind);
         table = RoundTablePlan.Closed(table, "Goodnight.", new RoundTableSummary(["The prose"], ["The ending"]));
         Assert.Equal(RoundTableStepKind.Done, RoundTablePlan.Next(table, panel, StoryLength.Novel).Kind);
@@ -137,9 +138,11 @@ public class RoundTablePlanTests
     public void PastTheCapOwedRebuttalsAreCuedStraightThenTheShowCloses()
     {
         var panel = new[] { Read("agent", 8), Read("harsh-critic", 3) };
-        var table = RoundTable.Empty;
-        for (var i = 0; i < RoundTablePlan.TurnCap(StoryLength.ShortStory); i++)
-            table = table with { Turns = [.. table.Turns, new RoundTableTurn(RoundTablePlan.HostId, "Chatter.")] };
+        var table = RoundTable.Empty with
+        {
+            Turns = [new RoundTableTurn(RoundTablePlan.HostId, "Chatter.")],
+            Rounds = RoundTablePlan.RoundCap(StoryLength.ShortStory),
+        };
 
         var step = RoundTablePlan.Next(table, panel, StoryLength.ShortStory);
         Assert.Equal(RoundTableStepKind.ReaderTurn, step.Kind);
@@ -253,26 +256,133 @@ public class RoundTablePlanTests
     }
 
     /// <summary>
-    /// Running long is accepted (owner's ruling): past the cap each topic still unraised gets its own host
-    /// turn and a reader's answer, the host's turn counting for the topic whatever it said, so the show ends.
+    /// Running long is accepted (owner's ruling): past the cap each topic still unraised gets its own round,
+    /// the host's turn counting for the topic whatever it said, so the show ends.
     /// </summary>
     [Fact]
-    public void PastTheCapEveryUnraisedTopicStillGetsItsExchangeThenTheShowCloses()
+    public void PastTheCapEveryUnraisedTopicStillGetsItsRoundThenTheShowCloses()
     {
         var panel = new[] { Read("agent", 7), Read("harsh-critic", 6) };
-        var table = Begun(panel, cap: 2);
-        table = table with { Turns = [new RoundTableTurn(RoundTablePlan.HostId, "Hi."), new RoundTableTurn("agent", "Hello.")] };
+        var table = Begun(panel, cap: 1) with
+        {
+            Turns = [new RoundTableTurn(RoundTablePlan.HostId, "Hi."), new RoundTableTurn("agent", "Hello.")],
+            Rounds = 1,
+        };
 
         for (var topic = 0; topic < 5; topic++)
         {
             Assert.Equal(RoundTableStepKind.HostTurn, RoundTablePlan.Next(table, panel, StoryLength.Novel).Kind);
             table = RoundTablePlan.Apply(table, new HostMove("Wrapping up.", "", "", "", Close: true), panel);
-            var step = RoundTablePlan.Next(table, panel, StoryLength.Novel);
-            Assert.Equal(RoundTableStepKind.ReaderTurn, step.Kind);
-            table = RoundTablePlan.Spoken(table, "An answer.");
+            for (var reader = 0; reader < panel.Length; reader++)
+            {
+                var step = RoundTablePlan.Next(table, panel, StoryLength.Novel);
+                Assert.Equal(RoundTableStepKind.ReaderTurn, step.Kind);
+                table = RoundTablePlan.Spoken(table with { Next = step.Cue }, "An answer.");
+            }
         }
 
         Assert.Empty(RoundTablePlan.Uncovered(table));
         Assert.Equal(RoundTableStepKind.Close, RoundTablePlan.Next(table, panel, StoryLength.Novel).Kind);
+    }
+
+    // A round (owner's ruling): the host speaks, the reader it named answers, and every other reader then
+    // gets a chance to come in, unless they would only echo what has been said. The cap counts rounds.
+
+    private static readonly IReadOnlyList<Review> Agreeing =
+        [Read("agent", 7), Read("harsh-critic", 6), Read("literature-professor", 7), Read("fellow-writer", 6)];
+
+    [Fact]
+    public void AfterTheHostSpeaksEveryReaderGetsAChanceBeforeTheHostSpeaksAgain()
+    {
+        var table = RoundTablePlan.Apply(Begun(Agreeing),
+            new HostMove("Structure first.", "agent", "Hugo?", "", false) { Topic = "Structure" }, Agreeing);
+        Assert.Equal(1, table.Rounds);
+
+        var spoke = new List<string>();
+        while (RoundTablePlan.Next(table, Agreeing, StoryLength.Novel) is { Kind: RoundTableStepKind.ReaderTurn } step)
+        {
+            spoke.Add(step.Cue!.Speaker);
+            table = RoundTablePlan.Spoken(table with { Next = step.Cue }, "My take.");
+        }
+
+        Assert.Equal(Agreeing.Select(review => review.PersonaId).Order(), spoke.Order());
+        Assert.Equal("agent", spoke[0]);
+        Assert.Equal(RoundTableStepKind.HostTurn, RoundTablePlan.Next(table, Agreeing, StoryLength.Novel).Kind);
+    }
+
+    [Fact]
+    public void AReaderNamedInTheLastLineComesInNext()
+    {
+        var table = RoundTablePlan.Apply(Begun(Agreeing), new HostMove("Hello.", "agent", "Hugo?", "", false), Agreeing);
+        table = RoundTablePlan.Spoken(table, "I liked it, but Ina will tell you the ending is rushed.");
+
+        var step = RoundTablePlan.Next(table, Agreeing, StoryLength.Novel);
+
+        Assert.Equal("fellow-writer", step.Cue!.Speaker);
+        Assert.True(step.Cue.MayPass);
+    }
+
+    [Fact]
+    public void AReaderWhoOwesARebuttalIsCuedToAnswerAndMayNotPass()
+    {
+        var panel = new[] { Read("agent", 8), Read("harsh-critic", 3), Read("fellow-writer", 6) };
+        var table = RoundTablePlan.Apply(RoundTable.Empty, new HostMove("Hello.", "agent", "Hugo?", "", false), panel);
+        table = RoundTablePlan.Spoken(table, "I loved it.");
+
+        var step = RoundTablePlan.Next(table, panel, StoryLength.Novel);
+
+        Assert.Equal("harsh-critic", step.Cue!.Speaker);
+        Assert.Equal("agent", step.Cue.Answering);
+        Assert.False(step.Cue.MayPass);
+    }
+
+    [Fact]
+    public void AReaderWithNothingToAddPassesAndLeavesNoLine()
+    {
+        var table = RoundTablePlan.Apply(Begun(Agreeing), new HostMove("Hello.", "agent", "Hugo?", "", false), Agreeing);
+        table = RoundTablePlan.Spoken(table, "I liked it.");
+        var step = RoundTablePlan.Next(table, Agreeing, StoryLength.Novel);
+
+        table = RoundTablePlan.Spoken(table with { Next = step.Cue }, "");
+
+        Assert.Equal(2, table.Turns.Count);
+        Assert.DoesNotContain(step.Cue!.Speaker, table.Waiting);
+    }
+
+    [Fact]
+    public void AReaderTheHostAskedDirectlyMayNotPass()
+    {
+        var table = RoundTablePlan.Apply(Begun(Agreeing), new HostMove("Hello.", "agent", "Hugo?", "", false), Agreeing);
+
+        Assert.False(table.Next!.MayPass);
+        Assert.Throws<InvalidOperationException>(() => RoundTablePlan.Spoken(table, "  "));
+    }
+
+    [Fact]
+    public void TheCapCountsRoundsNotLines()
+    {
+        var table = RoundTablePlan.Apply(Begun(Agreeing, cap: 2),
+            new HostMove("Hello.", "agent", "Hugo?", "", false) { Topic = "Structure" }, Agreeing);
+        while (RoundTablePlan.Next(table, Agreeing, StoryLength.Novel) is { Kind: RoundTableStepKind.ReaderTurn } step)
+            table = RoundTablePlan.Spoken(table with { Next = step.Cue }, "My take.");
+
+        // Five lines spoken, one round held: the host still has a round left under a cap of two.
+        Assert.Equal(5, table.Turns.Count);
+        Assert.Equal(1, table.Rounds);
+        Assert.Equal(1, RoundTablePlan.RoundsLeft(table, StoryLength.Novel));
+    }
+
+    /// <summary>
+    /// A close the rules refuse is not a goodbye: the host's farewell is dropped and a plain hand-on takes
+    /// its place, so the page never prints a sign-off followed by more show.
+    /// </summary>
+    [Fact]
+    public void ARefusedCloseDropsTheGoodbye()
+    {
+        var table = RoundTablePlan.Apply(Begun(Agreeing),
+            new HostMove("That’s our show, thanks for listening.", "", "", "", Close: true), Agreeing);
+
+        Assert.DoesNotContain("thanks for listening", table.Turns[^1].Words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("structure", table.Turns[^1].Words, StringComparison.OrdinalIgnoreCase);
     }
 }
