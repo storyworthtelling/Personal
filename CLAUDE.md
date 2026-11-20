@@ -582,6 +582,7 @@ same hue.
   - `Tools/IconStudio` (generated icons; `dotnet test Tools/IconStudio.sln`).
   - `Tools/LogLoopReader` (`Tools/LogLoop.sln`).
   - `Tools/IndexHistorySeal` (`dotnet test Tools/IndexHistorySeal.sln`).
+  - `Tools/FaceStudio` (Point, the watch face: generates `Watch/Point.Face` from `Watch.Domain` and packs it with aapt2; `dotnet run --project Tools/FaceStudio -- --repo-root . [--apk out.apk]`, tests `dotnet test Tools/FaceStudio.Tests/FaceStudio.Tests.csproj`; see `Watch/P14-PROGRESS.md` A3).
   - `Tools/LogKeyDerive`.
 - **Other folders:**
   - `docs/` is the published privacy page.

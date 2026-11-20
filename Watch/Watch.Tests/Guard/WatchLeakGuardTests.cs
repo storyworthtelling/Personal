@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace Watch.Tests.Guard;
 
 /// <summary>
-/// WD §13: <c>WatchTokens</c> is the only file in <c>Watch/</c> with a colour or a type size, and no
+/// WD §13: <c>WatchTokens</c> is the only file in <c>Watch/</c> or <c>Tools/FaceStudio</c> with a colour or a type size, and no
 /// watch project names a Paper &amp; Ink token or font (A33). Each finding is a file and a line.
 /// </summary>
 public class WatchLeakGuardTests
@@ -61,11 +61,18 @@ public class WatchLeakGuardTests
     }
 
     [Fact]
+    public void TheGuardSeesFaceStudio()
+    {
+        var studio = Path.Combine("Tools", "FaceStudio", "FaceDocument.cs");
+        Assert.Contains(WatchSources(), path => path.EndsWith(studio, StringComparison.Ordinal));
+        Assert.Contains(WatchProjects(), path => path.EndsWith("FaceStudio.csproj", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void NoWatchProjectReferencesPaperAndInk()
     {
         var root = RepoRoot();
-        var findings = Directory.EnumerateFiles(Path.Combine(root, "Watch"), "*.csproj", SearchOption.AllDirectories)
-            .Where(path => !IsBuildOutput(path))
+        var findings = WatchProjects()
             .Where(path => PaperAndInkProjects.Any(name => File.ReadAllText(path).Contains(name, StringComparison.Ordinal)))
             .Select(path => Path.GetRelativePath(root, path))
             .ToList();
@@ -94,11 +101,23 @@ public class WatchLeakGuardTests
     private static string Report(string what, List<string> findings) =>
         $"{what}:{Environment.NewLine}{string.Join(Environment.NewLine, findings)}";
 
+    /// <summary>The watch's folders, and FaceStudio, which writes the face's colours and sizes (A3).</summary>
+    private static IEnumerable<string> WatchFolders()
+    {
+        yield return Path.Combine(RepoRoot(), "Watch");
+        yield return Path.Combine(RepoRoot(), "Tools", "FaceStudio");
+    }
+
+    private static IEnumerable<string> WatchProjects() =>
+        WatchFolders()
+            .SelectMany(folder => Directory.EnumerateFiles(folder, "*.csproj", SearchOption.AllDirectories))
+            .Where(path => !IsBuildOutput(path));
+
     private static IEnumerable<string> WatchSources()
     {
-        var watch = Path.Combine(RepoRoot(), "Watch");
-        var tests = Path.Combine(watch, "Watch.Tests") + Path.DirectorySeparatorChar;
-        return Directory.EnumerateFiles(watch, "*.cs", SearchOption.AllDirectories)
+        var tests = Path.Combine(RepoRoot(), "Watch", "Watch.Tests") + Path.DirectorySeparatorChar;
+        return WatchFolders()
+            .SelectMany(folder => Directory.EnumerateFiles(folder, "*.cs", SearchOption.AllDirectories))
             .Where(path => !path.StartsWith(tests, StringComparison.Ordinal))
             .Where(path => !IsBuildOutput(path))
             .Where(path => Path.GetFileName(path) != "WatchTokens.cs");

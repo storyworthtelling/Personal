@@ -114,6 +114,53 @@ public static class WatchTokens
         public static IReadOnlyList<HapticPattern> All { get; } = [Call, Text, RestEnd, EaseOff];
     }
 
+    /// <summary>True black, the ground of every watch screen (WD §2): an OLED pixel that is off.</summary>
+    public static Oklch Ground { get; } = new(0, 0, 0);
+
+    /// <summary>
+    /// The face (WD §4.1, §10; study 1b). Each tone's hue is replaced by the minute's, so only lightness
+    /// and chroma live here. <see cref="DateSize"/> is the face's one type size, as a fraction of its radius.
+    /// </summary>
+    public static class Face
+    {
+        /// <summary>Red in OKLCH: the hue at the top of the hour, so the wheel turns red, yellow, green, blue, violet (WD §4.1).</summary>
+        public const double RedHue = 29.23;
+
+        /// <summary>The lit shape's body (mock: hsl 75% 52%).</summary>
+        public static Oklch Glass { get; } = new(0.66, 0.16, 0);
+
+        /// <summary>The thin bright rim (mock: hsl 90% 85%).</summary>
+        public static Oklch Rim { get; } = new(0.90, 0.08, 0);
+
+        /// <summary>The after-noon ring (mock: hsl 85% 80%).</summary>
+        public static Oklch Ring { get; } = new(0.86, 0.09, 0);
+
+        /// <summary>The date, the shape's colour at low saturation (mock: hsl 18% 62%).</summary>
+        public static Oklch Date { get; } = new(0.68, 0.035, 0);
+
+        /// <summary>Always-on keeps about a third of the lit lightness (WD §2).</summary>
+        public const double AlwaysOnShare = 1.0 / 3;
+
+        /// <summary>Always-on's chroma: the hue still reads, quietly.</summary>
+        public const double AlwaysOnChroma = 0.05;
+
+        /// <summary>The after-noon ring's opacity (mock: 0.7).</summary>
+        public const double RingAlpha = 0.7;
+
+        /// <summary>The glass's highlight, laid over the body high on the left.</summary>
+        public static Oklch Highlight { get; } = new(1, 0, 0);
+
+        public const double HighlightAlpha = 0.5;
+
+        /// <summary>The glass's deeper tone at the edge.</summary>
+        public static Oklch Shade { get; } = new(0, 0, 0);
+
+        public const double ShadeAlpha = 0.45;
+
+        /// <summary>The date's size, as a fraction of the face's radius (mock: 0.08 R).</summary>
+        public const double DateSize = 0.08;
+    }
+
     /// <summary>Motion durations in milliseconds (WD §8). Reduced motion and always-on remove all of it.</summary>
     public static class Motion
     {
