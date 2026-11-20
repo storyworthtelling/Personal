@@ -217,3 +217,12 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   line says where it is playing ("Playing on phone"). With the phone away, a streamed track stays in
   the library and says "Needs your phone nearby" (A62).
 - **A74 — The screens are approved** (round 2 with A73). Next: the P14 plan.
+
+## 17. Gate 1 closed
+
+- **A75 — PC1 accepted:** the watch apps share their phone app's package id and signing key (the Data
+  Layer requires it), and the update channel tells a watch APK from a phone APK.
+- **A76 — The release order is approved:** A Point, B Dash, C Wave, D Beat workouts, E Beat all-day and
+  her watch, F the device run; one PR per release.
+- **A77 — The technical finding and the plan are approved as they stand.** Build starts with release A.
+- **A78** — The owner installs the Point installer on the watch once, from a PC with adb.

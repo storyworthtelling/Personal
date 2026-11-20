@@ -1,6 +1,6 @@
 # P14 · Watch — technical finding (gate 1)
 
-**Status:** draft for the owner, round 4 (no lockdown on the watch; updates from the phone). It answers what the owner's 57 answers (A1–A57, in
+**Status:** approved (A77), round 4 (no lockdown on the watch; updates from the phone). It answers what the owner's 57 answers (A1–A57, in
 [`P14-OWNER-ANSWERS.md`](P14-OWNER-ANSWERS.md)) need from the platform, and says plainly which of
 them the platform does not allow. Design is in [`WATCH-DESIGN.md`](WATCH-DESIGN.md) (approved, A58).
 Owner decisions are **Q1–Q9** in §9. Nothing here has been tried on a watch: every claim is from

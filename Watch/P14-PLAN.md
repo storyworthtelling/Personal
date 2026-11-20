@@ -1,6 +1,6 @@
 # P14 · Watch — implementation plan
 
-**Status:** draft for the owner's approval, section by section.
+**Status:** approved (A75–A77).
 
 This plan builds what four approved records already decided, and reopens none of them:
 
@@ -442,5 +442,5 @@ writes, the partner's watch, the four buzzes, and a real day's battery.
 
 | # | Question | State |
 |---|---|---|
-| OQ1 | Does the owner approve the technical finding? | asked with this plan |
-| OQ2 | Plan choices PC1–PC8 | asked with this plan |
+| OQ1 | Does the owner approve the technical finding? | **Approved (A77)** |
+| OQ2 | Plan choices PC1–PC8 | **Approved (A75, A77)** |
