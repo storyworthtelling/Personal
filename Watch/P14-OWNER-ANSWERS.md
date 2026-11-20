@@ -204,3 +204,11 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   Flyleaf sends watch APKs over the Data Layer to a small Point installer on the watch, which asks once
   per app and then updates silently as installer of record (unverified on Wear OS).
 - **A71** — The spike app, its workflow and the `watch-spike` pre-release are removed.
+
+## 16. Screen mockups
+
+- **A72 — Screens round 1 approved except the tiles and Wave's Now playing,** which looked like stock
+  tiles and had generic controls. Round 2 redraws them glyph-led: Wave's sine is the player (bright
+  along its length as the track plays, its height the volume, flat when paused; tap the wave to pause,
+  the left or right edge to go back or skip), and Dash's tile is the dash glyph with the newest name in
+  full and earlier names fading, no count. Everything else in round 1 stands.

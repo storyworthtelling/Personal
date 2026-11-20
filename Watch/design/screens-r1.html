@@ -37,8 +37,9 @@ section > p { margin: 0; line-height: 1.5; max-width: 80ch; }
 
 <div class="wrap">
   <header>
-    <h1>Watch screens, round 1</h1>
-    <p>Every screen of Point, Dash, Wave and Beat on the round display, drawn in the approved watch language:
+    <h1>Watch screens, round 2</h1>
+    <p>Round 2 redraws only the tiles and Wave's Now playing, glyph-led as you chose; everything else is
+    approved as it was. Every screen of Point, Dash, Wave and Beat on the round display, drawn in the approved watch language:
     true black, IBM Plex Mono, one short sentence at most, and each app in its day colour (drawn here at
     4:20 pm). Each caption names the answer it follows (A#). Screens the watch itself draws (the call screen,
     the install prompt) are marked <span class="sys">system</span>. People, messages, music and workouts are
@@ -109,6 +110,24 @@ function ring(c, R, frac, col, r = 0.93, w = 0.03) {
 }
 function bigNum(c, R, s, y, col = INK, size = 0.32) { t(c, s, R, y, R * size, col, 500); }
 
+// ---- glyph-led Wave: the sine is the player (round 2) ----
+// progress: how much of the track has played (the bright part); amp: the volume (wave height); paused: a still line.
+function waveLine(c, R, { progress = 0.4, amp = 0.16, paused = false, y = R * 0.92, span = 1.5, width = 0.05, alpha = 1 } = {}) {
+  const col = day("Wave", alpha), faint = day("Wave", 0.22 * alpha), x0 = R - (R * span) / 2, n = 120;
+  const at = i => { const f = i / n; return [x0 + f * R * span, paused ? y : y - Math.sin(f * TAU * 2) * R * amp]; };
+  c.lineCap = "round"; c.lineJoin = "round"; c.lineWidth = R * width;
+  c.strokeStyle = faint; c.beginPath(); for (let i = 0; i <= n; i++) { const [x, yy] = at(i); i ? c.lineTo(x, yy) : c.moveTo(x, yy); } c.stroke();
+  c.save(); c.strokeStyle = col; c.shadowColor = col; c.shadowBlur = R * 0.08; c.beginPath();
+  for (let i = 0; i <= Math.round(n * progress); i++) { const [x, yy] = at(i); i ? c.lineTo(x, yy) : c.moveTo(x, yy); } c.stroke(); c.restore();
+}
+// The two edge marks: back on the left, skip on the right, drawn as short dashes, never arrows.
+function edgeMarks(c, R, y, alpha = 0.5, lit = 0) {
+  c.lineCap = "round"; c.lineWidth = R * 0.03;
+  [[R * 0.08, R * 0.16], [R * 1.84, R * 1.92]].forEach(([a, b], i) => {
+    c.strokeStyle = lit === i + 1 ? day("Wave") : `hsla(205 10% 64% / ${alpha})`;
+    c.beginPath(); c.moveTo(a, y); c.lineTo(b, y); c.stroke(); });
+}
+
 // ---- the face (study 1b, approved) ----
 const ang = f => f * TAU - Math.PI / 2, pt = (cx, cy, r, a) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
 function face(c, R, h, m, amb) {
@@ -128,20 +147,20 @@ function face(c, R, h, m, amb) {
 
 // ---- the screens ----
 const SECTIONS = [
-  { tag: "Point", title: "The face and the tiles", about: "Point is only the face (A46, A68). Swiping left from it reaches the standard tiles, Wave's Now playing and Dash's People waiting (A35). Nothing on the face changes when something arrives (A34).",
+  { tag: "Point", title: "The face and the tiles", about: "Point is only the face (A46, A68). Swiping left from it reaches the tiles, Wave's Now playing and Dash's People waiting (A35), drawn from their glyphs rather than the stock tile layout (round 2). Nothing on the face changes when something arrives (A34).",
     screens: [
       { name: "The face, 4:20 pm", note: "Four sides for four o'clock, the after-noon ring, the minute's colour (A46)", draw(c, R) { face(c, R, 16, 20, false); } },
       { name: "The face, always-on", note: "Outline only, no date (design book §2)", draw(c, R) { face(c, R, 16, 20, true); } },
-      { name: "Tile: Now playing", note: "Wave's tile: track, artist, play and skip (A35)", draw(c, R) { topTime(c, R);
-        const col = day("Wave"); glyph(c, R * 0.22, "Wave", col, R - R * 0.11, R * 0.24);
-        t(c, "Field Notes", R, R * 0.72, R * 0.11, INK, 600); t(c, "The Juniper Trio", R, R * 0.9, R * 0.075, SOFT);
-        c.fillStyle = col; c.beginPath(); c.arc(R, R * 1.3, R * 0.17, 0, TAU); c.fill();
-        c.fillStyle = "hsl(0 0% 6%)"; c.fillRect(R - R * 0.06, R * 1.22, R * 0.04, R * 0.16); c.fillRect(R + R * 0.02, R * 1.22, R * 0.04, R * 0.16);
-        [[-1, "prev"], [1, "next"]].forEach(([s]) => { const x = R + s * R * 0.48; c.fillStyle = SOFT; c.beginPath(); c.moveTo(x - s * R * 0.05, R * 1.22); c.lineTo(x - s * R * 0.05, R * 1.38); c.lineTo(x + s * R * 0.07, R * 1.3); c.closePath(); c.fill(); }); } },
-      { name: "Tile: People waiting", note: "Dash's tile: who has written, no counts (A11, A34)", draw(c, R) { topTime(c, R);
-        const col = day("Dash", 1, 0.08); glyph(c, R * 0.2, "Dash", col, R - R * 0.1, R * 0.22);
-        t(c, "People waiting", R, R * 0.58, R * 0.085, SOFT, 500);
-        ["Lee", "Robin", "Juniper's school"].forEach((p, i) => t(c, p, R, R * (0.86 + i * 0.24), R * 0.11, INK, 600)); } },
+      { name: "Tile: Now playing", note: "Round 2: the sine is the player. Tap the wave to pause; the bright part is how far through the track you are", draw(c, R) { topTime(c, R);
+        waveLine(c, R, { progress: 0.62, amp: 0.2, y: R * 0.95, span: 1.56 });
+        t(c, fit(c, "Field Notes", R * 1.2, R * 0.075, 500), R, R * 1.42, R * 0.075, SOFT, 500); } },
+      { name: "Tile: People waiting", note: "Round 2: the dash glyph, the newest name in full, earlier names fading; no count", draw(c, R) { topTime(c, R);
+        const col = day("Dash", 1, 0.08), g = R * 0.62; glyph(c, g, "Dash", col, R - g / 2, R * 0.66 - g / 2);
+        t(c, "Lee", R, R * 1.12, R * 0.13, INK, 600);
+        t(c, "Robin", R, R * 1.34, R * 0.085, "hsla(205 10% 64% / 0.7)", 500);
+        t(c, "Juniper's school", R, R * 1.52, R * 0.07, "hsla(205 10% 64% / 0.4)", 400); } },
+      { name: "Tile: nobody waiting", note: "Round 2: a faint dash and nothing else", draw(c, R) { topTime(c, R);
+        const g = R * 0.62; glyph(c, g, "Dash", day("Dash", 0.35, 0.08), R - g / 2, R - g / 2); } },
     ] },
   { tag: "Dash", title: "Calls, texts and mail", about: "Dash opens on People waiting (A14). Texts go out through Post on the phone (A67). Replies are by voice or keyboard (A10). A call is the system's own Phone screen, and Dash asks for the call note afterwards (A13).",
     screens: [
@@ -191,18 +210,25 @@ const SECTIONS = [
         t(c, "ember-tide-orchard", R, R * 0.96, R * 0.08, INK); t(c, "Shown so you can check it", R, R * 1.26, R * 0.065, SOFT);
         pill(c, R, R * 1.54, R * 0.7, "Unlock", day("Dash", 1, 0.08)); } },
     ] },
-  { tag: "Wave", title: "Music and podcasts", about: "Wave opens on Now playing (A19). Everything streams over LTE, nothing downloads (A17). Whoever starts playback owns it, with one line to switch (A20). Cadence sets the tempo on runs and walks (A21). TIDAL is a remote for Score on the phone, only while the phone is nearby (A62).",
+  { tag: "Wave", title: "Music and podcasts", about: "Wave opens on Now playing (A19), which in round 2 is the wave itself, with no play or skip buttons: tap the wave to pause or play, tap the left or right edge to go back or skip, and turn the crown to make the wave taller or shallower. Everything streams over LTE, nothing downloads (A17). Whoever starts playback owns it, with one line to switch (A20). Cadence sets the tempo on runs and walks (A21). TIDAL is a remote for Score on the phone, only while the phone is nearby (A62).",
     screens: [
-      { name: "Now playing", note: "Small square of art (O6); the crown is volume (A19)", draw(c, R) { topTime(c, R);
-        const a = R * 0.36, g = c.createLinearGradient(R - a / 2, R * 0.44 - a / 2, R + a / 2, R * 0.44 + a / 2); g.addColorStop(0, "hsl(200 30% 40%)"); g.addColorStop(1, "hsl(30 50% 45%)");
-        rr(c, R - a / 2, R * 0.46 - a / 2, a, a, R * 0.04); c.fillStyle = g; c.fill();
-        t(c, "Field Notes", R, R * 0.8, R * 0.11, INK, 600); t(c, "The Juniper Trio", R, R * 0.96, R * 0.075, SOFT);
-        const col = day("Wave"); c.fillStyle = col; c.beginPath(); c.arc(R, R * 1.3, R * 0.15, 0, TAU); c.fill();
-        c.fillStyle = "hsl(0 0% 6%)"; c.fillRect(R - R * 0.055, R * 1.23, R * 0.035, R * 0.14); c.fillRect(R + R * 0.02, R * 1.23, R * 0.035, R * 0.14);
-        [-1, 1].forEach(s => { const x = R + s * R * 0.45; c.fillStyle = SOFT; c.beginPath(); c.moveTo(x - s * R * 0.05, R * 1.23); c.lineTo(x - s * R * 0.05, R * 1.37); c.lineTo(x + s * R * 0.06, R * 1.3); c.closePath(); c.fill(); });
-        t(c, "Play on phone", R, R * 1.62, R * 0.07, SOFT);
-        c.lineCap = "round"; c.lineWidth = R * 0.03; c.strokeStyle = FAINT; c.beginPath(); c.arc(R, R, R * 0.93, -0.5, 0.5); c.stroke();
-        c.strokeStyle = col; c.beginPath(); c.arc(R, R, R * 0.93, 0.2, 0.5); c.stroke(); } },
+      { name: "Now playing", note: "Round 2: the wave fills the screen and brightens as the track plays; its height is the volume (A19)", draw(c, R) { topTime(c, R);
+        waveLine(c, R, { progress: 0.38, amp: 0.2, y: R * 0.9, span: 1.6, width: 0.055 });
+        edgeMarks(c, R, R * 0.9);
+        t(c, "Field Notes", R, R * 1.34, R * 0.1, INK, 600); t(c, "The Juniper Trio", R, R * 1.5, R * 0.07, SOFT);
+        t(c, "Play on phone", R, R * 1.74, R * 0.06, "hsla(205 10% 64% / 0.6)"); } },
+      { name: "Paused", note: "Round 2: the wave lies flat; tap it to play", draw(c, R) { topTime(c, R);
+        waveLine(c, R, { progress: 0.38, paused: true, y: R * 0.9, span: 1.6, width: 0.055 });
+        edgeMarks(c, R, R * 0.9);
+        t(c, "Field Notes", R, R * 1.34, R * 0.1, SOFT, 600); t(c, "The Juniper Trio", R, R * 1.5, R * 0.07, SOFT); } },
+      { name: "Turning the crown", note: "Round 2: louder is a taller wave, quieter a shallower one; no slider", draw(c, R) { topTime(c, R);
+        waveLine(c, R, { progress: 0.38, amp: 0.34, y: R * 0.92, span: 1.6, width: 0.055 });
+        waveLine(c, R, { progress: 0, amp: 0.2, y: R * 0.92, span: 1.6, width: 0.012, alpha: 0.6 });
+        t(c, "Field Notes", R, R * 1.5, R * 0.1, INK, 600); } },
+      { name: "Next track", note: "Round 2: tap the right edge; the new track's wave starts dark and fills from the left", draw(c, R) { topTime(c, R);
+        waveLine(c, R, { progress: 0.03, amp: 0.2, y: R * 0.9, span: 1.6, width: 0.055 });
+        edgeMarks(c, R, R * 0.9, 0.5, 2);
+        t(c, "Low Tide", R, R * 1.34, R * 0.1, INK, 600); t(c, "The Juniper Trio", R, R * 1.5, R * 0.07, SOFT); } },
       { name: "Browse", note: "Artists, albums, playlists, genres, songs, voice (A19)", draw(c, R) { topTime(c, R);
         ["Search by voice", "Playlists", "Artists", "Albums", "Genres", "Songs"].forEach((s, i) => { const y = R * (0.4 + i * 0.22);
           t(c, s, R, y, R * (i === 0 ? 0.085 : 0.095), i === 0 ? day("Wave") : INK, i === 0 ? 500 : 400); }); } },
