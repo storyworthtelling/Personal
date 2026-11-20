@@ -28,6 +28,14 @@ fi
 # ~1-2s on a warm container where the AST cache already covers most files. Never fails the session:
 # graphify might not be installed yet in some environments, and a build hiccup here shouldn't block
 # dotnet setup below.
+# The PreToolUse hooks in settings.json call `graphify hook-guard`, so install it when a fresh
+# container lacks it (PyPI is reachable). Without it every Bash/Grep/Read/Glob call showed "a hook gave
+# no usable answer". Non-fatal: the hooks themselves step aside when graphify is missing.
+if ! command -v graphify >/dev/null 2>&1 && command -v uv >/dev/null 2>&1; then
+  uv tool install graphifyy >/dev/null 2>&1 || echo "graphify install failed (non-fatal)"
+  export PATH="$HOME/.local/bin:$PATH"
+fi
+
 if command -v graphify >/dev/null 2>&1; then
   (
     cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" && \

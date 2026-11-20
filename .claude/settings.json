@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "graphify hook-guard search",
+            "command": "if command -v graphify >/dev/null 2>&1; then graphify hook-guard search; fi",
             "timeout": 10
           }
         ]
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "graphify hook-guard read --strict",
+            "command": "if command -v graphify >/dev/null 2>&1; then graphify hook-guard read --strict; fi",
             "timeout": 10
           }
         ]
