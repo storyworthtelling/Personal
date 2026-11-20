@@ -15,7 +15,12 @@ public class WatchLeakGuardTests
 
     private static readonly string[] PaperAndInk =
     [
-        "PaperColorTokens", "PaperUi", "PaperTheme", "Source Serif", "Source Sans", "Cascadia", "Italianno",
+        "PaperColorTokens", "PaperUi", "PaperTheme", "Codex.Ui", "Storyworthtelling.Maui", "Storyworthtelling.Materials", "Source Serif", "Source Sans", "Cascadia", "Italianno",
+    ];
+
+    private static readonly string[] PaperAndInkProjects =
+    [
+        "Codex.Ui.Android", "Storyworthtelling.Maui", "Storyworthtelling.Materials", "Storyworthtelling.Paper", @"..\..\Fonts", "../../Fonts",
     ];
 
     [Fact]
@@ -46,6 +51,26 @@ public class WatchLeakGuardTests
     public void TheGuardSeesTheWatch()
     {
         Assert.Contains(WatchSources(), path => path.EndsWith("DayColour.cs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheGuardSeesTheKit()
+    {
+        var kit = Path.Combine("Watch.Ui.Wear", "WaveView.cs");
+        Assert.Contains(WatchSources(), path => path.EndsWith(kit, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NoWatchProjectReferencesPaperAndInk()
+    {
+        var root = RepoRoot();
+        var findings = Directory.EnumerateFiles(Path.Combine(root, "Watch"), "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutput(path))
+            .Where(path => PaperAndInkProjects.Any(name => File.ReadAllText(path).Contains(name, StringComparison.Ordinal)))
+            .Select(path => Path.GetRelativePath(root, path))
+            .ToList();
+
+        Assert.True(findings.Count == 0, Report("A watch project referencing a Paper & Ink kit", findings));
     }
 
     private static List<string> Scan(Func<string, bool> offends)
@@ -79,13 +104,21 @@ public class WatchLeakGuardTests
             .Where(path => Path.GetFileName(path) != "WatchTokens.cs");
     }
 
-    private static bool IsBuildOutput(string path)
+    private static bool IsBuildOutput(string path) => WatchFiles.IsBuildOutput(path);
+
+    private static string RepoRoot() => WatchFiles.RepoRoot();
+}
+
+/// <summary>Where the watch's files are, for the guards that read them by content.</summary>
+internal static class WatchFiles
+{
+    public static bool IsBuildOutput(string path)
     {
         var parts = path.Split(Path.DirectorySeparatorChar);
         return parts.Contains("bin") || parts.Contains("obj");
     }
 
-    private static string RepoRoot()
+    public static string RepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Directory.Packages.props")))

@@ -25,6 +25,9 @@ public sealed record HapticPattern(string Name, IReadOnlyList<int> Timings, IRea
 /// </summary>
 public static class WatchTokens
 {
+    /// <summary>The smallest touch target, in dp (WD §12).</summary>
+    public const int TouchTargetDp = 48;
+
     /// <summary>IBM Plex Mono, the one family for words and numerals (WD §5, O3).</summary>
     public const string Typeface = "IBM Plex Mono";
 
@@ -45,6 +48,38 @@ public static class WatchTokens
         WatchApp.Beat => BeatRange,
         _ => throw new ArgumentOutOfRangeException(nameof(app), app, "Not one of the four watch apps."),
     };
+
+    /// <summary>
+    /// How much lighter an app's glyph is drawn than its day colour (mock: Dash's glyphs and accents take
+    /// +0.08 lightness so navy and maroon still read as glass on black). Every other app draws as named.
+    /// </summary>
+    public static double GlyphLift(WatchApp app) => app == WatchApp.Dash ? 0.08 : 0;
+
+    /// <summary>The neutrals (WD §4.3): words, the quiet line, a ring's empty track. Cool greys, no colour.</summary>
+    public static class Neutral
+    {
+        /// <summary>Primary words: a cool near-white.</summary>
+        public static Oklch Ink { get; } = new(0.954, 0.006, 238.5);
+
+        /// <summary>Secondary words, the quiet line, errors.</summary>
+        public static Oklch Soft { get; } = new(0.715, 0.017, 238.7);
+
+        /// <summary>A ring's empty track; never words.</summary>
+        public static Oklch Faint { get; } = new(0.417, 0.016, 238.9);
+    }
+
+    /// <summary>How much light a part of a glass shape carries (mock: <c>waveLine</c>, <c>edgeMarks</c>), as alpha 0–1.</summary>
+    public static class Light
+    {
+        /// <summary>The part of the wave not yet played.</summary>
+        public const double Unplayed = 0.22;
+
+        /// <summary>The wave's back and skip marks at rest.</summary>
+        public const double EdgeMark = 0.5;
+
+        /// <summary>A glyph with nothing behind it (mock: Tile: nobody waiting).</summary>
+        public const double Quiet = 0.35;
+    }
 
     /// <summary>
     /// The three type sizes, in sp (WD §5). These are first values, to be settled on the wrist.
