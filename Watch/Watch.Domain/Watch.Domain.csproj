@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- The watch's rules, pure .NET with no package: the tokens, the day colour, the hour shape, the kit's
-       geometry and the haptic plan (P14 E1). Every watch head and the desktop test build can see it, so the guards run with no
+       geometry, the haptic plan (P14 E1) and the update contracts (E3). Every watch head and the desktop test build can see it, so the guards run with no
        Android workload installed. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -12,5 +12,8 @@
   <ItemGroup>
     <!-- BCL-only: the suite's one undo window (six seconds, or Android's time to take action if longer). -->
     <ProjectReference Include="..\..\Storyworthtelling.Folds\Storyworthtelling.Folds.csproj" />
+    <!-- BCL-only: the update channel's form rule, its scope and its plan, which the Point installer applies with the
+         watch form (P14 W-3.1.2), so the phone and the watch judge an APK by one rule. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 </Project>

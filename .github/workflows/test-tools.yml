@@ -19,6 +19,8 @@ on:
       - 'Watch/Watch.Domain/**'
       - 'Watch/Fonts/**'
       - 'Watch/Point.Face/**'
+      # The watch's domain judges the installer's APKs by the update channel's own rule (P14 W-3.1.2).
+      - 'Storyworthtelling.Updates/**'
       # IndexHistorySeal builds on Index's domain and infrastructure (and what they build on).
       - 'Ledger/Ledger.Domain/**'
       - 'Ledger/Ledger.Infrastructure/**'

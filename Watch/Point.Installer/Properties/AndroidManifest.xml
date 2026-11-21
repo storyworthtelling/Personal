@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Point installer's manifest (P14 W-3.1.2). Its components (the Data Layer listener and two receivers) are declared
+  by attributes under their frozen names (WatchIdentity); what no attribute expresses is here. WatchInvariantsTests reads
+  this file: the package, the watch feature, the three permissions and the packages it may see.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.storyworthtelling.focusphone.launcher">
+  <!-- A watch app, by Wear OS's own marker. It also keeps this APK off the phone, where it would replace Flyleaf. -->
+  <uses-feature android:name="android.hardware.type.watch" />
+
+  <!-- Install at all ("install unknown apps", allowed once on the wrist); update silently as installer of record;
+       and put the one prompt on the wrist (a runtime permission with no screen to ask from: `adb install -g`). -->
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+  <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <!-- Android 11+ shows an app only the packages it names: the suite apps it compares versions with. -->
+  <queries>
+    <package android:name="com.storyworthtelling.focusphone.communication" />
+    <package android:name="com.storyworthtelling.focusphone.audio" />
+    <package android:name="com.storyworthtelling.constitution" />
+    <package android:name="com.storyworthtelling.watch.point" />
+  </queries>
+
+  <application>
+    <!-- Not standalone: it is nothing without Flyleaf on the phone sending it APKs. -->
+    <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+  </application>
+</manifest>

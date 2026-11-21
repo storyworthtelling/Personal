@@ -30,21 +30,34 @@ public class FrozenInvariantsTests
         Assert.Equal("com.storyworthtelling.focusphone.audio", PolicyContext.AudioPackage);
     }
 
-    // Exactly one head declares the frozen ApplicationId — the launcher. The rename
+    // Exactly one phone head declares the frozen ApplicationId — the launcher. The rename
     // may move/rename the csproj, but the literal must survive it.
+    //
+    // P14 (PC1, PC8): on the watch, the Point installer carries Flyleaf's package, because the
+    // Data Layer delivers only between apps of one package and one signature. It is the one
+    // other project allowed the id, and the update channel's form rule keeps its APK off the
+    // phone (W-3.1.1); any third copy is still a mistake.
     [Fact]
     public void LauncherCsprojDeclaresFrozenApplicationId()
     {
         var declaring = EnumerateRepoFiles("*.csproj")
             .Where(file => File.ReadAllText(file)
                 .Contains($"<ApplicationId>{PolicyContext.LauncherPackage}</ApplicationId>", StringComparison.Ordinal))
+            .Select(RepoRelative)
             .ToList();
+        var watch = declaring.Where(IsWatchProject).ToList();
+        var phone = declaring.Except(watch).ToList();
 
-        Assert.True(declaring.Count == 1,
-            $"Exactly one csproj must declare the frozen launcher ApplicationId " +
-            $"'{PolicyContext.LauncherPackage}'; found {declaring.Count}:\n" +
-            string.Join("\n", declaring.Select(RepoRelative)));
+        Assert.True(phone.Count == 1,
+            $"Exactly one phone csproj must declare the frozen launcher ApplicationId " +
+            $"'{PolicyContext.LauncherPackage}'; found {phone.Count}:\n" +
+            string.Join("\n", phone));
+        Assert.True(watch.All(path => path == Path.Combine("Watch", "Point.Installer", "Point.Installer.csproj")),
+            "Only the Point installer may carry the launcher's package on the watch:\n" + string.Join("\n", watch));
     }
+
+    private static bool IsWatchProject(string relative) =>
+        relative.StartsWith("Watch" + Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
     // The home Activity must keep MainLauncher + CategoryHome, or Flyleaf stops being
     // the device home app after the upgrade.
@@ -417,6 +430,10 @@ public class FrozenInvariantsTests
             // A spike is not a head: it ships to its own pre-release and is installed by hand, and it
             // must stay off apps-latest, since Flyleaf installs everything the channel carries.
             .Where(directory => !directory.Split('/').Contains("Spikes"))
+            // A watch head (P14) is published by build-watch.yml, which W-3.2.1 writes. Until that file
+            // exists a watch head reaches no release, which is safe (nothing installs it); the day it
+            // exists, this exemption ends by itself and every watch head must be published.
+            .Where(directory => WatchWorkflowExists() || !directory.StartsWith("Watch/", StringComparison.Ordinal))
             .Where(directory => !publishSteps.Any(text =>
                 text.Contains($"{directory}/bin/Release/net10.0-android/publish/", StringComparison.Ordinal)))
             .ToList();
@@ -426,6 +443,9 @@ public class FrozenInvariantsTests
             "signed APK to the apps-latest rolling release, so the phone will never install them: " +
             string.Join(", ", unpublished));
     }
+
+    private static bool WatchWorkflowExists() =>
+        File.Exists(Path.Combine(RepoRoot(), ".github", "workflows", "build-watch.yml"));
 
     // The other side of the exemption above: Flyleaf installs every owner-namespace APK on
     // apps-latest, so a spike that reached it would land on the locked phone unasked.

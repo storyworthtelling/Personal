@@ -505,3 +505,248 @@ was ever unsettled), and `APhoneApkKeepsItsName` (a phone APK still goes up unde
 
 - `Storyworthtelling.Updates.Tests`: **162 passed, 0 failed** (111 before). `FocusPhone/Codex.Tests`: **3082
   passed, 0 failed**. `RepoGuards.Tests`: **386 passed, 0 failed**. `Watch.Tests`: **132 passed, 0 failed**.
+
+---
+
+# Chunk A5 · the Point installer (W-3.1.2)
+
+Every figure below is from a real run on 21 Nov 2026. As before, the red runs were taken with the tests written and the
+code present only as stubs: methods threw `NotImplementedException`, and `WatchIdentity`'s constants were empty strings.
+
+## What it is
+
+`Watch/Point.Installer`: a Wear OS app (`net10.0-android`, `SupportedOSPlatformVersion` 34, the suite's one minimum:
+`USER_ACTION_NOT_REQUIRED` needs API 31 and both watches run Wear OS 6, API 36, so nothing asks for more and
+`OneBuildSettingTests` is untouched) under Flyleaf's package, `com.storyworthtelling.focusphone.launcher` (PC1, PC8). It
+has no activity and no launcher entry (WD §11), declares `uses-feature android.hardware.type.watch` and
+`com.google.android.wearable.standalone` = false (it is nothing without Flyleaf), and asks for three permissions:
+`REQUEST_INSTALL_PACKAGES`, `UPDATE_PACKAGES_WITHOUT_USER_ACTION` and `POST_NOTIFICATIONS`. Its `<queries>` name the other
+four watch packages, so it can see their versions. Label "Point installer". The Data Layer comes from Microsoft's
+`Xamarin.GooglePlayServices.Wearable` **120.0.1.2** (published 2 Sep 2026; CLAUDE.md dependency rule 2), version in
+`Directory.Packages.props`; every member name was read from the package's own assembly with `MetadataLoadContext` before a
+call was written (the override pairs on `WearableListenerService` take `ChannelClient.IChannel`, not the old
+`ChannelApi` channel; `ChannelClient.ActionChannelEvent`, `MessageClient.ActionMessageReceived` and the close reasons are
+`const`, so the intent filters name them).
+
+**The pure half, in `Watch.Domain`** (which now references `Storyworthtelling.Updates`, BCL only):
+- `WatchIdentity`: the frozen identifiers of plan §4 as literals: the five packages, the two Data Layer paths
+  (`/update/apk`, `/update/installed`), the capability (`point-installer`), the three registered component names
+  (`…launcher.point.UpdateListenerService`, `…InstallStatusReceiver`, `…ReplacedReceiver`), the preferences file
+  (`point-installer`) and key (`results`), and the notification channel (`point-install`).
+- `update/apk` (`UpdateApkFrame`, `UpdateApkHeader`, `UpdatePaths`): Flyleaf opens a channel on `/update/apk/<transfer>`
+  (1–64 of `a–z 0–9 -`, chosen by the sender) and writes four bytes of header length (big-endian), a UTF-8 JSON header
+  `{v, package, versionCode, form, length, sha256}`, then exactly the APK. `Unpack` refuses a newer `v` or an unreadable
+  header and copies nothing; otherwise it copies at most `length` bytes, hashing them, and the APK is `Intact` only if it
+  was exactly that long, nothing followed, and the hash matched. A header with no `form` is `Unknown` (this contract is
+  new; unlike a sidecar, nothing was ever written without one).
+- `update/installed` (`InstalledCodec`): `{v, kind: "ask"}` from the phone; `{v, kind: "report", apps, results}` from the
+  watch: each suite app's package and versionCode, and the last outcome of each app's install with the platform's status
+  word for a failure. A newer `v` is refused before anything else is read; one unknown outcome or status word refuses the
+  whole message.
+- `WatchUpdatePlan.Decide(offered, installed)`: the form first (anything but watch is `NotForThisWatch`), then the suite's
+  namespace (`NotOurs`), then A4's own rule, `SiblingUpdatePlan.Decide(Custodian, installer, ApkForm.Watch, …)` (not newer
+  is `AlreadyCurrent`); then **FirstInstall** (not on the watch: the wrist is asked once), **AskedUpdate** (installed by
+  another installer, by hand with adb: asked once, after which this installer is of record) or **SilentUpdate** (this
+  installer is its installer of record, or the package is the installer itself, which may update itself).
+  `Verify(received, reading, installed)` decides on what arrived: a transfer that is not intact, an APK the platform
+  cannot read, or a package or versionCode other than the header's is `Damaged`; the form is
+  `ApkForms.Agree(header, manifest scan, platform's uses-feature list)`, so **the installer refuses a phone APK itself**
+  whatever the header or the phone said; then `Decide` again on the APK's own package and version.
+- `WatchInstallOutcomes`: a platform status as the watch's words (`InstallerStatus`, mapped from `PackageInstallStatus` by
+  name in the Android half, so no platform number is copied) → `Waiting` (pending user action), `Installed`,
+  `InstalledAfterAsking` (success after the same version had been waiting: how R2 is answered), `Declined` (aborted),
+  `Failed` (everything else, with its status word). `SendAgain` is true only for `Damaged` and `Failed`: a prompt waiting
+  on the wrist, or one turned down, is not answered by sending the same APK again. `InstallResults` keeps the last outcome
+  per app, never letting an older build's result replace a newer one's (a newer build abandons the older one's waiting
+  session, whose end can be reported after it).
+- `UpdateLines`: the log lines: `UPDATE <package> <versionCode>: <Outcome>[ — <status>]`, `… Waiting — asked although
+  silence was requested` (R2), `… Waiting — notifications are off, so nothing reached the wrist`, and `CONTRACT
+  update/apk: received v1` / `refused v2, newer than this watch reads` / `refused, unreadable` / `transfer ended,
+  disconnected` / `sent v1` / `not sent, ApiException`. Never an APK's bytes, a message's body or the platform's free-text
+  status message.
+- `InstallPrompt`: the one sentence the wrist is asked, "Tap to install Dash." / "Tap to update Dash.", through
+  `WatchText`'s rules; one notification id per app.
+
+**The Android half** (thin: it carries bytes, asks the platform and reports):
+- `UpdateListenerService` (`WearableListenerService`, exported, two intent filters: `CHANNEL_EVENT` with
+  `pathPrefix=/update/apk` and `MESSAGE_RECEIVED` with `path=/update/installed`). On a channel it asks Play services to
+  `ReceiveFile` into `cache/update-apk/<transfer>.part` (so a process that dies mid-transfer loses nothing, and the
+  close callback finds the file again after a restart); on `OnInputClosed` with a normal close it installs; on an ask it
+  answers the asking node.
+- `WatchInstaller`: unpacks the frame into `<transfer>.apk`, decides on the header, reads the APK itself
+  (`GetPackageArchiveInfo(…, Configurations)` for package, versionCode and `ReqFeatures`, and `ApkManifest.FormOf`),
+  verifies, abandons any session of its own still waiting for the same app (one prompt per app), then opens a
+  `PackageInstaller` session with `SetRequireUserAction(NotRequired)` for a silent update and `Required` otherwise, writes
+  the APK and commits with a status `PendingIntent` to `InstallStatusReceiver`. Files are deleted once the session holds
+  its copy.
+- `InstallStatusReceiver`: classifies the status, records it and reports to every connected node. "Pending user action"
+  puts **one silent card** on the wrist (`InstallCard`: channel importance Low, no vibration, no sound) whose tap opens the
+  system's own prompt; a settled outcome clears it.
+- `ReplacedReceiver` (`MY_PACKAGE_REPLACED`): after the installer updates itself, which ends its process before its own
+  session's status can arrive, it reports what the watch has.
+- Logs go to logcat under the tag `Point`.
+
+## Tests written first
+
+- `Watch/Watch.Tests/Updates/WatchUpdatePlanTests.cs` (29 cases; 26 in the red run, see below): `FirstInstallAsksOnce`, `UpdateOfRecordIsSilent`,
+  `UpdateOfAnotherInstallerAsks`, `TheInstallerUpdatesItselfSilently`, `TheFaceInstallsLikeAnApp`,
+  `TheWatchNeverInstallsAPhoneApk` ×4 (Post's, Score's, Constitution's and Flyleaf's packages), `AnUnknownFormIsRefused`,
+  `OnlyTheSuite` ×3, `TheFormComesFirst`, `NotNewerIsCurrent` ×2, `OtherAppsDoNotCount`, `VerifyInstallsWhatAgrees`,
+  `ADamagedTransferIsRefused`, `WhatThePlatformCannotReadIsRefused`, `AnotherPackageIsRefused`, `AnotherVersionIsRefused`,
+  `APhoneApkCalledAWatchApkIsRefused`, `ReadingsMustAgree` ×3, `AHeaderThatSaysPhoneIsRefused`,
+  `VerifyStillComparesVersions`, `VerifyKeepsTheSilentRule`.
+- `Watch/Watch.Tests/Updates/InstallOutcomeTests.cs` (60 cases, 56 at the first red run): `StatusMeansOneOutcome` ×11, `EveryStatusIsClassified`,
+  `SuccessAfterAskingIsSaid`, `PendingIsWaitingEitherWay`, `AFailureAfterAskingIsAFailure`, `OnlyFailuresAreSentAgain` ×9,
+  `TheOutcomeWordsAreFrozen`, `TheStatusWordsAreFrozen`, `WordsRoundTrip`, `AnyOtherWordIsNoOutcome` ×5,
+  `OneResultPerApp`, `WaitingIsForTheSameVersion`, `ResultsRoundTrip`, `ADamagedRecordReadsEmpty` ×5, the line tests
+  (`TheLineIsTheOutcome`, `AFailureNamesItsStatus`, `AnAskedSilentUpdateIsSaid`, `TheLinesSayWordsAndNumbersOnly`,
+  `AReceiptSaysTheVersion`, `ANewerOneIsRefusedByVersion`, `AnUnreadableOneSaysSo`, `ATransferThatDidNotFinishSaysHow`),
+  `TheWristIsAskedOneSentence` ×7, `EachAppHasItsOwnPrompt`; added in two later rounds (below): `ACardThatCannotShowIsSaid`,
+  `TheInstallersOwnWords`, `AnOlderResultDoesNotReplaceANewerOne`, `ASendSaysTheVersion`.
+- `Watch/Watch.Tests/Updates/UpdateApkTests.cs` (51 cases): `TheHeaderDescribesTheApk`, `TheApkFollowsTheHeader`,
+  `EveryHeaderCarriesAnIntegerV`, `ANewerVersionIsRefused`, `AMalformedHeaderIsUnreadable` ×13, `ABrokenFrameIsUnreadable`
+  ×6, `AnyOtherFormIsUnknown` ×4, `NoFormIsUnknownHere`, `AShortApkIsNotIntact`, `TrailingBytesAreNotIntact`,
+  `AChangedByteIsNotIntact`, `TheCopyNeverRunsPastTheLength`, `TheFieldNamesAreFrozen`, `TheFormIsTheSidecarsWord`,
+  `APathCarriesItsTransfer` ×3, `AnyOtherPathHasNoTransfer` ×11, `ABadTransferIsRefused` ×3.
+- `Watch/Watch.Tests/Updates/InstalledMessageTests.cs` (22 cases): `AnAskRoundTrips`, `AReportRoundTrips`,
+  `AnEmptyReportRoundTrips`, `EveryMessageCarriesAnIntegerV`, `ANewerVersionIsRefused`, `AMalformedMessageIsUnreadable`
+  ×14, `NothingIsUnreadable`, `TheReportSaysNothingElse`, `TheWordsAreFrozen`.
+- `Watch/Watch.Tests/Guard/WatchInvariantsTests.cs` (plan §4): `PackagesAreFrozen`, `EveryPackageIsTheSuites`,
+  `TheInstallerIsFlyleafsPackage` (csproj and manifest), `TheFaceHasItsOwnPackage`, `PathsAreFrozen`,
+  `TheCapabilityIsFrozen`, `TheInstallerAdvertisesItsCapability`, `TheListenerHearsBothPaths`, `ComponentsAreFrozen`,
+  `EachComponentIsRegisteredByItsName` ×3, `StoredNamesAreFrozen`, `TheIdentityIsLiterals` (no `nameof`, every const a
+  literal), `TheIdsAreNotCopiedIntoTheInstaller`, `FormWordsAreFrozen` (A4's five words, now held on the watch's side too),
+  `TheInstallerIsAWatchApp`, `TheInstallerAsksForThreePermissions`, `TheInstallerSeesTheWatchApps`,
+  `TheInstallerHasNoScreen`, `TheInstallerNeverBuzzes`, `FrozenSetsAreNotEmpty`.
+
+## Red
+
+**Watch.Tests, first attempt, not counted:** 309 tests, 173 failed, 136 passed. Two guards passed for the wrong reason,
+over empty sets: `EveryPackageIsTheSuites` (the stub's package list was empty) and `TheIdsAreNotCopiedIntoTheInstaller`
+(no installer sources yet). Each was given an `Assert.NotEmpty`; the code was not touched.
+
+**Red run: `Watch.Tests` 309 tests, 175 failed, 134 passed.** The 134 are A1–A4's 132 and two that pass on the stubs
+because they hold what does not change: `FormWordsAreFrozen` (A4's constants) and `TheIdentityIsLiterals` (the stub's
+constants were literals). The 175: `WatchUpdatePlanTests` 26 of 26, `InstallOutcomeTests` 56 of 56,
+`InstalledMessageTests` 22 of 22, `UpdateApkTests` 51 of 51, `WatchInvariantsTests` 20 of 22. First errors:
+`System.NotImplementedException : The method or operation is not implemented.` (149 of them, the first
+`InstallOutcomeTests.TheWristIsAskedOneSentence`); `Assert.Equal() Failure: Strings differ` (8, the frozen ids stubbed
+empty, first `ComponentsAreFrozen`); `Watch/Point.Installer/Properties/AndroidManifest.xml isn’t there.` (4);
+`Assert.NotEmpty() Failure: Collection was empty` (3); `Assert.Throws() Failure: Exception type was not an exact match`
+(3, `ABadTransferIsRefused`); `The installer has no UpdateListenerService.` The suite reads 312 once the ids are real:
+with every package stubbed as `""`, xUnit folded `TheWatchNeverInstallsAPhoneApk`'s four identical rows into one.
+
+**Second red (two words the Android half needed, `UpdateLines.CannotAsk` and `InstallPrompt.InstallerLabel` /
+`ChannelName`):** 314 tests, 14 failed: the 12 installer guards still waiting for the Android half, `ACardThatCannotShowIsSaid`
+(`NotImplementedException`) and `TheInstallersOwnWords` (`Strings differ`). Green on the Domain: 302 of 314.
+
+**Third red (`UpdateLines.Sent`/`NotSent`, and the older-result rule):** 316 tests, 5 failed: `ASendSaysTheVersion`
+(`NotImplementedException`), `AnOlderResultDoesNotReplaceANewerOne` (the older build's `Declined` replaced the newer one's
+`Waiting`), and three installer guards (`TheInstallerNeverBuzzes`, `EachComponentIsRegisteredByItsName` for the two
+receivers). Green on the Domain: 313 of 316.
+
+**`Storyworthtelling.Updates.Tests`, with the new project in place: 162 tests, 3 failed:**
+`CiHygieneTests.EveryPathFilterCoversEveryProjectItsWorkflowBuilds` ("A change here runs none of the tests that read it:
+test-tools.yml: Storyworthtelling.Updates": FaceStudio builds `Watch.Domain`, which now builds on the Updates library),
+`CiHygieneTests.EveryWatchApkSaysWatch` ("Watch/Point.Installer: declares no android.hardware.type.watch", before the
+manifest existed: A4's guard biting on its first real watch app), and
+`ProjectReferenceTests.EveryProjectThatNamesTheUpdateLibraryReferencesIt` ("Watch/Watch.Tests/Watch.Tests.csproj").
+
+**`FocusPhone/Codex.Tests` (`FrozenInvariantsTests`, 49 tests): 2 failed**, both correct under PC1 and both wrong as
+written: `LauncherCsprojDeclaresFrozenApplicationId` ("Exactly one csproj must declare the frozen launcher ApplicationId
+'com.storyworthtelling.focusphone.launcher'; found 2") and `EveryOwnerHeadIsPublishedToTheRollingRelease` ("These heads
+declare an owner-namespace ApplicationId but no workflow publishes their signed APK … : Watch/Point.Installer").
+
+**`RepoGuards.Tests`, first run after the code: 386 tests, 1 failed:** `FixedWordingTests` flagged "cannot" in a log line
+(`WatchInstallOutcome.cs:206`, "spelled out where the copy contracts"); the line was reworded ("so nothing reached the
+wrist").
+
+## Green
+
+- **`Watch.Tests`: 316 passed, 0 failed.**
+- **`Storyworthtelling.Updates.Tests`: 162 passed, 0 failed**, after `test-tools.yml`'s filter gained
+  `Storyworthtelling.Updates/**`, `Watch.Tests` gained a direct reference, and the manifest declared the watch feature.
+- **`FocusPhone/Codex.Tests`: 3082 passed, 0 failed.** The two guards were changed, not loosened:
+  `LauncherCsprojDeclaresFrozenApplicationId` now holds exactly one *phone* csproj to the launcher's id and allows the
+  id under `Watch/` only to `Watch/Point.Installer/Point.Installer.csproj`; a probe `Watch/ProbeWear/ProbeWear.csproj` with
+  the id failed it ("Only the Point installer may carry the launcher's package on the watch"). The publish guard exempts
+  a `Watch/` head **only while `.github/workflows/build-watch.yml` does not exist**: a probe empty `build-watch.yml` made it
+  fail on `Watch/Point.Installer`, so the exemption ends by itself when W-3.2.1 lands. Both probes were deleted.
+- **`RepoGuards.Tests`: 386 passed, 0 failed.** `FaceStudio.Tests`: 19 passed (the committed face is unchanged).
+  `leakscan --ci` over the chunk's diff: "no personal-data shapes in the added lines".
+- **Compiled here:** `dotnet build Watch/Point.Installer/Point.Installer.csproj -p:AndroidSdkDirectory=/opt/android-sdk-min
+  -p:AndroidUseApkSigner=false`. dl.google.com was reachable, so Xamarin.Build.Download fetched the play-services aars. The
+  first build failed with two errors: `CS0104` (`Environment` ambiguous between `Android.OS.Environment` and
+  `System.Environment`) and `CS0121` (`PackageManager.PackageInfoFlags.Of(0)` ambiguous between `Of(long)` and
+  `Of(PackageInfoFlagsLong)`); both fixed. **Build succeeded, 0 warnings, 0 errors**, Debug and Release; `Watch.Ui.Wear`
+  still builds with 0 warnings.
+- **The built APK:** `aapt2 dump badging` reads `package: name='com.storyworthtelling.focusphone.launcher'`,
+  `application-label:'Point installer'`, `uses-feature: name='android.hardware.type.watch'`. The Release merged manifest
+  requests **4 permissions**: the three above and androidx.core's `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (no
+  `INTERNET`: Play services carries the Data Layer); its one `<activity>` is Play services' own non-exported
+  `GoogleApiActivity`. A4's `stage-apks.py`, run on it with real aapt2, staged
+  `com.storyworthtelling.focusphone.launcher-Signed.watch.apk` with the sidecar `{"package":
+  "com.storyworthtelling.focusphone.launcher", "versionCode": 1, "form": "watch"}` under `--form watch`, and refused it
+  under `--form phone` (exit 1, nothing staged). `ApkManifest.FormOf` reads it as `Watch` (and Flyleaf's APK as `Phone`).
+  `check-dependency-graph.py` over its restored graph: no package missing.
+
+## Decisions made in this chunk
+
+- **The prompt is a silent card, because the installer has no screen.** WD §11 gives the installer "only the system's
+  own install prompt". A first install comes back from the session as "pending user action" with that prompt as an
+  intent, and Android does not let a background app put an activity in front of anyone, so the prompt waits behind one
+  notification card per app ("Tap to install Dash."), importance Low, no vibration, no sound (WD §7: none of the four
+  buzzes means this), cleared when the session settles. Its tap opens the system's prompt directly. The owner may
+  overturn the wording or the card.
+- **The owner's one-time adb step becomes `adb install -g`** (A78): `POST_NOTIFICATIONS` is a runtime permission and the
+  installer has no screen to ask from; `-g` grants it at install. Without it every first install waits unseen, and the
+  log says so (`… Waiting — notifications are off, so nothing reached the wrist`). "Install unknown apps" is still allowed
+  once on the wrist, by the system's own flow (or ahead of time with `adb shell appops set
+  com.storyworthtelling.focusphone.launcher REQUEST_INSTALL_PACKAGES allow`).
+- **Each APK is received by Play services into a file named for its transfer** (`ChannelClient.receiveFile`, the Data
+  Layer's own way to move a file), on the path `/update/apk/<transfer>`: the frozen prefix plus a name the sender
+  chooses. A 10–60 MB APK takes minutes over Bluetooth; nothing of the installer's needs to stay alive for it, and the
+  close callback finds the file again in a new process. W-3.1.3 writes the frame with `UpdateApkFrame.Pack` and names
+  the transfer with `UpdatePaths.ApkPathFor`, so both ends share one layout.
+- **The installer reads every APK twice and refuses on any disagreement**, the A4 rule carried to the watch: header,
+  manifest scan and platform must all say watch, and the platform's package and versionCode must be the header's.
+- **Silence is asked for only where the platform may grant it** (installer of record, or itself) and `Required` is set
+  otherwise; the outcome says which way it went (`Installed` against `InstalledAfterAsking`), and the log line says when
+  silence was asked for and the wrist was asked anyway, which is risk R2 found on the first update.
+- **`update/installed` is one path with a `kind`**, since the plan names one contract for both directions; a report goes
+  to the node that asked, and to every connected node after each settled outcome and after the installer replaces
+  itself.
+- **What is logged:** outcomes, contract lines and the platform's status *word*, never the platform's free-text status
+  message (which names packages and paths, and is not needed to tell a signature clash, `conflict`, from a full disk,
+  `storage`), and never an APK's bytes. The watch has no log loop yet, so the lines are in logcat and the outcomes reach
+  the phone in the report, where W-3.1.3 can log them.
+- **The FocusPhone guards learnt PC1** as described above, rather than being exempted wholesale.
+
+## Not done, not verified
+
+- **Built, device check pending: all of it.** Play services delivering a channel and a message to the installer;
+  `receiveFile` writing into the installer's cache and `onInputClosed` arriving, including after the process died;
+  a 10–60 MB APK over Bluetooth and over the cloud relay; the card on Wear OS 6 and its tap opening the system's prompt;
+  the "install unknown apps" step; `GetInstallSourceInfo` naming this installer after a first install; the self-update and
+  its `MY_PACKAGE_REPLACED` report; the `<queries>` visibility.
+- **Whether `USER_ACTION_NOT_REQUIRED` works on Wear OS 6 is unverified** (risk R2; documented for phones since Android
+  12). If it does not, each update asks once on the wrist and the log says so.
+- **The stopped state:** an app installed with adb and never started is in Android's stopped state; whether Play services
+  binds the listener of an app that has never run is unverified. If it does not, the one-time adb step needs one command
+  that starts a component.
+- **A card swiped away without an answer leaves its session waiting** (`Waiting`, not sent again); sending the same build
+  again, or a newer one, replaces it. W-3.1.3 decides whether to re-offer a waiting build.
+- **A full disk while the frame is unpacked** is logged as `UPDATE work stopped: System.IO.IOException` with no outcome
+  recorded; the phone sees the version unchanged.
+- **Not in this chunk:** Flyleaf's sender and its own sent-record (W-3.1.3); the watch workflow, signing with the suite's
+  keystore (the Data Layer delivers only between apps of one signature, so a debug-signed installer will not hear the
+  release-signed Flyleaf), band 11, publishing, and the APP ID / FORM / ICON / FONT / DEPENDENCY checks (W-3.2.1). No CI
+  workflow builds the installer or runs `Watch.Tests` yet. The installer has **no launcher icon resource** (it has no
+  launcher entry; the system shows its default in the watch's settings); an IconStudio icon is W-3.2.1's if the ICON CHECK
+  wants one. CLAUDE.md has no P14 section with the installer's build command; left to the release.
+
+## Chunk A5 totals
+
+- `Watch.Tests`: **316 passed, 0 failed** (132 before). `Storyworthtelling.Updates.Tests`: **162 passed, 0 failed**.
+  `FocusPhone/Codex.Tests`: **3082 passed, 0 failed**. `RepoGuards.Tests`: **386 passed, 0 failed**. `FaceStudio.Tests`:
+  19 passed. `Watch/Point.Installer` and `Watch/Watch.Ui.Wear` compile here, 0 warnings.

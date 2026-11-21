@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Watch.Domain\Watch.Domain.csproj" />
+    <!-- The form words and the plan the installer applies (P14 W-3.1.2), named by the update tests. -->
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
   </ItemGroup>
 
   <ItemGroup>
