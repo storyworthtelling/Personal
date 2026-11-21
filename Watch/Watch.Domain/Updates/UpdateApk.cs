@@ -53,6 +53,16 @@ public static class UpdateApkFrame
         return new UpdateApkHeader(package, versionCode, form, length, Convert.ToHexString(hash).ToLowerInvariant());
     }
 
+    /// <summary><see cref="Describe"/> without blocking a thread on the read (finding 3).</summary>
+    public static async Task<UpdateApkHeader> DescribeAsync(string package, long versionCode, ApkForm form, Stream apk, CancellationToken cancellation)
+    {
+        var start = apk.Position;
+        var hash = await SHA256.HashDataAsync(apk, cancellation);
+        var length = apk.Position - start;
+        apk.Position = start;
+        return new UpdateApkHeader(package, versionCode, form, length, Convert.ToHexString(hash).ToLowerInvariant());
+    }
+
     /// <summary>The length prefix and the header, ready to go in front of the APK.</summary>
     public static byte[] Header(UpdateApkHeader header)
     {

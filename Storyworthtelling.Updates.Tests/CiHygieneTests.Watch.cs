@@ -145,7 +145,7 @@ public partial class CiHygieneTests
             .ToList();
         Assert.True(built >= 0 && leaves.All(index => index > built), "The face is built after the APKs leave, or not at all.");
 
-        foreach (var name in new[] { "APP ID CHECK", "FORM CHECK", "ICON CHECK", "FONT CHECK", "DEPENDENCY CHECK" })
+        foreach (var name in new[] { "APP ID CHECK", "FORM CHECK", "ABI CHECK", "ICON CHECK", "FONT CHECK", "DEPENDENCY CHECK" })
         {
             var at = build.IndexOf($"- name: {name}", StringComparison.Ordinal);
             Assert.True(at > built && leaves.All(index => at < index), $"{name} must run after the build and before any APK leaves.");
@@ -174,6 +174,13 @@ public partial class CiHygieneTests
         Assert.Contains($"name='{ApkForms.WatchFeature}'", form, StringComparison.Ordinal);
         Assert.Contains("uses-feature(-not-required)?", form, StringComparison.Ordinal);
 
+        // Every watch app carries 32-bit ARM code as well as 64-bit (P14 release A fix round): a watch whose system runs
+        // 32-bit userspace refuses an APK without it. The face carries no code.
+        var abi = Step(build, "ABI CHECK");
+        Assert.Contains("lib/armeabi-v7a/", abi, StringComparison.Ordinal);
+        Assert.Contains("lib/arm64-v8a/", abi, StringComparison.Ordinal);
+        Assert.Contains("unzip -l", abi, StringComparison.Ordinal);
+
         // A watch app with a launcher entry must carry an icon; one without (the installer) carries none to check, and the
         // face is shown in the picker by its preview.
         var icon = Step(build, "ICON CHECK");
@@ -196,6 +203,8 @@ public partial class CiHygieneTests
 
         Assert.Matches(new Regex(@"if: github\.ref == 'refs/heads/main'\s+uses: \./\.github/actions/publish-rolling-release"), build);
         Assert.Matches(@"(?m)^\s+form: watch\s*$", Step(build, "Publish to rolling GitHub Release"));
+        // To the watch's own release, which no phone reads (P14 release A fix round): never the phone's.
+        Assert.Matches($@"(?m)^\s+release: {Regex.Escape(ReleaseChannels.Watch)}\s*$", Step(build, "Publish to rolling GitHub Release"));
         Assert.Contains("name: Watch-Android", build, StringComparison.Ordinal);
         Assert.Contains("./.github/actions/prune-old-artifacts", build, StringComparison.Ordinal);
     }
@@ -214,6 +223,11 @@ public partial class CiHygieneTests
         Assert.Contains("- '!Watch/**/*.md'", yaml, StringComparison.Ordinal);
         Assert.Contains("- '!Watch/design/**'", yaml, StringComparison.Ordinal);
         Assert.Contains("- '.github/workflows/build-watch.yml'", yaml, StringComparison.Ordinal);
+
+        // Watch.Tests also holds Flyleaf's half of the update channel by its source, and Flyleaf's workflow by its filter
+        // (P14 release A fix round, finding 6): a Flyleaf-only change must run them too.
+        Assert.Contains("FocusPhone/Flyleaf.Android", filters);
+        Assert.Contains("- '.github/workflows/build-flyleaf.yml'", yaml, StringComparison.Ordinal);
     }
 
     private static string WatchWorkflow()

@@ -3,6 +3,23 @@ namespace FaceStudio.Tests;
 /// <summary>The face packs into an APK with no code (W-2.1.1), with aapt2 from the Android SDK.</summary>
 public class ApkTests
 {
+    // Release A fix round: build-tools and the workload's packs are version folders, and "9.0.0" sorts after "36.0.0" as
+    // text, so the newest is chosen by number.
+    [Fact]
+    public void TheNewestToolsComeFirstByNumber()
+    {
+        Assert.Equal(["36.0.0", "34.0.0", "9.0.0"], Apk.NewestFirst(["9.0.0", "36.0.0", "34.0.0"]).Select(Path.GetFileName));
+        Assert.Equal(["/sdk/build-tools/36.1.118", "/sdk/build-tools/36.0.0", "/sdk/build-tools/35.0.105"],
+            Apk.NewestFirst(["/sdk/build-tools/35.0.105", "/sdk/build-tools/36.0.0", "/sdk/build-tools/36.1.118"]));
+    }
+
+    [Fact]
+    public void AFolderThatIsNoVersionComesLast()
+    {
+        Assert.Equal(["10.0.0", "2.0", "debian"], Apk.NewestFirst(["debian", "2.0", "10.0.0"]).Select(Path.GetFileName));
+        Assert.Equal(["36.0.0", "36.0.0-rc1"], Apk.NewestFirst(["36.0.0-rc1", "36.0.0"]).Select(Path.GetFileName));
+    }
+
     [Fact]
     public void TheBuiltApkHasNoCode()
     {

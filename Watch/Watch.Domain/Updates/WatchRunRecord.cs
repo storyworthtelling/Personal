@@ -276,4 +276,13 @@ public static class WatchSendLines
     };
 
     public static string LeftForNextRun(string package, long versionCode) => $"WATCH {package} {versionCode}: left for the next run";
+
+    /// <summary>The run's deadline came before <paramref name="step"/>, which was not started (finding 4).</summary>
+    public static string OutOfTime(string step) => $"WATCH run: out of time before {step}, so it waits for the next run";
+
+    /// <summary>Another watch run held the gate until this run's deadline; this one looked for nothing.</summary>
+    public static string Busy() => "WATCH run: another run held the gate until this run’s time was up, so nothing was looked for";
+
+    /// <summary>A Data Layer call that had not answered within its wait; <paramref name="call"/> names the call.</summary>
+    public static string TimedOut(string call) => $"WATCH run: {call} didn’t answer in time";
 }

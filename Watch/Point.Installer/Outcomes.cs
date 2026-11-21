@@ -81,6 +81,43 @@ internal static class ResultStore
         context.GetSharedPreferences(WatchIdentity.InstallerPreferences, FileCreationMode.Private)!;
 }
 
+/// <summary>
+/// Each app's current install session and the sessions this installer abandoned (release A fix round, finding 5), in
+/// the installer's preferences under the same lock as the results, so a status is judged by the session it is for.
+/// </summary>
+internal static class SessionStore
+{
+    private static readonly Lock Gate = new();
+
+    public static InstallSessionRecord Read(Context context)
+    {
+        lock (Gate)
+        {
+            return InstallSessions.Decode(Preferences(context).GetString(WatchIdentity.SessionsKey, null));
+        }
+    }
+
+    public static void Began(Context context, InstallSession session) => Change(context, record => InstallSessions.Began(record, session));
+
+    public static void Abandoning(Context context, int sessionId) => Change(context, record => InstallSessions.Abandoning(record, sessionId));
+
+    public static void Ended(Context context, string package, int sessionId) => Change(context, record => InstallSessions.Ended(record, package, sessionId));
+
+    // Committed, not applied: the platform's status for a session can arrive in a new process moments later.
+    private static void Change(Context context, Func<InstallSessionRecord, InstallSessionRecord> change)
+    {
+        lock (Gate)
+        {
+            var preferences = Preferences(context);
+            var record = change(InstallSessions.Decode(preferences.GetString(WatchIdentity.SessionsKey, null)));
+            preferences.Edit()!.PutString(WatchIdentity.SessionsKey, InstallSessions.Encode(record))!.Commit();
+        }
+    }
+
+    private static ISharedPreferences Preferences(Context context) =>
+        context.GetSharedPreferences(WatchIdentity.InstallerPreferences, FileCreationMode.Private)!;
+}
+
 /// <summary>Sends the watch's report on <c>update/installed</c>: to the node that asked, or to every node connected.</summary>
 internal static class Reporter
 {

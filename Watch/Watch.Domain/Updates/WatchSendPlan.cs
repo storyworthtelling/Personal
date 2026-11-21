@@ -97,8 +97,19 @@ public static class WatchSendPlan
     /// <summary>How long a build left waiting on the wrist is left alone before it is offered again.</summary>
     public static readonly TimeSpan WaitingOffer = TimeSpan.FromDays(3);
 
-    /// <summary>How long one run spends starting sends; what is left goes on the next run.</summary>
-    public static readonly TimeSpan SendBudget = TimeSpan.FromMinutes(5);
+    /// <summary>How long one Data Layer call is waited for (finding the watch, asking it, opening a channel or its
+    /// stream): a call that has not answered by then is taken as out of reach, so the run's gate is always let go.</summary>
+    public static readonly TimeSpan DataLayerWait = TimeSpan.FromSeconds(30);
+
+    /// <summary>How long closing a channel is waited for.</summary>
+    public static readonly TimeSpan CloseWait = TimeSpan.FromSeconds(10);
+
+    /// <summary>How long a send waits for the installer to report on it before its channel is closed.</summary>
+    public static readonly TimeSpan ReportWait = TimeSpan.FromMinutes(1);
+
+    /// <summary>What a send needs left of the run to start at all (the download, the transfer and the report's wait);
+    /// with less, it waits for the next run.</summary>
+    public static readonly TimeSpan SendNeeds = TimeSpan.FromMinutes(3);
 
     /// <param name="offered">Every APK on the release as the phone read it (sidecar and name agreed); only the watch ones
     /// are decided.</param>

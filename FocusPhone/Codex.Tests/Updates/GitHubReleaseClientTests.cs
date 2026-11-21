@@ -5,7 +5,11 @@ namespace Codex.Tests.Updates;
 
 public class GitHubReleaseClientTests
 {
-    private const string LatestUrl = "https://api.github.com/repos/storyworthtelling/Personal/releases/latest";
+    // The phone's release by its tag (P14 release A fix round): never releases/latest, which is whichever release GitHub
+    // calls latest, and never the watch's.
+    private const string LatestUrl = "https://api.github.com/repos/storyworthtelling/Personal/releases/tags/apps-latest";
+
+    private const string WatchUrl = "https://api.github.com/repos/storyworthtelling/Personal/releases/tags/watch-latest";
 
     // browser_download_url is deliberately the public github.com URL — the fixture proves the
     // client does NOT use it (a token-authenticated GET of it 404s on a private repo) and instead
@@ -26,12 +30,12 @@ public class GitHubReleaseClientTests
         new(new HttpClient(handler), "storyworthtelling/Personal", "token123");
 
     [Fact]
-    public async Task GetLatestRelease_ParsesTagAndApkAssets()
+    public async Task GetRelease_ParsesTagAndApkAssets()
     {
         var handler = new FakeHttpMessageHandler();
         handler.Respond(LatestUrl, SampleRelease);
 
-        var release = await NewClient(handler).GetLatestReleaseAsync();
+        var release = await NewClient(handler).GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
 
         Assert.Equal("focusphone-v1.4.0", release.TagName);
         Assert.Equal(2, release.ApkAssets.Count);
@@ -40,12 +44,12 @@ public class GitHubReleaseClientTests
     }
 
     [Fact]
-    public async Task GetLatestRelease_DownloadUrlIsAuthenticatedAssetApiUrl()
+    public async Task GetRelease_DownloadUrlIsAuthenticatedAssetApiUrl()
     {
         var handler = new FakeHttpMessageHandler();
         handler.Respond(LatestUrl, SampleRelease);
 
-        var release = await NewClient(handler).GetLatestReleaseAsync();
+        var release = await NewClient(handler).GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
 
         // Must be the api.github.com asset endpoint (built from repo + id), not the public
         // github.com browser_download_url, or the download 404s against the private repo.
@@ -55,23 +59,23 @@ public class GitHubReleaseClientTests
     }
 
     [Fact]
-    public async Task GetLatestRelease_ExcludesNonApkAssets()
+    public async Task GetRelease_ExcludesNonApkAssets()
     {
         var handler = new FakeHttpMessageHandler();
         handler.Respond(LatestUrl, SampleRelease);
 
-        var release = await NewClient(handler).GetLatestReleaseAsync();
+        var release = await NewClient(handler).GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
 
         Assert.DoesNotContain(release.ApkAssets, a => a.Name == "checksums.txt");
     }
 
     [Fact]
-    public async Task GetLatestRelease_SendsAuthAndApiHeaders()
+    public async Task GetRelease_SendsAuthAndApiHeaders()
     {
         var handler = new FakeHttpMessageHandler();
         handler.Respond(LatestUrl, SampleRelease);
 
-        await NewClient(handler).GetLatestReleaseAsync();
+        await NewClient(handler).GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
 
         var request = Assert.Single(handler.Requests);
         Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
@@ -80,12 +84,12 @@ public class GitHubReleaseClientTests
     }
 
     [Fact]
-    public async Task GetLatestRelease_HttpFailure_ThrowsWithRepoInMessage()
+    public async Task GetRelease_HttpFailure_ThrowsWithRepoInMessage()
     {
         var handler = new FakeHttpMessageHandler();
         var client = new GitHubReleaseClient(new HttpClient(handler), "storyworthtelling/Other", "t");
 
-        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetLatestReleaseAsync());
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone));
         Assert.Contains("storyworthtelling/Other", ex.Message);
     }
 
@@ -104,7 +108,7 @@ public class GitHubReleaseClientTests
             """{"package":"com.storyworthtelling.focusphone.launcher","versionCode":100321}""");
         var client = NewClient(handler);
 
-        var release = await client.GetLatestReleaseAsync();
+        var release = await client.GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
         var apk = Assert.Single(release.ApkAssets);
         var candidate = await client.ReadSidecarAsync(release, apk);
 
@@ -130,7 +134,7 @@ public class GitHubReleaseClientTests
             """{"package":"com.storyworthtelling.focusphone.communication","versionCode":1103500000,"form":"watch"}""");
         var client = NewClient(handler);
 
-        var release = await client.GetLatestReleaseAsync();
+        var release = await client.GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
         var phone = await client.ReadSidecarAsync(release, release.ApkAssets.Single(a => a.Id == 21));
         var watch = await client.ReadSidecarAsync(release, release.ApkAssets.Single(a => a.Id == 23));
 
@@ -142,12 +146,43 @@ public class GitHubReleaseClientTests
     }
 
     [Fact]
+    public async Task EachReleaseIsReadByItsOwnTag()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(LatestUrl, """{"tag_name":"apps-latest","assets":[{"id":1,"name":"Flyleaf-Signed.apk"}]}""");
+        handler.Respond(WatchUrl, """{"tag_name":"watch-latest","assets":[{"id":2,"name":"com.storyworthtelling.focusphone.launcher-Signed.watch.apk"}]}""");
+        var client = NewClient(handler);
+
+        var phone = await client.GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
+        var watch = await client.GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Watch);
+
+        Assert.Equal("apps-latest", phone.TagName);
+        Assert.Equal(1, Assert.Single(phone.ApkAssets).Id);
+        Assert.Equal("watch-latest", watch.TagName);
+        Assert.Equal(2, Assert.Single(watch.ApkAssets).Id);
+        Assert.Equal([LatestUrl, WatchUrl], handler.Requests.Select(request => request.RequestUri!.ToString()));
+    }
+
+    [Fact]
+    public async Task ARepositorysLatestReleaseIsNeverAsked()
+    {
+        // Whichever release GitHub calls latest is not the phone's question: a second release made latest by mistake
+        // would otherwise be installed from.
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(LatestUrl, SampleRelease);
+
+        await NewClient(handler).GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
+
+        Assert.DoesNotContain(handler.Requests, request => request.RequestUri!.AbsolutePath.EndsWith("/releases/latest", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AnApkWithNoSidecarHasNoCandidate()
     {
         var handler = new FakeHttpMessageHandler();
         handler.Respond(LatestUrl, SampleRelease);
         var client = NewClient(handler);
-        var release = await client.GetLatestReleaseAsync();
+        var release = await client.GetReleaseAsync(Storyworthtelling.Updates.ReleaseChannels.Phone);
 
         Assert.Null(await client.ReadSidecarAsync(release, release.ApkAssets[0]));
     }

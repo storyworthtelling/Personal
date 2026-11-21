@@ -47,6 +47,9 @@ public class WatchInvariantsTests
         return File.ReadAllText(path);
     }
 
+    // A source without its comments.
+    private static string Code(string path) => Regex.Replace(Text(path), @"///.*|//.*", string.Empty);
+
     private static IEnumerable<string> InstallerSources() =>
         Directory.Exists(Installer())
             ? Directory.EnumerateFiles(Installer(), "*.cs", SearchOption.AllDirectories).Where(path => !WatchFiles.IsBuildOutput(path))
@@ -153,6 +156,96 @@ public class WatchInvariantsTests
         Assert.Equal("point-installer", WatchIdentity.InstallerPreferences);
         Assert.Equal("results", WatchIdentity.ResultsKey);
         Assert.Equal("point-install", WatchIdentity.InstallChannel);
+        Assert.Equal("sessions", WatchIdentity.SessionsKey);
+    }
+
+    [Fact]
+    public void StatusExtrasAreFrozen()
+    {
+        // A session's status intent is made by one installer and can be read by the next (its own update), so its extras
+        // are wire names (release A fix round, finding 5).
+        Assert.Equal("package", WatchIdentity.StatusPackageExtra);
+        Assert.Equal("versionCode", WatchIdentity.StatusVersionCodeExtra);
+        Assert.Equal("action", WatchIdentity.StatusActionExtra);
+        Assert.Equal("silence", WatchIdentity.StatusSilenceExtra);
+        Assert.Equal("session", WatchIdentity.StatusSessionExtra);
+    }
+
+    [Fact]
+    public void EachStatusIsJudgedByItsSession()
+    {
+        var receiver = Code(Installer("InstallStatusReceiver.cs"));
+        var installer = Code(Installer("WatchInstaller.cs"));
+
+        // The status intent carries its session and the action's frozen word, never an enum's name.
+        Assert.Contains("WatchIdentity.StatusSessionExtra", receiver, StringComparison.Ordinal);
+        Assert.Contains("WatchUpdateActions.Word(decision.Action)", receiver, StringComparison.Ordinal);
+        Assert.Contains("WatchUpdateActions.FromWord(", receiver, StringComparison.Ordinal);
+        Assert.DoesNotContain("Action.ToString()", receiver, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enum.TryParse", receiver, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"const string \w+Extra = """, receiver);
+        Assert.Contains("InstallSessions.Judge(", receiver, StringComparison.Ordinal);
+
+        // A session is recorded as abandoned before it is abandoned, and as begun before it is committed, so its status
+        // always finds it.
+        var abandoning = installer.IndexOf("SessionStore.Abandoning(", StringComparison.Ordinal);
+        var abandon = installer.IndexOf("AbandonSession(", StringComparison.Ordinal);
+        Assert.True(abandoning >= 0 && abandon > abandoning, "The installer abandons a session it hasn't recorded as abandoned.");
+        var began = installer.IndexOf("SessionStore.Began(", StringComparison.Ordinal);
+        var commit = installer.IndexOf(".Commit(", StringComparison.Ordinal);
+        Assert.True(began >= 0 && commit > began, "The installer commits a session it hasn't recorded as begun.");
+
+        // The store keeps the record with the domain's own rules, under the results' preferences file.
+        var store = Code(Installer("Outcomes.cs"));
+        Assert.Contains("InstallSessions.Abandoning(", store, StringComparison.Ordinal);
+        Assert.Contains("InstallSessions.Began(", store, StringComparison.Ordinal);
+        Assert.Contains("WatchIdentity.SessionsKey", store, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EveryWatchAppCarries32BitArm()
+    {
+        // .NET for Android builds 64-bit ARM and x64 unless told otherwise, and a watch whose system runs 32-bit userspace
+        // will not install an APK with no armeabi-v7a code (release A fix round, finding 2). A library's code goes into the
+        // app's APK, so the apps are what say it.
+        var apps = Directory.EnumerateFiles(Path.Combine(WatchFiles.RepoRoot(), "Watch"), "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !WatchFiles.IsBuildOutput(path) && File.ReadAllText(path).Contains("<ApplicationId>", StringComparison.Ordinal))
+            .ToList();
+        Assert.NotEmpty(apps);
+
+        foreach (var app in apps)
+        {
+            var identifiers = Regex.Match(File.ReadAllText(app), @"<RuntimeIdentifiers>([^<]*)</RuntimeIdentifiers>");
+            var named = identifiers.Success ? identifiers.Groups[1].Value.Split(';', StringSplitOptions.TrimEntries) : [];
+            Assert.True(named.Contains("android-arm") && named.Contains("android-arm64"),
+                $"{Path.GetRelativePath(WatchFiles.RepoRoot(), app)} doesn't build for android-arm and android-arm64.");
+        }
+    }
+
+    [Fact]
+    public void TheWatchWorkflowRunsWhenAnythingTheWatchTestsReadChanges()
+    {
+        // Every path outside Watch/ that a watch test names from the repository's root must wake build-watch.yml, or a
+        // change there alone (Flyleaf's half of the update channel, say) runs none of the guards that read it (release A
+        // fix round, finding 6).
+        var workflow = Text(Path.Combine(WatchFiles.RepoRoot(), ".github", "workflows", "build-watch.yml"));
+        var filters = Regex.Matches(workflow, @"(?m)^\s+- '([^'!][^']*)'\s*$").Select(match => match.Groups[1].Value).ToList();
+        var tests = Directory.EnumerateFiles(Path.Combine(WatchFiles.RepoRoot(), "Watch", "Watch.Tests"), "*.cs", SearchOption.AllDirectories)
+            .Where(path => !WatchFiles.IsBuildOutput(path));
+
+        var read = tests
+            .SelectMany(path => Regex.Matches(File.ReadAllText(path), @"RepoRoot\(\)\s*,\s*(""[^""]+""(?:\s*,\s*""[^""]+"")*)"))
+            .Select(match => string.Join('/', Regex.Matches(match.Groups[1].Value, @"""([^""]+)""").Select(part => part.Groups[1].Value)))
+            .Where(path => !path.StartsWith("Watch/", StringComparison.Ordinal) && path != "Watch")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        Assert.Contains("FocusPhone/Flyleaf.Android", read);
+
+        var missed = read
+            .Where(path => !filters.Any(filter => filter == path
+                || (filter.EndsWith("/**", StringComparison.Ordinal) && (path + "/").StartsWith(filter[..^2], StringComparison.Ordinal))))
+            .ToList();
+        Assert.True(missed.Count == 0, "build-watch.yml doesn't run when these change, though the watch tests read them:\n" + string.Join("\n", missed));
     }
 
     [Fact]
@@ -325,6 +418,64 @@ public class WatchInvariantsTests
         Assert.Contains(@"..\..\Watch\Watch.Domain\Watch.Domain.csproj", project, StringComparison.Ordinal);
         Assert.Contains("<PackageReference Include=\"Xamarin.GooglePlayServices.Wearable\" />", project, StringComparison.Ordinal);
         Assert.DoesNotContain(FlyleafSources(), path => File.ReadAllText(path).Contains("BinaryPrimitives", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TheWatchHalfRunsOffTheMainThread()
+    {
+        // "Install from GitHub now" awaits the watch half from the settings screen; hashing and sending a 10–60 MB APK
+        // there froze it (release A fix round, finding 3).
+        var service = Code(Flyleaf("UpdateService.cs"));
+        var send = Regex.Match(service, @"public static Task SendToWatchAsync\([^)]*\)\s*=>(?<body>[^;]+;)", RegexOptions.Singleline);
+        Assert.True(send.Success, "UpdateService has no SendToWatchAsync.");
+        Assert.Contains("Task.Run(", send.Groups["body"].Value, StringComparison.Ordinal);
+
+        var half = Code(Flyleaf("WatchUpdates.cs"));
+        Assert.Contains("UpdateApkFrame.DescribeAsync(", half, StringComparison.Ordinal);
+        Assert.DoesNotContain("UpdateApkFrame.Describe(", half, StringComparison.Ordinal);
+        Assert.Contains(".ReadAsync(", half, StringComparison.Ordinal);
+        Assert.Contains(".WriteAsync(", half, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"\bapk\.Read\(", half);
+    }
+
+    [Fact]
+    public void EveryDataLayerWaitIsBounded()
+    {
+        // A Data Layer call that never answers held the watch's gate for good (release A fix round, finding 4): every one
+        // is waited for at most its own wait, cut to what is left of the run.
+        var half = Code(Flyleaf("WatchUpdates.cs"));
+        string[] calls = ["GetCapabilityAsync(", "SendMessageAsync(", "OpenChannelAsync(", "GetOutputStreamAsync(", "CloseAsync("];
+
+        var lines = half.Split('\n');
+        var unbounded = lines
+            .Select((line, index) => (Line: line, Number: index + 1))
+            .Where(entry => calls.Any(call => entry.Line.Contains(call, StringComparison.Ordinal)))
+            .Where(entry => !entry.Line.Contains("BoundedAsync(", StringComparison.Ordinal))
+            .Select(entry => $"WatchUpdates.cs:{entry.Number}: {entry.Line.Trim()}")
+            .ToList();
+
+        Assert.NotEmpty(lines.Where(line => calls.Any(call => line.Contains(call, StringComparison.Ordinal))));
+        Assert.True(unbounded.Count == 0, "A Data Layer call waited for with no bound:\n" + string.Join("\n", unbounded));
+        Assert.Contains("WatchReports.WaitAsync(ticket, deadline.Cut(", half, StringComparison.Ordinal);
+        Assert.Contains("WatchReports.WaitForAsync(", half, StringComparison.Ordinal);
+        Assert.Contains("deadline.Cut(DateTimeOffset.UtcNow, WatchSendPlan.ReportWait)", half, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheWorkerHandsItsDeadlineDown()
+    {
+        // One deadline, from the start of DoWork, reaches the watch half; the owner's tap takes one from the tap.
+        var service = Code(Flyleaf("UpdateService.cs"));
+        var settings = Code(Flyleaf("LauncherSettingsActivity.cs"));
+        var half = Code(Flyleaf("WatchUpdates.cs"));
+
+        Assert.Matches(@"public override Result DoWork\(\)\s*=>\s*HeadDiagnostics\.Worker\(nameof\(UpdateWorker\),\s*\(\)\s*=>\s*Check\(RunDeadline\.From\(DateTimeOffset\.UtcNow\)\)\);", service);
+        Assert.Contains("SendToWatchAsync(ApplicationContext, force: false, deadline)", service, StringComparison.Ordinal);
+        Assert.Contains("WatchGate.TryRunAsync(", service, StringComparison.Ordinal);
+        Assert.Matches(@"var deadline = RunDeadline\.From\(DateTimeOffset\.UtcNow\);[\s\S]*SendToWatchAsync\(this, force: true, deadline\)", settings);
+        Assert.Contains("deadline.Allows(DateTimeOffset.UtcNow, WatchSendPlan.SendNeeds)", half, StringComparison.Ordinal);
+        Assert.DoesNotContain("SendBudget", half, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stopwatch", half.Split("class WatchReports")[0], StringComparison.Ordinal);
     }
 
     [Fact]

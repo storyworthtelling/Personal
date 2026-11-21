@@ -1076,3 +1076,238 @@ from the suite's secrets):
 - `Storyworthtelling.Updates.Tests`: **174 passed, 0 failed** (162 before). `Watch.Tests`: **389 passed, 0 failed**.
   `FocusPhone/Codex.Tests`: **3082 passed, 0 failed**. `RepoGuards.Tests`: **386 passed, 0 failed**. `FaceStudio.Tests`:
   **19 passed, 0 failed**.
+
+---
+
+# Release A fix round
+
+An independent review of release A (A1–A7, draft PR #385) found seven faults and some nits, and CI found one more (the
+log-loop gate). Every figure below is from a real run on 21 Nov 2026. As before, the red runs were taken with the tests
+written and the new code present only as stubs: methods threw `NotImplementedException`, and new constants were empty
+strings or zero.
+
+## The findings, and what each fix is
+
+1. **CRITICAL — the phones already deployed would have installed the watch's APKs.** Every Flyleaf and Score on `main`
+   reads `releases/latest` (which is `apps-latest`), lists its assets by `.apk` and installs by package, whatever the
+   form. A7's `build-watch.yml` published to `apps-latest`, so `…launcher-Signed.watch.apk` (band 11) would have replaced
+   Flyleaf on the locked phone for good, and the face (`com.storyworthtelling.watch.point`, in the suite's namespace and
+   not installed) would have been installed on both phones. A4's form rule only protects phones running A4's code.
+   **Fix:** watch APKs never go to `apps-latest`.
+   - `Storyworthtelling.Updates/ReleaseChannels`: `Phone = "apps-latest"`, `Watch = "watch-latest"`, frozen literals,
+     `For(form)` (none for Unknown).
+   - `publish-rolling-release` takes a `release` input (default `apps-latest`) and refuses, before it reads an APK or
+     asks `gh` anything, every pair but `phone`/`apps-latest` and `watch`/`watch-latest` (so a watch publish that forgets
+     to name its release stops). It now runs under `set -euo pipefail`.
+   - **Creating the watch's release needed what `apps-latest` never did.** GitHub makes a newly created release the
+     repository's latest unless told otherwise, and the deployed phones read `releases/latest`, so `watch-latest` is
+     created `--prerelease --latest=false` (a prerelease is never latest), and an existing one is put back to that with
+     `gh release edit watch-latest --prerelease --latest=false` before anything is uploaded to it. Creating it needs only
+     `contents: write`, which the build job has; the tag is made at `main`'s head, as `apps-latest`'s was.
+   - `build-watch.yml` publishes with `form: watch` and `release: watch-latest`.
+   - `GitHubReleaseClient.GetReleaseAsync(tag)` reads `releases/tags/<tag>`; `GetLatestReleaseAsync` is gone. Flyleaf's
+     phone half and Score read `ReleaseChannels.Phone` only; Flyleaf's watch half (`WatchUpdates`) reads
+     `ReleaseChannels.Watch` only. Nothing in FocusPhone asks for `releases/latest` any more, so a second release made
+     latest by mistake is never installed from. The form rule and the `.watch.apk` naming stay behind all of it.
+2. **HIGH — the installer had no 32-bit ARM code.** Its APK carried `lib/arm64-v8a/` and `lib/x86_64/` only (.NET for
+   Android's default), and a watch whose system runs 32-bit userspace refuses it. **Fix:** `Point.Installer.csproj` sets
+   `<RuntimeIdentifiers>android-arm;android-arm64</RuntimeIdentifiers>`; `WatchInvariantsTests.EveryWatchAppCarries32BitArm`
+   holds every `Watch/` project with an `ApplicationId` to it; `build-watch.yml` gained a fatal **ABI CHECK** (every app
+   APK must carry `lib/armeabi-v7a/` and `lib/arm64-v8a/`; the face has no code). `Watch.Ui.Wear` is a library: its code is
+   compiled into the app's APK, whose identifiers decide the ABIs, so it was left alone.
+3. **MEDIUM-HIGH — "Install from GitHub now" ran the watch half on the main thread.** `UpdateService.SendToWatchAsync` now
+   runs it in `Task.Run` (on the application context); `WatchUpdates` hashes with `UpdateApkFrame.DescribeAsync`
+   (`SHA256.HashDataAsync`), reads the APK with an async `FileStream` and writes each chunk with the Java stream's
+   `WriteAsync`. `ApkArchive.Read` stays synchronous, now on the pool thread.
+4. **MEDIUM — the watch half could outlast WorkManager's ten minutes, and hang holding `WatchGate`.** `Watch.Domain`'s
+   `RunDeadline` (pure): `From(started)` = started + 10 min − 1 min margin; `Left`, `Passed`, `Allows(now, needs)`,
+   `Cut(now, wait)`. `UpdateWorker.DoWork` takes it as it starts and hands it down (the owner's tap takes one from the tap);
+   the watch half starts nothing past it (a send needs `WatchSendPlan.SendNeeds`, 3 min, left; `SendBudget` is gone);
+   every Data Layer await (`GetCapabilityAsync` ×2, `SendMessageAsync`, `OpenChannelAsync`, `GetOutputStreamAsync`,
+   `CloseAsync`) goes through `BoundedAsync` (`DataLayerWait` 30 s, `CloseWait` 10 s, cut to what is left), the report
+   waits are cut too (`AnswerWait`, `ReportWait`), the download and the stream stop at the deadline (a
+   `CancellationTokenSource` on what is left; a stream still held in a write is abandoned and its channel closed), and the
+   gate is waited for only as long as the deadline leaves (`UpdateRunGate.TryRunAsync`, pure and tested in Codex). A call
+   the run stopped waiting for is observed, so its later fault is a log line, not an unobserved exception.
+5. **MEDIUM-LOW — the installer recorded its own abandoned session as a decline.** Sending a build again (or a newer one)
+   abandons the session still waiting, and the platform reports it aborted: that was recorded as `Declined` over the new
+   build's `Waiting`, cleared the new build's card, and stopped the phone sending the build again. **Fix:**
+   `Watch.Domain`'s `InstallSessions` (pure, with its codec): each app's current session (package, build, id, when) and
+   the ids the installer abandoned (newest 32 kept), stored under the installer's frozen `sessions` key (`SessionStore`).
+   `WatchInstaller` records a session as abandoned before abandoning it and as begun before committing it; the status
+   intent carries the session id (`WatchIdentity.StatusSessionExtra`, with the platform's `EXTRA_SESSION_ID` as the
+   fallback). `InstallSessions.Judge` says: **Ignore** a status for an abandoned session or one that is not the app's
+   current session (nothing recorded, no card cleared); **LetGo** an abort on the current session three days (less an
+   hour) after it began, which is the platform dropping a session nobody answered (`PackageInstallerService`'s
+   `MAX_AGE_MILLIS`, read from AOSP, not seen on a watch): the card goes, nothing is recorded, and the build stays
+   `Waiting`, so `WatchSendPlan`'s own three-day rule offers it again; **Settle** everything else as before (and a status
+   with no session id, from an installer before this fix, as it always was). The extras' names are frozen in
+   `WatchIdentity` and the action goes as its frozen word (`WatchUpdateActions`: `refuse`, `first-install`,
+   `asked-update`, `silent-update`), not `Action.ToString()`.
+6. **LOW-MEDIUM — a Flyleaf-only push ran none of the watch guards that read Flyleaf's source.** `build-watch.yml`'s
+   filter now takes `FocusPhone/Flyleaf.Android/**` and `.github/workflows/build-flyleaf.yml` (both read by
+   `WatchInvariantsTests`), and `TheWatchWorkflowRunsWhenAnythingTheWatchTestsReadChanges` collects every path outside
+   `Watch/` that a watch test names from the repository's root and fails if the filter misses one. The cost, accepted:
+   a Flyleaf change on `main` rebuilds and republishes the watch APKs.
+7. **LOW — `[MINUTE] / 59`** divided two whole numbers. FaceStudio writes `[MINUTE] / 59.0`; the face was regenerated with
+   the tool (485 lines of `watchface.xml`, the divisor only) and `TheFaceIsValidWff` validated it against the v4 XSD.
+8. **CI — the log-loop gate never woke for the watch workflow.** `LogLoopReader.Tests.LogLoopWorkflowTests.TheGateWaitsForEveryAppWorkflowThatHasATestJob`
+   failed on PR #385: "build-watch.yml (Build watch APKs) finishing does not wake the gate". **Fix:** `Build watch APKs`
+   joins `log-loop-automerge.yml`'s `workflow_run` list.
+
+**Nits:** CLAUDE.md now says Flyleaf, like Plate, compiles only while dl.google.com is reachable (the Wearable binding's
+aars), and describes the two releases, the deadline and the installer's sessions. Score passes over an asset named as a
+watch APK before downloading it. `FaceStudio.Apk.FindAapt2` orders build-tools and the workload's packs by number
+(`Apk.NewestFirst`: "9.0.0" no longer beats "36.0.0"; a pre-release after its release; a non-version folder last).
+
+**Found by the new tests, also fixed:** the publish action had no `set -e`, so a staging refusal (a watch APK in a phone
+publish) went on to `gh release upload apps-latest --clobber` with no files, and the step's outcome was whatever `gh`
+said. `PublishActionTests.AWatchApkInAPhonePublishStillStops` caught it against a stand-in `gh` that answers 0.
+
+## Tests written first
+
+- `Storyworthtelling.Updates.Tests/ReleaseChannelTests.cs` (3): `TheChannelsAreFrozen` (values, literals not `nameof`),
+  `EachFormHasItsOwnRelease`, `AnUnknownFormHasNoRelease`.
+- `Storyworthtelling.Updates.Tests/PublishActionTests.cs` (14): the action's own `run:` block, its expressions filled in as
+  GitHub fills them, run with bash against a stand-in `gh` (logs each call; `release view <tag>` answers from a fixture)
+  and a stand-in aapt2: `PhoneApksGoToTheirOwnReleaseOnly`, `WatchApksGoToTheirOwnReleaseOnly`,
+  `AWatchPublishToThePhonesReleaseStopsBeforeAnything` (named, and by the default), `APhonePublishToTheWatchsReleaseStopsBeforeAnything`,
+  `AnyOtherPairStops` ×4, `TheStepReadsItsInputsFromItsEnvironment`, `TheReleaseDefaultsToThePhones`,
+  `TheWatchsReleaseIsCreatedAsAPrereleaseThatIsNeverLatest`, `AnExistingWatchReleaseIsKeptOffLatestBeforeAnythingGoesUp`,
+  `ThePhonesReleaseIsCreatedAsTheLatest`, `AWatchApkInAPhonePublishStillStops`.
+- `CiHygieneTests`: `NoWorkflowPublishesAWatchApkToThePhonesRelease`, `TheReleaseRuleBites`; `EveryWatchApkSaysWatch` and
+  `PublishFormGaps` gained the release rule (watch to `watch-latest`, phone to `apps-latest`, unnamed is the default);
+  `TheWatchRuleBites` names the release; `TheWatchPublishesAsWatchFromMainOnly` asks for `release: watch-latest`;
+  `TheWatchChecksAreFatalAndComeBeforeAnyApkLeaves` has the ABI CHECK; `TheWatchFilterCoversWhatTheWatchTestsRead` asks
+  for Flyleaf's folder and workflow.
+- `FocusPhone/Codex.Tests`: `GitHubReleaseClientTests` read the phone's release by its tag throughout, plus
+  `EachReleaseIsReadByItsOwnTag` and `ARepositorysLatestReleaseIsNeverAsked`; `Guard/ReleaseChannelGuardTests` (4):
+  `ThePhoneReadsOnlyThePhonesRelease`, `OnlyTheWatchHalfNamesTheWatchsRelease`, `NothingAsksForTheRepositorysLatestRelease`,
+  `ScoreSkipsAWatchAssetBeforeDownloadingIt`; `UpdateRunGateTests` (5 new): `AFreeGateRunsAtOnce`,
+  `AWaitThatRunsOutRunsNothing`, `AGateHeldOnlyBrieflyIsWaitedFor`, `AThrowingTryFreesTheGateAndTheExceptionReachesTheCaller`,
+  `ANegativeWaitIsNoWait`.
+- `Watch.Tests`: `Updates/RunDeadlineTests.cs` (7), `Updates/InstallSessionTests.cs` (37 cases: the judge, the record and
+  its codec, the action words, and `ALetGoBuildIsOfferedAgain` through `WatchSendPlan`), `UpdateApkTests` (2:
+  `DescribingAsyncIsDescribing`, `DescribingAsyncStopsWhenCancelled`), `FlyleafWatchUpdateTests` (`TheWaitsAreTheDecidedOnes`
+  with the new waits, `ASendNeedsRoomForItsOwnWaits`, `TheRunsTimeIsSaidInWordsOnly`), and `Guard/WatchInvariantsTests`
+  (`StatusExtrasAreFrozen`, `StoredNamesAreFrozen` + `sessions`, `EachStatusIsJudgedByItsSession`,
+  `EveryWatchAppCarries32BitArm`, `TheWatchWorkflowRunsWhenAnythingTheWatchTestsReadChanges`, `TheWatchHalfRunsOffTheMainThread`,
+  `EveryDataLayerWaitIsBounded`, `TheWorkerHandsItsDeadlineDown`).
+- `FaceStudio.Tests`: `TheMinuteIsReadAsAFraction`, `TheNewestToolsComeFirstByNumber`, `AFolderThatIsNoVersionComesLast`.
+
+## Red
+
+- **`Storyworthtelling.Updates.Tests`: 192 tests, 23 failed, 169 passed** (with `ReleaseChannels` stubbed): the 3
+  `ReleaseChannelTests` (`NotImplementedException`, `Strings differ`), 13 `PublishActionTests` (the stub's empty channel
+  made the fixture's path a folder, `UnauthorizedAccessException`, and `The publish action has no release input with a
+  default.`) and 7 `CiHygieneTests` (`build-watch.yml: a watch publish to `, `Pattern not found … release:`,
+  `ABI CHECK must run after the build …`, `Item not found … FocusPhone/Flyleaf.Android`).
+- **Second red, the channels real and the action as A7 left it: 193 tests, 18 failed, 175 passed** (the env-mapping check
+  moved into its own test first, so each run test reached the action's behaviour). This is finding 1 shown:
+  `WatchApksGoToTheirOwnReleaseOnly`: `String: "release upload apps-latest /tmp/…" Expected start: "release upload watch-latest "`;
+  `TheWatchsReleaseIsCreatedAsAPrereleaseThatIsNeverLatest`: `Collection: ["release view apps-latest", "release upload apps-latest …"]`;
+  `AnExistingWatchReleaseIsKeptOffLatestBeforeAnythingGoesUp`: `release create apps-latest … --latest …`; the four
+  `AnyOtherPairStops` and the two cross-release tests published (`Expected: Not 0 Actual: 0`); and
+  `AWatchApkInAPhonePublishStillStops` exited 0 (no `set -e`). Failed: 13 of 14 `PublishActionTests` (the one that
+  passed, `ThePhonesReleaseIsCreatedAsTheLatest`, holds what did not change: A7's action created `apps-latest` with
+  `--latest`) and 5 `CiHygieneTests`; `TheReleaseRuleBites` and `TheWatchRuleBites` passed once the channels were real,
+  since they test the guard's own helpers.
+- **`FocusPhone/Codex.Tests`: 3093 tests, 19 failed, 3074 passed:** the 10 `GitHubReleaseClientTests` reading by tag
+  (`NotImplementedException`), the 5 new `UpdateRunGateTests` (`NotImplementedException`; the two throwing tests
+  `Exception type was not an exact match`), and the 4 `ReleaseChannelGuardTests` (`FocusPhone/Flyleaf.Android/UpdateService.cs
+  doesn't read the phone's release by its tag.`, `Reads releases/latest: FocusPhone/Codex.Infrastructure/Updates/GitHubReleaseClient.cs`,
+  `Score doesn't pass over a watch asset by its name.`, `Collections differ`).
+- **`Watch.Tests`: 446 tests, 59 failed, 387 passed:** every new test (57) and the two changed ones
+  (`TheWaitsAreTheDecidedOnes`, `StoredNamesAreFrozen`). 45 `NotImplementedException`; the guards: `Watch/Point.Installer/Point.Installer.csproj
+  doesn't build for android-arm and android-arm64.`, `WatchUpdates.cs:135: var paired = await capabilities.GetCapabilityAsync(…)`
+  (unbounded), `build-watch.yml doesn't run when these change, though the watch tests read them:` (Flyleaf's folder and
+  workflow), `Sub-string not found … Task.Run(` and `… WatchIdentity.StatusSessionExtra`. A first attempt did not compile
+  (`InstallSessionTests` lacked `using Watch.Tests.Guard;` for `WatchFiles`) and is not counted.
+- **Third red (`UpdateLines.Ignored`/`LetGo`, which the receiver needed):** `TheLinesSayWhatHappenedInWordsAndNumbersOnly`
+  1 of 1 failed, `NotImplementedException`.
+- **`FaceStudio.Tests` (`FACESTUDIO_APK_REQUIRED=1`): 22 tests, 3 failed, 19 passed:** `TheMinuteIsReadAsAFraction`
+  (`485 out of 485 items in the collection did not pass`) and the two `NewestFirst` tests (`NotImplementedException`).
+- **`LogLoopReader.Tests`: 115 tests, 1 failed, 114 passed:** `TheGateWaitsForEveryAppWorkflowThatHasATestJob`,
+  "build-watch.yml (Build watch APKs) finishing does not wake the gate, so a PR it tests would wait for another event."
+  (`LogLoopWorkflowTests.cs:61`), the same failure as PR #385's CI.
+
+## Green
+
+- **On the way:** `Watch.Tests` first read 446 with 6 failed: the five Flyleaf and installer source guards, waiting for the
+  Android half, and `ASendNeedsRoomForItsOwnWaits`, which caught the first `SendNeeds` (2 min) as shorter than a send's own
+  waits (2 × 30 s + 1 min + 10 s): it is 3 min. `EachStatusIsJudgedByItsSession` was pointed at `SessionStore.Abandoning`
+  and `SessionStore.Began` (the store wraps `InstallSessions`, and the guard now also reads the store), and
+  `TheWorkerHandsItsDeadlineDown` at an expression-bodied `DoWork`, which `RepoGuards.Tests/EveryWorkerIsTrailedTests`
+  requires. `RepoGuards.Tests` first read 386 with 1 failed, `DependencyGraphCheckTests.EveryWorkflowThatPublishesAnApkChecksTheGraphBeforeItLeaves`
+  ("build-watch.yml runs … check-dependency-graph.py before its build or after the APK has left"): the filter had gained
+  `.github/actions/publish-rolling-release/**`, which the guard reads as the APK leaving. No other workflow filters on
+  the action (its behaviour is `PublishActionTests`', which a `.github` change runs), so the line went.
+- **`Watch.Tests`: 447 passed, 0 failed. `Storyworthtelling.Updates.Tests`: 193 passed, 0 failed. `RepoGuards.Tests`: 386
+  passed, 0 failed. `FocusPhone/Codex.Tests`: 3093 passed, 0 failed. `LogLoopReader.Tests`: 115 passed, 0 failed
+  (`TheGateWaitsForEveryAppWorkflowThatHasATestJob` green). `FaceStudio.Tests` with `FACESTUDIO_APK_REQUIRED=1`: 22
+  passed, 0 failed** (`TheCommittedFaceIsCurrent` on the regenerated face, `TheFaceIsValidWff` against the v4 XSD, the APK
+  built).
+- **Compiled here** with `-p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false` (dl.google.com was
+  reachable): `Watch/Point.Installer` 0 warnings, 0 errors; `Watch/Watch.Ui.Wear` 0 warnings, 0 errors;
+  `FocusPhone/Flyleaf.Android` 0 errors (34 warnings, none in a changed file); `FocusPhone/Score.Android` 0 errors (219
+  warnings, none in a changed file). A Release `dotnet publish` of the installer carries **`lib/armeabi-v7a/` (47
+  entries) and `lib/arm64-v8a/` (47)**, and no longer `x86_64`. `check-dependency-graph.py .`: "Checked 37 dependency
+  graphs.", nothing missing. The three changed YAML files parse (`yaml.safe_load`): the publish step's `with` is
+  `{form: watch, release: watch-latest, apks: …}` and the action's `release` input defaults to `apps-latest`.
+- **The ABI CHECK, run here** (its `run:` block taken from the YAML): the installer "ok: lib/armeabi-v7a/ and
+  lib/arm64-v8a/", the face (FaceStudio's `--apk`) "ok: no code"; a probe, the installer with `lib/armeabi-v7a/*` deleted,
+  exit 1 ("carries no lib/armeabi-v7a/").
+- **The publish action's own shell, run here** (its `run:` block from the YAML, real aapt2 36.0.0, a stand-in `gh`): the
+  installer and the face with `form: watch`, `release: watch-latest` and no such release → `gh release create watch-latest …
+  --prerelease --latest=false …launcher-Signed.watch.apk …point-Signed.watch.apk` (and their sidecars); with the release
+  there → `gh release edit watch-latest --prerelease --latest=false`, then `gh release upload watch-latest … --clobber`.
+  Flyleaf's phone APK with `form: phone` → `gh release upload apps-latest …launcher-Signed.apk …json --clobber`. `watch` to
+  `apps-latest` and `phone` to `watch-latest`: exit 1, `gh` never called. The installer in a phone publish and Flyleaf in a
+  watch publish: refused by `stage-apks.py`, exit 1, nothing uploaded. No watch asset went near `apps-latest`, and no
+  phone asset near `watch-latest`.
+
+## Decisions made in this round
+
+- **A second release, not a second filter.** The phones already deployed cannot be taught anything before they read the
+  next release, so the only fix that holds for them is that the release they read never carries a watch APK.
+- **Every release is read by its tag**, so a release made latest by mistake (by hand, or a create that forgot
+  `--latest=false`) is never installed from by the new code either; the old phones' safety rests on `watch-latest` being a
+  prerelease, which the action now re-asserts before every upload.
+- **A platform-expired session stays `Waiting`**, rather than gaining a new outcome word: `update/installed`'s words are
+  frozen, and `WatchSendPlan` already re-offers a waiting build after three days. The three days (less an hour) are AOSP's,
+  from memory of `PackageInstallerService`; if the watch keeps sessions longer, the platform's abort comes later and is
+  still let go.
+- **The deadline covers the owner's tap too**, from the tap, so "Install from GitHub now" cannot hold the watch's gate past
+  the next six-hourly run's want of it.
+- **`Watch.Ui.Wear` sets no `RuntimeIdentifiers`:** a library's code is compiled into the app's APK, whose identifiers
+  decide its ABIs; the guard holds the apps.
+- **The watch's filter takes Flyleaf's folder**, as briefed; on `main` that means a Flyleaf change rebuilds and republishes
+  the watch APKs (a new versionCode, so the installer updates itself and the face). Accepted for now; a narrower trigger
+  would need the build job to ask which paths a push touched.
+
+## Not done, not verified
+
+- **Only CI can show** that `gh release create … --prerelease --latest=false` and `gh release edit … --latest=false` are
+  accepted by the runner's `gh` and by GitHub as written, and that `releases/latest` stays `apps-latest` once
+  `watch-latest` exists. Worth checking by hand after the first `main` run: `gh api repos/{repo}/releases/latest --jq
+  .tag_name` must print `apps-latest`.
+- **On a device:** `releases/tags/<tag>` with the update token (the same permission as `releases/latest`); the Data Layer
+  waits and the deadline under a real slow transfer; whether the platform sends a status for a session it drops at its
+  age limit (if it sends none, the record stays `Waiting` anyway); the 32-bit userspace on the Pixel Watch.
+- **The next CI failure on PR #385, found here and not fixed (it needs a decision):** with the gate test green,
+  `log-loop-guard.yml` reaches its later step, `leakscan --ci` over `git diff origin/main...HEAD`, which the failing
+  reader tests had stopped it reaching. Run here over the branch before this round (`origin/main...39fa23ec`) it reports
+  **78 findings**: 77 `card-number` in `Watch/Point.Face/res/raw/watchface.xml` and 1 `coordinates` in
+  `Watch/Watch.Tests/Design/SrgbTests.cs:14`, all from chunks A1–A3. The face's are false positives: a colour list is
+  space-separated `RRGGBB`, and a run of all-digit colours (`003230 003233 003236`) matches the card rule
+  (`\b(?:\d[ -]?){12,18}\d\b`) and can pass Luhn. This round's commit alone has 77 (the regenerated face's lines are
+  "added" again). The options are a narrower card rule, a named exemption for the generated face, or a different colour
+  format in the face (unverified on a watch); each changes a privacy guard or the face, so it is left to the owner.
+- **The installer's own Data Layer awaits** (`Reporter`'s `GetConnectedNodesAsync`/`SendMessageAsync`) are not bounded:
+  they run inside a broadcast's `GoAsync`, which holds no gate, and the finding was the phone's gate.
+
+## Release A fix round totals
+
+- `Watch.Tests`: **447 passed, 0 failed** (389 before). `Storyworthtelling.Updates.Tests`: **193 passed, 0 failed** (174).
+  `FocusPhone/Codex.Tests`: **3093 passed, 0 failed** (3082). `RepoGuards.Tests`: **386 passed, 0 failed**.
+  `LogLoopReader.Tests`: **115 passed, 0 failed** (114 of 115 on PR #385). `FaceStudio.Tests`: **22 passed, 0 failed** (19).

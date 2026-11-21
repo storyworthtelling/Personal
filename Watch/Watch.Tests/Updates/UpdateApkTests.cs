@@ -58,6 +58,31 @@ public class UpdateApkTests
         Assert.Equal(new InstallCandidate(WatchIdentity.DashPackage, 1_100_000_300, ApkForm.Watch), header.Candidate);
     }
 
+    // P14 release A fix round, finding 3: Flyleaf hashes a 10–60 MB APK before sending it, off the main thread and
+    // without blocking a thread on the read.
+    [Fact]
+    public async Task DescribingAsyncIsDescribing()
+    {
+        using var apk = new MemoryStream(Apk);
+        apk.Position = 0;
+
+        var header = await UpdateApkFrame.DescribeAsync(WatchIdentity.DashPackage, 1_100_000_300, ApkForm.Watch, apk, CancellationToken.None);
+
+        Assert.Equal(Describe(Apk), header);
+        Assert.Equal(0, apk.Position);
+    }
+
+    [Fact]
+    public async Task DescribingAsyncStopsWhenCancelled()
+    {
+        using var apk = new MemoryStream(Apk);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            UpdateApkFrame.DescribeAsync(WatchIdentity.DashPackage, 1_100_000_300, ApkForm.Watch, apk, cancelled.Token));
+    }
+
     [Fact]
     public void TheApkFollowsTheHeader()
     {

@@ -15,8 +15,7 @@ public static class Apk
         var fromSdk = SdkRoots()
             .Select(root => Path.Combine(root, "build-tools"))
             .Where(Directory.Exists)
-            .SelectMany(tools => Directory.EnumerateDirectories(tools))
-            .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+            .SelectMany(tools => NewestFirst(Directory.EnumerateDirectories(tools)))
             .Select(tools => Path.Combine(tools, "aapt2"))
             .FirstOrDefault(File.Exists);
         if (fromSdk is not null)
@@ -26,11 +25,31 @@ public static class Apk
 
         var packs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotnet", "packs", "Microsoft.Android.Sdk.Linux");
         return Directory.Exists(packs)
-            ? Directory.EnumerateDirectories(packs)
-                .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+            ? NewestFirst(Directory.EnumerateDirectories(packs))
                 .Select(pack => Path.Combine(pack, "tools", "Linux", "aapt2"))
                 .FirstOrDefault(File.Exists)
             : null;
+    }
+
+    /// <summary>
+    /// Version folders, newest first by number (as text, "9.0.0" sorts after "36.0.0"); a pre-release
+    /// ("36.0.0-rc1") goes after its release, and a folder that names no version goes last.
+    /// </summary>
+    public static IReadOnlyList<string> NewestFirst(IEnumerable<string> folders) =>
+        [.. folders
+            .Select(folder => (Folder: folder, Name: Path.GetFileName(folder.TrimEnd('/', '\\'))))
+            .Select(entry => (entry.Folder, Version: VersionOf(entry.Name), PreRelease: entry.Name.Contains('-', StringComparison.Ordinal)))
+            .OrderByDescending(entry => entry.Version is not null)
+            .ThenByDescending(entry => entry.Version)
+            .ThenBy(entry => entry.PreRelease)
+            .ThenBy(entry => entry.Folder, StringComparer.Ordinal)
+            .Select(entry => entry.Folder)];
+
+    // The numbers before any pre-release tag ("36.0.0-rc1" is 36.0.0), or none.
+    private static Version? VersionOf(string name)
+    {
+        var numbers = name.Split('-', 2)[0];
+        return Version.TryParse(numbers.Contains('.', StringComparison.Ordinal) ? numbers : numbers + ".0", out var version) ? version : null;
     }
 
     /// <summary>The platform the face is built against: API <see cref="PointFace.MinSdk"/>.</summary>

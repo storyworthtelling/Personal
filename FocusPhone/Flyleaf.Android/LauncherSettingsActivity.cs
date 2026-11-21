@@ -462,6 +462,9 @@ public class LauncherSettingsActivity : Activity
     // re-checks every asset so it also doubles as a manual retry.
     private async void InstallFromGitHubNow()
     {
+        // One deadline for the whole tap, as the worker has one from its start: the watch half starts nothing past it
+        // (release A fix round).
+        var deadline = RunDeadline.From(DateTimeOffset.UtcNow);
         var installing = TapWatch.Action(FlyleafKeyActions.InstallFromGitHub, TimeSpan.FromMinutes(15));
         inlineStatus = "Checking GitHub… new or updated apps install and appear in Apps.";
         undoPackage = null;
@@ -488,8 +491,9 @@ public class LauncherSettingsActivity : Activity
         checkingGitHub = false;
         Render();
 
-        // Then the watch's turn, once the phone's line is on screen; the watch's own line follows when it is done.
-        await UpdateService.SendToWatchAsync(this, force: true);
+        // Then the watch's turn, once the phone's line is on screen and off this thread; the watch's own line follows
+        // when it is done.
+        await UpdateService.SendToWatchAsync(this, force: true, deadline);
         if (!IsDestroyed)
         {
             Render();

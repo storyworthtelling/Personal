@@ -22,4 +22,27 @@ public sealed class UpdateRunGate
             gate.Release();
         }
     }
+
+    /// <summary>
+    /// Runs <paramref name="run"/> if the gate comes free within <paramref name="wait"/>; otherwise runs nothing (P14
+    /// release A fix round): a run with a deadline never waits behind another past it. A wait of nothing or less tries
+    /// the gate once.
+    /// </summary>
+    /// <returns>Whether it ran.</returns>
+    public async Task<bool> TryRunAsync(Func<Task> run, TimeSpan wait)
+    {
+        if (!await gate.WaitAsync(wait > TimeSpan.Zero ? wait : TimeSpan.Zero))
+        {
+            return false;
+        }
+        try
+        {
+            await run();
+            return true;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
 }

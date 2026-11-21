@@ -1,10 +1,11 @@
 name: Publish signed APKs to the rolling release
 description: >
-  Upload signed APKs to the single rolling "apps-latest" GitHub Release that the
-  FocusPhone launcher's device-owner update channel installs from. A new sibling
-  app rides the channel by adding one step that calls this action with its signed
-  APK glob and its form (gate it to main); the phone installs it on the next update
-  check, because the channel takes any owner-namespace (com.storyworthtelling.*) app
+  Upload signed APKs to their form's rolling GitHub Release: phone APKs to "apps-latest",
+  which the FocusPhone launcher's device-owner update channel installs from, and watch APKs
+  to "watch-latest", which only Flyleaf's watch half reads (to send them to the Point
+  installer). A new sibling app rides the channel by adding one step that calls this action
+  with its signed APK glob and its form (gate it to main); the phone installs it on the next
+  update check, because the channel takes any owner-namespace (com.storyworthtelling.*) app
   of the phone's form that is newer than what's installed — or not installed at all.
 inputs:
   apks:
@@ -18,16 +19,36 @@ inputs:
       versionCode band, so a watch APK published as a phone APK would be installed
       over the phone app (P14 W-3.1.1).
     required: true
+  release:
+    description: >
+      The rolling release these APKs go to: apps-latest (the phone's, and the default) for
+      phone APKs, watch-latest for watch APKs, and no other pair. Every Flyleaf and Score
+      already on a phone lists apps-latest's APKs and installs by package whatever their
+      form, so a watch APK there would replace its phone app; nothing on a phone reads
+      watch-latest (P14 release A fix round).
+    required: false
+    default: apps-latest
 runs:
   using: composite
   steps:
-    - name: Upload to apps-latest release
+    - name: Upload to the form's rolling release
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
         FORM: ${{ inputs.form }}
+        RELEASE: ${{ inputs.release }}
       run: |
+        set -euo pipefail
         shopt -s nullglob
+        # Each form to its own release, and nothing to the other's: checked before anything is read or asked, so a
+        # watch publish that forgot to name its release stops here rather than landing on every phone.
+        case "$FORM/$RELEASE" in
+          phone/apps-latest|watch/watch-latest) ;;
+          *)
+            echo "::error::'$FORM' APKs don't go to the '$RELEASE' release: phone APKs go to apps-latest and watch APKs to watch-latest; nothing is published"
+            exit 1
+            ;;
+        esac
         files=(${{ inputs.apks }})
         if [ ${#files[@]} -eq 0 ]; then
           echo "No signed APKs matched: ${{ inputs.apks }}"
@@ -37,9 +58,10 @@ runs:
         # the APK itself, so the phone decides before downloading whether it needs it (efficiency audit §13) and never
         # takes a watch APK for its phone app's update. The form is what keeps a watch APK off the phone, so there is no
         # publishing without it: no aapt2, nothing goes up. stage-apks.py checks each APK's form against FORM, names a
-        # watch APK <name>.watch.apk so it can't replace its phone app's asset, and stages nothing if any APK is refused.
-        AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
-        [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
+        # watch APK <name>.watch.apk so it can't replace its phone app's asset, and stages nothing if any APK is refused;
+        # set -e stops the step there.
+        AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1 || true)
+        [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1 || true)
         if [ -z "$AAPT2" ]; then
           echo "::error::aapt2 not found, so these APKs can't say what they are built for; nothing is published"
           exit 1
@@ -47,12 +69,29 @@ runs:
         staged=$(mktemp -d)
         python3 "${{ github.action_path }}/../../scripts/stage-apks.py" --aapt2 "$AAPT2" --form "$FORM" --out "$staged" "${files[@]}"
         files=("$staged"/*)
-        echo "Publishing to the apps-latest release:"
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "::error::nothing was staged; nothing is published"
+          exit 1
+        fi
+        echo "Publishing to the $RELEASE release:"
         printf '  %s\n' "${files[@]}"
-        # One shared rolling release across every app workflow, so releases/latest
-        # always carries the current APK of each. Create it once, then clobber this
-        # app's own asset(s) on subsequent builds; other apps' assets are untouched.
-        if gh release view apps-latest >/dev/null 2>&1; then
+        # One rolling release per form across every app workflow. Create it once, then clobber this app's own asset(s)
+        # on later builds; other apps' assets are untouched.
+        if [ "$RELEASE" = watch-latest ]; then
+          # The phones read the repository's latest release (every Flyleaf and Score on main before P14's fix round), so
+          # the watch's release is a prerelease, which GitHub never makes latest, and says --latest=false besides. One
+          # that exists is put back to that before anything lands on it, however it came to be otherwise.
+          if gh release view watch-latest >/dev/null 2>&1; then
+            gh release edit watch-latest --prerelease --latest=false
+            gh release upload watch-latest "${files[@]}" --clobber
+          else
+            gh release create watch-latest \
+              --title "Storyworthtelling watch apps (latest)" \
+              --notes "Rolling release of the latest signed watch APKs. Nothing on a phone installs from here: Flyleaf sends these to the Point installer on the watch." \
+              --prerelease --latest=false \
+              "${files[@]}"
+          fi
+        elif gh release view apps-latest >/dev/null 2>&1; then
           gh release upload apps-latest "${files[@]}" --clobber
         else
           gh release create apps-latest \

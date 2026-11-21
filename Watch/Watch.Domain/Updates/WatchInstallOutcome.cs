@@ -205,6 +205,14 @@ public static class UpdateLines
     public static string CannotAsk(string package, long versionCode) =>
         $"{Install(package, versionCode, WatchInstallOutcome.Waiting)} — notifications are off, so nothing reached the wrist";
 
+    /// <summary>A status for a session the installer abandoned, or one no longer the app's current one (finding 5).</summary>
+    public static string Ignored(string package, long versionCode) =>
+        $"UPDATE {package} {versionCode}: a status for a session this installer abandoned, ignored";
+
+    /// <summary>The platform let a waiting session go after its limit: not a decline, and the build is offered again.</summary>
+    public static string LetGo(string package, long versionCode) =>
+        $"UPDATE {package} {versionCode}: the platform let the waiting prompt go, so it’s offered again";
+
     public static string Sent(string contract) => $"CONTRACT {contract}: sent v{InstalledCodec.Version}";
 
     /// <param name="failure">The exception's type name; never its message.</param>

@@ -63,6 +63,23 @@ public static class WatchIdentity
     /// <summary>The silent notification channel the wrist is asked through. Android keeps a channel by its id.</summary>
     public const string InstallChannel = "point-install";
 
+    /// <summary>Each app's current install session and the sessions the installer abandoned itself (release A fix
+    /// round, finding 5), so a status is judged by the session it is for.</summary>
+    public const string SessionsKey = "sessions";
+
+    // ---- the installer's status intent: its extras outlive the process that made it, and the installer's own update ----
+
+    public const string StatusPackageExtra = "package";
+
+    public const string StatusVersionCodeExtra = "versionCode";
+
+    public const string StatusActionExtra = "action";
+
+    public const string StatusSilenceExtra = "silence";
+
+    /// <summary>The session the status is for.</summary>
+    public const string StatusSessionExtra = "session";
+
     // ---- Flyleaf's half (W-3.1.3): the phone end of the same contract ----
 
     /// <summary>Flyleaf's listener for the watch's reports, registered by this name in Flyleaf's manifest.</summary>

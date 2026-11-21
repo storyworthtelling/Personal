@@ -29,7 +29,9 @@ public static class FaceColours
             (Srgb.Argb(tone(HourShape.For(new TimeOnly(0, minute)).Hue)) & 0xFFFFFF).ToString("X6", CultureInfo.InvariantCulture)));
 
         // Sixty colours, one a minute: with interpolation on, value m/59 lands on colour m whether the
-        // format reads the value as a position along the list or as a share of it.
-        return $"extractColorFromColors(\"{list}\", true, [MINUTE] / 59)";
+        // format reads the value as a position along the list or as a share of it. The divisor is a
+        // fraction, so the share is never read as whole-number division, which would choose the first
+        // colour for every minute but the last (release A fix round).
+        return $"extractColorFromColors(\"{list}\", true, [MINUTE] / 59.0)";
     }
 }

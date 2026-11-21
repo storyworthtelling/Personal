@@ -14,11 +14,14 @@ namespace Flyleaf;
 
 /// <summary>
 /// Flyleaf's half of the watch's update channel (P14 W-3.1.3, A70): inside the six-hourly run, after the phone's own
-/// installs, it finds the watch that carries the Point installer, asks what it has, and sends it the release's watch
+/// installs, it finds the watch that carries the Point installer, asks what it has, and sends it the watch's release's
 /// APKs that are newer, one channel each, framed by the same codec the installer reads (<see cref="UpdateApkFrame"/>).
+/// It reads the watch's own release only (<see cref="ReleaseChannels.Watch"/>), which no phone installs from.
 ///
 /// Every decision is <see cref="WatchSendPlan"/>'s; this half only finds the watch, carries bytes and keeps the record.
-/// A failure here never reaches the phone's own installs: it runs after them, from its own try.
+/// A failure here never reaches the phone's own installs: it runs after them, from its own try. It runs under the run's
+/// one deadline (<see cref="RunDeadline"/>, release A fix round): nothing starts past it, and every Data Layer call is
+/// waited for at most its own wait, cut to what is left, so a call that never answers cannot hold the watch's gate.
 /// </summary>
 internal static class WatchUpdates
 {
@@ -27,15 +30,15 @@ internal static class WatchUpdates
     // A downloaded watch APK waits in the cache only while it is sent; the asset's id names it.
     private const string CacheFilePrefix = "watch-";  // not copy: a file name
 
-    /// <summary>How long a send waits for the installer to report on it before the channel is closed.</summary>
-    private static readonly TimeSpan ReportGrace = TimeSpan.FromMinutes(1);
+    // One read or write of the APK down the channel.
+    private const int ChunkBytes = 64 * 1024;
 
     /// <summary>The watch half of a run, logged and never thrown: the phone's run has already been recorded.</summary>
-    public static async Task RunQuietlyAsync(Context context, bool force)
+    public static async Task RunQuietlyAsync(Context context, bool force, RunDeadline deadline)
     {
         try
         {
-            await RunAsync(context, force);
+            await RunAsync(context, force, deadline);
         }
         catch (Exception e)
         {
@@ -44,19 +47,24 @@ internal static class WatchUpdates
         }
     }
 
-    private static async Task RunAsync(Context context, bool force)
+    private static async Task RunAsync(Context context, bool force, RunDeadline deadline)
     {
         var store = new WatchUpdateStore(context);
-        var clock = Stopwatch.StartNew();
+        if (deadline.Passed(DateTimeOffset.UtcNow))
+        {
+            // The phone's half used the run's time: the watch is looked for next run, and its record is left as it was.
+            HeadLog.Info(Tag, WatchSendLines.OutOfTime("looking for the watch"));
+            return;
+        }
 
-        var (node, reach) = await FindAsync(context);
+        var (node, reach) = await FindAsync(context, deadline);
         if (node is null)
         {
             Finish(store, WatchAnswer.Not(reach), [], [], []);
             return;
         }
 
-        var answer = await AskAsync(context, node);
+        var answer = await AskAsync(context, node, deadline);
         if (answer.Reach != WatchReach.Answered)
         {
             Finish(store, answer, [], [], []);
@@ -76,15 +84,16 @@ internal static class WatchUpdates
         ReleaseInfo release;
         try
         {
-            release = await client.GetLatestReleaseAsync();
+            release = await client.GetReleaseAsync(ReleaseChannels.Watch).WaitAsync(deadline.Left(DateTimeOffset.UtcNow));
         }
-        catch (HttpRequestException e)
+        catch (Exception e) when (e is HttpRequestException or TimeoutException)
         {
-            HeadLog.Warn(Tag, $"WATCH run: the release didn’t read ({e.GetType().Name}); it runs again next period");
+            HeadLog.Warn(Tag, $"WATCH run: the watch’s release didn’t read ({e.GetType().Name}); it runs again next period");
+            Finish(store, answer, [], [], []);
             return;
         }
 
-        var offered = await OfferedAsync(client, release);
+        var offered = await OfferedAsync(client, release, deadline);
         var decisions = WatchSendPlan.Decide([.. offered.Select(pair => pair.Apk)], answer, store.Sent, DateTimeOffset.UtcNow, force);
         foreach (var decision in decisions)
         {
@@ -97,14 +106,15 @@ internal static class WatchUpdates
         {
             var candidate = decision.Apk.Candidate;
             var app = new WatchApp(candidate.Package, candidate.VersionCode);
-            if (clock.Elapsed >= WatchSendPlan.SendBudget)
+            if (!deadline.Allows(DateTimeOffset.UtcNow, WatchSendPlan.SendNeeds))
             {
+                // Too little of the run is left to download, send and hear back: the next run starts it.
                 HeadLog.Info(Tag, WatchSendLines.LeftForNextRun(candidate.Package, candidate.VersionCode));
                 continue;
             }
 
             var asset = offered.Single(pair => pair.Apk.AssetId == decision.Apk.AssetId).Asset;
-            if (await SendOneAsync(context, http, token, asset, candidate, node))
+            if (await SendOneAsync(context, http, token, asset, candidate, node, deadline))
             {
                 store.RecordSent(new SentApk(candidate.Package, candidate.VersionCode, DateTimeOffset.UtcNow));
                 sent.Add(app);
@@ -127,20 +137,13 @@ internal static class WatchUpdates
     }
 
     // The watch with the installer: none paired (or no Wear OS on this phone) says nothing; paired but out of reach is said.
-    private static async Task<(INode? Node, WatchReach Reach)> FindAsync(Context context)
+    private static async Task<(INode? Node, WatchReach Reach)> FindAsync(Context context, RunDeadline deadline)
     {
         var capabilities = WearableClass.GetCapabilityClient(context);
+        ICapabilityInfo? paired;
         try
         {
-            var paired = await capabilities.GetCapabilityAsync(WatchIdentity.InstallerCapability, CapabilityClient.FilterAll);
-            if (paired?.Nodes is not { Count: > 0 })
-            {
-                return (null, WatchReach.NoWatch);
-            }
-
-            var reachable = await capabilities.GetCapabilityAsync(WatchIdentity.InstallerCapability, CapabilityClient.FilterReachable);
-            var node = reachable?.Nodes?.OrderByDescending(candidate => candidate.IsNearby).FirstOrDefault();
-            return node is null ? (null, WatchReach.Unreachable) : (node, WatchReach.Answered);
+            paired = await BoundedAsync(capabilities.GetCapabilityAsync(WatchIdentity.InstallerCapability, CapabilityClient.FilterAll), deadline, WatchSendPlan.DataLayerWait);
         }
         catch (ApiException e)
         {
@@ -148,25 +151,47 @@ internal static class WatchUpdates
             HeadLog.Info(Tag, $"WATCH run: no Wearable API ({nameof(ApiException)} {e.StatusCode})");
             return (null, WatchReach.NoWatch);
         }
+        catch (TimeoutException)
+        {
+            // No answer about the pairings at all: said in the log, and as quiet as no watch on Settings.
+            HeadLog.Warn(Tag, WatchSendLines.TimedOut("GetCapability"));
+            return (null, WatchReach.NoWatch);
+        }
+        if (paired?.Nodes is not { Count: > 0 })
+        {
+            return (null, WatchReach.NoWatch);
+        }
+
+        try
+        {
+            var reachable = await BoundedAsync(capabilities.GetCapabilityAsync(WatchIdentity.InstallerCapability, CapabilityClient.FilterReachable), deadline, WatchSendPlan.DataLayerWait);
+            var node = reachable?.Nodes?.OrderByDescending(candidate => candidate.IsNearby).FirstOrDefault();
+            return node is null ? (null, WatchReach.Unreachable) : (node, WatchReach.Answered);
+        }
+        catch (Exception e) when (e is ApiException or TimeoutException)
+        {
+            // Paired, and no word on whether it is near: out of reach this run.
+            HeadLog.Warn(Tag, WatchSendLines.TimedOut("GetCapability"));
+            return (null, WatchReach.Unreachable);
+        }
     }
 
-    private static async Task<WatchAnswer> AskAsync(Context context, INode node)
+    private static async Task<WatchAnswer> AskAsync(Context context, INode node, RunDeadline deadline)
     {
         var ticket = WatchReports.Mark();
         try
         {
-            await WearableClass.GetMessageClient(context)
-                .SendMessageAsync(node.Id!, WatchIdentity.UpdateInstalledPath, InstalledCodec.Encode(new InstalledAsk()));
+            await BoundedAsync(WearableClass.GetMessageClient(context).SendMessageAsync(node.Id!, WatchIdentity.UpdateInstalledPath, InstalledCodec.Encode(new InstalledAsk())), deadline, WatchSendPlan.DataLayerWait);
             HeadLog.Info(Tag, UpdateLines.Sent(UpdateLines.InstalledContract));
         }
-        catch (Java.Lang.Exception e)
+        catch (Exception e) when (e is Java.Lang.Exception or TimeoutException)
         {
-            // The watch went out of reach between finding it and asking: nothing is sent this run.
+            // The watch went out of reach between finding it and asking, or the ask never went: nothing is sent this run.
             HeadLog.Warn(Tag, UpdateLines.NotSent(UpdateLines.InstalledContract, e.GetType().Name));
             return WatchAnswer.Not(WatchReach.NoAnswer);
         }
 
-        var read = await WatchReports.WaitAsync(ticket, WatchSendPlan.AnswerWait);
+        var read = await WatchReports.WaitAsync(ticket, deadline.Cut(DateTimeOffset.UtcNow, WatchSendPlan.AnswerWait));
         return read switch
         {
             null => WatchAnswer.Not(WatchReach.NoAnswer),
@@ -177,14 +202,19 @@ internal static class WatchUpdates
     }
 
     // The release's watch APKs as their sidecars describe them; the sidecar's form and the asset's name must agree (A4).
-    private static async Task<List<(ReleaseAsset Asset, ReleaseApk Apk)>> OfferedAsync(GitHubReleaseClient client, ReleaseInfo release)
+    private static async Task<List<(ReleaseAsset Asset, ReleaseApk Apk)>> OfferedAsync(GitHubReleaseClient client, ReleaseInfo release, RunDeadline deadline)
     {
         var offered = new List<(ReleaseAsset, ReleaseApk)>();
         foreach (var asset in release.ApkAssets.Where(asset => ApkForms.FromAssetName(asset.Name) == ApkForm.Watch))
         {
+            if (deadline.Passed(DateTimeOffset.UtcNow))
+            {
+                HeadLog.Info(Tag, WatchSendLines.OutOfTime($"reading {asset.Name}’s sidecar"));
+                break;
+            }
             try
             {
-                if (await client.ReadSidecarAsync(release, asset) is { } candidate)
+                if (await client.ReadSidecarAsync(release, asset).WaitAsync(deadline.Left(DateTimeOffset.UtcNow)) is { } candidate)
                 {
                     offered.Add((asset, new ReleaseApk(asset.Id, candidate with { Form = ApkForms.Agree(candidate.Form, ApkForm.Watch) })));
                 }
@@ -194,7 +224,7 @@ internal static class WatchUpdates
                     HeadLog.Warn(Tag, $"WATCH {asset.Name}: no sidecar, so it isn’t sent");
                 }
             }
-            catch (HttpRequestException e)
+            catch (Exception e) when (e is HttpRequestException or TimeoutException)
             {
                 HeadLog.Info(Tag, $"WATCH {asset.Name}: the sidecar didn’t read ({e.GetType().Name}); it waits for the next run");
             }
@@ -203,14 +233,17 @@ internal static class WatchUpdates
     }
 
     /// <returns>Whether the whole APK went down the channel.</returns>
-    private static async Task<bool> SendOneAsync(Context context, HttpClient http, string token, ReleaseAsset asset, InstallCandidate candidate, INode node)
+    private static async Task<bool> SendOneAsync(Context context, HttpClient http, string token, ReleaseAsset asset, InstallCandidate candidate, INode node, RunDeadline deadline)
     {
         var path = Path.Combine(context.CacheDir!.AbsolutePath!, $"{CacheFilePrefix}{asset.Id}.apk");
         var channels = WearableClass.GetChannelClient(context);
         ChannelClient.IChannel? channel = null;
+        // Everything this send does stops at the run's deadline: the download, the reads of the file, and the wait on the
+        // channel's writes, which Play services may hold on a stalled connection.
+        using var cancel = new CancellationTokenSource(deadline.Left(DateTimeOffset.UtcNow));
         try
         {
-            await UpdateService.DownloadAsync(http, asset, token, path);
+            await UpdateService.DownloadAsync(http, asset, token, path, cancel.Token);
 
             // The APK's own reading must be the sidecar's, or the watch is sent nothing it would have to refuse.
             if (ApkArchive.Read(context, path) is not { } read || read.Form != ApkForm.Watch
@@ -221,18 +254,30 @@ internal static class WatchUpdates
             }
 
             var ticket = WatchReports.Mark();
-            channel = await channels.OpenChannelAsync(node.Id!, UpdatePaths.ApkPathFor(WatchSendPlan.TransferName(asset.Id, Guid.NewGuid())));
-            await StreamAsync(channels, channel, path, candidate);
+            channel = await BoundedAsync(channels.OpenChannelAsync(node.Id!, UpdatePaths.ApkPathFor(WatchSendPlan.TransferName(asset.Id, Guid.NewGuid()))), deadline, WatchSendPlan.DataLayerWait);
+            var streaming = StreamAsync(channels, channel, path, candidate, deadline, cancel.Token);
+            try
+            {
+                await streaming.WaitAsync(cancel.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // The channel is closed below, which ends a write still held; whatever the abandoned stream throws then
+                // is read, not left unobserved.
+                Observe(streaming);
+                throw;
+            }
             HeadLog.Info(Tag, UpdateLines.Sent(UpdateLines.ApkContract));
 
             // Closing the output ended the watch's input. The installer reports once the install has an outcome, and the
-            // channel stays open until then (or the grace runs out) so nothing still in flight is cut off.
-            await WatchReports.WaitForAsync(ticket, candidate.Package, candidate.VersionCode, ReportGrace);
+            // channel stays open until then (or the wait runs out) so nothing still in flight is cut off.
+            await WatchReports.WaitForAsync(ticket, candidate.Package, candidate.VersionCode, deadline.Cut(DateTimeOffset.UtcNow, WatchSendPlan.ReportWait));
             return true;
         }
-        catch (Exception e) when (e is HttpRequestException or IOException or Java.Lang.Exception)
+        catch (Exception e) when (e is HttpRequestException or IOException or TimeoutException or OperationCanceledException or Java.Lang.Exception)
         {
-            // A send that broke off: its channel is closed below, so the watch's half-received file is dropped.
+            // A send that broke off or ran out of time: its channel is closed below, so the watch's half-received file is
+            // dropped.
             HeadLog.Warn(Tag, WatchSendLines.NotSent(candidate.Package, candidate.VersionCode, e.GetType().Name));
             return false;
         }
@@ -240,41 +285,87 @@ internal static class WatchUpdates
         {
             if (channel is not null)
             {
-                await CloseQuietlyAsync(channels, channel);
+                await CloseQuietlyAsync(channels, channel, deadline);
             }
             DeleteCached(path);
         }
     }
 
     // The frame: the header (length and SHA-256 read from the file), then exactly the APK, on /update/apk/<transfer>.
-    private static async Task StreamAsync(ChannelClient channels, ChannelClient.IChannel channel, string path, InstallCandidate candidate)
+    // Off the calling thread throughout: the file is read and hashed asynchronously, and each write waits on its own.
+    private static async Task StreamAsync(ChannelClient channels, ChannelClient.IChannel channel, string path, InstallCandidate candidate, RunDeadline deadline, CancellationToken cancellation)
     {
-        using var apk = File.OpenRead(path);
-        var header = UpdateApkFrame.Describe(candidate.Package, candidate.VersionCode, ApkForm.Watch, apk);
-        using var output = await channels.GetOutputStreamAsync(channel);
-        output.Write(UpdateApkFrame.Header(header));
-        var buffer = new byte[64 * 1024];
+        await using var apk = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, ChunkBytes, useAsync: true);
+        var header = await UpdateApkFrame.DescribeAsync(candidate.Package, candidate.VersionCode, ApkForm.Watch, apk, cancellation);
+        using var output = await BoundedAsync(channels.GetOutputStreamAsync(channel), deadline, WatchSendPlan.DataLayerWait);
+        var frame = UpdateApkFrame.Header(header);
+        await output.WriteAsync(frame, 0, frame.Length);
+        var buffer = new byte[ChunkBytes];
         int count;
-        while ((count = apk.Read(buffer, 0, buffer.Length)) > 0)
+        while ((count = await apk.ReadAsync(buffer, cancellation)) > 0)
         {
-            output.Write(buffer, 0, count);
+            cancellation.ThrowIfCancellationRequested();
+            await output.WriteAsync(buffer, 0, count);
         }
         output.Flush();
         output.Close();
     }
 
-    private static async Task CloseQuietlyAsync(ChannelClient channels, ChannelClient.IChannel channel)
+    private static async Task CloseQuietlyAsync(ChannelClient channels, ChannelClient.IChannel channel, RunDeadline deadline)
     {
         try
         {
-            await channels.CloseAsync(channel);
+            // Asked even past the deadline; only the wait for its answer is cut.
+            await BoundedAsync(channels.CloseAsync(channel), deadline, WatchSendPlan.CloseWait);
         }
         catch (Java.Lang.Exception e)
         {
             // Already closed by the watch or by a dropped connection: nothing is left to close.
             HeadLog.Info(Tag, $"CONTRACT {UpdateLines.ApkContract}: the channel was already closed ({e.GetType().Name})");
         }
+        catch (TimeoutException)
+        {
+            // Play services closes it in its own time; the run does not wait past its own.
+            HeadLog.Info(Tag, WatchSendLines.TimedOut("CloseChannel"));
+        }
     }
+
+    // A Data Layer call waited for at most its own wait, cut to what is left of the run: one that never answers cannot
+    // hold the watch's gate. Play services goes on with the call; only the wait ends, and what the call throws after
+    // that is read rather than left unobserved.
+    private static async Task<T> BoundedAsync<T>(Task<T> call, RunDeadline deadline, TimeSpan wait)
+    {
+        try
+        {
+            return await call.WaitAsync(deadline.Cut(DateTimeOffset.UtcNow, wait));
+        }
+        catch (TimeoutException)
+        {
+            Observe(call);
+            throw;
+        }
+    }
+
+    private static async Task BoundedAsync(Task call, RunDeadline deadline, TimeSpan wait)
+    {
+        try
+        {
+            await call.WaitAsync(deadline.Cut(DateTimeOffset.UtcNow, wait));
+        }
+        catch (TimeoutException)
+        {
+            Observe(call);
+            throw;
+        }
+    }
+
+    // A task the run stopped waiting for: its fault, if it comes, is logged by type, never thrown into nothing.
+    private static void Observe(Task abandoned) =>
+        abandoned.ContinueWith(
+            static task => HeadLog.Info(Tag, $"WATCH run: a call it stopped waiting for later failed ({task.Exception?.InnerException?.GetType().Name})"),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
 
     private static void DeleteCached(string path)
     {

@@ -72,9 +72,12 @@ internal static class WatchInstaller
         var installer = context.PackageManager!.PackageInstaller;
         try
         {
-            // One prompt per app: a newer build replaces a prompt still waiting for the older one.
+            // One prompt per app: a newer build (or the same one sent again) replaces a prompt still waiting. The platform
+            // reports an abandoned session as aborted, so each is noted first, and its status is not taken for the app's
+            // outcome (release A fix round, finding 5).
             foreach (var waiting in installer.MySessions.Where(session => string.Equals(session.AppPackageName, header.Package, StringComparison.Ordinal)).ToList())
             {
+                SessionStore.Abandoning(context, waiting.SessionId);
                 installer.AbandonSession(waiting.SessionId);
             }
 
@@ -86,6 +89,8 @@ internal static class WatchInstaller
             parameters.SetRequireUserAction((int)(decision.RequestsSilence ? PackageInstallUserAction.NotRequired : PackageInstallUserAction.Required));
 
             var sessionId = installer.CreateSession(parameters);
+            // The app's current session from here on: only its status is the build's outcome.
+            SessionStore.Began(context, new InstallSession(header.Package, header.VersionCode, sessionId, DateTimeOffset.UtcNow));
             using var session = installer.OpenSession(sessionId);
             using (var output = session.OpenWrite("apk", 0, header.Length))
             using (var apk = File.OpenRead(apkPath))

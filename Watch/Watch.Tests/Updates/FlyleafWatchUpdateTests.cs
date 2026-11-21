@@ -519,6 +519,27 @@ public class FlyleafWatchUpdateTests
         Assert.Equal(TimeSpan.FromSeconds(30), WatchSendPlan.AnswerWait);
         Assert.Equal(TimeSpan.FromHours(1), WatchSendPlan.InFlightWait);
         Assert.Equal(TimeSpan.FromDays(3), WatchSendPlan.WaitingOffer);
-        Assert.Equal(TimeSpan.FromMinutes(5), WatchSendPlan.SendBudget);
+        Assert.Equal(TimeSpan.FromSeconds(30), WatchSendPlan.DataLayerWait);
+        Assert.Equal(TimeSpan.FromSeconds(10), WatchSendPlan.CloseWait);
+        Assert.Equal(TimeSpan.FromMinutes(1), WatchSendPlan.ReportWait);
+        Assert.Equal(TimeSpan.FromMinutes(3), WatchSendPlan.SendNeeds);
+    }
+
+    [Fact]
+    public void ASendNeedsRoomForItsOwnWaits()
+    {
+        // Opening the channel and its stream, the installer's report and closing: a send started with less than this
+        // left would be cut off by the deadline before its report could come.
+        Assert.True(WatchSendPlan.SendNeeds >= (2 * WatchSendPlan.DataLayerWait) + WatchSendPlan.ReportWait + WatchSendPlan.CloseWait);
+        Assert.True(WatchSendPlan.SendNeeds < RunDeadline.WorkerCeiling - RunDeadline.Margin);
+    }
+
+    [Fact]
+    public void TheRunsTimeIsSaidInWordsOnly()
+    {
+        Assert.Equal("WATCH run: out of time before sending com.storyworthtelling.focusphone.communication 1100000005, so it waits for the next run",
+            WatchSendLines.OutOfTime("sending com.storyworthtelling.focusphone.communication 1100000005"));
+        Assert.Equal("WATCH run: another run held the gate until this run’s time was up, so nothing was looked for", WatchSendLines.Busy());
+        Assert.Equal("WATCH run: GetCapability didn’t answer in time", WatchSendLines.TimedOut("GetCapability"));
     }
 }

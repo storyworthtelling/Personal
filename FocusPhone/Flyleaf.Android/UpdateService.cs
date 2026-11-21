@@ -12,6 +12,7 @@ using Codex.Ui.Voice;
 using Storyworthtelling.Voice.Health;
 using Codex.Ui;
 using Codex.Ui.Http;
+using Watch.Domain.Updates;
 
 namespace Flyleaf;
 
@@ -86,12 +87,18 @@ public static class UpdateService
     /// The watch half of the run (P14 W-3.1.3): called once the phone's own run has finished and been
     /// recorded, so nothing it does can break or hold back the phone's installs or their line. Its own
     /// gate keeps two of it apart; every failure inside it is logged there and goes no further.
+    /// It runs off the calling thread (the owner's tap awaits it from the settings screen, and hashing
+    /// and sending a 10–60 MB APK there froze it), under the run's one deadline: the gate is waited for
+    /// only as long as the deadline leaves, and nothing inside starts past it (release A fix round).
     /// </summary>
-    public static Task SendToWatchAsync(Context context, bool force) =>
-        WatchGate.RunAsync(async () =>
+    public static Task SendToWatchAsync(Context context, bool force, RunDeadline deadline) =>
+        Task.Run(async () =>
         {
-            await WatchUpdates.RunQuietlyAsync(context, force);
-            return true;
+            var application = context.ApplicationContext ?? context;
+            if (!await WatchGate.TryRunAsync(() => WatchUpdates.RunQuietlyAsync(application, force, deadline), deadline.Left(DateTimeOffset.UtcNow)))
+            {
+                HeadLog.Info("FlyleafWatch", WatchSendLines.Busy());
+            }
         });
 
     private static void Report(Context context, UpdateRunResult result)
@@ -140,7 +147,9 @@ public static class UpdateService
         ReleaseInfo release;
         try
         {
-            release = await client.GetLatestReleaseAsync();
+            // The phone's own release, by its tag: never the watch's, which carries watch APKs under the phone apps'
+            // packages (release A fix round).
+            release = await client.GetReleaseAsync(ReleaseChannels.Phone);
             // A successful release fetch clears any prior update-token failure.
             health.MarkOk(CredentialIds.GitHubUpdateToken);
         }
@@ -305,20 +314,21 @@ public static class UpdateService
         new(candidate.Package, candidate.VersionCode, settled,
             settled == InstallOutcome.NotForThisDevice ? $"form {ApkForms.Word(candidate.Form)}" : null);
 
-    /// <summary>One release asset to a file, with the update token; the watch half downloads its APKs the same way.</summary>
-    internal static async Task DownloadAsync(HttpClient http, ReleaseAsset asset, string token, string path)
+    /// <summary>One release asset to a file, with the update token; the watch half downloads its APKs the same way,
+    /// stopped at its run's deadline.</summary>
+    internal static async Task DownloadAsync(HttpClient http, ReleaseAsset asset, string token, string path, CancellationToken cancellation = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, asset.DownloadUrl);
         request.Headers.Authorization = new("Bearer", token);
         request.Headers.Accept.ParseAdd("application/octet-stream");
-        using var response = await http.SendAsync(request);
+        using var response = await http.SendAsync(request, cancellation);
         if (!response.IsSuccessStatusCode)
         {
             throw new HttpRequestException(
                 $"Downloading {asset.Name} failed with {(int)response.StatusCode} {response.StatusCode}.");
         }
         using var output = System.IO.File.Create(path);
-        await response.Content.CopyToAsync(output);
+        await response.Content.CopyToAsync(output, cancellation);
     }
 
     private static Dictionary<string, long> InstalledVersionCodes(Context context, IEnumerable<string> packages)
@@ -361,9 +371,11 @@ public class UpdateWorker : Worker
     // A run stopped before it returned leaves a line, not a lone "started" (audit 08 §20).
     public override void OnStopped() => HeadDiagnostics.Stopped(nameof(UpdateWorker), StopReason);
 
-    public override Result DoWork() => HeadDiagnostics.Worker(nameof(UpdateWorker), Check);
+    // One deadline for the whole run, taken as DoWork starts and handed to the watch half: WorkManager stops a worker ten
+    // minutes in, and the phone's half has used some of that by the time the watch's turn comes (release A fix round).
+    public override Result DoWork() => HeadDiagnostics.Worker(nameof(UpdateWorker), () => Check(RunDeadline.From(DateTimeOffset.UtcNow)));
 
-    private Result Check()
+    private Result Check(RunDeadline deadline)
     {
         try
         {
@@ -373,7 +385,7 @@ public class UpdateWorker : Worker
             RefreshRatings();
             // Then the watch's turn (P14 W-3.1.3), last and on its own: it logs its own outcome and
             // throws nothing, so the phone's result below is the run's result whatever the watch did.
-            UpdateService.SendToWatchAsync(ApplicationContext, force: false).GetAwaiter().GetResult();
+            UpdateService.SendToWatchAsync(ApplicationContext, force: false, deadline).GetAwaiter().GetResult();
             // Retry a transient fetch failure so recovery isn't gated on the full 6-hour
             // cadence; a failed install is already left unprocessed and retries next cycle.
             return result.State == UpdateRunState.FetchFailed

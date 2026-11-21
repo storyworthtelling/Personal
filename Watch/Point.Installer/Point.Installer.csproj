@@ -8,7 +8,9 @@
     The decisions are Watch.Domain's (WatchUpdatePlan, the update/apk and update/installed codecs) on the update
     channel's own rule (Storyworthtelling.Updates); this head only carries bytes, asks the platform and reports.
     SupportedOSPlatformVersion is the suite's one minimum: PackageInstaller's USER_ACTION_NOT_REQUIRED needs API 31,
-    and both watches run Wear OS 6 (API 36).
+    and both watches run Wear OS 6 (API 36). RuntimeIdentifiers: .NET for Android builds 64-bit ARM and x64 unless told,
+    and a watch whose system runs 32-bit userspace refuses an APK with no armeabi-v7a code, so every watch app names
+    32-bit ARM beside 64-bit (release A fix round; WatchInvariantsTests and the workflow's ABI CHECK hold it).
   -->
   <PropertyGroup>
     <TargetFramework>net10.0-android</TargetFramework>
@@ -18,6 +20,7 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
     <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <RuntimeIdentifiers>android-arm;android-arm64</RuntimeIdentifiers>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

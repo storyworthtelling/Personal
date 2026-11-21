@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage signed APKs for the rolling apps-latest release, each with the sidecar the phone reads (P14 W-3.1.1).
+"""Stage signed APKs for their form's rolling release (apps-latest or watch-latest), each with the sidecar the phone reads (P14 W-3.1.1).
 
     stage-apks.py --aapt2 <aapt2> --form phone|watch --out <folder> <apk> [<apk> ...]
 

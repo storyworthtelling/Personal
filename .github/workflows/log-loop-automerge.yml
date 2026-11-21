@@ -31,6 +31,7 @@ on:
       - Build Pulp APK
       - Build shared libraries
       - Build Folio APK
+      - Build watch APKs
       - Log loop guard
     types: [completed]
   workflow_dispatch:

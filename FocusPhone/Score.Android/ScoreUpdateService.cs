@@ -82,7 +82,9 @@ public static class ScoreUpdateService
         ReleaseInfo release;
         try
         {
-            release = await new GitHubReleaseClient(http, Repo, token).GetLatestReleaseAsync();
+            // The phone's own release, by its tag: Wave, Score's watch half, is published to the watch's (release A
+            // fix round).
+            release = await new GitHubReleaseClient(http, Repo, token).GetReleaseAsync(ReleaseChannels.Phone);
         }
         catch (HttpRequestException e)
         {
@@ -93,6 +95,13 @@ public static class ScoreUpdateService
         var results = new List<AppInstallResult>();
         foreach (var asset in release.ApkAssets)
         {
+            // Every asset here is downloaded in full to be read, so one named as a watch APK is passed over by its
+            // name before a byte is fetched; its manifest would refuse it anyway, below.
+            if (ApkForms.FromAssetName(asset.Name) != ApkForm.Phone)
+            {
+                continue;
+            }
+
             var path = System.IO.Path.Combine(context.CacheDir!.AbsolutePath!, $"score-update-{asset.Id}.apk");
             try
             {

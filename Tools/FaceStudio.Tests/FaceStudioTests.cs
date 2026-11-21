@@ -63,6 +63,20 @@ public class FaceStudioTests
         Assert.Equal(FaceRead.Expected(FaceColour.Ring), FaceRead.MinuteColours(ring));
     }
 
+    // Release A fix round: [MINUTE] and 59 are both whole numbers, and an expression that divides two whole numbers may
+    // be read as whole-number division, which chooses the list's first colour for every minute but the last. The
+    // divisor is written as a fraction, so the share is a fraction whatever the format's rule.
+    [Fact]
+    public void TheMinuteIsReadAsAFraction()
+    {
+        var face = File.ReadAllText(Path.Combine(FaceRead.RepoRoot(), "Watch", "Point.Face", "res", "raw", "watchface.xml"));
+        var colours = System.Text.RegularExpressions.Regex.Matches(face, @"extractColorFromColors\([^)]*\)");
+
+        Assert.NotEmpty(colours);
+        Assert.All(colours, colour => Assert.EndsWith(", true, [MINUTE] / 59.0)", colour.Value, StringComparison.Ordinal));
+        Assert.EndsWith("[MINUTE] / 59.0)", FaceColours.ByMinute(FaceColour.Glass), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AlwaysOnIsOutlineWithoutDate()
     {
