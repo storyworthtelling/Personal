@@ -1319,3 +1319,16 @@ With the gate test green, `log-loop-guard.yml` reached `leakscan --ci`, which fo
 - **Red:** `LogLoopReader.Tests` 117 tests, 1 failed: `CiDoesNotReadAColourListAsACard` (`Assert.Empty() Failure: Collection was not empty`). `CiStillFlagsACardWithOneLongGroup` (a 4-6-5 card) passed before and after.
 - **Fix:** `CiLeakScan` no longer reads a run made only of six-digit groups as a card; no card is written in groups of six, and a card with one six-digit group is still flagged. The test's OKLCH triple is written with named arguments, so it no longer reads as a coordinate pair. No path is exempted.
 - **Green:** `LogLoopReader.Tests` 117 of 117, `Watch.Tests` 447 of 447, `RepoGuards.Tests` 386 of 386; `leakscan --ci` over the branch's diff from main: "no personal-data shapes in the added lines".
+
+### After the merge: the first main run (21 Nov 2026)
+
+The merge of PR #385 built Flyleaf, Score, Post, Pulp and Constitution and published them to `apps-latest` (which GitHub still reports as the latest release; no watch asset reached it). Five workflows failed, for two causes; nothing from them was published.
+
+1. **Plate, Index, Folio and Foreword failed to restore.** A6 added a central `Xamarin.AndroidX.Lifecycle.LiveData` 2.9.1 so Flyleaf could override it. With transitive pinning that version was forced on every project reaching LiveData: Plate failed NU1109 (CameraView needs 2.10) and the MAUI heads NU1107 (MAUI needs LiveData.Core.Ktx 2.9.2.1, which LiveData 2.9.1 refuses). The branch's CI never built these heads, so it showed nothing.
+   - **Reproduced here:** with the central entry, `dotnet restore` of Index failed NU1107 and Plate NU1109, as on main.
+   - **Fix:** the central entry is gone; Flyleaf keeps its `VersionOverride` 2.11.0.1 and still resolves LiveData, Core and Core.Ktx at 2.11.0.1. `EveryPackageVersionIsCentral` names LiveData as the one package a head owns without a central version (`OneHeadsOwn`), and the new `LiveDataIsNotPinnedForEveryone` guard failed with the entry present (1 of 1) and passes without it.
+   - **Green:** Plate, Index, Folio and Foreword restore here; RepoGuards 387 of 387.
+2. **The watch build failed `TheCommittedFaceIsCurrent`:** `preview.png` differed on the runner. The 20 shape masks, which use no colour maths, matched byte for byte; the preview's colours go through the platform's pow and cbrt, whose last bit differs between machines, so a pixel rounds one step differently. The build's own `git diff` check after packing would have failed for the same reason.
+   - **Fix:** `FaceFiles.Same` compares a picture by its pixels, every channel within one step (`PictureTolerance`), and every other file byte for byte. `FaceFiles.Write` keeps a committed file that is the same, so the runner packs and leaves the committed preview untouched. `PngPixels` reads and writes FaceStudio's one PNG shape (8-bit RGBA, filter 0), and `Raster.Png` goes through it; the regenerated face is byte-identical to the committed one here.
+   - **Red:** `SamePictureTests` 6 tests, 6 failed (`NotImplementedException` from the stubs). **Green:** FaceStudio.Tests 28 of 28 (APK required).
+   - **Not verified:** that the runner's preview is within one step; if it is not, the test's message names the file and the next run says so.

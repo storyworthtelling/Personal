@@ -1,6 +1,3 @@
-using System.Buffers.Binary;
-using System.IO.Compression;
-using System.Text;
 
 namespace FaceStudio;
 
@@ -82,39 +79,21 @@ public sealed class Raster
     /// <summary>The canvas as a PNG: 8-bit RGBA, not interlaced, one zlib stream.</summary>
     public byte[] Png()
     {
-        var rows = new byte[Height * (1 + Width * 4)];
+        var rgba = new byte[Width * Height * 4];
         var at = 0;
         for (var y = 0; y < Height; y++)
         {
-            rows[at++] = 0;
             for (var x = 0; x < Width; x++)
             {
                 var argb = ArgbAt(x, y);
-                rows[at++] = (byte)(argb >> 16);
-                rows[at++] = (byte)(argb >> 8);
-                rows[at++] = (byte)argb;
-                rows[at++] = (byte)(argb >>> 24);
+                rgba[at++] = (byte)(argb >> 16);
+                rgba[at++] = (byte)(argb >> 8);
+                rgba[at++] = (byte)argb;
+                rgba[at++] = (byte)(argb >>> 24);
             }
         }
 
-        using var compressed = new MemoryStream();
-        using (var zlib = new ZLibStream(compressed, CompressionLevel.SmallestSize, leaveOpen: true))
-        {
-            zlib.Write(rows);
-        }
-
-        var header = new byte[13];
-        BinaryPrimitives.WriteInt32BigEndian(header, Width);
-        BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(4), Height);
-        header[8] = 8;
-        header[9] = 6;
-
-        using var png = new MemoryStream();
-        png.Write([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        Chunk(png, "IHDR", header);
-        Chunk(png, "IDAT", compressed.ToArray());
-        Chunk(png, "IEND", []);
-        return png.ToArray();
+        return PngPixels.Encode(Width, Height, rgba);
     }
 
     private void Over(int x, int y, int argb, double coverage)
@@ -144,48 +123,4 @@ public sealed class Raster
     }
 
     private static int Byte(double unit) => (int)Math.Round(Math.Clamp(unit, 0, 1) * 255);
-
-    private static void Chunk(Stream png, string type, byte[] data)
-    {
-        Span<byte> number = stackalloc byte[4];
-        BinaryPrimitives.WriteInt32BigEndian(number, data.Length);
-        png.Write(number);
-        var tagged = new byte[4 + data.Length];
-        Encoding.ASCII.GetBytes(type, tagged);
-        data.CopyTo(tagged, 4);
-        png.Write(tagged);
-        BinaryPrimitives.WriteUInt32BigEndian(number, Crc.Of(tagged));
-        png.Write(number);
-    }
-
-    /// <summary>The PNG chunk checksum (CRC-32, ISO 3309), written here since the BCL has none to hand.</summary>
-    private static class Crc
-    {
-        private static readonly uint[] Table = Build();
-
-        public static uint Of(byte[] data)
-        {
-            var crc = 0xFFFFFFFFu;
-            foreach (var value in data)
-            {
-                crc = Table[(crc ^ value) & 0xFF] ^ (crc >> 8);
-            }
-            return crc ^ 0xFFFFFFFFu;
-        }
-
-        private static uint[] Build()
-        {
-            var table = new uint[256];
-            for (var n = 0u; n < 256; n++)
-            {
-                var c = n;
-                for (var k = 0; k < 8; k++)
-                {
-                    c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
-                }
-                table[n] = c;
-            }
-            return table;
-        }
-    }
 }

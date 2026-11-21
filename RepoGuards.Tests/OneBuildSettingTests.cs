@@ -36,7 +36,8 @@ public partial class OneBuildSettingTests
                     found.Add($"{relative}: {include} names its own version");
                 else if (reference.Value.Contains("VersionOverride=", StringComparison.Ordinal) && !AllowedOverrides.Contains(include))
                     found.Add($"{relative}: {include} names its own version");
-                else if (!named.Contains(include) && !reference.Value.Contains("VersionOverride=\"$(MauiVersion)\"", StringComparison.Ordinal))
+                else if (!named.Contains(include) && !reference.Value.Contains("VersionOverride=\"$(MauiVersion)\"", StringComparison.Ordinal)
+                    && !(OneHeadsOwn.Contains(include) && reference.Value.Contains("VersionOverride=", StringComparison.Ordinal)))
                     found.Add($"{relative}: {include} has no central version");
             }
         }
@@ -101,10 +102,25 @@ public partial class OneBuildSettingTests
         Assert.True(found.Count == 0, string.Join("\n", found));
     }
 
+    // With transitive pinning a central version is forced on every project that reaches the package at all. LiveData
+    // is Flyleaf's alone to raise (P14): pinned centrally at 2.9.1 it refused Plate (CameraView needs 2.10) and the
+    // three MAUI heads (MAUI needs LiveData.Core.Ktx 2.9.2.1), and broke all four builds on main, 21 Nov 2026.
+    [Fact]
+    public void LiveDataIsNotPinnedForEveryone()
+    {
+        var props = File.ReadAllText(Path.Combine(Root, "Directory.Packages.props"));
+
+        Assert.DoesNotContain("Include=\"Xamarin.AndroidX.Lifecycle.LiveData\"", props);
+    }
+
     // The overrides that are decisions: MAUI's version comes from its workload, Plate's AppCompat sits above MAUI's
     // (a pin of 1.8.0 for everyone breaks the MAUI heads' Lifecycle graph), and Flyleaf's LiveData sits above every
     // other head's (P14 W-3.1.3: Play services' Fragment 1.9 needs LiveData.Core 2.11, which WorkManager 2.10's LiveData
     // 2.9.1 refuses by an exact range; raising it for everyone would move every head's Lifecycle graph).
+    // A package one head raises above what the rest resolve, with no central version: transitive pinning would force a
+    // central one on every head that reaches it (LiveDataIsNotPinnedForEveryone). The head names its version itself.
+    private static readonly HashSet<string> OneHeadsOwn = ["Xamarin.AndroidX.Lifecycle.LiveData"];
+
     private static readonly HashSet<string> AllowedOverrides = ["Microsoft.Maui.Controls", "Xamarin.AndroidX.AppCompat", "Xamarin.AndroidX.Lifecycle.LiveData"];
 
     [GeneratedRegex(@"<PackageReference\s+Include=""(?<name>[^""]+)""[^>]*>")]

@@ -68,10 +68,52 @@ public static class FaceFiles
         foreach (var file in files)
         {
             var path = Path.Combine(outputFolder, file.Path);
+            if (File.Exists(path) && Same(file.Path, file.Bytes, File.ReadAllBytes(path)))
+            {
+                continue;
+            }
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllBytes(path, file.Bytes);
         }
     }
+
+    /// <summary>
+    /// Whether a generated file is the committed one. A picture is the same when every channel of every pixel is
+    /// within <see cref="PictureTolerance"/>, since the preview's colours go through the platform's pow and cbrt,
+    /// whose last bit differs between machines; any other file must match byte for byte.
+    /// </summary>
+    public static bool Same(string path, byte[] generated, byte[] committed)
+    {
+        if (generated.AsSpan().SequenceEqual(committed))
+        {
+            return true;
+        }
+
+        if (!path.EndsWith(".png", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var made = PngPixels.Read(generated);
+        var kept = PngPixels.Read(committed);
+        if (made.Width != kept.Width || made.Height != kept.Height)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < made.Rgba.Length; i++)
+        {
+            if (Math.Abs(made.Rgba[i] - kept.Rgba[i]) > PictureTolerance)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>One step a channel: a rounding at the last bit, never a visible change.</summary>
+    public const int PictureTolerance = 1;
 
     private static FaceFile Xml(string path, XDocument document)
     {
