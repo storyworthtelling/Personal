@@ -1,3 +1,4 @@
+using Watch.Domain.Updates;
 using Storyworthtelling.Updates;
 using Codex.Domain.Diagnostics;
 using Android.App;
@@ -448,6 +449,12 @@ public class LauncherSettingsActivity : Activity
         {
             AddCardCaption("The channel checks every 6 hours. It hasn’t run yet on this phone.");
         }
+
+        // How the watch's last run went, in one sentence; nothing at all when no watch is paired (P14 W-3.1.3).
+        if (WatchUpdateLine.Say(new WatchUpdateStore(this).LastRun, DateTimeOffset.UtcNow, TimeZoneInfo.Local) is { } watchLine)
+        {
+            AddCardCaption(watchLine, progress: true);
+        }
     }
 
     // On-demand run of the owner-app update channel: pull the latest release now and install every
@@ -455,6 +462,9 @@ public class LauncherSettingsActivity : Activity
     // re-checks every asset so it also doubles as a manual retry.
     private async void InstallFromGitHubNow()
     {
+        // One deadline for the whole tap, as the worker has one from its start: the watch half starts nothing past it
+        // (release A fix round).
+        var deadline = RunDeadline.From(DateTimeOffset.UtcNow);
         var installing = TapWatch.Action(FlyleafKeyActions.InstallFromGitHub, TimeSpan.FromMinutes(15));
         inlineStatus = "Checking GitHub… new or updated apps install and appear in Apps.";
         undoPackage = null;
@@ -480,6 +490,14 @@ public class LauncherSettingsActivity : Activity
         }
         checkingGitHub = false;
         Render();
+
+        // Then the watch's turn, once the phone's line is on screen and off this thread; the watch's own line follows
+        // when it is done.
+        await UpdateService.SendToWatchAsync(this, force: true, deadline);
+        if (!IsDestroyed)
+        {
+            Render();
+        }
     }
 
     // ---- Power: Restart (device-owner reboot) ---------------------------------

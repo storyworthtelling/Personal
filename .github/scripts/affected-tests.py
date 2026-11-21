@@ -20,8 +20,9 @@ import sys
 READS = {
     "Storyworthtelling.Maui.Tests": ["FocusPhone/Codex.Domain/Design", "Foreword", "Ledger", "Storyboarder"],
     "Storyworthtelling.Paper.Tests": ["FocusPhone", "Foreword", "Ledger", "Storyboarder", "Fonts"],
-    # The CI and update-channel guards read every workflow, every project file and CLAUDE.md.
-    "Storyworthtelling.Updates.Tests": [".github", "CLAUDE.md", "**/*.csproj"],
+    # The CI and update-channel guards read every workflow, every project file and CLAUDE.md, and the watch form guard
+    # reads every watch app's manifest (P14 W-3.1.1).
+    "Storyworthtelling.Updates.Tests": [".github", "CLAUDE.md", "**/*.csproj", "Watch"],
 }
 
 # A change to the machinery itself runs everything.

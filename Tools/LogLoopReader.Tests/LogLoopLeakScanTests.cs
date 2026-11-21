@@ -63,6 +63,20 @@ public class LogLoopLeakScanTests
     }
 
     [Fact]
+    public void CiDoesNotReadAColourListAsACard()
+    {
+        var colours = "extractColorFromColors(\"202943 232843 262743\", true, [MINUTE] / 59.0)";
+        Assert.Empty(CiLeakScan.Scan("Watch/Point.Face/res/raw/watchface.xml", [(9, colours)], logfixBranch: false));
+    }
+
+    [Fact]
+    public void CiStillFlagsACardWithOneLongGroup()
+    {
+        var amex = "3782" + " 822463 " + "10005";
+        Assert.Equal("card-number", Assert.Single(CiLeakScan.Scan("a.cs", [(1, amex)], false)).Rule);
+    }
+
+    [Fact]
     public void CiAllowsExampleAddressesAndFlagsOthers()
     {
         var real = "ada" + "@" + "mail" + ".test-domain.net";

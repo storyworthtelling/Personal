@@ -15,7 +15,7 @@ public class ApkSidecarTests
     {
         var candidate = ApkSidecar.Read("""{"package":"com.storyworthtelling.pulp","versionCode":900123}""");
 
-        Assert.Equal(new InstallCandidate("com.storyworthtelling.pulp", 900123), candidate);
+        Assert.Equal(new InstallCandidate("com.storyworthtelling.pulp", 900123, ApkForm.Phone), candidate);
     }
 
     [Theory]
@@ -32,9 +32,13 @@ public class ApkSidecarTests
         while (root is not null && !File.Exists(Path.Combine(root, "CLAUDE.md")))
             root = Path.GetDirectoryName(root);
         var action = File.ReadAllText(Path.Combine(root!, ".github", "actions", "publish-rolling-release", "action.yml"));
+        // The action stages every APK through one script, which reads it with aapt2 and writes its sidecar
+        // (ApkStagingTests runs it).
+        var script = File.ReadAllText(Path.Combine(root!, ".github", "scripts", "stage-apks.py"));
 
         Assert.Contains("aapt2", action, StringComparison.Ordinal);
-        Assert.Contains(".apk.json", action, StringComparison.Ordinal);
-        Assert.Contains("versionCode", action, StringComparison.Ordinal);
+        Assert.Contains("stage-apks.py", action, StringComparison.Ordinal);
+        Assert.Contains(".json", script, StringComparison.Ordinal);
+        Assert.Contains("versionCode", script, StringComparison.Ordinal);
     }
 }

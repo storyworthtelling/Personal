@@ -1,7 +1,10 @@
 namespace Storyworthtelling.Updates;
 
-/// <summary>A release APK to consider installing: its package and versionCode.</summary>
-public record InstallCandidate(string Package, long VersionCode);
+/// <summary>
+/// A release APK to consider installing: its package, its versionCode, and what it is built for. The form has no
+/// default: every place that reads an APK says what it read, since a watch APK shares its phone app's package.
+/// </summary>
+public record InstallCandidate(string Package, long VersionCode, ApkForm Form);
 
 /// <summary>Facts about the app suite that every head has to agree on.</summary>
 public static class SuiteApps

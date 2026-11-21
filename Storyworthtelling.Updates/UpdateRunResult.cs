@@ -17,6 +17,11 @@ public enum InstallOutcome
     /// The downloaded asset wasn't a readable APK; skipped and remembered so it
     /// isn't re-downloaded.
     Unreadable,
+
+    /// The APK is built for another kind of device (a watch APK on the phone, a phone
+    /// APK on the watch), or its form couldn't be read. Never installed here; settled,
+    /// so the same asset isn't fetched again (P14 W-3.1.1).
+    NotForThisDevice,
 }
 
 /// <summary>The outcome of one app the channel looked at, with its version and any error text.</summary>

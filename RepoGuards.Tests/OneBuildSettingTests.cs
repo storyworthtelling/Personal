@@ -101,9 +101,11 @@ public partial class OneBuildSettingTests
         Assert.True(found.Count == 0, string.Join("\n", found));
     }
 
-    // The overrides that are decisions: MAUI's version comes from its workload, and Plate's AppCompat sits above MAUI's
-    // (a pin of 1.8.0 for everyone breaks the MAUI heads' Lifecycle graph).
-    private static readonly HashSet<string> AllowedOverrides = ["Microsoft.Maui.Controls", "Xamarin.AndroidX.AppCompat"];
+    // The overrides that are decisions: MAUI's version comes from its workload, Plate's AppCompat sits above MAUI's
+    // (a pin of 1.8.0 for everyone breaks the MAUI heads' Lifecycle graph), and Flyleaf's LiveData sits above every
+    // other head's (P14 W-3.1.3: Play services' Fragment 1.9 needs LiveData.Core 2.11, which WorkManager 2.10's LiveData
+    // 2.9.1 refuses by an exact range; raising it for everyone would move every head's Lifecycle graph).
+    private static readonly HashSet<string> AllowedOverrides = ["Microsoft.Maui.Controls", "Xamarin.AndroidX.AppCompat", "Xamarin.AndroidX.Lifecycle.LiveData"];
 
     [GeneratedRegex(@"<PackageReference\s+Include=""(?<name>[^""]+)""[^>]*>")]
     private static partial Regex PackageReference();

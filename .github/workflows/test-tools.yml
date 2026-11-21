@@ -2,7 +2,9 @@ name: Test tools
 
 # The committed tools' own tests (orphan audit §46). IconStudio regenerates every launcher icon in the app
 # builds, and IndexHistorySeal seals the owner's snowball history; both ran in CI, or by hand, without
-# their tests. Branch pushes and main both run them: they are quick and publish nothing.
+# their tests. FaceStudio, which generates the watch face (P14), has its tests run in build-watch.yml, which also packs
+# and signs the face, so a watch change runs them once (CiHygieneTests.FaceStudiosTestsRunOnceOnABranchPush).
+# Branch pushes and main both run them: they are quick and publish nothing.
 on:
   workflow_dispatch:
   push:

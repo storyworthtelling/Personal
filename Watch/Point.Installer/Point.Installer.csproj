@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Point installer (P14 W-3.1.2): a Wear OS app with no screen and no launcher entry that receives each watch APK
+    Flyleaf sends over the Data Layer and installs it with PackageInstaller, asking the wrist once per app and updating
+    silently after that as installer of record. It carries Flyleaf's package (PC8): the Data Layer delivers only between
+    apps of one package and one signature. Installed by hand once, with adb (A78).
+
+    The decisions are Watch.Domain's (WatchUpdatePlan, the update/apk and update/installed codecs) on the update
+    channel's own rule (Storyworthtelling.Updates); this head only carries bytes, asks the platform and reports.
+    SupportedOSPlatformVersion is the suite's one minimum: PackageInstaller's USER_ACTION_NOT_REQUIRED needs API 31,
+    and both watches run Wear OS 6 (API 36). RuntimeIdentifiers: .NET for Android builds 64-bit ARM and x64 unless told,
+    and a watch whose system runs 32-bit userspace refuses an APK with no armeabi-v7a code, so every watch app names
+    32-bit ARM beside 64-bit (release A fix round; WatchInvariantsTests and the workflow's ABI CHECK hold it).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Point.Installer</RootNamespace>
+    <ApplicationId>com.storyworthtelling.focusphone.launcher</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <RuntimeIdentifiers>android-arm;android-arm64</RuntimeIdentifiers>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Watch.Domain\Watch.Domain.csproj" />
+    <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Data Layer (ChannelClient, MessageClient, NodeClient), Microsoft's binding of play-services-wearable:
+         CLAUDE.md's dependency rule 2, and required to talk to the phone at all. -->
+    <PackageReference Include="Xamarin.GooglePlayServices.Wearable" />
+  </ItemGroup>
+</Project>

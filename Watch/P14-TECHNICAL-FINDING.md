@@ -1,6 +1,6 @@
 # P14 · Watch — technical finding (gate 1)
 
-**Status:** draft for the owner, round 3 (Q1–Q8 answered; headline 1 corrected). It answers what the owner's 57 answers (A1–A57, in
+**Status:** approved (A77), round 4 (no lockdown on the watch; updates from the phone). It answers what the owner's 57 answers (A1–A57, in
 [`P14-OWNER-ANSWERS.md`](P14-OWNER-ANSWERS.md)) need from the platform, and says plainly which of
 them the platform does not allow. Design is in [`WATCH-DESIGN.md`](WATCH-DESIGN.md) (approved, A58).
 Owner decisions are **Q1–Q9** in §9. Nothing here has been tried on a watch: every claim is from
@@ -35,15 +35,20 @@ People in examples are invented (Sam, Lee, Robin, Juniper).
    out of range. Google documents both routes as end-to-end encrypted. Post stays the one place
    texts are sent and recorded. The cost: **the phone must be on and online at home** (A15's "phone
    off" case fails for texts and email), and every text crosses Google's relay.
-4. **The face cannot enforce anything.** A Watch Face Format face is resources only (`hasCode=false`),
-   and the store refuses one with code (documented). Point is therefore two packages: the face
-   (generated XML) and a hidden **Point service** that enforces. That is the fallback the owner
-   already chose (A30).
-5. **Whether a Pixel Watch accepts a device owner at all is unknown.** On a phone, device owner can be
-   set only on a device with no accounts, after a reset. No source covers Wear OS. Without it, the
-   watch lockdown is curation: apps hidden and notifications switched off by hand, with nothing
-   enforcing them. Silent self-updates (A32) also depend on it (§5). A device spike answers it:
-   **Q5**.
+4. **No lockdown on the watch (owner decision, A68).** The watch runs stock Pixel Watch software.
+   Point is only the watch face (Watch Face Format, resources only), and Dash, Wave and Beat are
+   ordinary apps with standard tiles. There is no device owner, no enforcement and no allowlist, and
+   the earlier curation rules (no browser or Play Store, suite-only notifications, Fitbit hidden) are
+   dropped (A69, superseding A30–A31 and A65's "hidden"). The device-owner spike (S2) is cancelled.
+5. **Updates can come from the phone, with one prompt per app, ever (A70; unverified on Wear OS).**
+   Without device owner, nothing installs silently the first time. But since Android 12 an app that
+   *installed* another app may later *update* it without asking, if it holds
+   `UPDATE_PACKAGES_WITHOUT_USER_ACTION` and sets `USER_ACTION_NOT_REQUIRED` on the session
+   (documented for phones; not yet seen on a watch). So: a small **Point installer** on the watch (a
+   separate package from the code-free face, with no launcher icon) receives each APK from **Flyleaf
+   on the phone** over the Data Layer and installs it. The first install of each app asks once on the
+   wrist (and "install unknown apps" is allowed once for the installer); every update after that is
+   silent. The installer itself is first installed by hand with adb, once.
 6. **TIDAL has no official Wear OS player.** The only Wear OS TIDAL clients are unofficial, and
    Score's rule since P6 is that playback goes through TIDAL's own player module. So **TIDAL on the
    watch is blocked** until TIDAL supports Wear OS; Drive music and podcasts are not affected:
@@ -120,7 +125,7 @@ texts, with the watch's Phone app used only for calls.
   and its tests cannot disagree. It is its own package, separate from the Point service.
 - **Gestures on the face (A35):** Watch Face Format offers taps on defined regions, not swipes or
   long-presses (the system owns those). The owner's fallback, tiles and the crown, applies.
-- **Enforcement** needs the Point service to be device owner on the watch (§5).
+- **No enforcement (A68).** Point is the face alone, plus the installer of §5.
 
 ## 4. Keys and sign-in on the watch (A38)
 
@@ -134,23 +139,25 @@ texts, with the watch's Phone app used only for calls.
 - The passphrase is kept encrypted with the watch's Android Keystore and never logged (A38). Nothing in
   this phase asks for it, stores it in the repository or prints it.
 
-## 5. The lockdown and updates
+## 5. Updates, without a lockdown (A68–A70)
 
-| Need | With device owner on the watch | Without it |
+There is no lockdown on the watch (A68), so this section covers only how the watch apps arrive and
+stay current.
+
+| Step | Route | Verdict |
 |---|---|---|
-| Hide browser, news and Play Store (A31) | suspended, as on the phone | disabled by hand once (adb), not enforced |
-| Only suite notifications (A31) | enforced | switched off per app in Settings by hand |
-| Allowlist edited from the phone (A31) | Flyleaf sends the list; Point applies it | not possible |
-| Silent updates from `apps-latest` (A32) | `PackageInstaller` without a prompt, as Flyleaf does | each update asks on the wrist, or adb |
-| Pushed from the phone (A32) | the phone sends the APK over the Data Layer; Point installs it | same prompt problem |
+| Point installer, once | `adb install` from a PC (the S0 steps) | Feasible; one-time |
+| Flyleaf sees a new watch APK | the same `apps-latest` poll it already runs; watch APKs are told apart by a manifest marker (`android.hardware.type.watch`), never installed on the phone | Feasible; new code in Flyleaf |
+| Phone → watch | Flyleaf sends the APK over the Data Layer's `ChannelClient` (Bluetooth, or Google's relay when apart) | Feasible; unverified with a 10 MB file |
+| First install of Dash, Wave, Beat, the face | the Point installer's `PackageInstaller` session; the wrist asks once | Feasible |
+| Every later update | the same session with `USER_ACTION_NOT_REQUIRED`, as installer of record | **Unverified on Wear OS** (documented on phones since Android 12) |
 
-- **Device owner on Wear OS is unverified.** The phone rule (no accounts, so a reset first) clashes
-  with how a Pixel Watch is set up (paired through the phone, which adds the account). If it works,
-  it is likely only as: reset the watch, set the owner over adb before pairing, then pair. Whether
-  the LTE profile and the shared number survive that is exactly what A30 asks, and is also
-  unverified.
-- The watch has no Flyleaf of its own. The phone's Flyleaf keeps the policy (the allowlist, A31), and
-  the Point service applies it.
+- The installer is the only code-bearing piece of Point. The face stays code-free, as Watch Face
+  Format requires.
+- Version rule: the same `SiblingUpdatePlan` decision Flyleaf uses on the phone, with the watch's
+  installed versions reported back over the Data Layer.
+- If silent updates turn out not to work on the watch, each update asks once on the wrist. That is
+  a cost the owner can accept or not, and it would be found on the first update.
 
 ## 6. Battery and permissions
 
@@ -182,8 +189,7 @@ relay's message contract, the queue merge), the generated face XML (validated), 
 watch head with .NET for Android against API 36, including the alpha binding (if it restores here).
 
 **Only on a watch (built, device check pending):** whether calls and texts reach the wrist on Fi under
-Post's SMS role; the Data Layer cloud relay with the phone at home; device owner on a Pixel Watch and
-what a reset does to LTE; the face rendering and always-on brightness; the four buzzes; Health
+Post's SMS role; the Data Layer cloud relay with the phone at home; silent updates by the installer of record on a watch; the face rendering and always-on brightness; the four buzzes; Health
 Services cadence accuracy; battery over a real day; Drive streaming over LTE; the watch sign-in.
 
 ## 9. Owner decisions
@@ -194,11 +200,11 @@ Services cadence accuracy; battery over a real day; Drive streaming over LTE; th
 | Q2 | How texts reach the watch | **Settled (A60, A67):** through the phone on Fi; Dash uses the Post relay |
 | Q3 | Google sign-in on the watch | **Settled (A61):** the phone hands its tokens over the Data Layer |
 | Q4 | TIDAL on the watch | **Settled (A62):** Wave remote-controls the phone's TIDAL when the phone is nearby |
-| Q5 | Device owner on the watch | **Settled (A63):** a device spike first (reset the watch, try it, record what happens to LTE and the number) |
+| Q5 | Device owner on the watch | **Withdrawn (A68):** no device owner and no lockdown; the spike is cancelled |
 | Q6 | The alpha Health Services binding | **Settled (A64):** accepted, pinned to its exact version, with a guard |
 | Q7 | Sleep without Fitbit | **Settled (A65):** Fitbit stays as a hidden sleep pipe, never visible |
 | Q8 | Where Beat's watch data lands | **Settled (A66):** Constitution's own store **and** Health Connect (reverses a P13 non-goal) |
-| Q9 | **Phase shape** | Releases A–F as in the plan, starting with Q5's spike, then Point, then Dash (A41) |
+| Q9 | **Phase shape** | Releases A–F as in the plan: Point (face and installer) first, then Dash (A41) |
 
 ---
 

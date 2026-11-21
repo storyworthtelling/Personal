@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The watch kit (P14 W-1.2.1, plan §2.1): plain Android views over a canvas, each a thin painter over
+       Watch.Domain's geometry and colours. No package, no Compose, nothing from Paper & Ink (A33). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <RootNamespace>Watch.Ui.Wear</RootNamespace>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Watch.Domain\Watch.Domain.csproj" />
+  </ItemGroup>
+</Project>

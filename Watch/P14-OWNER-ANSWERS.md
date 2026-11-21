@@ -192,3 +192,37 @@ and brings it back (marked **⚠ finding**). No personal data: people are Sam, L
   nothing arrives until it is back on. So A15's "phone off" case cannot be met on Fi by any app design,
   S1b (the watch as its own SMS app) is dropped, and **the Post relay is Dash's route for texts**.
   Only S2 (device owner) remains to spike.
+
+## 15. No lockdown on the watch
+
+- **A68 — No device owner on the watch.** The watch runs stock Pixel Watch software: Point is the watch
+  face, and Dash, Wave and Beat are ordinary apps with standard tiles. Supersedes A30 (the face
+  enforcing a lockdown), A31 (the allowlist) and A63 (the device-owner spike, now cancelled).
+- **A69** — The curation rules are dropped too: no blocked browser or Play Store, no suite-only
+  notifications, and Fitbit is not hidden (it still serves as the sleep pipe, A65).
+- **A70** — Dash, Wave and Beat stay full apps that their tiles open. Updates come **from the phone**:
+  Flyleaf sends watch APKs over the Data Layer to a small Point installer on the watch, which asks once
+  per app and then updates silently as installer of record (unverified on Wear OS).
+- **A71** — The spike app, its workflow and the `watch-spike` pre-release are removed.
+
+## 16. Screen mockups
+
+- **A72 — Screens round 1 approved except the tiles and Wave's Now playing,** which looked like stock
+  tiles and had generic controls. Round 2 redraws them glyph-led: Wave's sine is the player (bright
+  along its length as the track plays, its height the volume, flat when paused; tap the wave to pause,
+  the left or right edge to go back or skip), and Dash's tile is the dash glyph with the newest name in
+  full and earlier names fading, no count. Everything else in round 1 stands.
+- **A73 — TIDAL looks no different on the watch, as on the phone (the merged-library rule).** A streamed
+  track uses the same wave, words and controls as an owned one and names no service; only the quiet
+  line says where it is playing ("Playing on phone"). With the phone away, a streamed track stays in
+  the library and says "Needs your phone nearby" (A62).
+- **A74 — The screens are approved** (round 2 with A73). Next: the P14 plan.
+
+## 17. Gate 1 closed
+
+- **A75 — PC1 accepted:** the watch apps share their phone app's package id and signing key (the Data
+  Layer requires it), and the update channel tells a watch APK from a phone APK.
+- **A76 — The release order is approved:** A Point, B Dash, C Wave, D Beat workouts, E Beat all-day and
+  her watch, F the device run; one PR per release.
+- **A77 — The technical finding and the plan are approved as they stand.** Build starts with release A.
+- **A78** — The owner installs the Point installer on the watch once, from a PC with adb.

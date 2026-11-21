@@ -30,21 +30,34 @@ public class FrozenInvariantsTests
         Assert.Equal("com.storyworthtelling.focusphone.audio", PolicyContext.AudioPackage);
     }
 
-    // Exactly one head declares the frozen ApplicationId — the launcher. The rename
+    // Exactly one phone head declares the frozen ApplicationId — the launcher. The rename
     // may move/rename the csproj, but the literal must survive it.
+    //
+    // P14 (PC1, PC8): on the watch, the Point installer carries Flyleaf's package, because the
+    // Data Layer delivers only between apps of one package and one signature. It is the one
+    // other project allowed the id, and the update channel's form rule keeps its APK off the
+    // phone (W-3.1.1); any third copy is still a mistake.
     [Fact]
     public void LauncherCsprojDeclaresFrozenApplicationId()
     {
         var declaring = EnumerateRepoFiles("*.csproj")
             .Where(file => File.ReadAllText(file)
                 .Contains($"<ApplicationId>{PolicyContext.LauncherPackage}</ApplicationId>", StringComparison.Ordinal))
+            .Select(RepoRelative)
             .ToList();
+        var watch = declaring.Where(IsWatchProject).ToList();
+        var phone = declaring.Except(watch).ToList();
 
-        Assert.True(declaring.Count == 1,
-            $"Exactly one csproj must declare the frozen launcher ApplicationId " +
-            $"'{PolicyContext.LauncherPackage}'; found {declaring.Count}:\n" +
-            string.Join("\n", declaring.Select(RepoRelative)));
+        Assert.True(phone.Count == 1,
+            $"Exactly one phone csproj must declare the frozen launcher ApplicationId " +
+            $"'{PolicyContext.LauncherPackage}'; found {phone.Count}:\n" +
+            string.Join("\n", phone));
+        Assert.True(watch.All(path => path == Path.Combine("Watch", "Point.Installer", "Point.Installer.csproj")),
+            "Only the Point installer may carry the launcher's package on the watch:\n" + string.Join("\n", watch));
     }
+
+    private static bool IsWatchProject(string relative) =>
+        relative.StartsWith("Watch" + Path.DirectorySeparatorChar, StringComparison.Ordinal);
 
     // The home Activity must keep MainLauncher + CategoryHome, or Flyleaf stops being
     // the device home app after the upgrade.
@@ -78,14 +91,14 @@ public class FrozenInvariantsTests
 
         // The install decision is package-id based: an owner app upgrades, a stray package is skipped.
         var upgraded = Storyworthtelling.Updates.UpdateScope.Decide(
-            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage,
-            [new Storyworthtelling.Updates.InstallCandidate(PolicyContext.LauncherPackage, 2)],
+            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage, Storyworthtelling.Updates.ApkForm.Phone,
+            [new Storyworthtelling.Updates.InstallCandidate(PolicyContext.LauncherPackage, 2, Storyworthtelling.Updates.ApkForm.Phone)],
             new Dictionary<string, long> { [PolicyContext.LauncherPackage] = 1 });
         Assert.Single(upgraded);
 
         var skipped = Storyworthtelling.Updates.UpdateScope.Decide(
-            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage,
-            [new Storyworthtelling.Updates.InstallCandidate("com.example.other", 9)],
+            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage, Storyworthtelling.Updates.ApkForm.Phone,
+            [new Storyworthtelling.Updates.InstallCandidate("com.example.other", 9, Storyworthtelling.Updates.ApkForm.Phone)],
             new Dictionary<string, long>());
         Assert.Empty(skipped);
     }
@@ -165,7 +178,9 @@ public class FrozenInvariantsTests
     [Fact]
     public void EveryFocusPhonePackageInTheBandTableMatchesTheDomainConstant()
     {
+        // The phone's entries: a watch app shares its phone app's package (P14 PC1), so the table is keyed by form too.
         var banded = Storyworthtelling.Updates.SuiteVersionBands.All
+            .Where(app => app.Form == Storyworthtelling.Updates.ApkForm.Phone)
             .Select(app => app.Package)
             .ToList();
 
@@ -184,6 +199,7 @@ public class FrozenInvariantsTests
     public void EveryPublishedFocusPhoneHeadHasABand()
     {
         var banded = Storyworthtelling.Updates.SuiteVersionBands.All
+            .Where(app => app.Form == Storyworthtelling.Updates.ApkForm.Phone)
             .Select(app => app.Package)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -194,7 +210,7 @@ public class FrozenInvariantsTests
                  })
         {
             Assert.True(banded.Contains(package),
-                $"{package} ships through the update channel but has no versionCode band.");
+                $"{package} ships through the update channel but has no phone versionCode band.");
         }
     }
 

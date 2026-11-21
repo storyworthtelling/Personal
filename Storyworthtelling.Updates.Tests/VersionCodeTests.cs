@@ -203,7 +203,9 @@ public class VersionCodeTests
 
         Assert.Equal(["band 1: com.storyworthtelling.focusphone.launcher, "
             + "com.storyworthtelling.focusphone.audio, com.storyworthtelling.focusphone.communication, "
-            + "com.storyworthtelling.focusphone.camera, com.storyworthtelling.ledger"], shared);
+            + "com.storyworthtelling.focusphone.camera, com.storyworthtelling.ledger",
+            // Every watch APK (PC4): the installer and the face, both built by build-watch.yml.
+            "band 11: com.storyworthtelling.focusphone.launcher, com.storyworthtelling.watch.point"], shared);
     }
 
     /// <summary>

@@ -22,8 +22,11 @@ public record ReleaseInfo(string TagName, IReadOnlyList<ReleaseAsset> ApkAssets)
 }
 
 /// <summary>
-/// The private update channel: reads the latest GitHub Release of this repo so
-/// the launcher's UpdateService can silent-install newer signed APKs.
+/// The private update channel: reads one of this repo's rolling GitHub Releases by its tag, so
+/// the launcher's UpdateService can silent-install newer signed APKs. Each form has its own release
+/// (<see cref="Storyworthtelling.Updates.ReleaseChannels"/>): the phone half reads the phone's and
+/// Flyleaf's watch half the watch's. Never "the latest release", which is whichever release GitHub
+/// last called latest (P14 release A fix round).
 /// </summary>
 public class GitHubReleaseClient
 {
@@ -38,10 +41,12 @@ public class GitHubReleaseClient
         this.token = token;
     }
 
-    public async Task<ReleaseInfo> GetLatestReleaseAsync()
+    /// <param name="tag">The release's tag: <see cref="Storyworthtelling.Updates.ReleaseChannels.Phone"/> or
+    /// <see cref="Storyworthtelling.Updates.ReleaseChannels.Watch"/>.</param>
+    public async Task<ReleaseInfo> GetReleaseAsync(string tag)
     {
-        var request = new HttpRequestMessage(
-            HttpMethod.Get, $"https://api.github.com/repos/{repo}/releases/latest");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, $"https://api.github.com/repos/{repo}/releases/tags/{Uri.EscapeDataString(tag)}");
         request.Headers.Authorization = new("Bearer", token);
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
         request.Headers.UserAgent.ParseAdd("FocusPhone-UpdateService");
@@ -52,7 +57,7 @@ public class GitHubReleaseClient
             // Carry the status code on the exception so the caller can tell a rejected token (401/403) from a
             // transient failure and record the update token's health accordingly.
             throw new HttpRequestException(
-                $"Fetching the latest release of {repo} failed with {(int)response.StatusCode} {response.StatusCode}.",
+                $"Fetching the {tag} release of {repo} failed with {(int)response.StatusCode} {response.StatusCode}.",
                 inner: null, response.StatusCode);
         }
 

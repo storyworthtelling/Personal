@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Generates Point, the watch face (P14 W-2.1.1): the Watch Face Format XML, its manifest and resources,
+       from Watch.Domain's HourShape, FaceGeometry and FaceColour, then packs them with aapt2.
+       BCL only: the masks and the preview are drawn and written as PNG here, with no imaging package. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>FaceStudio</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Watch\Watch.Domain\Watch.Domain.csproj" />
+  </ItemGroup>
+</Project>

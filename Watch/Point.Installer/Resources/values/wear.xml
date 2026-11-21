@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the installer offers the Data Layer, so Flyleaf can find the watch that runs it (WatchIdentity.InstallerCapability).
+     The array's name is Wear OS's own. -->
+<resources>
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>point-installer</item>
+    </string-array>
+</resources>

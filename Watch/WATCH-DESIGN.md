@@ -4,7 +4,7 @@
 open questions for the owner, and every one of them is listed in §14.
 
 This is the single source of truth for how the four watch apps look, move, buzz and speak: **Point**
-(the face and the lockdown, Flyleaf's counterpart), **Dash** (Post's), **Wave** (Score's) and **Beat**
+(the watch face, Flyleaf's counterpart), **Dash** (Post's), **Wave** (Score's) and **Beat**
 (Constitution's). It shares **nothing** with Paper & Ink (`DESIGN.md`) by the owner's decision (A33):
 not its palette, fonts, materials or voice rules. The two languages meet only at the repository's
 general rules (no hex or type-size literals outside registered token files, invented data in every
@@ -175,8 +175,10 @@ starting point (O4) and are settled on the wrist:
 - **Beat:** during a workout shows what A23 lists (cadence, live HR, distance when running; the set
   counter and rest timer for strength). Live heart rate is the only Body value the watch ever shows
   (A29). Accent: Beat's day colour.
-- **Point** has no screens of its own besides the face, apart from the vault passphrase entry on
-  first run (A38), which shows the passphrase in the clear as the phone apps do.
+- **Point** has no screens of its own besides the face. Its installer (A70) shows only the system's
+  own install prompt, once per app. The vault passphrase entry on first run (A38) lives in Dash, which
+  is the first suite app installed after the face, and shows the passphrase in the clear as the phone
+  apps do.
 
 ## 12. Accessibility
 

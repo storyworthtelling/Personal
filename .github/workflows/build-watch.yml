@@ -1,0 +1,334 @@
+name: Build watch APKs
+
+# The watch (P14 W-3.2.1, plan §2.3): the Point installer and Point, the face, today; Dash, Wave and Beat as they land.
+# A watch app carries its phone app's package (PC1), so everything here is published as a watch APK, numbered in band 11
+# (PC4), checked back out of the APK itself before it leaves, and published to watch-latest, the watch's own release, never
+# to apps-latest: every Flyleaf and Score already on a phone installs whatever .apk apps-latest carries, by package
+# (P14 release A fix round).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      # Watch.Tests reads every file under Watch/ by content (the leak guard, the installer's manifest), and FaceStudio's
+      # tests read the committed face and the watch's own fonts; the plan, progress notes and mockups build nothing.
+      - 'Watch/**'
+      - '!Watch/**/*.md'
+      - '!Watch/design/**'
+      - 'Tools/FaceStudio/**'
+      - 'Tools/FaceStudio.Tests/**'
+      # What Watch.Domain builds on: the update channel's own rule, by which the installer judges every APK (P14
+      # W-3.1.2), the suite's time words and the dog-ear's undo window.
+      - 'Storyworthtelling.Updates/**'
+      - 'Storyworthtelling.Time/**'
+      - 'Storyworthtelling.Folds/**'
+      # Watch.Tests also holds Flyleaf's half of the update channel by its source, and Flyleaf's workflow by its filter, so
+      # a Flyleaf-only change runs them too (P14 release A fix round; WatchInvariantsTests keeps this list whole).
+      - 'FocusPhone/Flyleaf.Android/**'
+      - '.github/workflows/build-flyleaf.yml'
+      - '.github/actions/dotnet/**'
+      - '.github/workflows/build-watch.yml'
+
+# A newer push to the same branch makes an in-flight run worthless, so cancel it rather than pay
+# for both. main is never cancelled: every main run publishes to the rolling release.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  # Branch pushes run the tests and nothing else — Actions minutes are the budget. main (and a manual
+  # "Run workflow", which is how a branch gets its APKs) runs the tests inside the build job instead.
+  test:
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/dotnet
+
+      # Both net10.0, so no Android SDK is set up: the watch's guards read the heads' files rather than build them.
+      - name: Test the watch
+        run: dotnet test Watch/Watch.Tests/Watch.Tests.csproj
+
+      # FaceStudio's APK test packs the face only where the runner's SDK has aapt2 and android-36; the build job
+      # makes that required.
+      - name: Test FaceStudio
+        run: dotnet test Tools/FaceStudio.Tests/FaceStudio.Tests.csproj
+
+  build:
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # actions: write lets the prune step delete artifacts from older runs;
+    # contents: write lets the rolling-release step publish the signed APKs.
+    permissions:
+      contents: write
+      actions: write
+    env:
+      DISPLAY_VERSION: 1.0.${{ github.run_number }}
+      # The face is no .NET project: FaceStudio packs it and this workflow signs it, into its own bin folder.
+      FACE_PACKAGE: com.storyworthtelling.watch.point
+      FACE_APK: Watch/Point.Face/bin/Release/com.storyworthtelling.watch.point-Signed.apk
+      # One line per watch app: its project, then the package its APK must carry (P14 plan §2.2). A new app is its line
+      # here and its publish folder in the two lists at the end; CiHygieneTests fails while either is missing.
+      WATCH_HEADS: |
+        Watch/Point.Installer/Point.Installer.csproj com.storyworthtelling.focusphone.launcher
+    steps:
+      - uses: actions/checkout@v4
+
+      # A plain .NET-for-Android head (not MAUI), so the lighter 'android' workload is enough.
+      - uses: ./.github/actions/dotnet
+        with:
+          workload: android
+
+      # Pinned rather than inherited, as on every Android workflow: the runner's default JDK is 17, and the Play
+      # services bindings' build steps and the SDK's apksigner run on it.
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # FaceStudio links the face against android-36's android.jar (the face's minSdk), and the face is aligned and
+      # signed with build-tools' own zipalign and apksigner. Installed so neither depends on the runner image's choice.
+      - name: Android SDK for the face
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Test the watch
+        run: dotnet test Watch/Watch.Tests/Watch.Tests.csproj
+
+      # Here a missing aapt2 or android.jar fails FaceStudio's APK test instead of skipping it (P14 W-2.1.1).
+      - name: Test FaceStudio
+        env:
+          FACESTUDIO_APK_REQUIRED: '1'
+        run: dotnet test Tools/FaceStudio.Tests/FaceStudio.Tests.csproj
+
+      # The suite's one keystore: the Data Layer delivers only between apps of one package and one signature, so an
+      # installer signed any other way never hears the phone's Flyleaf (P14 W-3.1.2).
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/watch.keystore
+
+      - name: Compute versionCode
+        id: version
+        uses: ./.github/actions/version-code
+        with:
+          band: 11
+
+      # Every watch app in the table, each one signed APK. The list it writes (APK, package, kind) is what every check
+      # below reads, so a check cannot pass over an APK the build did not name.
+      - name: Build the signed watch apps
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          : > "$RUNNER_TEMP/watch-apks.txt"
+          while read -r proj package; do
+            [ -n "$proj" ] || continue
+            echo "::group::Publishing $proj (versionCode $VERSION_CODE, version $DISPLAY_VERSION)"
+            dotnet publish "$proj" -f net10.0-android -c Release \
+              -p:ApplicationVersion=$VERSION_CODE \
+              -p:ApplicationDisplayVersion=$DISPLAY_VERSION \
+              -p:AndroidPackageFormat=apk \
+              -p:AndroidKeyStore=true \
+              -p:AndroidSigningKeyStore=/tmp/watch.keystore \
+              -p:AndroidSigningKeyAlias="$KEY_ALIAS" \
+              -p:AndroidSigningKeyPass="$KEY_PASSWORD" \
+              -p:AndroidSigningStorePass="$KEYSTORE_PASSWORD"
+            echo "::endgroup::"
+            signed=("$(dirname "$proj")"/bin/Release/net10.0-android/publish/*-Signed.apk)
+            if [ "${#signed[@]}" -ne 1 ]; then
+              echo "FAIL: $proj left ${#signed[@]} signed APKs, not one."
+              exit 1
+            fi
+            echo "${signed[0]} $package app" >> "$RUNNER_TEMP/watch-apks.txt"
+          done <<< "$WATCH_HEADS"
+
+      # FaceStudio writes the face (which must then be what is committed) and packs it unsigned; it is aligned before it
+      # is signed, since the signature covers the alignment, and verified. The passwords come from the environment.
+      - name: Build the signed face
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)
+          OUT=$(dirname "$FACE_APK")
+          mkdir -p "$OUT"
+          dotnet run --project Tools/FaceStudio -- --repo-root . --apk "$OUT/unsigned.apk" --version-code "$VERSION_CODE" --version-name "$DISPLAY_VERSION"
+          git diff --exit-code -- Watch/Point.Face || {
+            echo "FAIL: FaceStudio's face differs from the committed one; run the tool and commit what it writes."
+            exit 1
+          }
+          "$BUILD_TOOLS/zipalign" -f -p 4 "$OUT/unsigned.apk" "$OUT/aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign --ks /tmp/watch.keystore --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEY_PASSWORD \
+            --v4-signing-enabled false --out "$FACE_APK" "$OUT/aligned.apk"
+          "$BUILD_TOOLS/apksigner" verify "$FACE_APK"
+          rm "$OUT/unsigned.apk" "$OUT/aligned.apk"
+          echo "$FACE_APK $FACE_PACKAGE face" >> "$RUNNER_TEMP/watch-apks.txt"
+          cat "$RUNNER_TEMP/watch-apks.txt"
+
+      # Fatal: every package a package depends on is in the graph. Transitive pinning once left
+      # androidx.concurrent.futures out of four heads with no error, and each shipped app died on open
+      # (RepoGuards.Tests/DependencyGraphCheckTests).
+      - name: DEPENDENCY CHECK
+        run: python3 .github/scripts/check-dependency-graph.py .
+
+      # Fatal: the update channel installs by package id, and the installer is Flyleaf's package on the watch (PC8),
+      # so a wrong id is a second app on the wrist, or a watch APK nobody will install. The versionCode is read back too:
+      # an APK left at its csproj's code would be older than what the watch has.
+      - name: APP ID CHECK
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -e
+          echo "=== APP ID CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          while read -r apk package kind; do
+            echo "--- $kind: $apk"
+            BADGING=$("$AAPT2" dump badging "$apk")
+            echo "$BADGING" | head -1
+            echo "$BADGING" | grep -q "^package: name='$package' versionCode='$VERSION_CODE' " || {
+              echo "FAIL: $apk is not $package at versionCode $VERSION_CODE."
+              exit 1
+            }
+            echo "ok: $package at $VERSION_CODE"
+          done < "$RUNNER_TEMP/watch-apks.txt"
+          echo "=== END APP ID CHECK ==="
+
+      # Fatal: a watch APK that does not say it is one reads as its phone app's newest build by every other measure
+      # (P14 W-3.1.1). The publish action refuses it too; this says so here, by the APK's name, before anything leaves.
+      - name: FORM CHECK
+        run: |
+          set -e
+          echo "=== FORM CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          while read -r apk package kind; do
+            echo "--- $kind: $apk"
+            "$AAPT2" dump badging "$apk" | grep -Eq "^ *uses-feature(-not-required)?: name='android.hardware.type.watch'" || {
+              echo "FAIL: $apk does not declare android.hardware.type.watch, so it reads as a phone APK."
+              exit 1
+            }
+            echo "ok: a watch APK"
+          done < "$RUNNER_TEMP/watch-apks.txt"
+          echo "=== END FORM CHECK ==="
+
+      # Fatal: every watch app carries 32-bit ARM code beside 64-bit (each head's RuntimeIdentifiers). A watch whose system
+      # runs 32-bit userspace will not install an APK without armeabi-v7a, and .NET builds only 64-bit unless told
+      # (P14 release A fix round). The face carries no code.
+      - name: ABI CHECK
+        run: |
+          set -e
+          echo "=== ABI CHECK ==="
+          while read -r apk package kind; do
+            echo "--- $kind: $apk"
+            if [ "$kind" = face ]; then
+              echo "ok: no code, so no native libraries"
+              continue
+            fi
+            ENTRIES=$(unzip -l "$apk")
+            for abi in armeabi-v7a arm64-v8a; do
+              echo "$ENTRIES" | grep -q " lib/$abi/" || {
+                echo "FAIL: $apk carries no lib/$abi/, so a watch that runs $abi code can't install it."
+                exit 1
+              }
+            done
+            echo "ok: lib/armeabi-v7a/ and lib/arm64-v8a/"
+          done < "$RUNNER_TEMP/watch-apks.txt"
+          echo "=== END ABI CHECK ==="
+
+      # Fatal. A watch app with a launcher entry must carry its icon (two phone heads shipped the default one for
+      # months). The installer has no screen and no launcher entry (WD §11), so it has no icon to carry; the face is
+      # shown in the picker by its preview, which its watch_face_info.xml names.
+      - name: ICON CHECK
+        run: |
+          set -e
+          echo "=== ICON CHECK ==="
+          AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
+          while read -r apk package kind; do
+            echo "--- $kind: $apk"
+            BADGING=$("$AAPT2" dump badging "$apk")
+            ENTRIES=$(unzip -l "$apk")
+            if [ "$kind" = face ]; then
+              echo "$ENTRIES" | grep -q "res/xml/watch_face_info.xml" || {
+                echo "FAIL: the face carries no watch_face_info.xml, so the picker cannot list it."
+                exit 1
+              }
+              echo "$ENTRIES" | grep -Eq "res/drawable[^/]*/preview.png" || {
+                echo "FAIL: the face carries no preview.png for the picker."
+                exit 1
+              }
+              echo "ok: the picker's preview is packaged"
+            elif echo "$BADGING" | grep -q "^launchable-activity:"; then
+              ICON=$(echo "$BADGING" | grep -Eo "application-icon-[0-9]+:'[^']+'" | head -1)
+              if [ -z "$ICON" ]; then
+                echo "FAIL: $apk has a launcher entry but declares no icon."
+                exit 1
+              fi
+              echo "ok: $ICON"
+            else
+              echo "ok: no launcher entry, so no launcher icon to carry"
+            fi
+          done < "$RUNNER_TEMP/watch-apks.txt"
+          echo "=== END ICON CHECK ==="
+
+      # Fatal: the face draws its date in the watch's own IBM Plex Mono Medium (A57), embedded as res/font/plexmono.ttf,
+      # and it must be that file byte for byte. The installer draws no text. The kit's own Plex Mono asset is packaged
+      # by the first app that draws with it (Dash), and this check names it when it does.
+      - name: FONT CHECK
+        run: |
+          set -e
+          echo "=== FONT CHECK ==="
+          WANT=$(sha256sum < Watch/Fonts/IBMPlexMono-Medium.ttf | cut -d' ' -f1)
+          while read -r apk package kind; do
+            echo "--- $kind: $apk"
+            if [ "$kind" = face ]; then
+              GOT=$(unzip -p "$apk" res/font/plexmono.ttf | sha256sum | cut -d' ' -f1)
+              if [ "$GOT" != "$WANT" ]; then
+                echo "FAIL: the face's res/font/plexmono.ttf is not Watch/Fonts/IBMPlexMono-Medium.ttf."
+                exit 1
+              fi
+              echo "ok: Plex Mono Medium, byte for byte"
+            else
+              echo "ok: draws no text of its own"
+            fi
+          done < "$RUNNER_TEMP/watch-apks.txt"
+          echo "=== END FONT CHECK ==="
+
+      # Keep only the latest run's artifacts: delete artifacts from older runs of this
+      # workflow before uploading, which also frees storage so the upload succeeds.
+      - name: Prune old artifacts
+        uses: ./.github/actions/prune-old-artifacts
+
+      # The installer's first copy is installed by hand from here, once, with adb install -g (A78).
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Watch-Android
+          path: |
+            Watch/Point.Installer/bin/Release/net10.0-android/publish/*-Signed.apk
+            Watch/Point.Face/bin/Release/*-Signed.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      # Publish to the rolling "watch-latest" release, a prerelease no phone reads: Flyleaf's watch half reads the watch's
+      # assets from there and sends them to the installer (P14 W-3.1.3). Never apps-latest, which every phone installs
+      # from by package. main only — feature-branch builds must never reach the device.
+      - name: Publish to rolling GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/publish-rolling-release
+        with:
+          # Watch APKs: the action refuses any release but watch-latest for them, reads each APK's manifest, refuses a
+          # phone APK, and names each <name>.watch.apk so it never shares a name with its phone app's asset (P14 W-3.1.1).
+          form: watch
+          release: watch-latest
+          apks: |
+            Watch/Point.Installer/bin/Release/net10.0-android/publish/*-Signed.apk
+            Watch/Point.Face/bin/Release/*-Signed.apk
