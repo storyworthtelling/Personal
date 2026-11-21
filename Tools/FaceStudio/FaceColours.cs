@@ -19,14 +19,16 @@ public static class FaceColours
     public static string AtTheHour(Func<double, Oklch> tone) => Hex(tone(0));
 
     /// <summary>
-    /// The colour a tone takes as the minute goes round the wheel (WD §4.1): one opaque <c>RRGGBB</c>
+    /// The colour a tone takes as the minute goes round the wheel (WD §4.1): one opaque <c>#AARRGGBB</c>
     /// for each minute, from <see cref="HourShape.For"/>'s hue, chosen by <c>[MINUTE]</c>. The format's
-    /// <c>extractColorFromColors</c> (version 4) takes the list as a quoted string.
+    /// <c>extractColorFromColors</c> (version 4) takes the list as a quoted string. The watch's renderer reads
+    /// it as it reads a gradient's colours and refuses bare <c>RRGGBB</c>, which leaves every colour empty and
+    /// the face black (the first face on a Pixel Watch 2, Wear OS 7, 21 Nov 2026).
     /// </summary>
     public static string ByMinute(Func<double, Oklch> tone)
     {
         var list = string.Join(' ', Enumerable.Range(0, 60).Select(minute =>
-            (Srgb.Argb(tone(HourShape.For(new TimeOnly(0, minute)).Hue)) & 0xFFFFFF).ToString("X6", CultureInfo.InvariantCulture)));
+            Hex(tone(HourShape.For(new TimeOnly(0, minute)).Hue))));
 
         // Sixty colours, one a minute: with interpolation on, value m/59 lands on colour m whether the
         // format reads the value as a position along the list or as a share of it. The divisor is a

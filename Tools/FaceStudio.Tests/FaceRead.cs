@@ -11,7 +11,7 @@ internal static class FaceRead
 {
     public const double Radius = PointFace.Canvas / 2.0;
 
-    private static readonly Regex ColourList = new("\"([0-9A-Fa-f ]+)\"", RegexOptions.Compiled);
+    private static readonly Regex ColourList = new("\"([#0-9A-Fa-f ]+)\"", RegexOptions.Compiled);
 
     public static XDocument Face { get; } = FaceDocument.Build();
 
@@ -46,10 +46,10 @@ internal static class FaceRead
         return ColourList.Match(value).Groups[1].Value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
     }
 
-    /// <summary>What the colour list should hold for a tone: its colour at each minute's hue, as RRGGBB.</summary>
+    /// <summary>What the colour list should hold for a tone: its colour at each minute's hue, as opaque #AARRGGBB.</summary>
     public static IReadOnlyList<string> Expected(Func<double, Oklch> tone) =>
         Enumerable.Range(0, 60)
-            .Select(minute => (Srgb.Argb(tone(HourShape.For(new TimeOnly(0, minute)).Hue)) & 0xFFFFFF).ToString("X6", CultureInfo.InvariantCulture))
+            .Select(minute => "#" + Srgb.Argb(tone(HourShape.For(new TimeOnly(0, minute)).Hue)).ToString("X8", CultureInfo.InvariantCulture))
             .ToList();
 
     public static string RepoRoot()
