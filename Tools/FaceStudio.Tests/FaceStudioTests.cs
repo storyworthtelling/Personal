@@ -63,6 +63,25 @@ public class FaceStudioTests
         Assert.Equal(FaceRead.Expected(FaceColour.Ring), FaceRead.MinuteColours(ring));
     }
 
+    // The first face on a Pixel Watch 2 (Wear OS 7, 21 Nov 2026) drew nothing at all, date included: the renderer's
+    // colour parser (DWF:GradientUtil) refused every list written as bare RRGGBB ("Wrong parameter for colors E36556 …
+    // colors should not be null or empty"), although Google's reference example writes it that way. It reads the list
+    // as it reads a gradient's colours, #AARRGGBB, so every colour the face picks by the minute is written so.
+    [Fact]
+    public void EveryMinuteColourIsWrittenAsTheRendererReadsIt()
+    {
+        var face = File.ReadAllText(Path.Combine(FaceRead.RepoRoot(), "Watch", "Point.Face", "res", "raw", "watchface.xml"));
+        var lists = System.Text.RegularExpressions.Regex.Matches(face, @"extractColorFromColors\(&quot;([^&]*)&quot;");
+
+        Assert.NotEmpty(lists);
+        foreach (System.Text.RegularExpressions.Match list in lists)
+        {
+            var colours = list.Groups[1].Value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            Assert.Equal(60, colours.Length);
+            Assert.All(colours, colour => Assert.Matches("^#FF[0-9A-F]{6}$", colour));
+        }
+    }
+
     // Release A fix round: [MINUTE] and 59 are both whole numbers, and an expression that divides two whole numbers may
     // be read as whole-number division, which chooses the list's first colour for every minute but the last. The
     // divisor is written as a fraction, so the share is a fraction whatever the format's rule.
