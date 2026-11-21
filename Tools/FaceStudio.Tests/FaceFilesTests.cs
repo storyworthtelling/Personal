@@ -14,7 +14,7 @@ public class FaceFilesTests
         {
             var path = Path.Combine(folder, file.Path);
             Assert.True(File.Exists(path), $"{file.Path} is not committed; run FaceStudio.");
-            Assert.True(File.ReadAllBytes(path).AsSpan().SequenceEqual(file.Bytes), $"{file.Path} differs from what FaceStudio makes.");
+            Assert.True(FaceFiles.Same(file.Path, file.Bytes, File.ReadAllBytes(path)), $"{file.Path} differs from what FaceStudio makes.");
         }
 
         var committed = Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories)

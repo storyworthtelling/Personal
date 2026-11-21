@@ -32,7 +32,8 @@
     <PackageReference Include="Xamarin.GooglePlayServices.Wearable" />
     <!-- Play services' Fragment 1.9 needs LiveData.Core 2.11; WorkManager 2.10's LiveData 2.9.1 pins LiveData.Core to
          2.9.1 exactly, so restore fails (NU1107) unless Flyleaf takes LiveData 2.11 itself. WorkManager asks for 2.9.1
-         or newer, so it is satisfied. The central version stays at 2.9.1 so no other head's graph moves. -->
+         or newer, so it is satisfied. LiveData has no central version: with transitive pinning one would be forced on every
+         head, and a central 2.9.1 broke Plate and the MAUI heads on main (OneBuildSettingTests.LiveDataIsNotPinnedForEveryone). -->
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" VersionOverride="2.11.0.1" />
   </ItemGroup>
 </Project>
