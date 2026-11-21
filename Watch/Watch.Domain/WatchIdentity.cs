@@ -62,4 +62,18 @@ public static class WatchIdentity
 
     /// <summary>The silent notification channel the wrist is asked through. Android keeps a channel by its id.</summary>
     public const string InstallChannel = "point-install";
+
+    // ---- Flyleaf's half (W-3.1.3): the phone end of the same contract ----
+
+    /// <summary>Flyleaf's listener for the watch's reports, registered by this name in Flyleaf's manifest.</summary>
+    public const string PhoneReportListenerName = "com.storyworthtelling.focusphone.launcher.WatchReportListener";
+
+    /// <summary>Flyleaf's preferences file for the watch half: what it sent, and the last run.</summary>
+    public const string PhonePreferences = "watchUpdates";
+
+    /// <summary>What the phone last sent the watch, one entry per app.</summary>
+    public const string SentKey = "sent";
+
+    /// <summary>The watch's last run, for Settings' quiet line.</summary>
+    public const string LastRunKey = "lastRun";
 }

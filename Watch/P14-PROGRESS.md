@@ -750,3 +750,175 @@ wrist").
 - `Watch.Tests`: **316 passed, 0 failed** (132 before). `Storyworthtelling.Updates.Tests`: **162 passed, 0 failed**.
   `FocusPhone/Codex.Tests`: **3082 passed, 0 failed**. `RepoGuards.Tests`: **386 passed, 0 failed**. `FaceStudio.Tests`:
   19 passed. `Watch/Point.Installer` and `Watch/Watch.Ui.Wear` compile here, 0 warnings.
+
+---
+
+# Chunk A6 · Flyleaf sends watch updates (W-3.1.3)
+
+Every figure below is from a real run on 21 Nov 2026. As before, the red runs were taken with the tests written and the
+code present only as stubs: methods threw `NotImplementedException` and the phone's new `WatchIdentity` constants were
+empty strings.
+
+## What it is
+
+**The pure half, in `Watch.Domain/Updates`** (Flyleaf now references `Watch.Domain`, so the frame codec and the
+`update/installed` codec the installer reads are the very ones Flyleaf writes; nothing was copied or moved, and
+`Watch.Domain` gained a reference to the BCL-only `Storyworthtelling.Time` for the line):
+- `WatchSendPlan.Decide(offered, answer, sent, now, force)`: nothing at all unless the watch answered (`WatchAnswer`:
+  `NoWatch`, `Unreachable`, `NoAnswer`, `Unreadable`, `Newer`, or `Answered` with its report); only the suite's
+  `form: watch` assets; A4's own rule (`SiblingUpdatePlan`, custodian, watch form) for newer-or-absent against the
+  report's apps; then, for a due build, the watch's own result for that very build first and the phone's sent-record
+  second: installed (any of the three success words) is `AlreadyCurrent`, `NotForThisWatch`/`NotOurs` is
+  `RefusedByTheWatch`, `Declined` is not sent again, `Waiting` is `WaitingOnTheWrist` until its send is three days old,
+  `Failed`/`Damaged` is sent again, and no word yet is `InFlight` for an hour after the send. The installer itself may be
+  sent and always goes **last**. `TransferName(assetId, nonce)` names each channel.
+- `WatchSentRecord` (one entry per app, the latest send), `WatchRunRecord` (when, reach, what was due, sent, not sent, the
+  newest report; `WithReport` for a report that comes later) and `WatchRunCodec`, all JSON for Flyleaf's preferences.
+- `WatchUpdateLine.Say`: Settings' one sentence, or nothing when no run has happened or no watch is paired.
+  "Watch checked 2h ago: Wave didn’t install (conflict), Beat is waiting for a tap and Dash installed.",
+  "…: everything is up to date.", "…: it was out of reach, so nothing was sent." Counts go through `Quantities`
+  ("2 apps installed."), the time through `RelativeTime`, names through `InstallPrompt.NameOf`.
+- `WatchSendLines`: `WATCH run: Unreachable`, `WATCH <package> <code>: WaitingOnTheWrist`, `…: not sent, IOException`,
+  `…: left for the next run`, and `Heard` for a received `update/installed` (`CONTRACT update/installed: received v1` /
+  `refused v2, newer than Flyleaf reads` / `refused, unreadable`). Packages, numbers and words only.
+- `WatchIdentity` gained Flyleaf's frozen names as literals: `PhoneReportListenerName`
+  (`com.storyworthtelling.focusphone.launcher.WatchReportListener`), `PhonePreferences` (`watchUpdates`), `SentKey`
+  (`sent`), `LastRunKey` (`lastRun`).
+
+**The Android half in Flyleaf** (`FocusPhone/Flyleaf.Android/WatchUpdates.cs`, thin):
+- `UpdateService.SendToWatchAsync(context, force)`, under its own gate, called by `UpdateWorker` **after** the phone's run
+  has finished, been recorded (`UpdateStatusStore`) and logged, and after the ratings refresh; and by Settings' "Install
+  from GitHub now" (with `force`) after the phone's line is on screen, which then redraws for the watch's line.
+  `WatchUpdates.RunQuietlyAsync` catches anything unforeseen and logs its shape (`HeadLog.Quiet`), so it cannot break,
+  delay or change the phone's result.
+- Finding the watch: `CapabilityClient.GetCapabilityAsync(WatchIdentity.InstallerCapability, FilterAll)` (none, or an
+  `ApiException` because the phone has no Wear OS, is `NoWatch`), then `FilterReachable` (none is `Unreachable`; a nearby
+  node is preferred). Asking: `MessageClient.SendMessageAsync(node, /update/installed, InstalledCodec.Encode(new
+  InstalledAsk()))`, then up to `WatchSendPlan.AnswerWait` (30 s) for the report.
+- `WatchReportListener` (`WearableListenerService`, exported, filter `MESSAGE_RECEIVED` on `wear://*/update/installed`,
+  registered by the frozen name): decodes, logs `Heard`, writes a report into the stored last run, and wakes the run
+  waiting on it (`WatchReports`, an in-process ticket and signal). It also hears the report the installer sends every
+  connected phone after each settled install, so the line learns of a tap on the wrist without waiting six hours.
+- Sending: the release (the same `GitHubReleaseClient` and token), each `.watch.apk` asset's sidecar with its form agreed
+  against the name; for each `Send`, the APK downloads by asset id (`UpdateService.DownloadAsync`, now internal) into the
+  cache, is read with `ApkArchive` (it must read as a watch APK of the sidecar's package and version, or it is not sent),
+  and goes down `ChannelClient.OpenChannelAsync(node, UpdatePaths.ApkPathFor(transfer))` as `UpdateApkFrame.Header`
+  (length and SHA-256 from `UpdateApkFrame.Describe`) then exactly the APK, in 64 KB writes; the output is closed, the run
+  waits up to a minute for a report naming that build, then closes the channel and deletes the file. A completed send is
+  recorded (`WatchUpdateStore.RecordSent`); a failure (HTTP, IO or a Java exception) is logged by type and counted as not
+  sent. No new send starts after `SendBudget` (5 min); the rest wait for the next run.
+- The binding is Microsoft's `Xamarin.GooglePlayServices.Wearable` (already central, 120.0.1.2). Member names were read
+  from the package's own assembly with `MetadataLoadContext` (`GetCapabilityAsync(string, int)`, `FilterAll` /
+  `FilterReachable`, `ICapabilityInfo.Nodes`, `INode.IsNearby`, `OpenChannelAsync(string, string)`,
+  `GetOutputStreamAsync` returning `Java.IO.OutputStream`, `CloseAsync`, and `ApiException.StatusCode` in Basement).
+
+## Tests written first
+
+- `Watch/Watch.Tests/Updates/FlyleafWatchUpdateTests.cs` (66 cases): `SendsOnlyNewer`, `AnOlderBuildIsNotSent`,
+  `WhatIsNotThereIsSent`, `APhoneApkIsNeverSent`, `OnlyTheSuite`, `TheFaceIsSentLikeAnApp`, `TheInstallerMayUpdateItself`,
+  `TheInstallerGoesLast`, `WaitsForTheWatch` ×5, `AnAnswerNeedsAReport`, `ASendStillLandingIsNotSentAgain`,
+  `ALostSendIsSentAgain`, `AnOlderSendDoesNotHoldANewerBuild`, `AResultForAnotherBuildDoesNotCount`,
+  `AWaitingCardIsLeftAlone`, `ACardLeftUnansweredIsOfferedAgain`, `AWaitingCardWithNoRecordIsOfferedAgain`,
+  `ADeclinedBuildIsNotSentAgain`, `ANewerBuildFollowsADecline`, `AFailureIsSentAgain` ×2, `ARefusalIsNotSentAgain` ×2,
+  `AReportedInstallCounts` ×3, `TheOwnerCanAskAgain`, `TheRecordKeepsOneSendPerApp`, `TheRecordRoundTrips`,
+  `ADamagedRecordReadsEmpty` ×6, `ATransferHasItsOwnName`, `NoRunSaysNothing`, `NoWatchSaysNothing`,
+  `SaysWhyNothingWent` ×4, `SaysHowItWent`, `NothingDueIsUpToDate`, `ManyAreCounted`, `ManyWaitingAreCounted`,
+  `ASendNotYetReportedIsOnItsWay`, `ASendThatFailedOnThePhoneDidNotInstall`, `ADeclineIsSaid`,
+  `ALaterReportUpdatesTheLine`, `TheRunKeepsWhatWasDue`, `TheRunRoundTrips`, `ARunWithNoReportRoundTrips`,
+  `ADamagedRunReadsAsNone` ×6, `TheLogSaysOutcomesOnly`, `WhatThePhoneHeardIsLogged`, `TheWaitsAreTheDecidedOnes`.
+- `Watch/Watch.Tests/Guard/WatchInvariantsTests.cs`, Flyleaf's half: `ThePhonesNamesAreFrozen`,
+  `FlyleafRegistersItsListenerByName`, `FlyleafAsksForTheInstallerByItsCapability`, `TheIdsAreNotCopiedIntoFlyleaf`,
+  `FlyleafReadsTheSameCodec` (Flyleaf's csproj references `Watch.Domain` and the Wear binding, and no Flyleaf source writes
+  its own frame), and `FlyleafsBuildWatchesTheWatchsContracts`.
+
+## Red
+
+**Red run: `Watch.Tests` 386 tests, 69 failed, 317 passed.** The 317 are A1–A5's 316 and `TheWaitsAreTheDecidedOnes`,
+which passes on the stubs because the waits were declared with the stub. The 69: `FlyleafWatchUpdateTests` 64 of 65,
+`WatchInvariantsTests` 5 of 5 new. First errors: `System.NotImplementedException : The method or operation is not
+implemented.` (63, the first `NothingDueIsUpToDate`); `Assert.Throws() Failure: Exception type was not an exact match …
+Expected: typeof(System.ArgumentException)` (`AnAnswerNeedsAReport`); `Assert.Equal() Failure: Strings differ`
+(`ThePhonesNamesAreFrozen`); `Assert.Single() Failure: The collection was empty` (`FlyleafRegistersItsListenerByName`);
+`Assert.All() Failure: 2 out of 5 items in the collection did not pass. [3]: Item: ""` (`TheIdsAreNotCopiedIntoFlyleaf`,
+the stubbed names); and `Assert.Contains() Failure: Sub-string not found … "WatchIdentity.InstallerCapability"` and
+`… "..\..\Watch\Watch.Domain\Watch.Domain.csproj"` (`FlyleafAsksForTheInstallerByItsCapability`,
+`FlyleafReadsTheSameCodec`).
+
+**After the pure half: 386 tests, 3 failed** (the three Flyleaf source guards, waiting for the Android half).
+
+**Second red (`WatchSendLines.Heard`, which the listener needed):** `WhatThePhoneHeardIsLogged` 1 of 1 failed,
+`NotImplementedException`.
+
+**Third red (`FlyleafsBuildWatchesTheWatchsContracts`):** 1 of 1 failed, `Assert.Contains() Failure: Sub-string not found
+… "- 'Watch/Watch.Domain/**'"`. `CiHygieneTests.EveryPathFilterCoversEveryProjectItsWorkflowBuilds` follows `.csproj`
+paths named in a workflow, and `build-flyleaf.yml` publishes its heads by folder name, so that guard passed with Flyleaf
+building a project its filter did not watch; this guard holds the one case.
+
+**The first Flyleaf build failed at restore:** `error NU1107: Version conflict detected for
+Xamarin.AndroidX.Lifecycle.LiveData.Core`: `Work.Runtime 2.10.2 → Lifecycle.LiveData 2.9.1 → LiveData.Core (>= 2.9.1 &&
+< 2.9.2)` against `GooglePlayServices.Wearable 120.0.1.2 → Basement 118.10.0.3 → AndroidX.Fragment 1.9.0 → LiveData.Core
+(>= 2.11.0.1)`. Every Play services release from Basement 118.10.0.1 on asks for a LiveData.Core above 2.9.1 (Fragment
+1.8.9.2 needs 2.10.0.1), so an older Wear binding would not have avoided it.
+
+## Green
+
+- **`Watch.Tests`: 388 passed, 0 failed.**
+- **`Storyworthtelling.Updates.Tests`: 162 passed, 0 failed. `RepoGuards.Tests`: 386 passed, 0 failed.
+  `FocusPhone/Codex.Tests`: 3082 passed, 0 failed. `FaceStudio.Tests`: 19 passed, 0 failed.**
+- **Compiled here:** `dotnet build FocusPhone/Flyleaf.Android/Flyleaf.Android.csproj -p:AndroidSdkDirectory=/opt/android-sdk-min
+  -p:AndroidUseApkSigner=false`: **Build succeeded, 0 errors**; the 35 warnings are all in files this chunk did not touch
+  (`GmailApiClient`, `BookendChipView`, `HomeActivity`, `DeviceAccountTokens`' doc comments), none in `WatchUpdates.cs`,
+  `UpdateService.cs` or `LauncherSettingsActivity.cs`. The merged manifest declares
+  `com.storyworthtelling.focusphone.launcher.WatchReportListener`, exported, `MESSAGE_RECEIVED` with `scheme wear`,
+  `host *`, `path /update/installed`. `dotnet build Watch/Point.Installer/Point.Installer.csproj …`: **0 warnings, 0 errors.**
+- **`check-dependency-graph.py FocusPhone/Flyleaf.Android` over the restored graph: "Checked 1 dependency graphs.", no
+  package missing.** The graph holds `Concurrent.Futures` 1.3.0.4 (and `.Ktx` 1.2.0.7), `Work.Runtime` 2.10.2,
+  `Lifecycle.LiveData` and `LiveData.Core` 2.11.0.1, and `Wearable` 120.0.1.2.
+- `leakscan --ci` over the chunk's diff: "no personal-data shapes in the added lines".
+
+## Decisions made in this chunk
+
+- **The codec stays in `Watch.Domain` and Flyleaf references it.** `Watch.Domain` is BCL only (Folds, Updates, Time), so
+  the phone and the installer read one `UpdateApkFrame` and one `InstalledCodec` with nothing moved; the cost is a few
+  watch-only types (tokens, face geometry) in Flyleaf's APK, which nothing on the phone calls.
+- **Flyleaf takes LiveData 2.11.0.1 with a `VersionOverride`**, and the central version is 2.9.1, exactly what WorkManager
+  2.10.2 already brings every head, so no other head's graph moves. WorkManager asks for LiveData 2.9.1 or newer, so it is
+  satisfied. `OneBuildSettingTests.AllowedOverrides` names it with the reason, beside Plate's AppCompat. Raising
+  WorkManager suite-wide to 2.11 (which brings LiveData 2.11) was the alternative; it would move every head's Lifecycle
+  graph, including the MAUI heads', which AppCompat's note says breaks, so it waits for a release of its own.
+- **The watch half runs after the phone's, under its own gate, and never inside the phone's run.** The phone's result and
+  line are recorded before the watch is looked for; the worker's result is the phone's whatever the watch did.
+- **The sent-record keeps one entry per app, and the watch's own result for that build wins over it.** The phone's
+  processed set marks every watch asset `NotForThisDevice` (A4), so the watch half never reads it.
+- **In flight for an hour.** A 60 MB APK over Bluetooth takes minutes and an install seconds; a dropped channel or a full
+  disk leaves no result on the watch (A5), so after an hour with no word the send is taken as lost. Runs are six hours
+  apart, so in practice this only stops "Install from GitHub now" doubling a send that is still landing; it applies even
+  when the owner asks.
+- **A card left unanswered is offered again after three days, and at once when the owner asks.** A swiped card leaves its
+  session waiting; Android's package installer destroys an abandoned session after three days, after which nothing is
+  left on the wrist to tap, so the build is sent again and the installer puts up a fresh card. A declined build is not sent
+  again until a newer build or the owner's ask. Both follow the installer's own `SendAgain` rule otherwise.
+- **A reported install of this build counts, even if the app is gone from the watch's list**, so an app the owner took off
+  the watch by hand, or one the installer cannot see, is not pushed back on every run.
+- **The installer is sent last**, since replacing itself ends its process and whatever came after would land on nobody.
+- **The channel stays open until the installer reports on that build (at most a minute)**, then is closed, rather than
+  being closed the moment the output is, which could cut off bytes still in Play services' buffers.
+- **No sidecar, no send:** a watch asset with no readable sidecar is logged and waits, rather than downloading 10–60 MB
+  to learn its version; A4 makes the sidecar mandatory.
+- **Five minutes of sends per run**, so the watch half with the phone's own installs stays inside WorkManager's ten.
+- **A phone with no Wear OS (an `ApiException` from the capability lookup) is the same as no watch:** the line says
+  nothing, and the log names the status code.
+
+## Not done, not verified
+
+- **Built, device check pending: all of the Data Layer behaviour.** The capability lookup finding the installer with
+  `FilterAll` and `FilterReachable`; the ask and the report arriving through `WatchReportListener` within 30 seconds; the
+  live report after an install; a 10–60 MB APK down `ChannelClient`'s output stream, over Bluetooth and the cloud relay;
+  closing the output ending the watch's input normally; and Play services running on the locked phone. The two ends will
+  only hear each other once both are signed with the suite's keystore (W-3.2.1); a debug-signed installer will not.
+- **Whether Android really drops an unanswered install session after three days on Wear OS 6** is from the platform's
+  documented phone behaviour, not seen on a watch; if sessions last longer, a second card replaces the first (one per app).
+- **WorkManager's ten-minute ceiling** with a slow first transfer of several apps: a send that starts near the budget can
+  still run past it, and the worker's stop is then logged by `OnStopped`.
+- **LiveData 2.11 under WorkManager 2.10 in Flyleaf** compiles and resolves with nothing missing; it has not run.
+- Not in this chunk: the watch workflow, band 11 and signing (W-3.2.1).

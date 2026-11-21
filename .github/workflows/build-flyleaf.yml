@@ -27,6 +27,9 @@ on:
       - 'Storyworthtelling.Paper/**'
       - 'Storyworthtelling.Remarkable/**'
       - 'Storyworthtelling.Pipeline/**'
+      # Flyleaf sends watch updates through Watch.Domain's codecs (P14 W-3.1.3); the head is built by folder name, so
+      # the closure guard cannot see it (WatchInvariantsTests.FlyleafsBuildWatchesTheWatchsContracts).
+      - 'Watch/Watch.Domain/**'
       - '.github/actions/dotnet/**'
       - '.github/workflows/build-flyleaf.yml'
 

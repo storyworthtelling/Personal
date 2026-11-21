@@ -255,4 +255,86 @@ public class WatchInvariantsTests
         Assert.NotEmpty(WatchIdentity.Packages);
         Assert.NotEmpty(WatchIdentity.InstallerComponents);
     }
+
+    // ---- Flyleaf's half (W-3.1.3): the phone end of the same contract ----
+
+    private static string Flyleaf(params string[] parts) =>
+        Path.Combine([WatchFiles.RepoRoot(), "FocusPhone", "Flyleaf.Android", .. parts]);
+
+    private static IEnumerable<string> FlyleafSources() =>
+        Directory.EnumerateFiles(Flyleaf(), "*.cs", SearchOption.AllDirectories).Where(path => !WatchFiles.IsBuildOutput(path));
+
+    [Fact]
+    public void ThePhonesNamesAreFrozen()
+    {
+        Assert.Equal("com.storyworthtelling.focusphone.launcher.WatchReportListener", WatchIdentity.PhoneReportListenerName);
+        Assert.Equal("watchUpdates", WatchIdentity.PhonePreferences);
+        Assert.Equal("sent", WatchIdentity.SentKey);
+        Assert.Equal("lastRun", WatchIdentity.LastRunKey);
+    }
+
+    [Fact]
+    public void FlyleafRegistersItsListenerByName()
+    {
+        var listener = FlyleafSources().Select(File.ReadAllText)
+            .Where(source => source.Contains($"Name = WatchIdentity.{nameof(WatchIdentity.PhoneReportListenerName)}", StringComparison.Ordinal))
+            .ToList();
+
+        var source = Assert.Single(listener);
+        Assert.Contains(": WearableListenerService", source, StringComparison.Ordinal);
+        Assert.Contains("MessageClient.ActionMessageReceived", source, StringComparison.Ordinal);
+        Assert.Contains("DataPath = WatchIdentity.UpdateInstalledPath", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FlyleafAsksForTheInstallerByItsCapability()
+    {
+        var sources = string.Join("\n", FlyleafSources().Select(File.ReadAllText));
+
+        Assert.Contains("WatchIdentity.InstallerCapability", sources, StringComparison.Ordinal);
+        Assert.Contains("UpdatePaths.ApkPathFor", sources, StringComparison.Ordinal);
+        Assert.Contains("UpdateApkFrame.Header", sources, StringComparison.Ordinal);
+        Assert.Contains("InstalledCodec.Encode(new InstalledAsk())", sources, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheIdsAreNotCopiedIntoFlyleaf()
+    {
+        // Flyleaf names the watch's paths, capability and stores only through WatchIdentity, so the two ends cannot drift.
+        string[] watchWords =
+        [
+            WatchIdentity.UpdateApkPath, WatchIdentity.UpdateInstalledPath, WatchIdentity.InstallerCapability,
+            WatchIdentity.PhoneReportListenerName, WatchIdentity.PhonePreferences,
+        ];
+        Assert.All(watchWords, word => Assert.False(string.IsNullOrEmpty(word)));
+
+        var copied = FlyleafSources()
+            .Where(path => watchWords.Any(word => File.ReadAllText(path).Contains($"\"{word}", StringComparison.Ordinal)))
+            .Select(path => Path.GetRelativePath(WatchFiles.RepoRoot(), path))
+            .ToList();
+
+        Assert.True(copied.Count == 0, "Use WatchIdentity rather than a copy:\n" + string.Join("\n", copied));
+    }
+
+    [Fact]
+    public void FlyleafReadsTheSameCodec()
+    {
+        // One frame and one message layout for both ends: Flyleaf references Watch.Domain rather than a copy of it.
+        var project = Text(Flyleaf("Flyleaf.Android.csproj"));
+
+        Assert.Contains(@"..\..\Watch\Watch.Domain\Watch.Domain.csproj", project, StringComparison.Ordinal);
+        Assert.Contains("<PackageReference Include=\"Xamarin.GooglePlayServices.Wearable\" />", project, StringComparison.Ordinal);
+        Assert.DoesNotContain(FlyleafSources(), path => File.ReadAllText(path).Contains("BinaryPrimitives", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FlyleafsBuildWatchesTheWatchsContracts()
+    {
+        // build-flyleaf.yml publishes the head by folder name, so CiHygieneTests' closure (which follows .csproj paths
+        // named in a workflow) cannot see that Flyleaf now builds Watch.Domain. A codec change must still rebuild Flyleaf,
+        // or the phone sends a frame the installer no longer reads.
+        var workflow = Text(Path.Combine(WatchFiles.RepoRoot(), ".github", "workflows", "build-flyleaf.yml"));
+
+        Assert.Contains("- 'Watch/Watch.Domain/**'", workflow, StringComparison.Ordinal);
+    }
 }

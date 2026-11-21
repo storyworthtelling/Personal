@@ -44,6 +44,7 @@ public static class UpdateService
     private const string WorkName = "focusphone-update-check";
     public const string Repo = "storyworthtelling/Personal";
     private static readonly UpdateRunGate RunGate = new();
+    private static readonly UpdateRunGate WatchGate = new();
 
     public static void Schedule(Context context)
     {
@@ -77,6 +78,24 @@ public static class UpdateService
         // The worker and the manual action can overlap; one run at a time keeps them off each
         // other's cache files and install sessions.
         var result = await RunGate.RunAsync(() => RunAsync(context, force));
+        Report(context, result);
+        return result;
+    }
+
+    /// <summary>
+    /// The watch half of the run (P14 W-3.1.3): called once the phone's own run has finished and been
+    /// recorded, so nothing it does can break or hold back the phone's installs or their line. Its own
+    /// gate keeps two of it apart; every failure inside it is logged there and goes no further.
+    /// </summary>
+    public static Task SendToWatchAsync(Context context, bool force) =>
+        WatchGate.RunAsync(async () =>
+        {
+            await WatchUpdates.RunQuietlyAsync(context, force);
+            return true;
+        });
+
+    private static void Report(Context context, UpdateRunResult result)
+    {
         new UpdateStatusStore(context).Record(result.Summarize());
         // The run's own sentence too, so a run with no per-app lines (no token, not device owner) still leaves one (audit 08 §16).
         if (result.AnyFailed || result.State is UpdateRunState.FetchFailed)
@@ -99,7 +118,6 @@ public static class UpdateService
                 HeadDiagnostics.Current?.Info("Update", line);
             }
         }
-        return result;
     }
 
     private static async Task<UpdateRunResult> RunAsync(Context context, bool force)
@@ -287,7 +305,8 @@ public static class UpdateService
         new(candidate.Package, candidate.VersionCode, settled,
             settled == InstallOutcome.NotForThisDevice ? $"form {ApkForms.Word(candidate.Form)}" : null);
 
-    private static async Task DownloadAsync(HttpClient http, ReleaseAsset asset, string token, string path)
+    /// <summary>One release asset to a file, with the update token; the watch half downloads its APKs the same way.</summary>
+    internal static async Task DownloadAsync(HttpClient http, ReleaseAsset asset, string token, string path)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, asset.DownloadUrl);
         request.Headers.Authorization = new("Bearer", token);
@@ -352,6 +371,9 @@ public class UpdateWorker : Worker
             // The same six-hourly, network-gated run re-reads due Play ratings (new versions, month-old
             // reads, earlier failures), so an app re-rated M is caught without its own worker.
             RefreshRatings();
+            // Then the watch's turn (P14 W-3.1.3), last and on its own: it logs its own outcome and
+            // throws nothing, so the phone's result below is the run's result whatever the watch did.
+            UpdateService.SendToWatchAsync(ApplicationContext, force: false).GetAwaiter().GetResult();
             // Retry a transient fetch failure so recovery isn't gated on the full 6-hour
             // cadence; a failed install is already left unprocessed and retries next cycle.
             return result.State == UpdateRunState.FetchFailed
