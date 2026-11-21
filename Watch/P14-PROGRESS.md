@@ -922,3 +922,157 @@ Xamarin.AndroidX.Lifecycle.LiveData.Core`: `Work.Runtime 2.10.2 → Lifecycle.Li
   still run past it, and the worker's stop is then logged by `OnStopped`.
 - **LiveData 2.11 under WorkManager 2.10 in Flyleaf** compiles and resolves with nothing missing; it has not run.
 - Not in this chunk: the watch workflow, band 11 and signing (W-3.2.1).
+
+---
+
+# Chunk A7 · the watch workflow (W-3.2.1)
+
+Every figure below is from a real run on 21 Nov 2026. The red run was taken with the tests written, no
+`build-watch.yml`, FaceStudio's tests still in `test-tools.yml`, and the band table stubbed: `AppVersionBand` had its
+new `Form` member (every entry `Phone`), `SuiteVersionBands.WatchBand` was 0, and there were no watch entries.
+
+## What it is
+
+`.github/workflows/build-watch.yml`, on `main`, `claude/**` and **Run workflow**, filtered to `Watch/**` (less
+`Watch/**/*.md` and `Watch/design/**`), `Tools/FaceStudio`, `Tools/FaceStudio.Tests`, what `Watch.Domain` builds on
+(`Storyworthtelling.Updates`, `.Time`, `.Folds`), the dotnet action and itself. Concurrency as every app workflow (a stale
+branch run is cancelled, `main` never).
+
+- **`test` (branch pushes only):** `dotnet test Watch/Watch.Tests/Watch.Tests.csproj` and
+  `dotnet test Tools/FaceStudio.Tests/FaceStudio.Tests.csproj`, no workload, no SDK, no secrets.
+- **`build` (`main` or by hand):** the dotnet action with the `android` workload, JDK 21, `sdkmanager "platforms;android-36"
+  "build-tools;36.0.0"`, both test projects (FaceStudio's with `FACESTUDIO_APK_REQUIRED=1`), the keystore decoded from
+  `KEYSTORE_BASE64`, versionCode at **band 11**, then:
+  - **Build the signed watch apps:** one `dotnet publish` per line of the job's `WATCH_HEADS` table (`<project> <package>`;
+    today only `Watch/Point.Installer/Point.Installer.csproj com.storyworthtelling.focusphone.launcher`), signed with the
+    suite keystore like every phone head, `ApplicationVersion` the band-11 code and `ApplicationDisplayVersion`
+    `1.0.<run_number>`; a project that leaves other than one `*-Signed.apk` fails the step. Each APK is written to
+    `$RUNNER_TEMP/watch-apks.txt` (APK, package, kind), the list every check reads.
+  - **Build the signed face:** FaceStudio writes the face (and `git diff --exit-code -- Watch/Point.Face` fails if that
+    differs from what is committed) and packs it unsigned with the run's versionCode; `zipalign -f -p 4`, then `apksigner
+    sign` (passwords as `env:` arguments, v4 off so no `.idsig` sits beside it) into
+    `Watch/Point.Face/bin/Release/com.storyworthtelling.watch.point-Signed.apk`, and `apksigner verify`.
+  - Fatal, in this order and all before anything leaves: **DEPENDENCY CHECK** (`check-dependency-graph.py .`), **APP ID
+    CHECK** (badging's first line must be `package: name='<package>' versionCode='<this run's code>'`), **FORM CHECK**
+    (`uses-feature` or `uses-feature-not-required` naming `android.hardware.type.watch`), **ICON CHECK**, **FONT CHECK**.
+  - The artifact **Watch-Android** (installer and face), and on `main` the publish action with **`form: watch`**.
+
+## Decisions made in this chunk
+
+- **`SuiteVersionBands` is keyed by package and form.** `AppVersionBand` gained `ApkForm Form`, with no default (as
+  everywhere the form is read since A4), and every existing entry says `Phone`. The installer is then two entries for one
+  package, Flyleaf's at band 1 as a phone APK and the installer's at band 11 as a watch APK, and the face is one watch
+  entry. Rejected: a second table for the watch (two places to look, and nothing to say a package in both is one app in two
+  forms), and keying by package with a list of bands (no way to say which band is which device's). Every existing guard
+  keeps its meaning: "a package appears twice" became "a package appears twice in one form"; "every band but band 1 holds
+  one app" became "every band but band 1 and the watch band" (band 11 is the watch's band 1: one band for every watch APK,
+  per PC4); `NoTwoAppsShareABandUnlessTheyShareAWorkflow` lists band 11 with its two APKs, which do share a workflow; the
+  FocusPhone band guards (`EveryFocusPhonePackageInTheBandTableMatchesTheDomainConstant`, `EveryPublishedFocusPhoneHeadHasABand`)
+  read the phone entries only; `ConstitutionIsBandTen` selects the phone entry, so Beat's watch entry will not break it.
+  New: `WatchBand` = 11 is one constant the workflow test reads; no phone entry may take it; every watch entry has it;
+  every APK `build-watch.yml` builds has a watch entry.
+- **A new watch app is two lines, not one.** The table drives the build and every check; the upload and publish lists
+  spell each head's publish folder, as build-flyleaf.yml spells its heads (a folder glob there stopped matching on a
+  rename), and because the FocusPhone publish guard reads a publish folder by name. `MainBuildsEveryWatchAppAndTheFace`
+  fails if any `Watch/` project with an `ApplicationId` is not in the table with the package it declares, or if its publish
+  folder is not in both lists. Dash, Wave and Beat are one table line and one line in each list.
+- **The ICON CHECK is scoped to what each APK shows, not faked.** The installer has no activity and no launcher entry (WD
+  §11), so no launcher ever draws an icon for it; giving it one to pass a check would be decoration. The check: an APK with a
+  `launchable-activity` must declare an `application-icon` (so Dash, Wave and Beat must carry one, and the check bites when
+  they land); one without passes and says so; the face, which the system lists by its preview, must carry
+  `res/xml/watch_face_info.xml` and its `preview.png`. Shown to fail on a probe APK with a launcher entry and no icon, and
+  on the installer listed as a face.
+- **The FONT CHECK covers the face only.** It compares the face's `res/font/plexmono.ttf` with
+  `Watch/Fonts/IBMPlexMono-Medium.ttf` by SHA-256. The installer draws no text; the kit's own Plex Mono asset is packaged by
+  the first app that draws with it (Dash), and the check gains that line then.
+- **FaceStudio's tests moved from `test-tools.yml` to `build-watch.yml`,** with the watch paths of test-tools' filter, so a
+  watch change runs them once (`FaceStudiosTestsRunOnceOnABranchPush`). `EveryToolsTestProjectIsRunByAWorkflow` still holds.
+- **The publish-guard exemption is gone.** `FrozenInvariantsTests.EveryOwnerHeadIsPublishedToTheRollingRelease` no longer
+  skips `Watch/` heads, and `WatchWorkflowExists` is deleted: `Watch/Point.Installer` is now held like every phone head.
+- **The secrets reach the signing steps through `env:`** rather than being pasted into the script's text by the
+  expression (the phone workflows' way); `dotnet publish` still takes them as `-p:` properties, while the face's apksigner
+  reads its two passwords from the environment (`--ks-pass env:…`), so they are never in its arguments.
+- **No `--print-certs` in the workflow:** the face is verified, not described; the run log stays free of the certificate.
+
+## Tests written first
+
+- `Storyworthtelling.Updates.Tests/CiHygieneTests.Watch.cs` (a second part of `CiHygieneTests`, now `partial`, 8 cases):
+  `BranchPushesRunTheWatchTestsAndNothingElse`, `FaceStudiosTestsRunOnceOnABranchPush`, `MainBuildsEveryWatchAppAndTheFace`,
+  `EveryWatchApkIsSignedWithTheSuitesKeystore`, `TheWatchIsBandEleven`, `TheWatchChecksAreFatalAndComeBeforeAnyApkLeaves`,
+  `TheWatchPublishesAsWatchFromMainOnly`, `TheWatchFilterCoversWhatTheWatchTestsRead`.
+- `SuiteVersionBandsTests`: `BandsAreUnique` (per form; band 11 shared by watch APKs), `EveryEntrySaysItsForm`,
+  `EveryWatchApkIsInTheWatchBand`, `NoPhoneAppIsInTheWatchBand`, `TheInstallerKeepsFlyleafsPhoneBand`, `ConstitutionIsBandTen`
+  (the phone entry); `VersionCodeTests.NoTwoAppsShareABandUnlessTheyShareAWorkflow` (band 11's two).
+- `Watch.Tests`: `WatchInvariantsTests.TheWatchWorkflowChecksEveryFrozenPackage` (the table's installer line and
+  `FACE_PACKAGE` are `WatchIdentity`'s frozen ids).
+- `FocusPhone/Codex.Tests`: the exemption removed from `EveryOwnerHeadIsPublishedToTheRollingRelease`; the two band guards
+  read the phone form.
+
+## Red
+
+- **`Storyworthtelling.Updates.Tests`: 174 tests, 12 failed, 162 passed.** Failed: the eight `CiHygieneTests.Watch` cases
+  (seven with "build-watch.yml doesn't exist, so no watch APK is built, signed or published.";
+  `FaceStudiosTestsRunOnceOnABranchPush` with `Assert.Equal() Failure: Collections differ … (pos 0)`, test-tools.yml being
+  the only runner), `TheInstallerKeepsFlyleafsPhoneBand` (`Collections differ … (pos 1)`), `NoPhoneAppIsInTheWatchBand`
+  (`Assert.InRange() Failure: Value not in range Range: (1 - 20)`, the stub's band 0), `EveryWatchApkIsInTheWatchBand`
+  (`Assert.Contains() Failure: Filter not matched in collection Collection: []`) and
+  `NoTwoAppsShareABandUnlessTheyShareAWorkflow` (`Collections differ … (pos 1)`). Passing on the stub, for what does not
+  change: `BandsAreUnique`, `EveryEntrySaysItsForm`, `ConstitutionIsBandTen`.
+- **`Watch.Tests`: 389 tests, 1 failed:** `TheWatchWorkflowChecksEveryFrozenPackage`
+  (".github/workflows/build-watch.yml isn’t there.").
+- **`FocusPhone/Codex.Tests`: 3082 tests, 1 failed:** `EveryOwnerHeadIsPublishedToTheRollingRelease` ("These heads declare
+  an owner-namespace ApplicationId but no workflow publishes their signed APK … : Watch/Point.Installer"): the exemption
+  removed and no workflow yet.
+
+## Green
+
+- **First green attempt, `Storyworthtelling.Updates.Tests`: 2 failed.** `EveryPathFilterCoversEveryProjectItsWorkflowBuilds`
+  ("build-watch.yml: Storyworthtelling.Time", "… Storyworthtelling.Folds": `Watch.Domain` builds on both, which
+  test-tools.yml had covered by accident, through IndexHistorySeal's filter) and `BranchPushesRunTheWatchTestsAndNothingElse`
+  (a comment in the test job said "workload:"). The two filters were added and the comment reworded.
+- **`Storyworthtelling.Updates.Tests`: 174 passed. `Watch.Tests`: 389 passed. `FocusPhone/Codex.Tests`: 3082 passed.
+  `RepoGuards.Tests`: 386 passed. `FaceStudio.Tests`: 19 passed** (and 19 with `FACESTUDIO_APK_REQUIRED=1`, the APK
+  built). Both YAML files parse (`yaml.safe_load`).
+- **Shown to bite:** with the installer's publish lines deleted from `build-watch.yml`, `EveryOwnerHeadIsPublishedToTheRollingRelease`
+  failed on `Watch/Point.Installer` and `MainBuildsEveryWatchAppAndTheFace` failed; restored.
+
+## Dry run (here, not in CI)
+
+The build job's own `run:` blocks were taken out of the YAML and run in order with bash, from the repository root, against
+an SDK put together in the session's scratch folder (the minimal SDK's android-36 and platform-tools, and build-tools 36.0.0
+from dl.google.com for `apksigner`, which the minimal SDK lacks), with the version-code action's own script for the code,
+and a **throwaway keystore generated for the run** (invented alias and passwords, deleted with the scratch folder; nothing
+from the suite's secrets):
+- *Decode keystore*, *Build the signed watch apps* (a real `dotnet publish` of the installer, signed by .NET's apksigner
+  path: `com.storyworthtelling.focusphone.launcher-Signed.apk`, versionCode 1103623845), *Build the signed face*
+  (FaceStudio, `git diff` clean, zipalign, apksigner sign and verify; `zipalign -c 4` passes on the signed face), then
+  **DEPENDENCY CHECK** ("Checked 34 dependency graphs."), **APP ID**, **FORM**, **ICON** and **FONT**: all exit 0, the
+  installer reading "no launcher entry, so no launcher icon to carry" and "draws no text of its own", the face "the picker's
+  preview is packaged" and "Plex Mono Medium, byte for byte". Both APKs carry one signer, the same certificate.
+- Each check refused a bad entry, exit 1: FORM and ICON on a probe phone APK (aapt2-linked, a launcher activity and no
+  icon); APP ID on the face listed under the installer's package (and, by accident, on a versionCode from a second
+  computation a minute later); FONT and ICON on the installer listed as a face.
+- `stage-apks.py --form watch` staged `com.storyworthtelling.focusphone.launcher-Signed.watch.apk` and
+  `com.storyworthtelling.watch.point-Signed.watch.apk` with `"form": "watch"` sidecars at the run's versionCode; `--form phone`
+  refused (exit 1, nothing staged).
+- **The publish action's own `run:` block**, with the workflow's `apks:` and `form: watch` and a stand-in `gh`: staged both
+  and called `gh release upload apps-latest <both .watch.apk and their .json> --clobber`. No real upload was made.
+
+## Not done, not verified
+
+- **Only CI can show:** that the secrets decode and sign (the dry run used a throwaway keystore), that the runner's
+  `sdkmanager` installs android-36 and build-tools 36.0.0 as written, that `ANDROID_HOME`'s apksigner signs the face, that
+  dl.google.com serves the Play services aars to the runner, and the upload to `apps-latest`. The first `build-watch.yml` run
+  on `main` is the verification.
+- **Signature match with Flyleaf is by construction, not checked:** both are signed from the one keystore secret, so the
+  Data Layer should deliver; no step compares the installer's certificate with Flyleaf's.
+- **The installer has no icon resource** and the check says why; if the owner wants one in the watch's app list, it is an
+  IconStudio spec, not done.
+- **The kit's Plex Mono asset** is not packaged by anything yet; the FONT CHECK covers the face only.
+- Not verified on a device: everything the workflow publishes.
+
+## Chunk A7 totals
+
+- `Storyworthtelling.Updates.Tests`: **174 passed, 0 failed** (162 before). `Watch.Tests`: **389 passed, 0 failed**.
+  `FocusPhone/Codex.Tests`: **3082 passed, 0 failed**. `RepoGuards.Tests`: **386 passed, 0 failed**. `FaceStudio.Tests`:
+  **19 passed, 0 failed**.

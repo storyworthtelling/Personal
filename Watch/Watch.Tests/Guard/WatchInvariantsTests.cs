@@ -337,4 +337,15 @@ public class WatchInvariantsTests
 
         Assert.Contains("- 'Watch/Watch.Domain/**'", workflow, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void TheWatchWorkflowChecksEveryFrozenPackage()
+    {
+        // build-watch.yml's APP ID CHECK reads each APK's package back against its line of the table (P14 W-3.2.1). The
+        // workflow types the packages out, so it is held to the frozen ids here, from the watch's side.
+        var workflow = Text(Path.Combine(WatchFiles.RepoRoot(), ".github", "workflows", "build-watch.yml"));
+
+        Assert.Matches($@"(?m)^\s+Watch/Point\.Installer/Point\.Installer\.csproj {Regex.Escape(WatchIdentity.InstallerPackage)}\s*$", workflow);
+        Assert.Contains($"FACE_PACKAGE: {WatchIdentity.FacePackage}", workflow, StringComparison.Ordinal);
+    }
 }

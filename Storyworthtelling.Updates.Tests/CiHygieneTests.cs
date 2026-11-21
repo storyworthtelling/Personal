@@ -9,7 +9,7 @@ namespace Storyworthtelling.Updates.Tests;
 /// tests run once, the shared libraries tested only where a change reaches them, the log-loop guard run once per
 /// change, and every workflow's path filter covering every project it builds or tests.
 /// </summary>
-public class CiHygieneTests
+public partial class CiHygieneTests
 {
     private const string MainOrByHand = "if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'";
 

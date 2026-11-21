@@ -2,7 +2,8 @@ name: Test tools
 
 # The committed tools' own tests (orphan audit §46). IconStudio regenerates every launcher icon in the app
 # builds, and IndexHistorySeal seals the owner's snowball history; both ran in CI, or by hand, without
-# their tests. FaceStudio, which generates the watch face (P14), joined with its tests from the start.
+# their tests. FaceStudio, which generates the watch face (P14), has its tests run in build-watch.yml, which also packs
+# and signs the face, so a watch change runs them once (CiHygieneTests.FaceStudiosTestsRunOnceOnABranchPush).
 # Branch pushes and main both run them: they are quick and publish nothing.
 on:
   workflow_dispatch:
@@ -13,14 +14,6 @@ on:
       - 'Tools/IconStudio.Tests/**'
       - 'Tools/IndexHistorySeal/**'
       - 'Tools/IndexHistorySeal.Tests/**'
-      # FaceStudio generates Point, the watch face (P14 W-2.1.1), from the watch's domain and its own font.
-      - 'Tools/FaceStudio/**'
-      - 'Tools/FaceStudio.Tests/**'
-      - 'Watch/Watch.Domain/**'
-      - 'Watch/Fonts/**'
-      - 'Watch/Point.Face/**'
-      # The watch's domain judges the installer's APKs by the update channel's own rule (P14 W-3.1.2).
-      - 'Storyworthtelling.Updates/**'
       # IndexHistorySeal builds on Index's domain and infrastructure (and what they build on).
       - 'Ledger/Ledger.Domain/**'
       - 'Ledger/Ledger.Infrastructure/**'
@@ -53,11 +46,6 @@ jobs:
 
       - name: Test IconStudio
         run: dotnet test Tools/IconStudio.Tests/IconStudio.Tests.csproj
-
-      # Holds the committed face to the tool, checks it against the format's schema, and packs it with aapt2
-      # when the runner's Android SDK has build-tools and android-36 (P14 W-3.2.1 makes that required).
-      - name: Test FaceStudio
-        run: dotnet test Tools/FaceStudio.Tests/FaceStudio.Tests.csproj
 
       # The tool references Ledger.Infrastructure with AdditionalProperties="LedgerTfms=net10.0", but NuGet
       # restore ignores AdditionalProperties and restores every TFM, so without the global switch it asks for

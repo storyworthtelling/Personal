@@ -178,7 +178,9 @@ public class FrozenInvariantsTests
     [Fact]
     public void EveryFocusPhonePackageInTheBandTableMatchesTheDomainConstant()
     {
+        // The phone's entries: a watch app shares its phone app's package (P14 PC1), so the table is keyed by form too.
         var banded = Storyworthtelling.Updates.SuiteVersionBands.All
+            .Where(app => app.Form == Storyworthtelling.Updates.ApkForm.Phone)
             .Select(app => app.Package)
             .ToList();
 
@@ -197,6 +199,7 @@ public class FrozenInvariantsTests
     public void EveryPublishedFocusPhoneHeadHasABand()
     {
         var banded = Storyworthtelling.Updates.SuiteVersionBands.All
+            .Where(app => app.Form == Storyworthtelling.Updates.ApkForm.Phone)
             .Select(app => app.Package)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -207,7 +210,7 @@ public class FrozenInvariantsTests
                  })
         {
             Assert.True(banded.Contains(package),
-                $"{package} ships through the update channel but has no versionCode band.");
+                $"{package} ships through the update channel but has no phone versionCode band.");
         }
     }
 
@@ -430,10 +433,6 @@ public class FrozenInvariantsTests
             // A spike is not a head: it ships to its own pre-release and is installed by hand, and it
             // must stay off apps-latest, since Flyleaf installs everything the channel carries.
             .Where(directory => !directory.Split('/').Contains("Spikes"))
-            // A watch head (P14) is published by build-watch.yml, which W-3.2.1 writes. Until that file
-            // exists a watch head reaches no release, which is safe (nothing installs it); the day it
-            // exists, this exemption ends by itself and every watch head must be published.
-            .Where(directory => WatchWorkflowExists() || !directory.StartsWith("Watch/", StringComparison.Ordinal))
             .Where(directory => !publishSteps.Any(text =>
                 text.Contains($"{directory}/bin/Release/net10.0-android/publish/", StringComparison.Ordinal)))
             .ToList();
@@ -443,9 +442,6 @@ public class FrozenInvariantsTests
             "signed APK to the apps-latest rolling release, so the phone will never install them: " +
             string.Join(", ", unpublished));
     }
-
-    private static bool WatchWorkflowExists() =>
-        File.Exists(Path.Combine(RepoRoot(), ".github", "workflows", "build-watch.yml"));
 
     // The other side of the exemption above: Flyleaf installs every owner-namespace APK on
     // apps-latest, so a spike that reached it would land on the locked phone unasked.
