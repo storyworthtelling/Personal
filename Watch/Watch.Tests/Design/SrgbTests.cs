@@ -11,7 +11,7 @@ public class SrgbTests
     public void BlackIsBlack() => Assert.Equal(unchecked((int)0xFF000000), Srgb.Argb(new Oklch(0, 0, 0)));
 
     [Fact]
-    public void RedIsRed() => Assert.Equal(unchecked((int)0xFFFF0000), Srgb.Argb(new Oklch(0.627955, 0.257683, 29.2339)));
+    public void RedIsRed() => Assert.Equal(unchecked((int)0xFFFF0000), Srgb.Argb(new Oklch(L: 0.627955, C: 0.257683, H: 29.2339)));
 
     [Fact]
     public void AlphaIsTheTopByte() => Assert.Equal(0x80, (Srgb.Argb(new Oklch(1, 0, 0), 0.5) >> 24) & 0xFF);

@@ -1311,3 +1311,11 @@ said. `PublishActionTests.AWatchApkInAPhonePublishStillStops` caught it against 
 - `Watch.Tests`: **447 passed, 0 failed** (389 before). `Storyworthtelling.Updates.Tests`: **193 passed, 0 failed** (174).
   `FocusPhone/Codex.Tests`: **3093 passed, 0 failed** (3082). `RepoGuards.Tests`: **386 passed, 0 failed**.
   `LogLoopReader.Tests`: **115 passed, 0 failed** (114 of 115 on PR #385). `FaceStudio.Tests`: **22 passed, 0 failed** (19).
+
+### Release A fix round, follow-up: the CI leak scan
+
+With the gate test green, `log-loop-guard.yml` reached `leakscan --ci`, which found 78 hits over the branch: 77 "card-number" in the generated `Watch/Point.Face/res/raw/watchface.xml` (runs of six-digit minute colours such as `202943 232843 262743` pass Luhn) and 1 "coordinates" in `Watch/Watch.Tests/Design/SrgbTests.cs` (an OKLCH triple shaped like a latitude and longitude). Neither is personal data.
+
+- **Red:** `LogLoopReader.Tests` 117 tests, 1 failed: `CiDoesNotReadAColourListAsACard` (`Assert.Empty() Failure: Collection was not empty`). `CiStillFlagsACardWithOneLongGroup` (a 4-6-5 card) passed before and after.
+- **Fix:** `CiLeakScan` no longer reads a run made only of six-digit groups as a card; no card is written in groups of six, and a card with one six-digit group is still flagged. The test's OKLCH triple is written with named arguments, so it no longer reads as a coordinate pair. No path is exempted.
+- **Green:** `LogLoopReader.Tests` 117 of 117, `Watch.Tests` 447 of 447, `RepoGuards.Tests` 386 of 386; `leakscan --ci` over the branch's diff from main: "no personal-data shapes in the added lines".

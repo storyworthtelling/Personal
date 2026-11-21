@@ -139,7 +139,7 @@ public static partial class CiLeakScan
         var isTest = IsTestPath(path);
         foreach (var (line, text) in addedLines)
         {
-            if (Card().Matches(text).Any(m => Luhn(m.Value)))
+            if (Card().Matches(text).Any(m => Luhn(m.Value) && !SixDigitGroups(m.Value)))
             {
                 hits.Add(new CiHit(path, line, "card-number"));
             }
@@ -185,6 +185,16 @@ public static partial class CiLeakScan
 
     private static bool Fictional(string phone) =>
         Regex.Matches(phone, @"\d{3,4}").Any(m => m.Value == "555");
+
+    /// <summary>
+    /// A run made only of six-digit groups is a list of colours (the watch face's minute colours), not a card:
+    /// no card is written in groups of six. A card with one six-digit group (4-6-5) is still a card.
+    /// </summary>
+    private static bool SixDigitGroups(string candidate)
+    {
+        var groups = candidate.Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries);
+        return groups.Length > 1 && groups.All(group => group.Length == 6);
+    }
 
     private static bool Luhn(string candidate)
     {
