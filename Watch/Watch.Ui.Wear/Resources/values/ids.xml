@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TalkBack's custom actions on the wave: an accessibility action's id must be a resource id. -->
+<resources>
+    <item type="id" name="waveBack" />
+    <item type="id" name="waveSkip" />
+</resources>

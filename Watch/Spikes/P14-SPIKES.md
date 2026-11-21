@@ -1,3 +1,7 @@
+**Closed (A67, A68, A71).** S1 was answered by the owner's own use: texts and calls on Fi need the phone
+on. S2 was cancelled: there is no device owner on the watch. The spike app, its workflow and its
+`watch-spike` pre-release were removed. This file is kept as the record.
+
 # P14 · device spikes (A60, A63)
 
 Two questions that decide P14's shape, answered on the owner's own Pixel Watch before any screen

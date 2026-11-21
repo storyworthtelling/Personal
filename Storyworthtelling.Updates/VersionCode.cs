@@ -76,12 +76,14 @@ public static class VersionCode
 
 /// <summary>
 /// One app's numbering space, and the highest versionCode it shipped under the old
-/// per-workflow schemes. The second number is the reason the first was chosen.
+/// per-workflow schemes. The second number is the reason the first was chosen. An entry is
+/// one package in one form: a watch app shares its phone app's package (P14 PC1), so the
+/// package alone no longer names one APK. The form has no default, as everywhere else it is read.
 /// </summary>
-public sealed record AppVersionBand(string Package, int Band, int LastShippedBeforeUnification);
+public sealed record AppVersionBand(string Package, int Band, int LastShippedBeforeUnification, ApkForm Form);
 
 /// <summary>
-/// Every app on the rolling channel, with the band it was given. Recorded here rather than
+/// Every app on the rolling channel, in each form it ships in, with the band it was given. Recorded here rather than
 /// in each workflow so the choice can be checked against what actually shipped — the check
 /// nobody ran before either floor bump.
 ///
@@ -90,20 +92,28 @@ public sealed record AppVersionBand(string Package, int Band, int LastShippedBef
 /// </summary>
 public static class SuiteVersionBands
 {
+    /// <summary>
+    /// Every watch APK's band (P14 PC4). A watch app carries its phone app's package (PC1), and a versionCode is compared
+    /// per package on one device, so the watch's codes never meet the phone's: one band holds every watch APK, the way
+    /// band 1 holds the legacy phone apps, and no phone app may take it. build-watch.yml passes it to the version-code
+    /// action.
+    /// </summary>
+    public const int WatchBand = 11;
+
     public static IReadOnlyList<AppVersionBand> All { get; } =
     [
         // Flyleaf and Score share build-flyleaf.yml, so they shared 100000 + run_number.
-        new("com.storyworthtelling.focusphone.launcher", 1, 100_163),
-        new("com.storyworthtelling.focusphone.audio", 1, 100_163),
+        new("com.storyworthtelling.focusphone.launcher", 1, 100_163, ApkForm.Phone),
+        new("com.storyworthtelling.focusphone.audio", 1, 100_163, ApkForm.Phone),
 
         // Post and Plate took the 200000 floor when they were split into their own workflows.
-        new("com.storyworthtelling.focusphone.communication", 1, 200_051),
-        new("com.storyworthtelling.focusphone.camera", 1, 200_030),
+        new("com.storyworthtelling.focusphone.communication", 1, 200_051, ApkForm.Phone),
+        new("com.storyworthtelling.focusphone.camera", 1, 200_030, ApkForm.Phone),
 
         // Ledger was on a bare run_number — two digits. A rename of its workflow would have reset
         // it to 1 and bricked its own update channel. Index is this same app under the same package
         // id, so this one entry covers it.
-        new("com.storyworthtelling.ledger", 1, 58),
+        new("com.storyworthtelling.ledger", 1, 58, ApkForm.Phone),
 
         // Folio (Canonizer's package) needs a high band for the SAME reason Foreword does, and this
         // entry was wrong until a phone proved it. It read band 1 against a last-shipped of 169 — the
@@ -116,17 +126,23 @@ public static class SuiteVersionBands
         // the table recorded what the WORKFLOW injected and missed what the CSPROJ computed, and the
         // csproj is just as capable of setting a versionCode. Band 8 is Folio's own space, clear of
         // Foreword's, and the ceiling below is the highest that scheme could reach in 2026.
-        new("com.storyworthtelling.storyboarder", 8, 612_312_359),
+        new("com.storyworthtelling.storyboarder", 8, 612_312_359, ApkForm.Phone),
 
         // Foreword keeps DailyLoader's package, so it has to clear the old csproj scheme
         // (yearDigit + MMddHHmm, which reached ~609,060,000 in September 2026). Band 7 puts it
         // above that and lets it upgrade in place. Its display version is 2.0.x regardless.
-        new("com.storyworthtelling.dailyloader", 7, 609_999_999),
+        new("com.storyworthtelling.dailyloader", 7, 609_999_999, ApkForm.Phone),
 
         // Pulp (P12) is a new package with nothing shipped before; band 9 is unused by any other app.
-        new("com.storyworthtelling.pulp", 9, 0),
+        new("com.storyworthtelling.pulp", 9, 0, ApkForm.Phone),
 
         // Constitution (P13) is a new package with nothing shipped before; band 10 is unused by any other app.
-        new("com.storyworthtelling.constitution", 10, 0),
+        new("com.storyworthtelling.constitution", 10, 0, ApkForm.Phone),
+
+        // The watch (P14), keyed by package and form because each watch app shares its phone app's package. Nothing was
+        // published before build-watch.yml: the installer's first copy is installed by hand from that workflow's artifact
+        // (A78). Dash, Wave and Beat join here at the watch band when their projects land.
+        new("com.storyworthtelling.focusphone.launcher", WatchBand, 0, ApkForm.Watch),
+        new("com.storyworthtelling.watch.point", WatchBand, 0, ApkForm.Watch),
     ];
 }

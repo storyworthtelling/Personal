@@ -17,6 +17,9 @@
     <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
     <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+    <!-- The watch's update contracts (P14 W-3.1.3): the same update/apk frame and update/installed codec the Point
+         installer reads, and the plan of what to send it. BCL only. -->
+    <ProjectReference Include="..\..\Watch\Watch.Domain\Watch.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,5 +27,12 @@
     <!-- WorkManager needs androidx.concurrent.futures; without a direct reference, transitive pinning drops it from
          the APK and the app dies at start (OneBuildSettingTests.EveryProjectWithWorkManagerNamesConcurrentFuturesItself). -->
     <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" />
+    <!-- The Data Layer (CapabilityClient, MessageClient, ChannelClient), Microsoft's binding of play-services-wearable:
+         CLAUDE.md's dependency rule 2, and the only way to reach the Point installer on the watch (A70). -->
+    <PackageReference Include="Xamarin.GooglePlayServices.Wearable" />
+    <!-- Play services' Fragment 1.9 needs LiveData.Core 2.11; WorkManager 2.10's LiveData 2.9.1 pins LiveData.Core to
+         2.9.1 exactly, so restore fails (NU1107) unless Flyleaf takes LiveData 2.11 itself. WorkManager asks for 2.9.1
+         or newer, so it is satisfied. The central version stays at 2.9.1 so no other head's graph moves. -->
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" VersionOverride="2.11.0.1" />
   </ItemGroup>
 </Project>

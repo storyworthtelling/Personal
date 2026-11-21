@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using Storyworthtelling.Updates;
 
 namespace Codex.Ui;
 
@@ -45,6 +46,13 @@ public class ApkInstallException : Exception
 /// Shared rather than Flyleaf's, because both phones install the same suite: the
 /// launcher does it for everyone on the locked one, and each app does it for itself
 /// on the unrestricted one.
+///
+/// <b>Never a watch APK</b> (P14 W-3.1.1). This kit is the phones', and a watch app
+/// carries its phone app's package and signature, so the platform would take Dash as
+/// Post's update without a word. Whatever the caller decided, the APK's own manifest
+/// is read before a session is opened, and anything that is not a phone APK is
+/// refused: the last line behind the update channel's form rule, and the only line
+/// in front of the admin-mode install from Downloads.
 /// </summary>
 public static class ApkInstaller
 {
@@ -56,6 +64,29 @@ public static class ApkInstaller
 
     public static async Task InstallAsync(Context context, Stream apk)
     {
+        // The form is read from the zip, which needs to seek. A picked file arrives as a content stream, whose seeking
+        // is not something to rely on, so anything but a file on disk is copied to the cache first.
+        if (apk is not FileStream)
+        {
+            var staged = Path.Combine(context.CacheDir!.AbsolutePath!, $"install-{Guid.NewGuid():N}.apk");
+            try
+            {
+                using (var copy = File.Create(staged))
+                {
+                    await apk.CopyToAsync(copy);
+                }
+                using var seekable = File.OpenRead(staged);
+                await InstallAsync(context, seekable);
+            }
+            finally
+            {
+                File.Delete(staged);
+            }
+            return;
+        }
+
+        RefuseAnotherForm(apk);
+
         var installer = context.PackageManager!.PackageInstaller;
         var sessionParams = new PackageInstaller.SessionParams(PackageInstallMode.FullInstall);
         sessionParams.SetWhitelistedRestrictedPermissions(
@@ -121,6 +152,22 @@ public static class ApkInstaller
         {
             context.UnregisterReceiver(receiver);
         }
+    }
+
+    // This is a phone. A watch APK, or one whose manifest can't be read, is never installed on it.
+    private static void RefuseAnotherForm(Stream apk)
+    {
+        var form = ApkManifest.FormOf(apk);
+        if (form == ApkForm.Phone)
+        {
+            return;
+        }
+
+        throw new ApkInstallException(
+            (int)PackageInstallStatus.FailureIncompatible,
+            form == ApkForm.Watch
+                ? "This app is built for a watch, so it isn’t installed on a phone."
+                : "This file doesn’t read as an app, so it isn’t installed.");
     }
 
     private static async Task<InstallSignal> Settle(

@@ -37,18 +37,31 @@ public enum UpdateRole
 /// Both roles are gated on the owner namespace first, which is the part that is
 /// never a device question: a package from anywhere else is not installed, whoever
 /// put it on the release.
+///
+/// And on the form before anything else (P14 W-3.1.1): a device installs only APKs of
+/// its own form. A watch APK carries its phone app's package and a higher versionCode
+/// band, so compared by version it would be that app's newest build; a phone APK on
+/// the watch is "not installed yet". An APK of <see cref="ApkForm.Unknown"/> form, and
+/// a device that does not know its own, install nothing.
 /// </summary>
 public static class UpdateScope
 {
     public static IReadOnlyList<InstallCandidate> Decide(
         UpdateRole role,
         string selfPackage,
+        ApkForm deviceForm,
         IEnumerable<InstallCandidate> available,
         IReadOnlyDictionary<string, long> installedVersionCodes)
     {
         var chosen = new List<InstallCandidate>();
         foreach (var candidate in available)
         {
+            // The form first, before a version is compared: band 11 outranks every phone band.
+            if (deviceForm == ApkForm.Unknown || candidate.Form != deviceForm)
+            {
+                continue;
+            }
+
             if (!SuiteApps.IsOwnApp(candidate.Package))
             {
                 continue;

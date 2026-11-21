@@ -108,7 +108,37 @@ public class GitHubReleaseClientTests
         var apk = Assert.Single(release.ApkAssets);
         var candidate = await client.ReadSidecarAsync(release, apk);
 
-        Assert.Equal(new Storyworthtelling.Updates.InstallCandidate("com.storyworthtelling.focusphone.launcher", 100321), candidate);
+        Assert.Equal(new Storyworthtelling.Updates.InstallCandidate("com.storyworthtelling.focusphone.launcher", 100321, Storyworthtelling.Updates.ApkForm.Phone), candidate);
+    }
+
+    // P14 W-3.1.1: Post's APK and Dash share a package, so the release carries both, under names the publish action
+    // keeps apart. Each APK's sidecar is its own; the watch one never answers for the phone one.
+    [Fact]
+    public async Task APhoneAndAWatchApkOfOnePackageKeepTheirOwnSidecars()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(LatestUrl, """
+            {"tag_name":"apps-latest","assets":[
+              {"id":21,"name":"com.storyworthtelling.focusphone.communication-Signed.apk"},
+              {"id":22,"name":"com.storyworthtelling.focusphone.communication-Signed.apk.json"},
+              {"id":23,"name":"com.storyworthtelling.focusphone.communication-Signed.watch.apk"},
+              {"id":24,"name":"com.storyworthtelling.focusphone.communication-Signed.watch.apk.json"}]}
+            """);
+        handler.Respond("https://api.github.com/repos/storyworthtelling/Personal/releases/assets/22",
+            """{"package":"com.storyworthtelling.focusphone.communication","versionCode":103500000,"form":"phone"}""");
+        handler.Respond("https://api.github.com/repos/storyworthtelling/Personal/releases/assets/24",
+            """{"package":"com.storyworthtelling.focusphone.communication","versionCode":1103500000,"form":"watch"}""");
+        var client = NewClient(handler);
+
+        var release = await client.GetLatestReleaseAsync();
+        var phone = await client.ReadSidecarAsync(release, release.ApkAssets.Single(a => a.Id == 21));
+        var watch = await client.ReadSidecarAsync(release, release.ApkAssets.Single(a => a.Id == 23));
+
+        Assert.Equal(2, release.ApkAssets.Count);
+        Assert.Equal(Storyworthtelling.Updates.ApkForm.Phone, phone!.Form);
+        Assert.Equal(103500000, phone.VersionCode);
+        Assert.Equal(Storyworthtelling.Updates.ApkForm.Watch, watch!.Form);
+        Assert.Equal(1103500000, watch.VersionCode);
     }
 
     [Fact]

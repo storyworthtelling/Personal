@@ -49,10 +49,10 @@ public class InstallDutyTests
 public class DeferredScopeTests
 {
     private static readonly InstallCandidate Score =
-        new("com.storyworthtelling.focusphone.audio", 200);
+        new("com.storyworthtelling.focusphone.audio", 200, ApkForm.Phone);
 
     private static readonly InstallCandidate Launcher =
-        new("com.storyworthtelling.focusphone.launcher", 200);
+        new("com.storyworthtelling.focusphone.launcher", 200, ApkForm.Phone);
 
     // Deferred installs nothing — not even itself. Anything else and the sibling app
     // on the locked phone would retry a download it can never install.
@@ -61,7 +61,7 @@ public class DeferredScopeTests
     {
         var chosen = UpdateScope.Decide(
             UpdateRole.Deferred,
-            Score.Package,
+            Score.Package, ApkForm.Phone,
             [Score, Launcher],
             new Dictionary<string, long>());
 

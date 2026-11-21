@@ -1,0 +1,8 @@
+Watch Face Format specification, version 4: the XSD files as published by Google in
+github.com/google/watchface, folder third_party/wff/specification/documents/4, branch main,
+fetched 20 Nov 2026. Apache License 2.0 (LICENSE.txt beside this file); each file keeps its own
+copyright header (Google LLC, Samsung Electronics). Unmodified.
+
+FaceStudio validates the generated res/raw/watchface.xml against watchface.xsd here, with the
+.NET schema validator. This is the specification Google's wff-validator checks; it is not that
+validator, whose jar was not reachable from the environment this was built in.

@@ -55,6 +55,8 @@ on:
       - 'Ledger/**'
       - 'Storyboarder/**'
       - 'Branding/**'
+      # The watch form guard (Updates.Tests, P14 W-3.1.1) reads every watch app's manifest.
+      - 'Watch/**'
 
 # One run per branch at a time: a newer push makes the in-flight one worthless.
 concurrency:
