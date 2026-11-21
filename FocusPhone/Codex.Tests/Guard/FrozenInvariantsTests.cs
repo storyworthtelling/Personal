@@ -78,14 +78,14 @@ public class FrozenInvariantsTests
 
         // The install decision is package-id based: an owner app upgrades, a stray package is skipped.
         var upgraded = Storyworthtelling.Updates.UpdateScope.Decide(
-            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage,
-            [new Storyworthtelling.Updates.InstallCandidate(PolicyContext.LauncherPackage, 2)],
+            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage, Storyworthtelling.Updates.ApkForm.Phone,
+            [new Storyworthtelling.Updates.InstallCandidate(PolicyContext.LauncherPackage, 2, Storyworthtelling.Updates.ApkForm.Phone)],
             new Dictionary<string, long> { [PolicyContext.LauncherPackage] = 1 });
         Assert.Single(upgraded);
 
         var skipped = Storyworthtelling.Updates.UpdateScope.Decide(
-            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage,
-            [new Storyworthtelling.Updates.InstallCandidate("com.example.other", 9)],
+            Storyworthtelling.Updates.UpdateRole.Custodian, PolicyContext.LauncherPackage, Storyworthtelling.Updates.ApkForm.Phone,
+            [new Storyworthtelling.Updates.InstallCandidate("com.example.other", 9, Storyworthtelling.Updates.ApkForm.Phone)],
             new Dictionary<string, long>());
         Assert.Empty(skipped);
     }

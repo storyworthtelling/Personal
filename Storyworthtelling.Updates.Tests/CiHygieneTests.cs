@@ -126,6 +126,136 @@ public class CiHygieneTests
         Assert.True(gaps.Count == 0, "A change here runs none of the tests that read it:\n" + string.Join("\n", gaps.Distinct()));
     }
 
+    /// <summary>
+    /// P14 W-3.1.1 (risk R1): a watch APK carries its phone app's package and a higher versionCode band, so the only thing
+    /// that keeps it off the phone is its form. Every publish says which form it carries and the action checks it against
+    /// each APK's own manifest; a workflow that builds a watch APK publishes it as a watch APK; and every watch app
+    /// declares the watch feature, since one that forgot would read as a phone APK by every measure. The watch workflow
+    /// is a later chunk: this holds now and bites when it lands (see <see cref="TheWatchRuleBites"/>).
+    /// </summary>
+    [Fact]
+    public void EveryWatchApkSaysWatch()
+    {
+        var action = File.ReadAllText(RepoFile(".github/actions/publish-rolling-release/action.yml"));
+        var script = File.ReadAllText(RepoFile(".github/scripts/stage-apks.py"));
+
+        // The action asks for the form, stages every APK through the script, and never publishes without a sidecar.
+        Assert.Matches(@"(?m)^  form:\s*\n(?:\s+.*\n)*?\s+required: true", action);
+        Assert.Contains("stage-apks.py", action, StringComparison.Ordinal);
+        Assert.Contains("--form", action, StringComparison.Ordinal);
+        Assert.DoesNotContain("publishing without sidecars", action, StringComparison.Ordinal);
+
+        // The script reads the feature the phone reads and names a watch asset the way the phone reads names.
+        Assert.Contains($"\"{ApkForms.WatchFeature}\"", script, StringComparison.Ordinal);
+        Assert.Contains($"\"{ApkForms.WatchAssetSuffix}\"", script, StringComparison.Ordinal);
+        Assert.Contains($"\"{ApkForms.Field}\"", script, StringComparison.Ordinal);
+        Assert.Contains($"\"{ApkForms.PhoneWord}\"", script, StringComparison.Ordinal);
+        Assert.Contains($"\"{ApkForms.WatchWord}\"", script, StringComparison.Ordinal);
+
+        var gaps = Workflows()
+            .SelectMany(path => PublishFormGaps(Path.GetFileName(path), File.ReadAllText(path)))
+            .Concat(WatchAppsWithoutTheFeature(RepoRoot()))
+            .ToList();
+
+        Assert.True(gaps.Count == 0, "A watch APK that could be published as a phone APK:\n" + string.Join("\n", gaps));
+    }
+
+    [Fact]
+    public void TheWatchRuleBites()
+    {
+        const string Build = """
+            name: Build watch
+            jobs:
+              build:
+                steps:
+                  - name: Build Dash
+                    run: dotnet publish Watch/Dash.Wear/Dash.Wear.csproj -c Release
+                  - name: Publish to rolling GitHub Release
+                    if: github.ref == 'refs/heads/main'
+                    uses: ./.github/actions/publish-rolling-release
+                    with:
+                      apks: Watch/Dash.Wear/bin/Release/net10.0-android/publish/*-Signed.apk
+            """;
+
+        Assert.NotEmpty(PublishFormGaps("build-watch.yml", Build));
+        Assert.NotEmpty(PublishFormGaps("build-watch.yml", Build + "\n          form: phone\n"));
+        Assert.Empty(PublishFormGaps("build-watch.yml", Build + "\n          form: watch\n"));
+        Assert.NotEmpty(PublishFormGaps("build-post.yml", Build.Replace("Watch/Dash.Wear/Dash.Wear.csproj", "FocusPhone/Post.Android/Post.Android.csproj", StringComparison.Ordinal) + "\n          form: phone\n"));
+
+        var root = Directory.CreateTempSubdirectory("watch-rule-").FullName;
+        var dash = Directory.CreateDirectory(Path.Combine(root, "Watch", "Dash.Wear")).FullName;
+        File.WriteAllText(Path.Combine(dash, "Dash.Wear.csproj"), "<Project><PropertyGroup><ApplicationId>com.example.dash</ApplicationId></PropertyGroup></Project>");
+        Assert.NotEmpty(WatchAppsWithoutTheFeature(root));
+        File.WriteAllText(Path.Combine(dash, "WatchFeature.cs"), "[assembly: Android.App.UsesFeature(\"android.hardware.type.watch\")]");
+        Assert.Empty(WatchAppsWithoutTheFeature(root));
+    }
+
+    // Each call of the publish action names its form; a call that publishes from Watch/, and every call in a workflow that
+    // builds a watch APK, says watch; a call that says watch is in a workflow that builds one.
+    private static IEnumerable<string> PublishFormGaps(string name, string yaml)
+    {
+        var buildsWatch = Regex.IsMatch(yaml, @"dotnet (?:publish|build)\s+Watch/[\w./-]+\.csproj")
+            || Regex.IsMatch(yaml, @"Tools/FaceStudio[^\n]*--apk");
+        var steps = Regex.Split(yaml, @"(?m)^(?=\s*- (?:name|uses|run):)");
+        foreach (var step in steps.Where(step => step.Contains("uses: ./.github/actions/publish-rolling-release", StringComparison.Ordinal)))
+        {
+            var form = Regex.Match(step, @"(?m)^\s+form:\s*['""]?(\w+)['""]?\s*$");
+            var said = form.Success ? form.Groups[1].Value : null;
+            if (said is not (ApkForms.PhoneWord or ApkForms.WatchWord))
+            {
+                yield return $"{name}: a publish that doesn't say its form (phone or watch)";
+                continue;
+            }
+
+            var fromWatch = Regex.IsMatch(step, @"(?m)^\s+apks:[\s\S]*\bWatch/");
+            if ((fromWatch || buildsWatch) && said != ApkForms.WatchWord)
+            {
+                yield return $"{name}: publishes a watch APK as {said}";
+            }
+            if (!buildsWatch && !fromWatch && said == ApkForms.WatchWord)
+            {
+                yield return $"{name}: says watch but builds no watch APK";
+            }
+        }
+    }
+
+    // Every app project under Watch/ (one with an ApplicationId) declares android.hardware.type.watch, in a manifest or
+    // as a UsesFeature attribute, and so does the face's generated manifest.
+    private static IEnumerable<string> WatchAppsWithoutTheFeature(string root)
+    {
+        var watch = Path.Combine(root, "Watch");
+        if (!Directory.Exists(watch))
+        {
+            yield break;
+        }
+
+        var apps = Directory.EnumerateFiles(watch, "*.csproj", SearchOption.AllDirectories)
+            .Where(project => File.ReadAllText(project).Contains("<ApplicationId>", StringComparison.Ordinal))
+            .Select(Path.GetDirectoryName)
+            .ToList();
+        var face = Path.Combine(watch, "Point.Face");
+        if (Directory.Exists(face))
+        {
+            apps.Add(face);
+        }
+
+        foreach (var app in apps)
+        {
+            var sources = Directory.EnumerateFiles(app!, "*", SearchOption.AllDirectories)
+                .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                    && !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+            var declares = sources.Any(file =>
+                (Path.GetFileName(file) == "AndroidManifest.xml"
+                    && Regex.IsMatch(File.ReadAllText(file), @"<uses-feature\s+android:name=""android\.hardware\.type\.watch"""))
+                || (file.EndsWith(".cs", StringComparison.Ordinal)
+                    && Regex.IsMatch(File.ReadAllText(file), @"UsesFeature\(\s*""android\.hardware\.type\.watch""")));
+            if (!declares)
+            {
+                yield return $"{Path.GetRelativePath(root, app!).Replace('\\', '/')}: declares no android.hardware.type.watch";
+            }
+        }
+    }
+
     // The folders a workflow's push filter names ('X/**'), relative to the repository.
     private static List<string> PathFilters(string yaml) =>
         Regex.Matches(yaml, @"^\s*-\s*'([^'*]+)/\*\*'", RegexOptions.Multiline).Select(m => m.Groups[1].Value).ToList();

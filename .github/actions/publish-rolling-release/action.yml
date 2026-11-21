@@ -3,12 +3,20 @@ description: >
   Upload signed APKs to the single rolling "apps-latest" GitHub Release that the
   FocusPhone launcher's device-owner update channel installs from. A new sibling
   app rides the channel by adding one step that calls this action with its signed
-  APK glob (gate it to main); the phone installs it on the next update check,
-  because the channel takes any owner-namespace (com.storyworthtelling.*) app that
-  is newer than what's installed — or not installed at all.
+  APK glob and its form (gate it to main); the phone installs it on the next update
+  check, because the channel takes any owner-namespace (com.storyworthtelling.*) app
+  of the phone's form that is newer than what's installed — or not installed at all.
 inputs:
   apks:
     description: Space/newline-separated globs of signed *-Signed.apk files to upload.
+    required: true
+  form:
+    description: >
+      What these APKs are built for: phone or watch. Each APK's own manifest is read
+      with aapt2 and must agree (android.hardware.type.watch makes a watch APK), or
+      nothing is published. A watch app carries its phone app's package and a higher
+      versionCode band, so a watch APK published as a phone APK would be installed
+      over the phone app (P14 W-3.1.1).
     required: true
 runs:
   using: composite
@@ -17,6 +25,7 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        FORM: ${{ inputs.form }}
       run: |
         shopt -s nullglob
         files=(${{ inputs.apks }})
@@ -24,21 +33,20 @@ runs:
           echo "No signed APKs matched: ${{ inputs.apks }}"
           exit 1
         fi
-        # A sidecar beside each APK (<name>.apk.json) names its package and versionCode, read from the APK itself,
-        # so the phone decides before downloading whether it needs it (efficiency audit §13). Without aapt2 the APKs
-        # go up alone, and the phone downloads and reads them as it always has.
+        # Every APK goes up with a sidecar (<published name>.json) naming its package, versionCode and form, read from
+        # the APK itself, so the phone decides before downloading whether it needs it (efficiency audit §13) and never
+        # takes a watch APK for its phone app's update. The form is what keeps a watch APK off the phone, so there is no
+        # publishing without it: no aapt2, nothing goes up. stage-apks.py checks each APK's form against FORM, names a
+        # watch APK <name>.watch.apk so it can't replace its phone app's asset, and stages nothing if any APK is refused.
         AAPT2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)
         [ -z "$AAPT2" ] && AAPT2=$(find "$ANDROID_HOME" -name aapt2 -type f 2>/dev/null | head -1)
-        sidecars=()
-        for apk in "${files[@]}"; do
-          [ -z "$AAPT2" ] && { echo "::warning::aapt2 not found; publishing without sidecars"; break; }
-          line=$("$AAPT2" dump badging "$apk" | grep -m1 '^package:')
-          package=$(echo "$line" | sed -E "s/.* name='([^']+)'.*/\1/")
-          versionCode=$(echo "$line" | sed -E "s/.* versionCode='([0-9]+)'.*/\1/")
-          printf '{"package":"%s","versionCode":%s}\n' "$package" "$versionCode" > "$apk.json"
-          sidecars+=("$apk.json")
-        done
-        files+=("${sidecars[@]}")
+        if [ -z "$AAPT2" ]; then
+          echo "::error::aapt2 not found, so these APKs can't say what they are built for; nothing is published"
+          exit 1
+        fi
+        staged=$(mktemp -d)
+        python3 "${{ github.action_path }}/../../scripts/stage-apks.py" --aapt2 "$AAPT2" --form "$FORM" --out "$staged" "${files[@]}"
+        files=("$staged"/*)
         echo "Publishing to the apps-latest release:"
         printf '  %s\n' "${files[@]}"
         # One shared rolling release across every app workflow, so releases/latest

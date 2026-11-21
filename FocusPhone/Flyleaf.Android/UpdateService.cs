@@ -26,10 +26,21 @@ namespace Flyleaf;
 /// admin-mode "Install from GitHub now" action passes force to re-check every
 /// asset. Every install session re-whitelists the hard-restricted call-log/SMS
 /// permissions so the Communication app keeps that access across updates.
+///
+/// Phone APKs only (P14 W-3.1.1). A watch app carries its phone app's package and a
+/// higher versionCode band, so the release's Dash would otherwise be Post's newest
+/// build. Each asset is judged as itself by <see cref="SiblingUpdatePlan"/>, form
+/// first: its sidecar's form and its name must agree before anything is downloaded,
+/// and once downloaded the APK's own manifest has the last word. A watch APK is
+/// settled as NotForThisDevice and never fetched again; ApkInstaller refuses one
+/// whatever this decided.
 /// </summary>
 public static class UpdateService
 {
     private const string Tag = "FocusPhoneUpdate";  // not copy: a stage, id or wire word
+
+    // Flyleaf is a phone app: it installs phone APKs, never a watch app that shares a package with one.
+    private const ApkForm ThisDevice = ApkForm.Phone;
     private const string WorkName = "focusphone-update-check";
     public const string Repo = "storyworthtelling/Personal";
     private static readonly UpdateRunGate RunGate = new();
@@ -144,8 +155,8 @@ public static class UpdateService
             return UpdateRunResult.Ran([]);
         }
 
-        // Each APK's sidecar names its package and version, so an APK this phone already has is not downloaded at
-        // all (efficiency audit §13). One with no readable sidecar is downloaded and read as before.
+        // Each APK's sidecar names its package, version and form, so an APK this phone already has, or one built for
+        // a watch, is not downloaded at all (efficiency audit §13). One with no readable sidecar is downloaded and read.
         var described = new Dictionary<long, InstallCandidate>();
         foreach (var asset in pending)
         {
@@ -153,7 +164,11 @@ public static class UpdateService
             {
                 if (await client.ReadSidecarAsync(release, asset) is { } candidate)
                 {
-                    described[asset.Id] = candidate;
+                    // The sidecar and the asset's name must say the same form, or it is neither.
+                    described[asset.Id] = candidate with
+                    {
+                        Form = ApkForms.Agree(candidate.Form, ApkForms.FromAssetName(asset.Name)),
+                    };
                 }
             }
             catch (HttpRequestException e)
@@ -161,21 +176,24 @@ public static class UpdateService
                 HeadLog.Info(Tag, $"The sidecar for {asset.Name} did not read ({e.GetType().Name}); downloading the APK to read it.");
             }
         }
-        var wanted = UpdateScope
-            .Decide(UpdateRole.Custodian, PolicyContext.LauncherPackage,
-                described.Values, InstalledVersionCodes(context, described.Values.Select(c => c.Package)))
-            .Select(c => c.Package)
-            .ToHashSet();
+        // Flyleaf is the custodian on this device: as the device owner it is the only
+        // thing that can install silently, so it installs for the whole suite. Each
+        // asset is decided as itself: a package being due never carries its watch APK along.
+        var beforeDownload = SiblingUpdatePlan
+            .Decide(UpdateRole.Custodian, PolicyContext.LauncherPackage, ThisDevice,
+                described.Select(pair => new ReleaseApk(pair.Key, pair.Value)).ToList(),
+                InstalledVersionCodes(context, described.Values.Select(c => c.Package)))
+            .ToDictionary(decision => decision.Apk.AssetId);
 
-        // Download each pending APK to the cache and read its package + version.
+        // Download each APK still wanted to the cache and read its package, version and form from the APK itself.
         var downloaded = new List<(ReleaseAsset Asset, string Path, InstallCandidate Candidate)>();
         var results = new List<AppInstallResult>();
         foreach (var asset in pending)
         {
-            if (described.TryGetValue(asset.Id, out var known) && !wanted.Contains(known.Package))
+            if (beforeDownload.TryGetValue(asset.Id, out var known) && known.Settled is { } settled)
             {
-                results.Add(new AppInstallResult(known.Package, known.VersionCode, InstallOutcome.AlreadyCurrent));
-                if (InstallOutcomes.ShouldMarkProcessed(InstallOutcome.AlreadyCurrent))
+                results.Add(Settle(known.Apk.Candidate, settled));
+                if (InstallOutcomes.ShouldMarkProcessed(settled))
                 {
                     processed.Add(asset.Id);
                 }
@@ -196,8 +214,7 @@ public static class UpdateService
                 continue;
             }
 
-            var info = context.PackageManager!.GetPackageArchiveInfo(path, (PackageInfoFlags)0);
-            if (info?.PackageName is null)
+            if (ApkArchive.Read(context, path) is not { } read)
             {
                 HeadLog.Warn(Tag, $"{asset.Name} is not a readable APK; skipping.");
                 DeleteQuietly(path);
@@ -205,21 +222,29 @@ public static class UpdateService
                 results.Add(new AppInstallResult(asset.Name, 0, InstallOutcome.Unreadable));
                 continue;
             }
-            downloaded.Add((asset, path, new InstallCandidate(info.PackageName, info.LongVersionCode)));
+
+            // The APK's own manifest has the last word, and its name and sidecar (if any) must agree with it: a
+            // sidecar that called a watch APK a phone APK leaves it of no form, and installed nowhere.
+            var form = ApkForms.Agree(
+                read.Form,
+                ApkForms.FromAssetName(asset.Name),
+                described.TryGetValue(asset.Id, out var said) ? said.Form : read.Form);
+            if (form != read.Form)
+            {
+                HeadLog.Warn(Tag, $"{asset.Name} reads as {ApkForms.Word(read.Form)} but its name or sidecar says otherwise; not installing it.");
+            }
+            downloaded.Add((asset, path, read with { Form = form }));
         }
 
-        var installedVersions = InstalledVersionCodes(context, downloaded.Select(d => d.Candidate.Package));
-        // Flyleaf is the custodian on this device: as the device owner it is the only
-        // thing that can install silently, so it installs for the whole suite.
-        var toInstall = UpdateScope
-            .Decide(UpdateRole.Custodian, PolicyContext.LauncherPackage,
-                downloaded.Select(d => d.Candidate), installedVersions)
-            .Select(c => c.Package)
-            .ToHashSet();
+        var afterDownload = SiblingUpdatePlan
+            .Decide(UpdateRole.Custodian, PolicyContext.LauncherPackage, ThisDevice,
+                downloaded.Select(d => new ReleaseApk(d.Asset.Id, d.Candidate)).ToList(),
+                InstalledVersionCodes(context, downloaded.Select(d => d.Candidate.Package)))
+            .ToDictionary(decision => decision.Apk.AssetId);
 
         foreach (var item in downloaded)
         {
-            var outcome = await InstallOneAsync(context, item, toInstall);
+            var outcome = await InstallOneAsync(context, item, afterDownload[item.Asset.Id]);
             results.Add(outcome);
             // Remember every settled outcome so an unchanged asset isn't re-fetched;
             // a failed install is left unprocessed so the next poll retries it.
@@ -236,11 +261,11 @@ public static class UpdateService
     private static async Task<AppInstallResult> InstallOneAsync(
         Context context,
         (ReleaseAsset Asset, string Path, InstallCandidate Candidate) item,
-        HashSet<string> toInstall)
+        ApkDecision decision)
     {
-        if (!toInstall.Contains(item.Candidate.Package))
+        if (decision.Settled is { } settled)
         {
-            return new AppInstallResult(item.Candidate.Package, item.Candidate.VersionCode, InstallOutcome.AlreadyCurrent);
+            return Settle(item.Candidate, settled);
         }
 
         try
@@ -256,6 +281,11 @@ public static class UpdateService
             return new AppInstallResult(item.Candidate.Package, item.Candidate.VersionCode, InstallOutcome.Failed, e.Message);
         }
     }
+
+    // An APK not installed, and why; a watch APK's line names its form.
+    private static AppInstallResult Settle(InstallCandidate candidate, InstallOutcome settled) =>
+        new(candidate.Package, candidate.VersionCode, settled,
+            settled == InstallOutcome.NotForThisDevice ? $"form {ApkForms.Word(candidate.Form)}" : null);
 
     private static async Task DownloadAsync(HttpClient http, ReleaseAsset asset, string token, string path)
     {
@@ -284,7 +314,7 @@ public static class UpdateService
             }
             catch (PackageManager.NameNotFoundException)
             {
-                // Not installed: SiblingUpdatePlan reads the absence as "install".
+                // Not installed: UpdateScope reads the absence as "install".
             }
         }
         return result;

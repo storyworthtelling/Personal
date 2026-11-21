@@ -97,18 +97,23 @@ public static class ScoreUpdateService
             try
             {
                 await DownloadAsync(http, asset, token, path);
-                var candidate = ReadCandidate(context, path);
-                if (candidate is null)
+                if (ApkArchive.Read(context, path) is not { } read)
                 {
                     results.Add(new AppInstallResult(asset.Name, 0, InstallOutcome.Unreadable));
                     continue;
                 }
 
-                // Self only. Everything else on the release is somebody else's business,
-                // including the other apps on this very phone.
+                // Wave is Score's watch half and carries Score's package at a higher
+                // versionCode band, so by package and version it is Score's newest build.
+                // The APK's own manifest and its asset's name must both say phone (P14 W-3.1.1).
+                var candidate = read with { Form = ApkForms.Agree(read.Form, ApkForms.FromAssetName(asset.Name)) };
+
+                // Self only, and phone only. Everything else on the release is somebody
+                // else's business, including the other apps on this very phone.
                 var wanted = UpdateScope.Decide(
                     UpdateRole.SelfOnly,
                     context.PackageName!,
+                    ApkForm.Phone,
                     [candidate],
                     InstalledVersionCodes(context, [candidate.Package]));
                 if (wanted.Count == 0)
@@ -139,7 +144,9 @@ public static class ScoreUpdateService
     // The mechanical bits, kept here rather than shared with the launcher's copies.
     // Sharing them would need either Codex.Ui.Android to depend on Codex.Infrastructure
     // — a boundary the UI kit deliberately keeps — or Infrastructure to multi-target
-    // Android, and neither is worth it for four short methods with no decisions in them.
+    // Android, and neither is worth it for three short methods with no decisions in them.
+    // Reading what an APK is does decide something (its form), so that one is shared:
+    // ApkArchive, in the kit.
     private static async Task DownloadAsync(HttpClient http, ReleaseAsset asset, string token, string path)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, asset.DownloadUrl);
@@ -157,13 +164,6 @@ public static class ScoreUpdateService
 
         using var output = File.Create(path);
         await response.Content.CopyToAsync(output);
-    }
-
-    private static InstallCandidate? ReadCandidate(Context context, string path)
-    {
-        var info = context.PackageManager!.GetPackageArchiveInfo(
-            path, (Android.Content.PM.PackageInfoFlags)0);
-        return info?.PackageName is null ? null : new InstallCandidate(info.PackageName, info.LongVersionCode);
     }
 
     // Absent and version 0 mean different things to the update decision, so a package

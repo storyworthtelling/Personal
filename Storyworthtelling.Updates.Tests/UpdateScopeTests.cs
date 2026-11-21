@@ -15,8 +15,8 @@ public class UpdateScopeTests
     [Fact]
     public void Custodian_InstallsANewOwnerAppOnFirstSight()
     {
-        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
-            [new InstallCandidate(FutureHealthApp, 1)], Installed());
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher, ApkForm.Phone,
+            [new InstallCandidate(FutureHealthApp, 1, ApkForm.Phone)], Installed());
 
         Assert.Contains(plan, c => c.Package == FutureHealthApp);
     }
@@ -24,8 +24,8 @@ public class UpdateScopeTests
     [Fact]
     public void Custodian_UpdatesAnInstalledOwnerApp()
     {
-        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
-            [new InstallCandidate(Storyboarder, 42)], Installed((Storyboarder, 41)));
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher, ApkForm.Phone,
+            [new InstallCandidate(Storyboarder, 42, ApkForm.Phone)], Installed((Storyboarder, 41)));
 
         Assert.Contains(plan, c => c.Package == Storyboarder);
     }
@@ -33,8 +33,8 @@ public class UpdateScopeTests
     [Fact]
     public void Custodian_SkipsAVersionTheDeviceAlreadyHas()
     {
-        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
-            [new InstallCandidate(Storyboarder, 42)], Installed((Storyboarder, 42)));
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher, ApkForm.Phone,
+            [new InstallCandidate(Storyboarder, 42, ApkForm.Phone)], Installed((Storyboarder, 42)));
 
         Assert.Empty(plan);
     }
@@ -42,8 +42,8 @@ public class UpdateScopeTests
     [Fact]
     public void Custodian_NeverDowngrades()
     {
-        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
-            [new InstallCandidate(Launcher, 5)], Installed((Launcher, 9)));
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher, ApkForm.Phone,
+            [new InstallCandidate(Launcher, 5, ApkForm.Phone)], Installed((Launcher, 9)));
 
         Assert.Empty(plan);
     }
@@ -51,12 +51,12 @@ public class UpdateScopeTests
     [Fact]
     public void Custodian_InstallsOnlyTheOwnerAppsThatAdvanced()
     {
-        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher,
+        var plan = UpdateScope.Decide(UpdateRole.Custodian, Launcher, ApkForm.Phone,
             [
-                new InstallCandidate(Launcher, 10),        // newer -> install
-                new InstallCandidate(Storyboarder, 3),     // same -> skip
-                new InstallCandidate(FutureHealthApp, 1),  // new -> install
-                new InstallCandidate("com.evil.app", 100), // not owner -> skip
+                new InstallCandidate(Launcher, 10, ApkForm.Phone),        // newer -> install
+                new InstallCandidate(Storyboarder, 3, ApkForm.Phone),     // same -> skip
+                new InstallCandidate(FutureHealthApp, 1, ApkForm.Phone),  // new -> install
+                new InstallCandidate("com.evil.app", 100, ApkForm.Phone), // not owner -> skip
             ],
             Installed((Launcher, 9), (Storyboarder, 3)));
 
@@ -70,8 +70,8 @@ public class UpdateScopeTests
     [Fact]
     public void SelfOnly_TakesANewerBuildOfItself()
     {
-        var plan = UpdateScope.Decide(UpdateRole.SelfOnly, Score,
-            [new InstallCandidate(Score, 2)], Installed((Score, 1)));
+        var plan = UpdateScope.Decide(UpdateRole.SelfOnly, Score, ApkForm.Phone,
+            [new InstallCandidate(Score, 2, ApkForm.Phone)], Installed((Score, 1)));
 
         Assert.Equal([Score], plan.Select(c => c.Package));
     }
@@ -81,8 +81,8 @@ public class UpdateScopeTests
     {
         // The whole difference between the roles: another app's update is that app's
         // business, even when this run is looking straight at its APK.
-        var plan = UpdateScope.Decide(UpdateRole.SelfOnly, Score,
-            [new InstallCandidate(Launcher, 9), new InstallCandidate(FutureHealthApp, 3)],
+        var plan = UpdateScope.Decide(UpdateRole.SelfOnly, Score, ApkForm.Phone,
+            [new InstallCandidate(Launcher, 9, ApkForm.Phone), new InstallCandidate(FutureHealthApp, 3, ApkForm.Phone)],
             Installed((Launcher, 1)));
 
         Assert.Empty(plan);
@@ -91,8 +91,8 @@ public class UpdateScopeTests
     [Fact]
     public void SelfOnly_SkipsABuildItAlreadyHas()
     {
-        var plan = UpdateScope.Decide(UpdateRole.SelfOnly, Score,
-            [new InstallCandidate(Score, 5)], Installed((Score, 5)));
+        var plan = UpdateScope.Decide(UpdateRole.SelfOnly, Score, ApkForm.Phone,
+            [new InstallCandidate(Score, 5, ApkForm.Phone)], Installed((Score, 5)));
 
         Assert.Empty(plan);
     }
@@ -102,10 +102,10 @@ public class UpdateScopeTests
     [Fact]
     public void NeitherRoleTouchesAPackageOutsideTheSuite()
     {
-        var stray = new InstallCandidate("com.someone.else", 99);
+        var stray = new InstallCandidate("com.someone.else", 99, ApkForm.Phone);
 
-        Assert.Empty(UpdateScope.Decide(UpdateRole.Custodian, Launcher, [stray], Installed()));
-        Assert.Empty(UpdateScope.Decide(UpdateRole.SelfOnly, "com.someone.else", [stray], Installed()));
+        Assert.Empty(UpdateScope.Decide(UpdateRole.Custodian, Launcher, ApkForm.Phone, [stray], Installed()));
+        Assert.Empty(UpdateScope.Decide(UpdateRole.SelfOnly, "com.someone.else", ApkForm.Phone, [stray], Installed()));
     }
 
     [Fact]

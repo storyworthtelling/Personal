@@ -327,3 +327,181 @@ the repository's `/Fonts`) still passes: `Watch/Fonts` is the watch's own.
 - `Watch.Tests`: **132 passed, 0 failed.** `FaceStudio.Tests`: **19 passed, 0 failed** (the APK built here).
 - `RepoGuards.Tests`: 386 passed, 0 failed. `Storyworthtelling.Updates.Tests`: 111 passed, 0 failed (after
   the `test-tools.yml` step; 1 failed before it, as above).
+
+---
+
+# Chunk A4 · the update channel tells a watch APK from a phone APK (W-3.1.1)
+
+Every figure below is from a real run on 20–21 Nov 2026. As before, the red run was taken with the tests written
+and the code present only as stubs: `ApkForms`, `ApkManifest` and `SiblingUpdatePlan` threw
+`NotImplementedException` with their constants empty, `InstallCandidate`, `UpdateScope.Decide` and
+`InstallOutcome` had their new members but no behaviour (every sidecar read as phone, the device's form ignored),
+and `.github/scripts/stage-apks.py` was the old publish action's behaviour written as a script (read package and
+versionCode, write a sidecar with no form, copy the APK under its own name, refuse nothing).
+
+## Why: every way a watch APK could reach a phone
+
+A watch app shares its phone app's package and signature (PC1) and is built in versionCode band 11, above every
+phone band, so each of these would have installed Dash, Wave, Beat or the Point installer over Post, Score,
+Constitution or Flyleaf, with nothing failing:
+
+1. **Flyleaf, sidecar read:** `UpdateScope` compared package and version only; band 11 is "newer".
+2. **Flyleaf, no readable sidecar:** the APK was downloaded and read with `GetPackageArchiveInfo` for package and
+   version only.
+3. **Flyleaf's package-keyed sets:** `wanted` and `toInstall` were sets of package names, so once Post's phone APK
+   was due, the release's other APK of the same package was downloaded and installed too, even with a form-aware
+   `UpdateScope`.
+4. **Score on the partner's phone (SelfOnly):** downloads every APK and read package and version only; Wave is
+   Score's package.
+5. **Admin mode, "Install APK from Downloads":** `ApkInstaller` installed whatever it was given.
+6. **The publish action:** .NET names a signed APK after its package, so Dash and Post both go up as
+   `com.storyworthtelling.focusphone.communication-Signed.apk`, and `gh release upload --clobber` replaces by name:
+   the phone APK would leave the release and the watch APK take its place and its sidecar.
+7. **No aapt2 on the runner:** the action published without sidecars.
+8. **A watch app that forgot `uses-feature android.hardware.type.watch`:** reads as a phone APK by every measure
+   on the phone, so only CI can catch it.
+
+## Tests written first
+
+- `Storyworthtelling.Updates.Tests/WatchFormTests.cs` (34 cases): `APhoneNeverInstallsAWatchApk`,
+  `TheWatchNeverInstallsAPhoneApk`, `EachFormInstallsItsOwn`, `NoFormIsPhone`, `TheSidecarSaysItsForm` ×2,
+  `AnUnknownFormIsInstalledNowhere` ×10 (`"tablet"`, `""`, `"Watch"`, `"PHONE"`, `" phone"`, `null`, `11`, `true`,
+  `{}`, `["phone"]`), `ADeviceOfNoKnownFormInstallsNothing`, `SamePackageTwoForms` (both orders, phone and watch),
+  `TheFormComesBeforeTheVersion` (band 1, 10 and 11), `ThePlanKeepsTheOldRulesWithinAForm`, `ReadingsMustAgree`,
+  `AWatchAssetIsNamedForIt` ×5, `TheWatchFeatureMakesAWatch`, `TheWordsAreFrozen` (values, and literals not
+  `nameof` in `ApkForm.cs`), `NotForThisDeviceIsSettled`, and the manifest scan:
+  `AManifestNamingTheWatchFeatureIsAWatch` (UTF-16 and UTF-8 string pools), `AManifestWithoutItIsAPhone`,
+  `WhatIsNotAnApkHasNoForm`, `ReadingLeavesTheStreamForTheInstaller`, `RealApksSayTheirForm` (APKs linked by the
+  SDK's aapt2: required, not-required and no watch feature).
+- `Storyworthtelling.Updates.Tests/ApkStagingTests.cs` (15 cases) runs `stage-apks.py` against a stand-in aapt2:
+  `APhoneApkKeepsItsName`, `AWatchApkSaysWatchAndIsNamedForIt` ×2 (`uses-feature` and
+  `uses-feature-not-required`), `AWatchApkInAPhonePublishStopsIt`, `APhoneApkInAWatchPublishStopsIt`,
+  `APhoneApkNamedLikeAWatchApkStopsIt`, `TwoApksOneNameStopsIt`, `AnUnknownFormStopsIt` ×3,
+  `AnApkThatWontReadStopsIt` ×3, `Aapt2FailingStopsIt`, and `TheRealAapt2AgreesWithThePhone` (the same script
+  over real aapt2 output, its sidecars read by `ApkSidecar.Read` and its staged APK by `ApkManifest`).
+- `CiHygieneTests.EveryWatchApkSaysWatch` and `TheWatchRuleBites` (below).
+- The existing `UpdateScopeTests`, `DeferredScopeTests`, `ApkSidecarTests`, `FrozenInvariantsTests` and
+  `GitHubReleaseClientTests` now state the phone form at every call (the form has no default, so every reader of
+  an APK says what it read).
+
+## Red
+
+**First attempt, not counted:** with no script at all and then with the stub script, 41 of 162 failed, but nine
+staging tests passed for the wrong reason: the test helper's two `Stage` overloads let C# bind
+`Stage(form, apk)` to `Stage(form, aapt2, params apks)` (the overload with more declared parameters wins when both
+are expanded), so the APK's path was passed as aapt2, no APK was given, and argparse exited 2, which the refusal
+tests read as a refusal. The helper was fixed (`StageWith(aapt2, form, …)`); the code was not touched.
+
+**Red run: `Storyworthtelling.Updates.Tests` 162 tests, 49 failed, 113 passed.** The 113 are the 111 that passed
+before, less `ApkSidecarTests.ThePublishActionWritesASidecarBesideEveryApk` (the action did not yet call the
+script), plus three that pass on the stubs because they hold behaviour that does not change:
+`TheSidecarSaysItsForm(phone)` (the stub read every sidecar as phone), `NotForThisDeviceIsSettled` (only `Failed`
+was ever unsettled), and `APhoneApkKeepsItsName` (a phone APK still goes up under its own name). The 49:
+`WatchFormTests` 32 of 34, `ApkStagingTests` 14 of 15, `CiHygieneTests` 2 (`EveryWatchApkSaysWatch`,
+`TheWatchRuleBites`) and `ApkSidecarTests` 1. First errors:
+- `APhoneNeverInstallsAWatchApk`: `Assert.Empty() Failure: Collection was not empty … InstallCandidate { Package =
+  com.storyworthtelling.focusphone.communication, VersionCode = 1103500000, Form = Watch }, …` — all four watch
+  apps chosen for the phone, which is R1 exactly.
+- `NoFormIsPhone`: `Assert.Empty() Failure` — a phone APK chosen for the watch.
+- `AnUnknownFormIsInstalledNowhere({})`: `Assert.Equal() Failure: Values differ … Expected: Unknown`.
+- `SamePackageTwoForms`: `System.NotImplementedException … at SiblingUpdatePlan.Decide(…)`.
+- `AWatchApkInAPhonePublishStopsIt`, `TwoApksOneNameStopsIt`: `Assert.NotEqual() Failure: Values are equal
+  Expected: Not 0 Actual: 0` — the old action published both.
+- `EveryWatchApkSaysWatch`: `Assert.Matches() Failure: Pattern not found` (the action had no `form` input).
+- `TheWatchRuleBites`: `Assert.Empty() Failure … "build-watch.yml: a publish that doesn't say its fo"…`.
+
+## Green
+
+- **`Storyworthtelling.Updates.Tests`: 162 passed, 0 failed**, with `RealApksSayTheirForm` and
+  `TheRealAapt2AgreesWithThePhone` running against `/opt/android-sdk-min` (aapt2 36.0.0, android-36): the real
+  sidecars read `{"package": "com.example.probe", "versionCode": 1100000123, "form": "watch"}` and `"phone"`.
+- `GitHubReleaseClientTests.APhoneAndAWatchApkOfOnePackageKeepTheirOwnSidecars` was added after: it passed on its
+  first run, since the client already maps a sidecar by its APK's name. It stays as a guard.
+- **`FocusPhone/Codex.Tests`: 3082 passed, 0 failed. `RepoGuards.Tests`: 386 passed, 0 failed.
+  `Watch.Tests`: 132 passed, 0 failed.** `leakscan --ci` over the chunk's diff: no personal-data shapes.
+- **Compiled here:** `Flyleaf.Android` (with `Codex.Ui.Android`) and `Score.Android`, 0 errors, no new warnings in
+  the changed files.
+- **The action's own shell, run here:** its `run:` block, with real aapt2 and a stand-in `gh`, published a phone
+  APK as `…-Signed.apk` with a `phone` sidecar and a watch APK as `…-Signed.watch.apk` with a `watch` sidecar,
+  and stopped (exit 1, nothing uploaded) for a watch APK under `form: phone` and a phone APK under `form: watch`.
+
+## How each path is closed
+
+1. and 2. **`UpdateScope.Decide(role, selfPackage, deviceForm, …)` skips a candidate of another form before any
+   version is compared**, and `InstallCandidate` carries an `ApkForm` with no default. `ApkSidecar.Read` reads
+   `form`: absent is phone (every sidecar before P14), exactly `"phone"` or `"watch"` is that form, anything else
+   (another word, another case, `null`, a number) is `Unknown`. A downloaded APK's form comes from **`ApkArchive`**
+   (`Codex.Ui.Android`): the platform's `ReqFeatures` (asked for with `PackageInfoFlags.Configurations`) and
+   **`ApkManifest.FormOf`**, which reads the compiled `AndroidManifest.xml` out of the zip and looks for the
+   feature in its string pool (UTF-16, as aapt2 writes it, or UTF-8). The two must agree.
+3. **`SiblingUpdatePlan.Decide`** (it exists again; CLAUDE.md named it, audit 13 found it gone) decides **per
+   asset**: install, `AlreadyCurrent` or the new **`NotForThisDevice`**, form first. Flyleaf keys every decision by
+   asset id. Before download a sidecar's form must agree with the asset's name; after download the APK's own
+   reading must agree with its name and its sidecar, or it is `Unknown`. `NotForThisDevice` is settled, so the asset
+   is not fetched again, and is not a failure, so Settings still says "Everything is up to date"; its log line is
+   `UPDATE <package> <code>: NotForThisDevice — form watch`.
+4. **Score** reads through `ApkArchive`, agrees the form with the asset's name and asks `UpdateScope` for the phone
+   form only.
+5. **`ApkInstaller` refuses anything whose manifest is not a phone's** before it opens a session
+   (`FailureIncompatible`, "This app is built for a watch, so it isn’t installed on a phone."). Anything but a file
+   on disk (the picked file's content stream) is copied to the cache first, since the zip has to be read by seeking.
+   This is the last line behind 1–4 and the only line in front of 5.
+6. and 7. **`publish-rolling-release` requires `form:`** (all eight phone workflows now say `form: phone`), finds
+   aapt2 or publishes nothing, and stages every APK through **`.github/scripts/stage-apks.py`**: the form from
+   aapt2's badging (`uses-feature` or `uses-feature-not-required` naming the watch feature), which must be the
+   declared form; a watch APK named `<name>.watch.apk` (`ApkForms.WatchAssetSuffix`); a phone APK named like a watch
+   APK, two APKs with one published name, an unreadable badging or an unknown form each stop the publish with
+   nothing staged; the sidecar `{"package", "versionCode", "form"}`.
+8. **`CiHygieneTests.EveryWatchApkSaysWatch`:** the action asks for the form and has no sidecar-less path; the
+   script names the same five literals as `ApkForms`; every publish says `phone` or `watch`, a publish from
+   `Watch/` and every publish in a workflow that builds a `Watch/` project or a FaceStudio `--apk` says `watch`, and
+   one that says `watch` builds one; every app project under `Watch/` (one with an `ApplicationId`), and
+   `Watch/Point.Face`, declares the watch feature in a manifest or a `UsesFeature` attribute. It holds now (no
+   watch workflow, no watch app project yet; the face declares it). **`TheWatchRuleBites`** shows it fails on a
+   `build-watch.yml` that publishes Dash with no form or `form: phone`, on a phone workflow publishing from
+   `Watch/`, and on a `Watch/Dash.Wear` project with no feature, and passes once the attribute is there. A
+   `Watch/` change now runs `Storyworthtelling.Updates.Tests` in CI (`affected-tests.py` READS, and `Watch/**` in
+   `build-shared-libs.yml`'s filter).
+
+## Decisions made in this chunk
+
+- **An unknown form is installed nowhere, on both ends, and settled.** A sidecar's form that is there but is not
+  exactly `phone` or `watch` was written by somebody and was not "phone": reading it as phone could install a watch
+  APK whose writer misspelt one word, and reading it as "no sidecar" would leave the decision to the APK reading
+  alone. Refusing is safe on the phone and on the watch. It is marked processed (the same asset never changes), and
+  its log line says `form unknown`; a new build replaces the asset and is read afresh.
+- **Readings must agree** (`ApkForms.Agree`): sidecar, asset name, the platform's `ReqFeatures` and the manifest
+  scan. Any disagreement is `Unknown`. This turns "one reading is wrong on some Android version" into a refusal
+  rather than an install.
+- **`uses-feature android:required="false"` is still a watch app.** Wear OS's own marker either way, and the
+  phone is never its device.
+- **A watch APK's asset is `<name>.watch.apk`,** chosen by the action from the form it read, so a watch workflow
+  cannot forget it; a phone APK keeps the name it has always had, so no phone asset moves.
+- **No aapt2, no publish.** The old fallback (publish without sidecars) is gone: a sidecar-less watch APK under its
+  phone app's name is exactly the case this chunk exists to prevent.
+- **Flyleaf's and Score's device form is a constant, phone:** both are phone heads; the watch's installer is its own
+  APK (W-3.1.2).
+- **The phone marks a watch asset processed.** W-3.1.3 (Flyleaf sends watch updates) must keep its own record of
+  what it has sent, or the phone's record would hide a watch APK from it.
+
+## Not done, not verified
+
+- **The publish action has not run in CI.** Its shell ran here against aapt2 36.0.0 with a stand-in `gh`; the
+  runner's aapt2 is whatever `ANDROID_HOME` holds, and no real upload was made.
+- **`PackageInfo.ReqFeatures` from `GetPackageArchiveInfo(…, Configurations)` is unverified on a device.** If a
+  device left it empty, a watch APK's two readings would disagree and it would be refused (safe); a phone APK would
+  read phone twice.
+- **Built, device check pending:** Flyleaf's per-asset run, Score's, the installer's refusal and the Downloads copy,
+  on the locked phone and on hers.
+- **The watch end is pure only:** `TheWatchNeverInstallsAPhoneApk` holds in `UpdateScope` and `SiblingUpdatePlan`
+  with `ApkForm.Watch`; the Point installer (W-3.1.2) must call them with the watch form, read the form with
+  `ApkManifest`, and carry its own refusal of a phone APK.
+- **No band-11 entry in `SuiteVersionBands`:** the table is keyed by package and the watch apps share packages;
+  W-3.2.1 decides how it records a second band for one package.
+- The form literals are frozen in `WatchFormTests.TheWordsAreFrozen`; plan §4's `WatchInvariantsTests` can hold
+  them too once `Watch.Domain` references `Storyworthtelling.Updates` (W-3.1.2).
+
+## Chunk A4 totals
+
+- `Storyworthtelling.Updates.Tests`: **162 passed, 0 failed** (111 before). `FocusPhone/Codex.Tests`: **3082
+  passed, 0 failed**. `RepoGuards.Tests`: **386 passed, 0 failed**. `Watch.Tests`: **132 passed, 0 failed**.

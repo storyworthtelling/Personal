@@ -3,10 +3,14 @@ using System.Text.Json;
 namespace Storyworthtelling.Updates;
 
 /// <summary>
-/// The small file published beside each APK on the rolling release, naming its package and versionCode, so the
+/// The small file published beside each APK on the rolling release, naming its package, versionCode and form, so the
 /// phone decides whether it needs the APK before downloading it (efficiency audit §13). Written by the
-/// publish-rolling-release action from the APK itself (aapt2); an APK with no readable sidecar is downloaded and read
-/// as before.
+/// publish-rolling-release action from the APK itself (aapt2, <c>.github/scripts/stage-apks.py</c>); an APK with no
+/// readable sidecar is downloaded and read as before.
+///
+/// The form (P14 W-3.1.1): a sidecar with no <c>form</c> is a phone APK, since every sidecar published before P14 is
+/// one. A form that is there but is not exactly "phone" or "watch" is <see cref="ApkForm.Unknown"/> and installed
+/// nowhere, rather than read as either: somebody wrote it, and it was not "phone".
 /// </summary>
 public static class ApkSidecar
 {
@@ -24,11 +28,20 @@ public static class ApkSidecar
             {
                 return null;
             }
-            return new InstallCandidate(name, code);
+            return new InstallCandidate(name, code, FormOf(root));
         }
         catch (JsonException)
         {
             return null;
         }
+    }
+
+    private static ApkForm FormOf(JsonElement root)
+    {
+        if (!root.TryGetProperty(ApkForms.Field, out var form))
+        {
+            return ApkForm.Phone;
+        }
+        return form.ValueKind == JsonValueKind.String ? ApkForms.FromWord(form.GetString()) : ApkForm.Unknown;
     }
 }
