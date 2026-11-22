@@ -44,6 +44,7 @@ public class BinderTabs : ViewGroup
     private readonly Paint gutter;
     private readonly int radius;
     private int activeIndex;
+    private bool tabsEnabled = true;
 
     public BinderTabs(Context context) : base(context)
     {
@@ -95,6 +96,19 @@ public class BinderTabs : ViewGroup
         Invalidate();
     }
 
+    /// <summary>
+    /// Whether the tabs can be taken. A screen that cannot be left by a tab (a first run) disables them, so a tap
+    /// is not answered by nothing and TalkBack says they are disabled; the choice outlives <see cref="SetAreas"/>.
+    /// </summary>
+    public void SetTabsEnabled(bool enabled)
+    {
+        tabsEnabled = enabled;
+        for (var i = 0; i < ChildCount; i++)
+        {
+            GetChildAt(i)!.Enabled = tabsEnabled;
+        }
+    }
+
     // The active area's own cloth, matching the fill an inactive tab of that area
     // would wear (PaintTab) — the nearest thing this class has to "the cover color."
     private void UpdateGutterColor()
@@ -128,6 +142,7 @@ public class BinderTabs : ViewGroup
 
         tab.Click += (_, _) => AreaSelected?.Invoke(index);
         tab.ContentDescription = $"{area.Label} tab";
+        tab.Enabled = tabsEnabled;
         PaintTab(tab, area, index == activeIndex);
         return tab;
     }
