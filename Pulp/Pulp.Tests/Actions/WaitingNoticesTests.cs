@@ -22,7 +22,7 @@ public class WaitingNoticesTests
     [Fact]
     public void LandedElsewhereIsAProblemWithTheHandOffSentenceAndOpensTheTitle()
     {
-        var notice = WaitingNotices.AfterLanding(Landing.LandedElsewhere, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight);
+        var notice = WaitingNotices.AfterLanding(Landing.LandedElsewhere, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true);
 
         Assert.NotNull(notice);
         Assert.Equal("Lanternbox opened, but not on Saltmarsh", notice.Headline);
@@ -37,7 +37,7 @@ public class WaitingNoticesTests
     [Fact]
     public void NotSeenIsHedgedAndQuiet()
     {
-        var notice = WaitingNotices.AfterLanding(Landing.NotSeen, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight);
+        var notice = WaitingNotices.AfterLanding(Landing.NotSeen, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true);
 
         Assert.NotNull(notice);
         Assert.Equal("Lanternbox may not have opened on Saltmarsh", notice.Headline);
@@ -46,11 +46,38 @@ public class WaitingNoticesTests
         Assert.Equal(WaitingNotices.HandOffKey(Saltmarsh), notice.Key);
     }
 
+    // A sports hand-off has nothing to reopen: the notice offered "Open" anyway and the head threw on the
+    // main thread when it found no handler. Whether a notice can offer the title is decided here.
+    [Theory]
+    [InlineData(Landing.NotSeen)]
+    [InlineData(Landing.LandedElsewhere)]
+    public void ALandingNothingCanReopenOffersNoButton(Landing landing)
+    {
+        var game = new TitleId("game-invented-fc");
+        var notice = WaitingNotices.AfterLanding(landing, "Lanternbox", "Invented FC at Example FC", game, Tonight, canReopen: false);
+
+        Assert.NotNull(notice);
+        Assert.Equal(NoticeAction.None, notice.Action);
+        Assert.Null(notice.ActionLabel);
+    }
+
+    [Theory]
+    [InlineData(Landing.NotSeen)]
+    [InlineData(Landing.LandedElsewhere)]
+    public void ALandingThatCanReopenOffersTheTitle(Landing landing)
+    {
+        var notice = WaitingNotices.AfterLanding(landing, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true);
+
+        Assert.NotNull(notice);
+        Assert.Equal(NoticeAction.OpenTitle, notice.Action);
+        Assert.Equal("Open Saltmarsh", notice.ActionLabel);
+    }
+
     [Theory]
     [InlineData(Landing.Landed)]
     [InlineData(Landing.Unknown)]
     public void ALandingThatWorkedOrCannotBeToldLeavesNothing(Landing landing) =>
-        Assert.Null(WaitingNotices.AfterLanding(landing, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight));
+        Assert.Null(WaitingNotices.AfterLanding(landing, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true));
 
     [Theory]
     [InlineData(StartRefusal.Hidden)]
@@ -162,8 +189,8 @@ public class WaitingNoticesTests
         }
 
         yield return WaitingNotices.NotInstalled("Lanternbox", Saltmarsh, Tonight);
-        yield return WaitingNotices.AfterLanding(Landing.LandedElsewhere, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight)!;
-        yield return WaitingNotices.AfterLanding(Landing.NotSeen, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight)!;
+        yield return WaitingNotices.AfterLanding(Landing.LandedElsewhere, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true)!;
+        yield return WaitingNotices.AfterLanding(Landing.NotSeen, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true)!;
         yield return WaitingNotices.KeyRejected("availability", "availability", Tonight);
         yield return WaitingNotices.SportsFeedUnreachable("league-east", "Eastern Rowing League", Tonight);
         yield return WaitingNotices.HouseholdUnreadable(Tonight);

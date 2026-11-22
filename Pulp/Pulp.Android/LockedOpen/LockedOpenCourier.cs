@@ -84,7 +84,7 @@ internal static class LockedOpenCourier
                 LockedOpenHandOff.Permission,
                 new AnswerReceiver(code => Resolve(code)),
                 main,
-                LockedOpenHandOff.ResultRefused,
+                (Result)LockedOpenHandOff.ResultNoAnswer,
                 null,
                 null);
             HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, ContractSendOutcome.Sent));
@@ -102,10 +102,14 @@ internal static class LockedOpenCourier
     private const string Contract = "locked-open";
 
     // The ordered broadcast's final receiver: it runs once Flyleaf's receiver (or nobody) has finished.
+    // Flyleaf sets Ok or Canceled; anything else is the initial code left standing, so nobody answered.
     private sealed class AnswerReceiver(Action<int> answered) : BroadcastReceiver
     {
-        public override void OnReceive(Context? context, Intent? intent) => answered(ResultCode == Result.Ok
-            ? LockedOpenHandOff.ResultStarted
-            : LockedOpenHandOff.ResultRefused);
+        public override void OnReceive(Context? context, Intent? intent) => answered(ResultCode switch
+        {
+            Result.Ok => LockedOpenHandOff.ResultStarted,
+            Result.Canceled => LockedOpenHandOff.ResultRefused,
+            _ => LockedOpenHandOff.ResultNoAnswer,
+        });
     }
 }

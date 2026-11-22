@@ -60,7 +60,7 @@ public static class PulpNotices
             case HandOffResult.Refused:
                 // The executor already wrote the refusal's sentence (HandOffNotice.ForRefusal).
                 var sentence = outcome.Notice
-                    ?? throw new InvalidOperationException($"The refused hand-off of '{titleName}' came back with no sentence.");
+                    ?? throw new InvalidOperationException("A refused hand-off came back with no sentence.");
                 Raise(context, overlay, WaitingNotices.Refused(sentence, titleName, title, at), buttons, title);
                 break;
             default:
@@ -73,7 +73,8 @@ public static class PulpNotices
         Context context, FrameLayout overlay, LandingVerdict verdict, TitleId title,
         string serviceName, string titleName, DateTimeOffset at, Buttons buttons)
     {
-        var notice = WaitingNotices.AfterLanding(verdict.Landing, serviceName, titleName, title, at);
+        var notice = WaitingNotices.AfterLanding(
+            verdict.Landing, serviceName, titleName, title, at, canReopen: buttons.OpenTitle is not null);
         if (notice is null)
         {
             Withdraw(context, overlay, WaitingNotices.HandOffKey(title));
@@ -91,17 +92,15 @@ public static class PulpNotices
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "A notice role with no colour."),
     };
 
+    // A button the page cannot serve is dropped, not thrown: the notice still says what happened, and a
+    // throw here runs on the main thread (a posted landing) where nothing catches it.
     private static DogEar.Notice ToDogEar(WaitingNotice notice, Buttons buttons, TitleId? about)
     {
         Action? onAction = notice.Action switch
         {
-            NoticeAction.None => null,
-            NoticeAction.OpenTitle => about is { } title && buttons.OpenTitle is { } open
-                ? () => open(title)
-                : throw new ArgumentException($"'{notice.Headline}' opens a title, but no title or handler was given."),
-            NoticeAction.OpenVault => buttons.OpenVault
-                ?? throw new ArgumentException($"'{notice.Headline}' opens the Vault, but no handler was given."),
-            _ => throw new ArgumentOutOfRangeException(nameof(notice), notice.Action, "A notice button with no handler decided."),
+            NoticeAction.OpenTitle when about is { } title && buttons.OpenTitle is { } open => () => open(title),
+            NoticeAction.OpenVault => buttons.OpenVault,
+            _ => null,
         };
 
         return new DogEar.Notice(

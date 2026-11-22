@@ -24,6 +24,9 @@ public class PulpLogLinesTests
         Assert.Equal("LOCKED OPEN started by Flyleaf", PulpLogLines.LockedOpen(LockedOpenHandOff.ResultStarted));
         Assert.Equal("LOCKED OPEN refused by Flyleaf (answer 0); opened plainly", PulpLogLines.LockedOpen(LockedOpenHandOff.ResultRefused));
         Assert.Equal("LOCKED OPEN no answer from Flyleaf; opened plainly", PulpLogLines.LockedOpen(null));
+        // Nobody answered the ordered broadcast at all: not a refusal, which would send hunting in Flyleaf's gate.
+        Assert.Equal("LOCKED OPEN no answer from Flyleaf’s receiver; opened plainly", PulpLogLines.LockedOpen(LockedOpenHandOff.ResultNoAnswer));
+        Assert.NotEqual(PulpLogLines.LockedOpen(LockedOpenHandOff.ResultRefused), PulpLogLines.LockedOpen(LockedOpenHandOff.ResultNoAnswer));
         Assert.Equal("LOCKED OPEN couldn’t be asked (SecurityException); opened plainly", PulpLogLines.LockedOpenNotSent("SecurityException"));
     }
 

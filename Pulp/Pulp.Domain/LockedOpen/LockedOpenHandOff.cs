@@ -33,8 +33,15 @@ public static class LockedOpenHandOff
     /// </summary>
     public const int ResultStarted = -1;
 
-    /// <summary>Anything else: refused, or could not start. The initial code, so silence reads as this.</summary>
+    /// <summary>Flyleaf's receiver ran and refused, or could not start a session (<c>RESULT_CANCELED</c>).</summary>
     public const int ResultRefused = 0;
+
+    /// <summary>
+    /// Pulp's own, never Flyleaf's: the ordered broadcast's initial code, so a broadcast no receiver of
+    /// Flyleaf's answered (not delivered, not installed, an older build) reads as silence rather than as a
+    /// refusal. Not <c>RESULT_OK</c> (-1) or <c>RESULT_CANCELED</c> (0), the two codes Flyleaf sets.
+    /// </summary>
+    public const int ResultNoAnswer = 1;
 
     /// <summary>How long Pulp waits for Flyleaf's answer before falling back to the plain hand-off.</summary>
     public static readonly TimeSpan AnswerTimeout = TimeSpan.FromSeconds(10);

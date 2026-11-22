@@ -60,8 +60,17 @@ public static class Landings
                 continue;
             }
             Codex.Ui.HeadLog.Info("Pulp", $"Hand-off landing: {landing.Verdict.Landing} ({landing.Verdict.Reason}).");
-            PulpNotices.AfterLanding(answer.Context, answer.Overlay, landing.Verdict, answer.Title,
-                answer.Service, answer.TitleName, DateTimeOffset.Now, answer.Buttons);
+            // One landing's notice failing must not take the rest, or the app, with it (a posted
+            // callback has no caller to catch for it). Logged by shape: the words could name the title.
+            try
+            {
+                PulpNotices.AfterLanding(answer.Context, answer.Overlay, landing.Verdict, answer.Title,
+                    answer.Service, answer.TitleName, DateTimeOffset.Now, answer.Buttons);
+            }
+            catch (Exception e)
+            {
+                Codex.Ui.HeadLog.Quiet("Pulp", $"Hand-off landing notice failed: {landing.Verdict.Landing}", e);
+            }
         }
     }
 }

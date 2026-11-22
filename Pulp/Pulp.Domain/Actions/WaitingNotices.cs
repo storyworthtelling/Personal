@@ -48,20 +48,24 @@ public static class WaitingNotices
     /// <summary>
     /// After the landing check: a mis-landing is a Problem (D122); silence is said quietly and hedged
     /// (D286). A landing that worked, or one nothing can tell, leaves no notice — the caller withdraws
-    /// the title's key instead.
+    /// the title's key instead. <paramref name="canReopen"/> is whether the page that started it can open
+    /// the title again (a sports game or a child's pick cannot); with nothing to do, the notice has no button.
     /// </summary>
-    public static WaitingNotice? AfterLanding(Landing landing, string service, string titleName, TitleId title, DateTimeOffset at)
+    public static WaitingNotice? AfterLanding(
+        Landing landing, string service, string titleName, TitleId title, DateTimeOffset at, bool canReopen)
     {
         var name = Require(service, nameof(service));
         var titled = Require(titleName, nameof(titleName));
+        var label = canReopen ? OpenTitleLabel(titled) : null;
+        var action = canReopen ? NoticeAction.OpenTitle : NoticeAction.None;
         return landing switch
         {
             Landing.LandedElsewhere => new WaitingNotice(
                 HandOffKey(title), $"{name} opened, but not on {titled}", HandOffNotice.LandedElsewhere(name),
-                NoticeRole.Problem, OpenTitleLabel(titled), NoticeAction.OpenTitle, at),
+                NoticeRole.Problem, label, action, at),
             Landing.NotSeen => new WaitingNotice(
                 HandOffKey(title), $"{name} may not have opened on {titled}", HandOffNotice.NotSeen(name),
-                NoticeRole.Reference, OpenTitleLabel(titled), NoticeAction.OpenTitle, at),
+                NoticeRole.Reference, label, action, at),
             Landing.Landed or Landing.Unknown => null,
             _ => throw new ArgumentOutOfRangeException(nameof(landing), landing, "A landing with no notice decided."),
         };

@@ -18,6 +18,7 @@ public class LoopDiagnosticsActivity : Activity
 {
     private FrameLayout? undoHost;
     private LinearLayout? column;
+    private Button? copyButton;
     private bool sending;
 
     public static void Open(Context context) =>
@@ -45,7 +46,7 @@ public class LoopDiagnosticsActivity : Activity
         root.AddView(PaperUi.BottomBar(this,
             PaperUi.PrimaryButton(this, "Send logs now", SendLogsNow),
             PaperUi.SecondaryButton(this, "Share", Share),
-            PaperUi.QuietButton(this, "Copy", Copy),
+            copyButton = PaperUi.QuietButton(this, "Copy", Copy),
             PaperUi.QuietButton(this, "Clear", ClearLog)));
         SetContentView(root);
         Bind();
@@ -129,6 +130,8 @@ public class LoopDiagnosticsActivity : Activity
         if (GetSystemService(ClipboardService) is ClipboardManager clipboard)
         {
             clipboard.PrimaryClip = ClipData.NewPlainText("Diagnostics", HeadDiagnostics.Current?.BuildExport() ?? string.Empty);
+            // Success is the button saying so (§5), not a toast.
+            copyButton!.Text = "Copied";
         }
     }
 
