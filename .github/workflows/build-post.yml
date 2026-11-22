@@ -26,6 +26,8 @@ on:
       - 'Storyworthtelling.Paper/**'
       - 'Storyworthtelling.Remarkable/**'
       - 'Storyworthtelling.Pipeline/**'
+      # Post answers the watch through Watch.Domain's Dash codecs (P14 W-4.1.1); a codec change must rebuild Post.
+      - 'Watch/Watch.Domain/**'
       - '.github/actions/dotnet/**'
       - '.github/workflows/build-post.yml'
 

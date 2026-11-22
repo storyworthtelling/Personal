@@ -74,4 +74,17 @@ public class CallNoteTests
     {
         Assert.Null(CallNote.FromShare(shared, When));
     }
+
+    // The watch shows a note as a note, not as a call (P14 B1): a note is a call under its own source id.
+    [Fact]
+    public void ANoteIsKnownByItsSourceId()
+    {
+        var note = CallNote.For("+15550102233", "Agreed he would come Tuesday.", When);
+        var call = new TimelineItem(TimelineItemKind.Call, note.ContactKey, When, "Missed call", true, "call:7");
+
+        Assert.Equal("note:", CallNote.SourcePrefix);
+        Assert.True(CallNote.IsNote(note));
+        Assert.False(CallNote.IsNote(call));
+        Assert.False(CallNote.IsNote(note with { Kind = TimelineItemKind.Message }));
+    }
 }

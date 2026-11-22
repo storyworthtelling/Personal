@@ -24,6 +24,11 @@ public class WatchInvariantsTests
         "com.storyworthtelling.watch.point",
     ];
 
+    private static readonly string[] ExpectedDashPaths =
+    [
+        "/dash/people", "/dash/thread", "/dash/send", "/dash/file", "/dash/delete", "/dash/undo", "/dash/read", "/dash/call-note", "/dash/mail",
+    ];
+
     private static readonly string[] ExpectedInstallerComponents =
     [
         "com.storyworthtelling.focusphone.launcher.point.UpdateListenerService",
@@ -101,6 +106,30 @@ public class WatchInvariantsTests
     {
         Assert.Equal("/update/apk", WatchIdentity.UpdateApkPath);
         Assert.Equal("/update/installed", WatchIdentity.UpdateInstalledPath);
+    }
+
+    [Fact]
+    public void DashPathsAreFrozen()
+    {
+        // Post's listener and Dash's will each hear only the paths they name (P14 W-4.1.1).
+        Assert.Equal("/dash/people", WatchIdentity.DashPeoplePath);
+        Assert.Equal("/dash/thread", WatchIdentity.DashThreadPath);
+        Assert.Equal("/dash/send", WatchIdentity.DashSendPath);
+        Assert.Equal("/dash/file", WatchIdentity.DashFilePath);
+        Assert.Equal("/dash/delete", WatchIdentity.DashDeletePath);
+        Assert.Equal("/dash/undo", WatchIdentity.DashUndoPath);
+        Assert.Equal("/dash/read", WatchIdentity.DashReadPath);
+        Assert.Equal("/dash/call-note", WatchIdentity.DashCallNotePath);
+        Assert.Equal("/dash/mail", WatchIdentity.DashMailPath);
+        Assert.Equal(ExpectedDashPaths, WatchIdentity.DashPaths);
+    }
+
+    [Fact]
+    public void EveryDashPathIsItsOwn()
+    {
+        Assert.Equal(WatchIdentity.DashPaths.Count, WatchIdentity.DashPaths.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(WatchIdentity.DashPaths, path => Assert.StartsWith("/dash/", path, StringComparison.Ordinal));
+        Assert.DoesNotContain(WatchIdentity.DashPaths, path => path == WatchIdentity.UpdateApkPath || path == WatchIdentity.UpdateInstalledPath);
     }
 
     [Fact]
@@ -345,6 +374,8 @@ public class WatchInvariantsTests
         Assert.NotEmpty(ExpectedPackages);
         Assert.NotEmpty(ExpectedInstallerComponents);
         Assert.NotEmpty(ExpectedInstallerPermissions);
+        Assert.NotEmpty(ExpectedDashPaths);
+        Assert.NotEmpty(WatchIdentity.DashPaths);
         Assert.NotEmpty(WatchIdentity.Packages);
         Assert.NotEmpty(WatchIdentity.InstallerComponents);
     }

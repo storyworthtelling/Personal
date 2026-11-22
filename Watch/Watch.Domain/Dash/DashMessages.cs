@@ -1,0 +1,173 @@
+namespace Watch.Domain.Dash;
+
+/// <summary>
+/// A message on one of Dash's contracts (plan §2.5, P14 W-4.1.1): Post on the phone and Dash on the watch, over the
+/// Data Layer. Each knows the path it travels on; <see cref="DashCodec"/> writes every one with an integer <c>v</c> and
+/// refuses one it cannot read. Names, lines and message words cross on <c>dash/people</c>, <c>dash/thread</c> and
+/// <c>dash/mail</c> only, by design, and a text's or a note's words on <c>dash/send</c> and <c>dash/call-note</c>; the
+/// log lines (<see cref="DashLogLines"/>) never carry any of them.
+/// </summary>
+public abstract record DashMessage
+{
+    /// <summary>The Data Layer path this message travels on (<see cref="WatchIdentity"/>).</summary>
+    public abstract string Path { get; }
+}
+
+// ---- dash/people ----
+
+/// <summary>Dash asking who is waiting.</summary>
+public sealed record DashPeopleAsk : DashMessage
+{
+    public override string Path => WatchIdentity.DashPeoplePath;
+}
+
+/// <summary>
+/// One correspondence waiting (WD §11: a person is their name and one line). <paramref name="Key"/> is opaque
+/// (<see cref="DashIds.Correspondence"/>), so no number or address is the key the watch holds or sends back;
+/// <paramref name="At"/> is when the newest message came, an instant the watch says as a relative time. There is no
+/// photo: photos come on request only.
+/// </summary>
+public sealed record DashPerson(string Key, string Name, string Line, DateTimeOffset At, bool Unread, bool Group);
+
+/// <summary>Post's answer: the correspondences waiting, newest first.</summary>
+public sealed record DashPeople(IReadOnlyList<DashPerson> People) : DashMessage
+{
+    public override string Path => WatchIdentity.DashPeoplePath;
+}
+
+// ---- dash/thread ----
+
+/// <summary>Dash asking for one correspondence's last messages.</summary>
+public sealed record DashThreadAsk(string Key) : DashMessage
+{
+    public override string Path => WatchIdentity.DashThreadPath;
+}
+
+/// <summary>What a message in a conversation is.</summary>
+public enum DashMessageType
+{
+    Text,
+    Call,
+    Voicemail,
+
+    /// <summary>The owner's own note on a call.</summary>
+    Note,
+}
+
+/// <summary>What an attachment is, so the watch can say "Photo" before it asks for one.</summary>
+public enum DashAttachmentType
+{
+    Photo,
+    Video,
+    File,
+}
+
+/// <summary>An attachment, named by an opaque id (<see cref="DashIds.Attachment"/>); the bytes come on request only.</summary>
+public sealed record DashAttachment(string Id, DashAttachmentType Type);
+
+/// <summary>
+/// One message of a conversation. <paramref name="Id"/> is opaque (<see cref="DashIds.Message"/>), and is what a file or
+/// a delete names; <paramref name="From"/> is the sender's name for an incoming message in a group, and null otherwise.
+/// </summary>
+public sealed record DashThreadMessage(
+    string Id, DateTimeOffset At, bool Incoming, DashMessageType Type, string Text, string? From, IReadOnlyList<DashAttachment> Attachments);
+
+/// <summary>Post's answer: a correspondence's title, its members' names for a group, and its last messages, oldest first.</summary>
+public sealed record DashThread(string Key, string Title, bool Group, IReadOnlyList<string> Members, IReadOnlyList<DashThreadMessage> Messages)
+    : DashMessage
+{
+    public override string Path => WatchIdentity.DashThreadPath;
+}
+
+// ---- dash/send ----
+
+/// <summary>
+/// A text from the wrist: a reply into a correspondence (<paramref name="Key"/>, a person or a group) or a new text to
+/// numbers (<paramref name="To"/>), never both. Dictated or typed is the same on the wire. <paramref name="Id"/> is the
+/// watch's own name for the send, which Post's answer carries back.
+/// </summary>
+public sealed record DashSend(string Id, string? Key, IReadOnlyList<string> To, string Text) : DashMessage
+{
+    public override string Path => WatchIdentity.DashSendPath;
+}
+
+/// <summary>How a send from the wrist went.</summary>
+public enum DashSendOutcome
+{
+    /// <summary>A route took it: Google Messages, a plain text or one MMS to a group.</summary>
+    Sent,
+
+    /// <summary>Nothing can carry a text right now: no bridge and no permission to send a plain one.</summary>
+    NoRoute,
+
+    /// <summary>Nobody to send it to: an unknown correspondence, one with no number, or a group Post cannot reach whole.</summary>
+    Nowhere,
+
+    /// <summary>The route Post chose refused it.</summary>
+    Failed,
+}
+
+/// <summary>Post's answer to a send.</summary>
+public sealed record DashSent(string Id, DashSendOutcome Outcome) : DashMessage
+{
+    public override string Path => WatchIdentity.DashSendPath;
+}
+
+// ---- dash/file, dash/delete, dash/undo ----
+
+/// <summary>
+/// File a whole correspondence (<paramref name="Key"/>) or some of its messages (<paramref name="Messages"/>, their ids),
+/// never both. <paramref name="Window"/> is the undo window the wrist is showing, so Post holds the act at least that long.
+/// </summary>
+public sealed record DashFile(string Id, string? Key, IReadOnlyList<string> Messages, TimeSpan Window) : DashMessage
+{
+    public override string Path => WatchIdentity.DashFilePath;
+}
+
+/// <summary>Delete a whole correspondence or some of its messages, undo-first; as <see cref="DashFile"/>.</summary>
+public sealed record DashDelete(string Id, string? Key, IReadOnlyList<string> Messages, TimeSpan Window) : DashMessage
+{
+    public override string Path => WatchIdentity.DashDeletePath;
+}
+
+/// <summary>Take back the file or delete the watch named <paramref name="Act"/>, inside its window.</summary>
+public sealed record DashUndo(string Act) : DashMessage
+{
+    public override string Path => WatchIdentity.DashUndoPath;
+}
+
+// ---- dash/read ----
+
+/// <summary>A correspondence read on the watch, through the newest message the watch showed (<paramref name="Through"/>).</summary>
+public sealed record DashRead(string Key, DateTimeOffset Through) : DashMessage
+{
+    public override string Path => WatchIdentity.DashReadPath;
+}
+
+// ---- dash/call-note ----
+
+/// <summary>
+/// The owner's note on a call: the call as a message id from a conversation (<paramref name="Call"/>), or the number of a
+/// call the watch's own phone app had (<paramref name="Number"/>), never both.
+/// </summary>
+public sealed record DashCallNote(string? Call, string? Number, string Text) : DashMessage
+{
+    public override string Path => WatchIdentity.DashCallNotePath;
+}
+
+// ---- dash/mail ----
+
+/// <summary>Dash asking for the mail lines.</summary>
+public sealed record DashMailAsk : DashMessage
+{
+    public override string Path => WatchIdentity.DashMailPath;
+}
+
+/// <summary>One mail line: subject and sender only (A11), and when it came.</summary>
+public sealed record DashMailLine(string Id, string From, string Subject, DateTimeOffset At);
+
+/// <summary>Post's answer: people-only mail waiting, newest first.</summary>
+public sealed record DashMail(IReadOnlyList<DashMailLine> Mail) : DashMessage
+{
+    public override string Path => WatchIdentity.DashMailPath;
+}

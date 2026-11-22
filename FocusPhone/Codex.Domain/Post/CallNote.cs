@@ -23,6 +23,13 @@ public static partial class CallNote
     [GeneratedRegex(@"\+?\d[\d\s().\-]{6,}\d")]
     private static partial Regex PhoneLike();
 
+    /// <summary>A note's source id starts with this: Post keeps a note as a call, under an id of its own.</summary>
+    public const string SourcePrefix = "note:";
+
+    /// <summary>Whether a call in the timeline is the owner's note rather than the call itself.</summary>
+    public static bool IsNote(TimelineItem item) =>
+        item.Kind == TimelineItemKind.Call && item.SourceId.StartsWith(SourcePrefix, StringComparison.Ordinal);
+
     public static TimelineItem For(string number, string text, DateTimeOffset when) =>
         new(
             TimelineItemKind.Call,
@@ -32,7 +39,7 @@ public static partial class CallNote
             // The owner wrote it, so it is theirs. Marking it incoming would put it on the
             // wrong side of the conversation.
             Incoming: false,
-            SourceId: $"note:{when.ToUnixTimeMilliseconds()}");
+            SourceId: $"{SourcePrefix}{when.ToUnixTimeMilliseconds()}");
 
     /// <summary>
     /// Reads a note shared in from elsewhere. A share carries no structure at all, so the

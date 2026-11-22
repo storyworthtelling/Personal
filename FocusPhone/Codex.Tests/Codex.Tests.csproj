@@ -13,6 +13,8 @@
          P4 palette. Domain itself never references Paper (which carries SkiaSharp/PDFsharp). -->
     <ProjectReference Include="..\..\Storyworthtelling.Paper\Storyworthtelling.Paper.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+    <!-- The Dash contracts Post's relay answers in (P14 W-4.1.1). -->
+    <ProjectReference Include="..\..\Watch\Watch.Domain\Watch.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

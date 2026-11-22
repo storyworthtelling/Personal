@@ -90,6 +90,20 @@ public class TextRoutingTests
         Assert.DoesNotContain("DeepLink", Enum.GetNames<TextSendPath>());
     }
 
+    // Without the bridge (down, or it refused the text) a person gets a plain SMS and a group
+    // one MMS to everyone, never a text to each of them; with no permission to send, nothing.
+    // The Mailbox and the watch's relay both ask this (P14 B1).
+    [Theory]
+    [InlineData(1, true, TextSendPath.NativeSms)]
+    [InlineData(2, true, TextSendPath.GroupMms)]
+    [InlineData(5, true, TextSendPath.GroupMms)]
+    [InlineData(1, false, TextSendPath.Unavailable)]
+    [InlineData(3, false, TextSendPath.Unavailable)]
+    public void WithoutTheBridgeAGroupIsOneMms(int recipients, bool canSendSms, TextSendPath expected)
+    {
+        Assert.Equal(expected, TextSend.WithoutBridge(recipients, canSendSms));
+    }
+
     // ---- reading ----
 
     // Paired, the bridge carries every text (SMS included) with its real conversation, so the

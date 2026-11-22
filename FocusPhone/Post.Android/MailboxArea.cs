@@ -479,17 +479,13 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             // undo window via the shared delete buffer), merge by resolved person identity,
             // then split off marketing mail into its own bucket, then stamp unread from the
             // per-thread read record.
+            // MailboxView is the one place this is built, so Post's relay shows the watch the same correspondences.
             var spam = SpamStore.Load(Host);
-            var visible = deleteBuffer.Filter(spam.Filter(database.Hidden.Filter(all))).ToList();
-            var (ordinary, marketing) = MailboxSections.SplitMarketing(visible);
             var resolver = ContactAssociations.BuildResolver(Host, database.IdentityLinks);
             var readState = new ReadState(database.ReadState.LoadAll());
-            merged = new TimelineMerger().Merge(ordinary, resolver)
-                .Select(readState.Apply)
-                .ToList();
-            marketingThreads = new TimelineMerger().Merge(marketing, resolver)
-                .Select(readState.Apply)
-                .ToList();
+            var view = MailboxView.Build(all, database.Hidden.LoadHidden(), spam, deleteBuffer, resolver, readState);
+            merged = view.Waiting;
+            marketingThreads = view.Marketing;
         }
         catch (Exception e)
         {
@@ -532,25 +528,8 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         return new ThreadRow(thread.ContactKey, title, subtitle, thread.HasUnread, thread.Items);
     }
 
-    private string ThreadTitle(ContactThread thread, GroupNames groupNames)
-    {
-        if (thread.IsGroup)
-        {
-            if (groupNames.TitleFor(thread.ContactKey) is { } named)
-            {
-                return named;
-            }
-            var names = thread.Participants.Take(3)
-                .Select(key => ContactNameResolver.DisplayName(Host, key));
-            var joined = string.Join(", ", names);
-            if (joined.Length == 0)
-            {
-                return "Group";
-            }
-            return thread.Participants.Count > 3 ? $"{joined} +{thread.Participants.Count - 3}" : joined;
-        }
-        return ContactNameResolver.DisplayName(Host, thread.ContactKey);
-    }
+    private string ThreadTitle(ContactThread thread, GroupNames groupNames) =>
+        ThreadTitles.ForRow(thread, groupNames, key => ContactNameResolver.DisplayName(Host, key));
 
     private void BindRows()
     {
@@ -1199,8 +1178,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         openGroupKey = openIsGroup ? thread!.ContactKey : null;
         // A group seen only in Google Messages' notifications lists just who has spoken,
         // so it is not offered a group MMS reply that would leave the others out.
-        openGroupMembershipKnown = thread?.Items.Where(item => item.IsGroup)
-            .All(item => GroupMembership.IsKnown(item.GroupId)) ?? false;
+        openGroupMembershipKnown = thread is not null && ReplyTarget.MembershipKnown(thread.Items);
         openTitle = OpenThreadTitle(thread);
 
         // Hide anything the owner just deleted (still inside its undo window, single or
@@ -1211,8 +1189,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         openSelection.RetainKnown(openItems.Select(item => item.SourceId));
         // The conversation id to reply through the bridge (learned from the most
         // recent bridge-captured message in this thread).
-        openBridgeConversationId =
-            openItems.LastOrDefault(item => item.ExternalConversationId is not null)?.ExternalConversationId;
+        openBridgeConversationId = ReplyTarget.ConversationOf(openItems);
 
         if (openListView is not null)
         {
@@ -1496,7 +1473,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             // ParticipantAddresses (raw, country code intact) is what actually has to reach
             // each number; Participants is the normalized fallback for an older cached
             // thread that predates the raw-address column.
-            var groupRecipients = openParticipantAddresses.Count > 0 ? openParticipantAddresses : openParticipants;
+            var groupRecipients = ReplyTarget.GroupRecipients(openParticipantAddresses, openParticipants);
             if (groupRecipients.Count > 0 && openGroupMembershipKnown)
             {
                 AddAction("Text", () => ShowGroupCompose(groupRecipients));
@@ -1504,7 +1481,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             return;
         }
 
-        var phone = openMemberKeys.FirstOrDefault(IsPhone) ?? (IsPhone(openContactKey!) ? openContactKey : null);
+        var phone = ReplyTarget.PhoneOf(openMemberKeys, openContactKey!);
         var email = openMemberKeys.FirstOrDefault(IsEmail) ?? (IsEmail(openContactKey!) ? openContactKey : null);
 
         if (phone is not null)
@@ -1536,7 +1513,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     {
         var actions = new List<CardAction>();
 
-        var phone = openMemberKeys.FirstOrDefault(IsPhone) ?? (IsPhone(openContactKey!) ? openContactKey : null);
+        var phone = ReplyTarget.PhoneOf(openMemberKeys, openContactKey!);
         if (phone is not null && !openIsGroup)
         {
             actions.Add(new CardAction("Call back", () => PlaceCall(phone)));
@@ -1544,7 +1521,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }
         else if (openIsGroup && openParticipants.Count > 0 && openGroupMembershipKnown)
         {
-            var groupRecipients = openParticipantAddresses.Count > 0 ? openParticipantAddresses : openParticipants;
+            var groupRecipients = ReplyTarget.GroupRecipients(openParticipantAddresses, openParticipants);
             actions.Add(new CardAction("Text back", () => ShowGroupCompose(groupRecipients), Lead: true));
         }
 
@@ -1970,18 +1947,18 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
     private void SendWithoutBridge(IReadOnlyList<string> recipients, string text, bool canSendSms, Storyworthtelling.Diagnostics.KeyAction sending)
     {
-        if (!canSendSms)
+        // TextSend decides, for the Mailbox and the watch's relay alike: nothing without the permission, one MMS to
+        // everyone in a group (never a text to each), and a plain text to a person.
+        switch (TextSend.WithoutBridge(recipients.Count, canSendSms))
         {
-            sending.Failed("no bridge and no SEND_SMS permission");
-            NotSent(TextSend.UnavailableReason);
-            return;
-        }
-        if (recipients.Count > 1)
-        {
-            // A group without the bridge is one MMS to everyone, never N separate texts.
-            sending.Succeeded();
-            SendGroupMms(recipients, text, media: []);
-            return;
+            case TextSendPath.Unavailable:
+                sending.Failed("no bridge and no SEND_SMS permission");
+                NotSent(TextSend.UnavailableReason);
+                return;
+            case TextSendPath.GroupMms:
+                sending.Succeeded();
+                SendGroupMms(recipients, text, media: []);
+                return;
         }
         try
         {
@@ -2133,8 +2110,6 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         TimelineItemKind.Voicemail => "voicemail",
         _ => "text",
     };
-
-    private static bool IsPhone(string key) => key.Length > 0 && key.All(char.IsAsciiDigit);
 
     private static bool IsEmail(string key) => key.Contains('@');
 }

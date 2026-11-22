@@ -55,6 +55,17 @@ public class ReadStateTests
 
         Assert.True(state.Apply(Thread("alice", Incoming(0))).HasUnread);
     }
+
+    // A read on the watch through an older message must not undo a later read on the phone (P14 B1).
+    [Fact]
+    public void ThroughNeverMovesBack()
+    {
+        var state = new ReadState(new Dictionary<string, DateTimeOffset> { ["alice"] = T0.AddMinutes(10) });
+
+        Assert.Equal(T0.AddMinutes(10), state.Through("alice", T0.AddMinutes(5)));
+        Assert.Equal(T0.AddMinutes(20), state.Through("alice", T0.AddMinutes(20)));
+        Assert.Equal(T0, state.Through("bob", T0));
+    }
 }
 
 public class InboxOrderingTests

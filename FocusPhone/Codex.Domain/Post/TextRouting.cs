@@ -30,6 +30,9 @@ public enum TextSendPath
     /// never handed to another app to reply.
     /// </summary>
     Unavailable,
+
+    /// <summary>Post sends one MMS to everyone in a group, never a text to each of them.</summary>
+    GroupMms,
 }
 
 /// <summary>
@@ -77,6 +80,15 @@ public static class TextSend
         bridgeConnected ? TextSendPath.Bridge
         : canSendSms ? TextSendPath.NativeSms
         : TextSendPath.Unavailable;
+
+    /// <summary>
+    /// What a text takes when the bridge is down or refused it (P14 B1, out of the Mailbox's send): a plain SMS to one
+    /// person, one MMS to a group, or nothing without the permission to send.
+    /// </summary>
+    public static TextSendPath WithoutBridge(int recipients, bool canSendSms) =>
+        !canSendSms ? TextSendPath.Unavailable
+        : recipients > 1 ? TextSendPath.GroupMms
+        : TextSendPath.NativeSms;
 
     /// <summary>What the owner is told when a text could not go by any route.</summary>
     public const string UnavailableReason =

@@ -22,6 +22,16 @@ public sealed class ReadState
         return thread.Items.Any(item => item.Incoming && item.TimestampUtc > lastRead);
     }
 
+    /// <summary>
+    /// The stamp that marks a thread read through <paramref name="seen"/>, never earlier than the one it has: a read on
+    /// the watch through an older message must not undo a later read on the phone (P14 B1).
+    /// </summary>
+    public DateTimeOffset Through(string threadKey, DateTimeOffset seen)
+    {
+        var last = LastRead(threadKey);
+        return seen > last ? seen : last;
+    }
+
     /// <summary>Stamps the thread's HasUnread from the persisted read timestamps.</summary>
     public ContactThread Apply(ContactThread thread) => thread with { HasUnread = IsUnread(thread) };
 

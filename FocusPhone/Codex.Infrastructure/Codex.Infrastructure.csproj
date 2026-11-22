@@ -9,6 +9,10 @@
     <ProjectReference Include="..\Codex.Domain\Codex.Domain.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Voice\Storyworthtelling.Voice.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+    <!-- Post's relay to Dash on the watch (P14 W-4.1.1): the Dash contracts' codec lives in Watch.Domain (BCL only),
+         so Post and the watch read one layout. The relay is here rather than in Codex.Domain, which stays free of the
+         shared libraries Watch.Domain builds on and is referenced by Pulp and Constitution, which have no watch half. -->
+    <ProjectReference Include="..\..\Watch\Watch.Domain\Watch.Domain.csproj" />
   </ItemGroup>
 
   <ItemGroup>

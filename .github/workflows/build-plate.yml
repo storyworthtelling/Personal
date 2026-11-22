@@ -24,6 +24,8 @@ on:
       - 'Storyworthtelling.Paper/**'
       - 'Storyworthtelling.Remarkable/**'
       - 'Storyworthtelling.Pipeline/**'
+      # Codex.Infrastructure builds on Watch.Domain for Post's relay to Dash (P14 W-4.1.1).
+      - 'Watch/Watch.Domain/**'
       - '.github/actions/dotnet/**'
       - '.github/workflows/build-plate.yml'
 

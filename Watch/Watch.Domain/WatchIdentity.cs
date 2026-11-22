@@ -42,6 +42,39 @@ public static class WatchIdentity
     /// <summary>What the installer advertises (its <c>android_wear_capabilities</c>), so Flyleaf can find the watch.</summary>
     public const string InstallerCapability = "point-installer";
 
+    // ---- Dash's contracts (plan §2.5, P14 W-4.1.1): Post on the phone, Dash on the watch ----
+
+    /// <summary>Post → Dash: the correspondences waiting. Dash asks on the same path.</summary>
+    public const string DashPeoplePath = "/dash/people";
+
+    /// <summary>Post → Dash: the last messages of one correspondence. Dash asks on the same path.</summary>
+    public const string DashThreadPath = "/dash/thread";
+
+    /// <summary>Dash → Post: a reply or a new text; Post answers how it went on the same path.</summary>
+    public const string DashSendPath = "/dash/send";
+
+    /// <summary>Dash → Post: file a correspondence or some of its messages.</summary>
+    public const string DashFilePath = "/dash/file";
+
+    /// <summary>Dash → Post: delete a correspondence or some of its messages, undo-first.</summary>
+    public const string DashDeletePath = "/dash/delete";
+
+    /// <summary>Dash → Post: take back a file or a delete inside its window.</summary>
+    public const string DashUndoPath = "/dash/undo";
+
+    /// <summary>Dash → Post: a correspondence read on the watch is read on the phone (A14).</summary>
+    public const string DashReadPath = "/dash/read";
+
+    /// <summary>Dash → Post: the note dictated for a call (A13).</summary>
+    public const string DashCallNotePath = "/dash/call-note";
+
+    /// <summary>Post → Dash: people-only mail lines (A11). Dash asks on the same path.</summary>
+    public const string DashMailPath = "/dash/mail";
+
+    /// <summary>Every Dash path, in the plan's order.</summary>
+    public static readonly IReadOnlyList<string> DashPaths =
+        [DashPeoplePath, DashThreadPath, DashSendPath, DashFilePath, DashDeletePath, DashUndoPath, DashReadPath, DashCallNotePath, DashMailPath];
+
     // ---- the installer's registered names ----
 
     public const string UpdateListenerName = "com.storyworthtelling.focusphone.launcher.point.UpdateListenerService";
