@@ -281,6 +281,42 @@ public class SleepIqClientTests
         Assert.Contains(log.Lines, line => line.StartsWith("sleepiq sleepers: unexpected shape", StringComparison.Ordinal));
     }
 
+    // The bed answered every night with an entry that had no days list, and the line said only that. It now names the
+    // entry's keys and what kind of value each holds, so the next export shows the real shape, and never a value: a
+    // key that is not a plain word (a date, an id) is counted, not named. Every value here is invented.
+    [Fact]
+    public async Task AnEntryWithoutDaysNamesItsKeysAndKindsButNoValue()
+    {
+        const string reply =
+            "{\"sleepData\":[{\"sleeperId\":\"example-sleeper-0142\",\"message\":\"example-quiet-night\","
+            + "\"tags\":[],\"goal\":7.83,\"2026-10-17\":{}}]}";
+        var bed = Bed.Working().On("sleepData", Bed.Reply(HttpStatusCode.OK, reply));
+        var log = new CapturingSleepLog();
+
+        var result = await Bed.Client(bed, log).NightAsync(BedSide.Left, Morning, default);
+
+        Assert.Equal(SleepIqFailure.UnexpectedShape, result.Failure);
+        var line = Assert.Single(log.Lines, l => l.StartsWith("sleepiq sleep-data: unexpected shape", StringComparison.Ordinal));
+        Assert.Equal(
+            "sleepiq sleep-data: unexpected shape (no days list; entry keys: sleeperId:String, message:String, tags:Array, goal:Number, 1 unnamed)",
+            line);
+        foreach (var value in new[] { "example-sleeper-0142", "example-quiet-night", "7.83", "2026-10-17" })
+        {
+            Assert.DoesNotContain(value, line, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task AnEntryThatIsNotAnObjectSaysItsKind()
+    {
+        var bed = Bed.Working().On("sleepData", Bed.Reply(HttpStatusCode.OK, "{\"sleepData\":[\"example-word\"]}"));
+        var log = new CapturingSleepLog();
+
+        await Bed.Client(bed, log).NightAsync(BedSide.Left, Morning, default);
+
+        Assert.Contains("sleepiq sleep-data: unexpected shape (no days list; entry is String)", log.Lines);
+    }
+
     [Theory]
     [InlineData("{}")]
     [InlineData("{\"sleepData\":{}}")]

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Constitution.Domain.Body;
+using Constitution.Infrastructure.SleepNumber;
 
 namespace Constitution.Tests.Body;
 
@@ -49,6 +50,22 @@ public class BodyLogsCarryNoValuesTests
 
         await new SignalReader(store, source, () => Samples.Today, log, filler).ReadAsync(default);
 
+        AssertNoSentinel(log.Lines);
+    }
+
+    [Fact]
+    public async Task ABedReplyOfAnUnknownShapeLogsItsKeysButNoValue()
+    {
+        // The unexpected-shape line names an entry's keys and value kinds; the sentinels sit in that entry's values.
+        var reply = "{\"sleepData\":[{\"hours\":" + SleepHours.ToString(CultureInfo.InvariantCulture)
+            + ",\"restingHeart\":" + RestingHeart.ToString(CultureInfo.InvariantCulture)
+            + ",\"note\":\"" + Weight.ToString(CultureInfo.InvariantCulture) + "\"}]}";
+        var bed = SleepNumber.Bed.Working().On("sleepData", SleepNumber.Bed.Reply(System.Net.HttpStatusCode.OK, reply));
+        var log = new SleepNumber.CapturingSleepLog();
+
+        await SleepNumber.Bed.Client(bed, log).NightAsync(BedSide.Left, Samples.Today, default);
+
+        Assert.Contains(log.Lines, line => line.Contains("entry keys:", StringComparison.Ordinal));
         AssertNoSentinel(log.Lines);
     }
 
