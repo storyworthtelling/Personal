@@ -221,6 +221,56 @@ public class ArchiveBackupSyncTests : IDisposable
         Assert.True(size.Bytes > 0);
     }
 
+    // The launch restore and every PostSync run each started a sync, with nothing between them: each read the phone's
+    // archive before the others had restored theirs, so each downloaded the backup and restored the same thousands of
+    // ghosts again. Overlapping syncs now take turns, and the later ones find the marker already matching.
+    [Fact]
+    public async Task OverlappingSyncsRestoreEachGhostOnce()
+    {
+        const int count = 40;
+        var ghosts = Enumerable.Range(1, count).Select(n => Filed("m" + n)).ToList();
+        var gated = new GatedDriveTextFile(sealedDrive);
+        sealedDrive.Content = VaultEnvelope.Write(ArchiveSnapshotCodec.Encode(new ArchiveSnapshot(ghosts, Now)), Pass);
+        var shared = new MemoryMarker();
+
+        var first = new ArchiveBackupSync(gated, legacyDrive, () => Pass, shared).SyncAsync(filing, Now, default);
+        var second = new ArchiveBackupSync(gated, legacyDrive, () => Pass, shared).SyncAsync(filing, Now, default);
+        await gated.FirstArrived.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await Task.WhenAny(gated.SecondArrived.Task, Task.Delay(TimeSpan.FromSeconds(1)));
+        var readsBefore = sealedDrive.Reads;
+        gated.Release();
+        var results = await Task.WhenAll(first, second);
+
+        Assert.Equal(count, results.Sum(result => result.Restored));
+        Assert.Equal(count, LocalIds().Count);
+        Assert.True(sealedDrive.Reads - readsBefore <= 2, $"read the backup {sealedDrive.Reads - readsBefore} times");
+    }
+
+    // Holds every download of the backup until released, and says when the first and second arrive.
+    private sealed class GatedDriveTextFile(InMemoryDriveTextFile inner) : Storyworthtelling.Voice.IDriveTextFile, Storyworthtelling.Voice.IDriveFileRevision
+    {
+        private readonly TaskCompletionSource gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int arrivals;
+
+        public TaskCompletionSource FirstArrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource SecondArrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Release() => gate.TrySetResult();
+
+        public async Task<string?> ReadAsync(CancellationToken cancellationToken)
+        {
+            var arrival = Interlocked.Increment(ref arrivals);
+            (arrival == 1 ? FirstArrived : arrival == 2 ? SecondArrived : null)?.TrySetResult();
+            await gate.Task;
+            return await inner.ReadAsync(cancellationToken);
+        }
+
+        public Task WriteAsync(string content, CancellationToken cancellationToken) => inner.WriteAsync(content, cancellationToken);
+
+        public Task<string?> RevisionAsync(CancellationToken cancellationToken) => inner.RevisionAsync(cancellationToken);
+    }
+
     private sealed class MemoryMarker : IArchiveBackupMarker
     {
         private string? value;
