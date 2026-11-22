@@ -42,6 +42,27 @@ public class LockedOpenContractTests
         Assert.Equal(int.Parse(match.Groups[1].Value), (int)typeof(LockedOpenHandOff).GetField(ourName)!.GetValue(null)!);
     }
 
+    /// <summary>
+    /// The broadcast's initial code is what Pulp reads when no receiver of Flyleaf's set one, so it must be
+    /// neither of Flyleaf's answers (RESULT_OK is -1 and RESULT_CANCELED 0), or silence reads as a refusal.
+    /// </summary>
+    [Fact]
+    public void TheCourierStartsTheBroadcastWithACodeFlyleafNeverAnswers()
+    {
+        Assert.NotEqual(LockedOpenHandOff.ResultStarted, LockedOpenHandOff.ResultNoAnswer);
+        Assert.NotEqual(LockedOpenHandOff.ResultRefused, LockedOpenHandOff.ResultNoAnswer);
+
+        var courier = File.ReadAllText(Path.Combine(PulpSource.Root(), CourierPath));
+        var send = courier[courier.IndexOf("SendOrderedBroadcast(", StringComparison.Ordinal)..];
+        send = send[..send.IndexOf(';')];
+        Assert.Contains("LockedOpenHandOff.ResultNoAnswer", send);
+        Assert.DoesNotContain("LockedOpenHandOff.ResultRefused", send);
+
+        var answer = courier[courier.IndexOf("class AnswerReceiver", StringComparison.Ordinal)..];
+        Assert.Contains("Result.Canceled", answer);
+        Assert.Contains("LockedOpenHandOff.ResultNoAnswer", answer);
+    }
+
     /// <summary>Flyleaf refuses a link off the service's own domains (D301); Pulp must not send one it would refuse.</summary>
     [Fact]
     public void EveryServicesLinkDomainsEqualFlyleafsPackageForPackage()
