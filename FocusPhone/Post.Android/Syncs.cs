@@ -33,16 +33,22 @@ internal static class Syncs
     /// Syncs after <paramref name="action"/>, waiting out its undo window first where it
     /// has one. Returns immediately; nothing about the owner's action waits on this.
     /// </summary>
-    public static void After(Activity host, PostAction action)
+    public static void After(Activity host, PostAction action) =>
+        Later(host, SyncMoment.Delay(action, DogEar.UndoWindow(host)));
+
+    /// <summary>
+    /// Syncs once <paramref name="delay"/> has passed (at once for none): an act from the wrist (P14 B2) waits out the
+    /// window Post holds it for, which <c>DashRelay</c> works out from both devices' windows.
+    /// </summary>
+    public static void Later(Context context, TimeSpan delay)
     {
-        var delay = SyncMoment.Delay(action, DogEar.UndoWindow(host));
         if (delay <= TimeSpan.Zero)
         {
-            Run(host);
+            Run(context);
             return;
         }
 
-        new Handler(Looper.MainLooper!).PostDelayed(() => Run(host), (long)delay.TotalMilliseconds);
+        new Handler(Looper.MainLooper!).PostDelayed(() => Run(context), (long)delay.TotalMilliseconds);
     }
 
     private static void Run(Context context)

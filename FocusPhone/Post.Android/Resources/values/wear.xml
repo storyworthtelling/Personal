@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What Post offers the Data Layer, so Dash on the watch can find the phone that carries the owner's texts
+     (WatchIdentity.PostCapability, P14 B2). The array's name is Wear OS's own. -->
+<resources>
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>post-relay</item>
+    </string-array>
+</resources>

@@ -41,6 +41,10 @@ public class PostApplication : Application
         var app = this;
         Task.Run(() => MmsStubSweep.Run(app));
 
+        // A delete from the wrist still inside its window when the process last went is held again, or carried out if
+        // the window has closed (P14 B2). Off the main thread: it reads the preferences.
+        Task.Run(() => DashHolds.Resume(app));
+
         try
         {
             GmBridgeClient.Shared(this).ConnectIfPaired();

@@ -9,10 +9,23 @@ namespace Codex.Tests.Guard;
 /// what is waiting, name a row, choose a reply's numbers and a text's route through the same pure types, so the watch
 /// can never be shown a different Mailbox, or reply by a different road, than the phone. And Post names Dash's paths
 /// only through <see cref="WatchIdentity"/>, so the two ends cannot drift.
+///
+/// <para>B2 adds Post's listener: it hears every Dash path under a frozen registered name, says where it is by a frozen
+/// capability, carries each plan out through the code the Mailbox itself uses (one send road, one delete buffer, one
+/// commit at the source), takes one message at a time, keeps its book across a restart, and waits for every Data Layer
+/// call a bounded time.</para>
 /// </summary>
 public class DashRelayGuardTests
 {
+    private const string Post = "FocusPhone/Post.Android";
+
     private static string Code(string relative) => Regex.Replace(LogLoopSource.File(relative), @"///.*|//.*", string.Empty);
+
+    private static IReadOnlyList<(string Path, string Text)> PostSources() =>
+        LogLoopSource.Sources(Post).Select(source => (source.Path, Regex.Replace(source.Text, @"///.*|//.*", string.Empty))).ToList();
+
+    private static string DashHalf() =>
+        string.Join("\n", PostSources().Where(source => source.Path.StartsWith($"{Post}/Dash/", StringComparison.Ordinal)).Select(source => source.Text));
 
     [Theory]
     [InlineData("MailboxView.Build(")]
@@ -21,11 +34,14 @@ public class DashRelayGuardTests
     [InlineData("ReplyTarget.GroupRecipients(")]
     [InlineData("ReplyTarget.MembershipKnown(")]
     [InlineData("ReplyTarget.ConversationOf(")]
-    [InlineData("TextSend.Choose(")]
-    [InlineData("TextSend.WithoutBridge(")]
+    [InlineData("TextCourier.Deliver(")]
+    [InlineData("TextCourier.DeliverMedia(")]
+    [InlineData("SourceDeletes.Held")]
+    [InlineData("SourceDeletes.Commit(")]
+    [InlineData("MailboxSources.LiveTail(")]
     public void TheMailboxUsesTheSharedRules(string call)
     {
-        Assert.Contains(call, Code("FocusPhone/Post.Android/MailboxArea.cs"), StringComparison.Ordinal);
+        Assert.Contains(call, Code($"{Post}/MailboxArea.cs"), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -47,7 +63,7 @@ public class DashRelayGuardTests
     public void TheMailboxNoLongerBuildsItsOwn()
     {
         // The reload's merge and the row title live in Codex.Domain now; a second copy here could drift from the wrist's.
-        var mailbox = Code("FocusPhone/Post.Android/MailboxArea.cs");
+        var mailbox = Code($"{Post}/MailboxArea.cs");
 
         Assert.DoesNotContain("thread.Participants.Take(3)", mailbox.Split("private string OpenThreadTitle")[0], StringComparison.Ordinal);
         Assert.DoesNotContain("recipients.Count > 1", mailbox, StringComparison.Ordinal);
@@ -55,15 +71,179 @@ public class DashRelayGuardTests
     }
 
     [Fact]
+    public void TheMailboxNoLongerDeletesItself()
+    {
+        // The commit at the source and the delete buffer are shared with the listener, so a delete from the wrist is held
+        // where the Mailbox holds its own, and carried out by the same code.
+        var mailbox = Code($"{Post}/MailboxArea.cs");
+
+        Assert.DoesNotContain("private void CommitDelete", mailbox, StringComparison.Ordinal);
+        Assert.DoesNotContain("DeleteProviderRow(", mailbox, StringComparison.Ordinal);
+        Assert.DoesNotContain("new DeleteBuffer()", mailbox, StringComparison.Ordinal);
+        Assert.DoesNotContain("private void ReadLiveTail", mailbox, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThePhoneSendsTextsInOnePlace()
+    {
+        // One send road (bridge, then a plain text or one MMS): only the courier calls a route, and the courier runs the
+        // pure cascade, which alone decides between them.
+        string[] routes = ["SmsSender.Send(", "MmsSender.Send(", ".TrySend(", ".TrySendMedia(", "FindOrStartConversation(", "TextSend.Choose(", "TextSend.WithoutBridge("];
+        string[] definitions = ["TextCourier.cs", "GmBridgeClient.cs", "SmsSender.cs", "MmsSender.cs"];
+
+        var elsewhere = PostSources()
+            .Where(source => !definitions.Contains(Path.GetFileName(source.Path)))
+            .SelectMany(source => routes.Where(route => source.Text.Contains(route, StringComparison.Ordinal)).Select(route => $"{source.Path}: {route}"))
+            .ToList();
+        var courier = Code($"{Post}/TextCourier.cs");
+        var cascade = Code("FocusPhone/Codex.Domain/Post/TextCascade.cs");
+
+        Assert.True(elsewhere.Count == 0, "Send through TextCourier, the phone's one send road:\n" + string.Join("\n", elsewhere));
+        Assert.Contains("TextCascade.Text(", courier, StringComparison.Ordinal);
+        Assert.Contains("TextCascade.Media(", courier, StringComparison.Ordinal);
+        Assert.Contains("TextSend.Choose(", cascade, StringComparison.Ordinal);
+        Assert.Contains("TextSend.WithoutBridge(", cascade, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheDashPathsAreNotCopied()
     {
         Assert.All(WatchIdentity.DashPaths, path => Assert.StartsWith("/dash/", path, StringComparison.Ordinal));
-        var copies = new[] { "FocusPhone/Post.Android", "FocusPhone/Codex.Infrastructure", "FocusPhone/Codex.Domain" }
+        string[] words = [.. WatchIdentity.DashPaths, WatchIdentity.DashListenerName, WatchIdentity.PostCapability, WatchIdentity.DashPreferences];
+        Assert.All(words, word => Assert.False(string.IsNullOrEmpty(word)));
+
+        var copies = new[] { Post, "FocusPhone/Codex.Infrastructure", "FocusPhone/Codex.Domain" }
             .SelectMany(LogLoopSource.Sources)
-            .Where(source => WatchIdentity.DashPaths.Any(path => source.Text.Contains($"\"{path}", StringComparison.Ordinal)))
+            .Where(source => words.Any(word => source.Text.Contains($"\"{word}", StringComparison.Ordinal)))
             .Select(source => source.Path)
             .ToList();
 
-        Assert.True(copies.Count == 0, "Use WatchIdentity rather than a copy of a Dash path:\n" + string.Join("\n", copies));
+        Assert.True(copies.Count == 0, "Use WatchIdentity rather than a copy of a Dash path or name:\n" + string.Join("\n", copies));
+    }
+
+    // ---- Post's listener (B2) ----
+
+    [Fact]
+    public void PostRegistersItsListenerByName()
+    {
+        var listeners = PostSources().Where(source => source.Text.Contains("Name = WatchIdentity.DashListenerName", StringComparison.Ordinal)).ToList();
+
+        var listener = Assert.Single(listeners).Text;
+        Assert.Contains(": WearableListenerService", listener, StringComparison.Ordinal);
+        Assert.Contains("MessageClient.ActionMessageReceived", listener, StringComparison.Ordinal);
+        string[] paths =
+        [
+            "DashPeoplePath", "DashThreadPath", "DashSendPath", "DashFilePath", "DashDeletePath", "DashUndoPath", "DashReadPath",
+            "DashCallNotePath", "DashMailPath",
+        ];
+        Assert.Equal(WatchIdentity.DashPaths.Count, paths.Length);
+        Assert.All(paths, path => Assert.Contains($"DataPath = WatchIdentity.{path}", listener, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PostAdvertisesItsCapability()
+    {
+        // The watch finds the phone that carries the owner's texts by this capability, as Flyleaf finds the installer.
+        var wear = LogLoopSource.File($"{Post}/Resources/values/wear.xml");
+
+        Assert.Matches(@"<string-array\s+name=""android_wear_capabilities""", wear);
+        Assert.Contains($"<item>{WatchIdentity.PostCapability}</item>", wear, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("DashInbox.Turn(")]
+    [InlineData("DashInbox.Delivered(")]
+    [InlineData("TextCourier.Deliver(")]
+    [InlineData("Filing.File(")]
+    [InlineData("Filing.Unfile(")]
+    [InlineData("SourceDeletes.Held.Schedule(")]
+    [InlineData("SourceDeletes.Held.Undo(")]
+    [InlineData("SourceDeletes.Commit(")]
+    [InlineData("ReadState.MarkRead(")]
+    [InlineData("Cache.Upsert(")]
+    [InlineData("Syncs.Later(")]
+    [InlineData("MailboxSources.LiveTail(")]
+    [InlineData("Cache.LoadPage(")]
+    [InlineData("DogEar.UndoWindow(")]
+    public void TheListenerCarriesThePlansThroughPostsOwnCode(string call)
+    {
+        Assert.Contains(call, DashHalf(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EveryDataLayerWaitIsBounded()
+    {
+        // As Flyleaf's watch half (release A fix round, finding 4): a Data Layer call that never answers holds nothing.
+        string[] calls = ["SendMessageAsync(", "GetCapabilityAsync(", "OpenChannelAsync(", "GetOutputStreamAsync(", "CloseAsync("];
+        var lines = PostSources()
+            .SelectMany(source => source.Text.Split('\n').Select((line, index) => (source.Path, Line: line, Number: index + 1)))
+            .Where(entry => calls.Any(call => entry.Line.Contains(call, StringComparison.Ordinal)))
+            .ToList();
+
+        Assert.NotEmpty(lines);
+        var unbounded = lines.Where(entry => !entry.Line.Contains("BoundedAsync(", StringComparison.Ordinal)).Select(entry => $"{entry.Path}:{entry.Number}").ToList();
+        Assert.True(unbounded.Count == 0, "A Data Layer call waited for with no bound:\n" + string.Join("\n", unbounded));
+        Assert.Contains("deadline.Cut(DateTimeOffset.UtcNow, DashReplies.ReplyWait)", DashHalf(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnAnswerIsSentOnceAndAMissIsCounted()
+    {
+        // The watch-unreachable rule: one attempt on the node that asked, no queue, no retry, and a count line.
+        var sends = PostSources().Sum(source => Regex.Matches(source.Text, @"SendMessageAsync\(").Count);
+        var half = DashHalf();
+
+        Assert.Equal(1, sends);
+        Assert.Contains(".Missed()", half, StringComparison.Ordinal);
+        Assert.Contains(".Landed()", half, StringComparison.Ordinal);
+        Assert.Contains("DashOutcome.Unreached", half, StringComparison.Ordinal);
+        Assert.Contains("SourceNodeId", half, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheListenerTakesOneMessageAtATime()
+    {
+        var half = DashHalf();
+
+        Assert.Matches(@"static readonly UpdateRunGate \w+ = new\(\);", half);
+        Assert.Contains(".TryRunAsync(", half, StringComparison.Ordinal);
+        Assert.Contains("DashReplies.GateWait", half, StringComparison.Ordinal);
+        Assert.Contains("DashOutcome.Busy", half, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheListenerWorksOffTheMainThread()
+    {
+        var listener = Regex.Match(DashHalf(), @"public override void OnMessageReceived\(IMessageEvent \w+\)\s*\{(?<body>[\s\S]*?)\n    \}");
+
+        Assert.True(listener.Success, "The listener has no OnMessageReceived.");
+        Assert.Contains("Task.Run(", listener.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.Contains("Looper.MainLooper", listener.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.Contains("DashReplies.TurnWait", listener.Groups["body"].Value, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheActsSurviveARestart()
+    {
+        var half = DashHalf();
+
+        Assert.Contains("WatchIdentity.DashPreferences", half, StringComparison.Ordinal);
+        Assert.Contains("WatchIdentity.DashActsKey", half, StringComparison.Ordinal);
+        Assert.Contains("DashActsCodec.Encode(", half, StringComparison.Ordinal);
+        Assert.Contains("DashActsCodec.Decode(", half, StringComparison.Ordinal);
+        Assert.Contains(".Owed()", half, StringComparison.Ordinal);
+        Assert.Contains(".Settle(", half, StringComparison.Ordinal);
+        Assert.Contains("DashHolds.Resume(", Code($"{Post}/PostApplication.cs"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PostReadsTheWatchsCodec()
+    {
+        var project = LogLoopSource.File($"{Post}/Post.Android.csproj");
+
+        Assert.Contains(@"..\..\Watch\Watch.Domain\Watch.Domain.csproj", project, StringComparison.Ordinal);
+        Assert.Contains("<PackageReference Include=\"Xamarin.GooglePlayServices.Wearable\" />", project, StringComparison.Ordinal);
+        Assert.Contains("DashCodec.Decode(", DashHalf(), StringComparison.Ordinal);
+        Assert.Contains("DashCodec.Encode(", DashHalf(), StringComparison.Ordinal);
     }
 }

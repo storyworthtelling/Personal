@@ -17,6 +17,8 @@
     <ProjectReference Include="..\Codex.Infrastructure\Codex.Infrastructure.csproj" />
     <ProjectReference Include="..\Codex.Ui.Android\Codex.Ui.Android.csproj" />
     <ProjectReference Include="..\..\Storyworthtelling.Updates\Storyworthtelling.Updates.csproj" />
+    <!-- Dash on the watch (P14 W-4.1.1, B2): the Dash contracts' codec and paths, the same ones the watch reads. BCL only. -->
+    <ProjectReference Include="..\..\Watch\Watch.Domain\Watch.Domain.csproj" />
   </ItemGroup>
 
   <!-- In-app texting: reference the gmbridge binding only when its .aar has been
@@ -35,6 +37,13 @@
     <!-- WorkManager needs androidx.concurrent.futures; without a direct reference, transitive pinning drops it from
          the APK and the app dies at start (OneBuildSettingTests.EveryProjectWithWorkManagerNamesConcurrentFuturesItself). -->
     <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" />
+    <!-- The Data Layer (MessageClient, the listener service), Microsoft's binding of play-services-wearable: CLAUDE.md's
+         dependency rule 2, and the only way Dash on the watch reaches Post (P14 B2), as Flyleaf reaches the installer. -->
+    <PackageReference Include="Xamarin.GooglePlayServices.Wearable" />
+    <!-- As Flyleaf's: Play services' Fragment 1.9 needs LiveData.Core 2.11, which WorkManager 2.10's LiveData 2.9.1 refuses
+         by an exact range (NU1107), so the head takes LiveData 2.11 itself. No central version: with transitive pinning one
+         would be forced on every head (OneBuildSettingTests.LiveDataIsNotPinnedForEveryone). -->
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.LiveData" VersionOverride="2.11.0.1" />
   </ItemGroup>
 
   <!-- Preserve SQLitePCLRaw from the Release IL trimmer. Its provider is wired

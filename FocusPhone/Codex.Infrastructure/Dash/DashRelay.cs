@@ -247,7 +247,7 @@ public sealed partial class DashRelay
             return new DashActPlan(DashOutcome.Unknown, [], window, syncAfter);
         }
 
-        acts.Record(new DashActRecord(id, kind, items.Select(item => new ActedItem(item.Kind, item.SourceId)).ToList(), now + window));
+        acts.Record(new DashActRecord(id, kind, items.Select(item => new ActedItem(item.Kind, item.SourceId, item.MessageId)).ToList(), now + window));
         return new DashActPlan(kind == DashActKind.File ? DashOutcome.Filed : DashOutcome.Held, items, window, syncAfter);
     }
 

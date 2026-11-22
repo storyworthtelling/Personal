@@ -112,6 +112,15 @@ public class DashLogLinesTests
     }
 
     [Fact]
+    public void AMissedAnswerIsACount()
+    {
+        // Post's watch-unreachable rule (B2): an answer the wrist did not take is counted, and a message that waited too
+        // long behind another is said, each by its contract only.
+        Assert.Equal("DASH dash/people: Unreached 3", DashLogLines.Outcome(WatchIdentity.DashPeoplePath, DashOutcome.Unreached, 3));
+        Assert.Equal("DASH dash/file: Busy", DashLogLines.Outcome(WatchIdentity.DashFilePath, DashOutcome.Busy));
+    }
+
+    [Fact]
     public void TheContractIsThePathWithoutItsSlash()
     {
         Assert.Equal("dash/call-note", DashLogLines.Contract(WatchIdentity.DashCallNotePath));

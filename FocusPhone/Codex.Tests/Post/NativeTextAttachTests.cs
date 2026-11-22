@@ -27,10 +27,11 @@ public class NativeTextAttachTests
     [Fact]
     public void WithoutTheBridgeAOneToOneTextGoesThroughSmsSender()
     {
-        var body = MethodBody("SendWithoutBridge");
-
-        // The fourth argument is the send's key action (LOG-LOOP-PLAN.md §4.1), which reports the radio's result.
-        Assert.Contains("SmsSender.Send(Host, recipients[0], text, sending)", body);
+        // The send road is TextCourier's since P14 B2, shared with the wrist's relay; which route a text takes is the pure
+        // cascade's (TextCascadeTests), and the courier's plain text is SmsSender's. The fourth argument is the send's key
+        // action (LOG-LOOP-PLAN.md §4.1), which reports the radio's result.
+        Assert.Contains("TextCourier.Deliver(Host, recipients, conversationId, text, sending, canSendSms)", MethodBody("DeliverText"));
+        Assert.Contains("public void SendText(string number, string text) => SmsSender.Send(context, number, text, sending);", ReadSource("TextCourier.cs"));
     }
 
     [Fact]

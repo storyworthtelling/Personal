@@ -47,6 +47,12 @@ public enum DashOutcome
 
     /// <summary>A call note kept.</summary>
     Kept,
+
+    /// <summary>A message that waited past its turn behind the one before it: dropped, and the wrist asks or acts again.</summary>
+    Busy,
+
+    /// <summary>An answer the wrist did not take: dropped and counted, never queued or tried again.</summary>
+    Unreached,
 }
 
 /// <summary>

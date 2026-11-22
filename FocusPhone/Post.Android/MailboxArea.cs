@@ -38,8 +38,9 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 {
     // The timeline cache is read a page at a time (newest first) so a large history never
     // has to be pulled into memory at once; more pages load as the owner scrolls. Live
-    // call/SMS rows are the small recent tail and come in whole on each reload.
-    private const int CachePageSize = 300;
+    // call/SMS rows are the small recent tail and come in whole on each reload. Both are
+    // MailboxSources', which Dash's listener reads too, so the wrist is shown what this is.
+    private const int CachePageSize = MailboxSources.CachePageSize;
     private const int LoadMoreThreshold = 30;
 
     private ListView? threadList;
@@ -362,7 +363,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         Task.Run(() =>
         {
-            var live = ReadLiveTail();
+            var live = MailboxSources.LiveTail(Host);
             var (page, rows, marketing) = ReadPageAndBuild(live, [], null, titleSeed);
             Host.RunOnUiThread(() =>
             {
@@ -421,33 +422,6 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 BindMarketingSection();
             });
         });
-    }
-
-    private List<TimelineItem> ReadLiveTail()
-    {
-        var live = new List<TimelineItem>();
-        try
-        {
-            live.AddRange(CallLogReader.ReadAll(Host));
-        }
-        catch (Java.Lang.SecurityException)
-        {
-            // READ_CALL_LOG not granted yet; show what we have, and say so once (audit 08 §24).
-            HeadLog.Denied("READ_CALL_LOG");
-        }
-        try
-        {
-            if (TextSources.ReadsProvider(GmBridgeClient.Shared(Host).IsPaired))
-            {
-                live.AddRange(SmsLogReader.ReadAll(Host));
-            }
-        }
-        catch (Java.Lang.SecurityException)
-        {
-            // READ_SMS not granted yet; show what we have, and say so once (audit 08 §24).
-            HeadLog.Denied("READ_SMS");
-        }
-        return live;
     }
 
     // Reads one cache page at the given offset and merges it with the live tail and the
@@ -951,8 +925,9 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     // single or Choose-mode bulk — inside the open correspondence: an item scheduled here
     // disappears from BOTH views at once (see ReadPageAndBuild/BindOpenThread), because a
     // delete made from either screen should read as done everywhere, not just where it
-    // was made.
-    private readonly DeleteBuffer deleteBuffer = new();
+    // was made. It is the process's one buffer (SourceDeletes.Held), so a delete made on the
+    // wrist is gone from here too, and one made here from what the wrist is shown.
+    private readonly DeleteBuffer deleteBuffer = SourceDeletes.Held;
     private readonly Handler deleteHandler = new(Looper.MainLooper!);
     private string? pendingPhotoConversationId;
     private const int PickGroupMedia = 72;
@@ -1106,26 +1081,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
 
         Task.Run(() =>
         {
-            var gathered = new List<TimelineItem>();
-            try
-            {
-                gathered.AddRange(CallLogReader.ReadAll(Host));
-            }
-            catch (Java.Lang.SecurityException)
-            {
-                HeadLog.Denied("READ_CALL_LOG");
-            }
-            try
-            {
-                if (TextSources.ReadsProvider(GmBridgeClient.Shared(Host).IsPaired))
-                {
-                    gathered.AddRange(SmsLogReader.ReadAll(Host));
-                }
-            }
-            catch (Java.Lang.SecurityException)
-            {
-                HeadLog.Denied("READ_SMS");
-            }
+            var gathered = MailboxSources.LiveTail(Host);
 
             ContactThread? thread = null;
             try
@@ -1430,7 +1386,7 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
                 // Commit only what was not undone in the meantime.
                 if (deleteBuffer.Undo(item.Kind, item.SourceId))
                 {
-                    CommitDelete(item);
+                    SourceDeletes.Commit(Host, item);
                 }
             }
         }, (long)window.TotalMilliseconds);
@@ -1779,121 +1735,6 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private void DeleteWithUndo(TimelineItem item) =>
         ScheduleBulkDelete([item], $"Deleted {ChannelWord(item)}.", null, LoadOpenThread);
 
-    // Performs the irreversible, channel-specific delete once the undo window closes.
-    private void CommitDelete(TimelineItem item)
-    {
-        Task.Run(() =>
-        {
-            try
-            {
-                switch (item.Kind)
-                {
-                    case TimelineItemKind.Email:
-                        DeleteEmail(item);
-                        break;
-                    case TimelineItemKind.Call:
-                    case TimelineItemKind.Voicemail:
-                        DeleteCallOrVoicemail(item);
-                        break;
-                    default:
-                        DeleteText(item);
-                        break;
-                }
-            }
-            catch (Exception e)
-            {
-                Android.Util.Log.Warn("FocusPhoneComm", $"Delete of {item.Kind}:{item.SourceId} failed: {e}");
-                PostDiagnostics.LogWarning("Delete", $"Delete of {item.Kind}:{item.SourceId} failed", e);
-            }
-        });
-    }
-
-    private void DeleteEmail(TimelineItem item)
-    {
-        var account = new AccountStore(Host);
-        if (item.MessageId is not null)
-        {
-            switch (MailRoute.Choose(VoiceGoogleAccount.IsSignedIn, account.IsConfigured))
-            {
-                case MailTransport.GmailApi:
-                    // A real trash, recoverable for 30 days — the same delete the Gmail app
-                    // performs, rather than IMAP's move into a folder that happens to be named
-                    // Trash. This is what makes filing safe enough to be a first-class verb.
-                    MailAccess.Api(Host, account).TrashAsync(item.MessageId).GetAwaiter().GetResult();
-                    break;
-                case MailTransport.AppPassword:
-                    new GmailClient(account.GmailAddress!, account.GmailAppPassword!)
-                        .DeleteAsync(item.MessageId).GetAwaiter().GetResult();
-                    break;
-            }
-        }
-        using var database = TimelineDatabase.Open(Host);
-        database.Cache.Delete(item.Kind, item.SourceId);
-    }
-
-    // Deleting a text for real depends on where it came from, and the routing is decided
-    // by pure tested logic rather than here. A bridge message is deleted in Google Messages;
-    // a provider row only while Post itself holds the texting role.
-    private void DeleteText(TimelineItem item)
-    {
-        var holdsRole = SmsRoleAccess.Status(Host) == SmsRoleStatus.Held;
-        switch (TextDelete.Choose(item.SourceId, holdsRole, GmBridgeClient.Shared(Host).IsConnected))
-        {
-            case TextDeletePath.SmsProvider:
-                DeleteProviderRow(Android.Provider.Telephony.Sms.ContentUri!, item, "sms:");
-                return;
-            case TextDeletePath.MmsProvider:
-                DeleteProviderRow(Android.Provider.Telephony.Mms.ContentUri!, item, "mms:");
-                return;
-            case TextDeletePath.Bridge:
-                // Off the UI thread (it is a network call); gone from Post either way at once.
-                var messageId = item.SourceId["gm:".Length..];
-                HideLocally(item);
-                var bridge = GmBridgeClient.Shared(Host);
-                Task.Run(() =>
-                {
-                    if (!messageId.Contains(':') && bridge.TryDelete(messageId) != BridgeDeleteResult.Deleted)
-                    {
-                        PostDiagnostics.LogWarning("Bridge", "A message was hidden here but could not be deleted in Google Messages");
-                    }
-                });
-                return;
-        }
-
-        HideLocally(item);
-    }
-
-    // Removes the row the timeline item came from. The provider is the phone's own record
-    // of the owner's texts, so this is the delete that actually means something — every
-    // other app that reads it sees the message gone too.
-    private void DeleteProviderRow(Android.Net.Uri contentUri, TimelineItem item, string prefix)
-    {
-        var rowId = item.SourceId[prefix.Length..];
-        Host.ContentResolver!.Delete(contentUri, "_id = ?", [rowId]);
-        using var database = TimelineDatabase.Open(Host);
-        database.Cache.Delete(item.Kind, item.SourceId);
-    }
-
-    private void DeleteCallOrVoicemail(TimelineItem item)
-    {
-        if (item.SourceId.All(char.IsAsciiDigit))
-        {
-            // A live call-log row: remove it at the source (needs WRITE_CALL_LOG).
-            // "_id" is the stable BaseColumns row-id name for the call-log provider.
-            Host.ContentResolver!.Delete(Android.Provider.CallLog.Calls.ContentUri!,
-                "_id = ?", [item.SourceId]);
-        }
-        using var database = TimelineDatabase.Open(Host);
-        database.Cache.Delete(item.Kind, item.SourceId);
-    }
-
-    private void HideLocally(TimelineItem item)
-    {
-        using var database = TimelineDatabase.Open(Host);
-        database.Hidden.Hide(item.Kind, item.SourceId);
-        database.Cache.Delete(item.Kind, item.SourceId);
-    }
-
     private void PlaceCall(string number) =>
         Host.StartActivity(new Intent(Intent.ActionCall, Android.Net.Uri.Parse($"tel:{number}")));
 
@@ -1904,10 +1745,6 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
     private void SendText(string number) => ComposeText([number], openBridgeConversationId);
 
     private void ShowGroupCompose(IReadOnlyList<string> recipients) => ComposeText(recipients, openBridgeConversationId);
-
-    private bool CanSendSms =>
-        AndroidX.Core.Content.ContextCompat.CheckSelfPermission(Host, Android.Manifest.Permission.SendSms)
-            == Android.Content.PM.Permission.Granted;
 
     private void ComposeText(IReadOnlyList<string> recipients, string? conversationId)
     {
@@ -1923,54 +1760,56 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         }, multiLine: true, also: new CardButton("Attach", () => PickMedia(recipients, conversationId)));
     }
 
+    // The phone's one send road (TextCourier, shared with Dash's listener): the bridge, then a
+    // plain text to a person or one MMS to a group. The tap's key action and the permission are
+    // read here, on the UI thread, as the tap happens; the send runs off it, and what happened
+    // is said here.
     private void DeliverText(IReadOnlyList<string> recipients, string? conversationId, string text)
     {
-        var bridge = GmBridgeClient.Shared(Host);
-        var canSendSms = CanSendSms;
-        var sending = TapWatch.Action(PostKeyActions.SendSms, TimeSpan.FromSeconds(60));
+        var canSendSms = TextCourier.CanSendSms(Host);
+        var sending = TextSending.FromTap();
         Task.Run(() =>
         {
-            if (TextSend.Choose(bridge.IsConnected, canSendSms) == TextSendPath.Bridge)
-            {
-                var target = conversationId ?? bridge.FindOrStartConversation(recipients);
-                if (target is not null && bridge.TrySend(target, text))
-                {
-                    sending.Succeeded();
-                    Host.RunOnUiThread(AfterSend);
-                    return;
-                }
-            }
-            // The bridge is down or refused it: a plain text through the phone, if that can go.
-            Host.RunOnUiThread(() => SendWithoutBridge(recipients, text, canSendSms, sending));
+            var delivery = TextCourier.Deliver(Host, recipients, conversationId, text, sending, canSendSms);
+            Host.RunOnUiThread(() => Delivered(delivery));
         });
     }
 
-    private void SendWithoutBridge(IReadOnlyList<string> recipients, string text, bool canSendSms, Storyworthtelling.Diagnostics.KeyAction sending)
+    private void Delivered(TextDelivery delivery)
     {
-        // TextSend decides, for the Mailbox and the watch's relay alike: nothing without the permission, one MMS to
-        // everyone in a group (never a text to each), and a plain text to a person.
-        switch (TextSend.WithoutBridge(recipients.Count, canSendSms))
+        switch (delivery)
         {
-            case TextSendPath.Unavailable:
-                sending.Failed("no bridge and no SEND_SMS permission");
+            case { Path: TextSendPath.Unavailable }:
                 NotSent(TextSend.UnavailableReason);
                 return;
-            case TextSendPath.GroupMms:
-                sending.Succeeded();
-                SendGroupMms(recipients, text, media: []);
+            case { Path: TextSendPath.GroupMms, Failure: MmsAttachmentTooLargeException }:
+                DogEar.ShowNotices(Host, Overlay,
+                [
+                    new DogEar.Notice("That attachment is too large to send.",
+                        "It never reached the carrier — pick a smaller photo or video, or trim the clip first.",
+                        PaperTheme.ProblemMark),
+                ]);
+                return;
+            case { Path: TextSendPath.GroupMms, Failure: not null }:
+                DogEar.ShowNotices(Host, Overlay,
+                [
+                    new DogEar.Notice("That text didn’t go out.",
+                        "It stopped before it went anywhere. Try again.",
+                        PaperTheme.ProblemMark),
+                ]);
+                return;
+            case { Path: TextSendPath.GroupMms }:
+                // The send itself is fire-and-forget from here: SmsManager.SendMultimediaMessage is
+                // asynchronous, so there is nothing left to confirm by the time this returns — a
+                // failure surfaces later via PendingMmsSendFailureStore, checked on the next resume,
+                // not from this call site.
+                Syncs.After(Host, PostAction.Sent);
+                return;
+            case { Failure: not null }:
+                NotSent("Google Messages couldn’t be reached, and the phone couldn’t send it as a plain text either. Try again in a moment.");
                 return;
         }
-        try
-        {
-            SmsSender.Send(Host, recipients[0], text, sending);
-            AfterSend();
-        }
-        catch (Exception e)
-        {
-            sending.Failed($"{e.GetType().Name}: {e.Message}");
-            PostDiagnostics.LogWarning("Sms", "Sending a text failed", e);
-            NotSent("Google Messages couldn’t be reached, and the phone couldn’t send it as a plain text either. Try again in a moment.");
-        }
+        AfterSend();
     }
 
     private void AfterSend()
@@ -1996,44 +1835,6 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         Host.StartActivityForResult(Intent.CreateChooser(intent, "Attach"), PickGroupMedia);
     }
 
-    // The send itself is fire-and-forget from here: SmsManager.SendMultimediaMessage is
-    // asynchronous, so there is nothing left to confirm by the time this returns — a
-    // failure surfaces later via PendingMmsSendFailureStore, checked on the next resume,
-    // not from this call site.
-    private void SendGroupMms(IReadOnlyList<string> recipients, string? text, IReadOnlyList<MmsOutboundPart> media)
-    {
-        // An MMS can sit on the network for a minute or more before the platform answers.
-        var sending = TapWatch.Action(PostKeyActions.SendMms, TimeSpan.FromMinutes(3));
-        try
-        {
-            MmsSender.Send(Host, recipients, text, media, sending);
-            Syncs.After(Host, PostAction.Sent);
-        }
-        catch (MmsAttachmentTooLargeException e)
-        {
-            sending.Failed("the attachment is too large to send");
-            PostDiagnostics.LogWarning("Mms", "Refused an oversized attachment", e);
-            DogEar.ShowNotices(Host, Overlay,
-            [
-                new DogEar.Notice("That attachment is too large to send.",
-                    "It never reached the carrier — pick a smaller photo or video, or trim the clip first.",
-                    PaperTheme.ProblemMark),
-            ]);
-        }
-        catch (Exception e)
-        {
-            sending.Failed($"{e.GetType().Name}: {e.Message}");
-            Android.Util.Log.Warn("Post", $"Group MMS send failed: {e}");
-            PostDiagnostics.LogWarning("Mms", "Sending a group text failed", e);
-            DogEar.ShowNotices(Host, Overlay,
-            [
-                new DogEar.Notice("That text didn’t go out.",
-                    "It stopped before it went anywhere. Try again.",
-                    PaperTheme.ProblemMark),
-            ]);
-        }
-    }
-
     public override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         if (requestCode != PickGroupMedia)
@@ -2055,20 +1856,12 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             return;
         }
         var fileName = mime.StartsWith("video/", StringComparison.Ordinal) ? "video" : "photo";
-        var bridge = GmBridgeClient.Shared(Host);
+        var media = new MmsOutboundPart(fileName, mime, bytes);
+        // By the bridge first; without it a picture is an MMS, to one person or to the whole group (TextCourier).
         Task.Run(() =>
         {
-            if (bridge.IsConnected)
-            {
-                var target = conversationId ?? bridge.FindOrStartConversation(recipients);
-                if (target is not null && bridge.TrySendMedia(target, bytes, fileName, mime))
-                {
-                    Host.RunOnUiThread(AfterSend);
-                    return;
-                }
-            }
-            // Without the bridge a picture is an MMS, to one person or to the whole group.
-            Host.RunOnUiThread(() => SendGroupMms(recipients, text: null, media: [new MmsOutboundPart(fileName, mime, bytes)]));
+            var delivery = TextCourier.DeliverMedia(Host, recipients, conversationId, media, TextSending.FromTapGroup);
+            Host.RunOnUiThread(() => Delivered(delivery));
         });
     }
 

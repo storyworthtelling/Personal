@@ -8,12 +8,19 @@ namespace RepoGuards.Tests;
 /// relay log nothing at all, and the one place a Dash line is made, <c>DashLogLines</c>, takes no message and fills its
 /// lines only from a path, a version, a word, a count and an exception's type name. Read by content, like the repo's
 /// other log-site guards; <c>DashLogLinesTests</c> runs the lines over sentinel payloads.
+///
+/// <para>Post's listener (B2) is the one place a Dash message is logged, and it logs only those lines: every call in
+/// <c>Post.Android/Dash</c> is <c>HeadLog.Info</c> or <c>HeadLog.Warn</c> with a <c>DashLogLines</c> line or a plain
+/// literal, or <c>HeadLog.Quiet</c> with a plain literal and the exception, whose shape is written and never its
+/// message. Nothing is interpolated, and no other logger is called.</para>
 /// </summary>
 public partial class DashLogsCarryNoPayloadTests
 {
     private static readonly string[] Folders = ["Watch/Watch.Domain/Dash", "FocusPhone/Codex.Infrastructure/Dash"];
 
     private const string Lines = "Watch/Watch.Domain/Dash/DashLogLines.cs";
+
+    private const string Listener = "FocusPhone/Post.Android/Dash";
 
     // The only things a Dash line may be filled from.
     private static readonly string[] AllowedHoles = ["contract", "read.Version", "DashCodec.Version", "reader", "outcome", "count", "typeName"];
@@ -68,6 +75,53 @@ public partial class DashLogsCarryNoPayloadTests
         Assert.True(parameters.Count == 0, "A Dash log line that takes more than a path, a read, a word or a count:\n" + string.Join("\n", parameters));
     }
 
+    [Fact]
+    public void TheListenerLogsOnlyDashLines()
+    {
+        var sources = Sources(Listener).ToList();
+        Assert.Contains(sources, source => source.Path.EndsWith("DashListener.cs", StringComparison.Ordinal));
+
+        var calls = sources.SelectMany(source => LogCalls(Code(source.Text)).Select(call => (source.Path, Call: call))).ToList();
+        Assert.NotEmpty(calls);
+        var other = calls.Where(entry => !IsListenerLine(entry.Call)).Select(entry => $"{entry.Path}: {entry.Call}").ToList();
+
+        Assert.True(other.Count == 0,
+            "Post's listener logs a DashLogLines line or a plain literal through HeadLog, and an exception only by its shape (HeadLog.Quiet):\n"
+            + string.Join("\n", other));
+    }
+
+    [Theory]
+    [InlineData("HeadLog.Info(Tag, $\"Sent {send.Text}\")")]
+    [InlineData("HeadLog.Info(Tag, send.Text)")]
+    [InlineData("HeadLog.Warn(Tag, DashLogLines.Sent(path), e)")]
+    [InlineData("HeadLog.Quiet(Tag, $\"Stopped on {send.Id}\", e)")]
+    [InlineData("HeadLog.Quiet(Tag, DashLogLines.Sent(path), e)")]
+    [InlineData("PostDiagnostics.LogWarning(\"Dash\", \"A send stopped\", e)")]
+    [InlineData("Android.Util.Log.Warn(Tag, \"A send stopped\")")]
+    [InlineData("HeadLog.Info(Tag, \"Sent \" + send.Text)")]
+    public void TheListenerRuleSeesAPayload(string call)
+    {
+        Assert.False(IsListenerLine(call));
+    }
+
+    [Theory]
+    [InlineData("HeadLog.Info(Tag, DashLogLines.Receipt(path, read, DashEnd.Post))")]
+    [InlineData("HeadLog.Warn(Tag, DashLogLines.Outcome(path, DashOutcome.Unreached, missed))")]
+    [InlineData("HeadLog.Quiet(Tag, \"A message from the wrist stopped\", e)")]
+    [InlineData("HeadLog.Warn(Tag, \"DASH the acts’ record didn’t read; a new one starts\")")]
+    public void TheListenerRuleLeavesItsLinesAlone(string call)
+    {
+        Assert.True(IsListenerLine(call));
+    }
+
+    [Fact]
+    public void TheCallsAreReadWhole()
+    {
+        var calls = LogCalls("x();\n HeadLog.Info(Tag,\n    DashLogLines.Outcome(path, outcome, Count(\"(\")));\n y();").ToList();
+
+        Assert.Equal(["HeadLog.Info(Tag,\n    DashLogLines.Outcome(path, outcome, Count(\"(\")))"], calls);
+    }
+
     [Theory]
     [InlineData("Log.Warn(\"Post\", $\"Sent {send.Text}\");")]
     [InlineData("HeadLog.Info(\"Dash\", line);")]
@@ -104,6 +158,132 @@ public partial class DashLogsCarryNoPayloadTests
             .Where(path => !path.Contains($"{separator}bin{separator}") && !path.Contains($"{separator}obj{separator}"))
             .Select(path => (Path.GetRelativePath(root, path).Replace('\\', '/'), File.ReadAllText(path)));
     }
+
+    // A listener line: HeadLog.Info or Warn with a DashLogLines line or a plain literal, or HeadLog.Quiet with a plain literal
+    // and the exception; never an interpolation, a concatenation or a value.
+    private static bool IsListenerLine(string call)
+    {
+        var open = call.IndexOf('(');
+        var name = Regex.Replace(call[..open], @"\s", string.Empty);
+        var arguments = Arguments(call[(open + 1)..^1]);
+        if (call.Contains("$\"", StringComparison.Ordinal) || arguments.Count < 2)
+        {
+            return false;
+        }
+
+        var message = arguments[1];
+        var line = message.StartsWith("DashLogLines.", StringComparison.Ordinal) || PlainLiteral().IsMatch(message);
+        return name switch
+        {
+            "HeadLog.Info" or "HeadLog.Warn" => arguments.Count == 2 && line,
+            "HeadLog.Quiet" => arguments.Count == 3 && PlainLiteral().IsMatch(message),
+            _ => false,
+        };
+    }
+
+    // Every logger call in a source, from its name to its closing bracket, strings read as strings.
+    private static IEnumerable<string> LogCalls(string code)
+    {
+        foreach (Match match in LogCall().Matches(code))
+        {
+            var start = match.Index;
+            var open = code.IndexOf('(', start);
+            if (open < 0)
+            {
+                continue;
+            }
+            var end = Close(code, open);
+            yield return end < 0 ? code[start..] : code[start..(end + 1)];
+        }
+    }
+
+    // The bracket that closes the one at <paramref name="open"/>, or -1.
+    private static int Close(string code, int open)
+    {
+        var depth = 0;
+        var inString = false;
+        for (var index = open; index < code.Length; index++)
+        {
+            var character = code[index];
+            if (inString)
+            {
+                if (character == '\\')
+                {
+                    index++;
+                }
+                else if (character == '"')
+                {
+                    inString = false;
+                }
+                continue;
+            }
+            switch (character)
+            {
+                case '"':
+                    inString = true;
+                    break;
+                case '(':
+                    depth++;
+                    break;
+                case ')':
+                    depth--;
+                    if (depth == 0)
+                    {
+                        return index;
+                    }
+                    break;
+            }
+        }
+        return -1;
+    }
+
+    // A call's arguments, split at its own commas only.
+    private static List<string> Arguments(string inside)
+    {
+        var arguments = new List<string>();
+        var depth = 0;
+        var inString = false;
+        var start = 0;
+        for (var index = 0; index < inside.Length; index++)
+        {
+            var character = inside[index];
+            if (inString)
+            {
+                if (character == '\\')
+                {
+                    index++;
+                }
+                else if (character == '"')
+                {
+                    inString = false;
+                }
+                continue;
+            }
+            if (character == '"')
+            {
+                inString = true;
+            }
+            else if (character is '(' or '[' or '{')
+            {
+                depth++;
+            }
+            else if (character is ')' or ']' or '}')
+            {
+                depth--;
+            }
+            else if (character == ',' && depth == 0)
+            {
+                arguments.Add(inside[start..index].Trim());
+                start = index + 1;
+            }
+        }
+        arguments.Add(inside[start..].Trim());
+        return arguments;
+    }
+
+    // One string literal and nothing else: no interpolation and no concatenation.
+    [GeneratedRegex(@"^""(?:[^""\\]|\\.)*""$")]
+    private static partial Regex PlainLiteral();
 
     // A call to a logger: the platform's, the suite's heads', the console, a trace, or an ILogger method.
     [GeneratedRegex(@"\b(?:Log|HeadLog|Console|Trace|Debug|PostDiagnostics|DiagnosticLog)\s*\.\s*\w+\s*\(|\.Log(?:Warning|Error|Information|Debug|Trace|Critical)\s*\(|\bILogger\b")]

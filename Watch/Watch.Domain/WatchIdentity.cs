@@ -75,6 +75,20 @@ public static class WatchIdentity
     public static readonly IReadOnlyList<string> DashPaths =
         [DashPeoplePath, DashThreadPath, DashSendPath, DashFilePath, DashDeletePath, DashUndoPath, DashReadPath, DashCallNotePath, DashMailPath];
 
+    // ---- Post's half of Dash (P14 B2): the phone end of the same contracts ----
+
+    /// <summary>What Post advertises (its <c>android_wear_capabilities</c>), so Dash can find the phone that carries the texts.</summary>
+    public const string PostCapability = "post-relay";
+
+    /// <summary>Post's listener for every Dash path, registered by this name in Post's manifest.</summary>
+    public const string DashListenerName = "com.storyworthtelling.focusphone.communication.DashListener";
+
+    /// <summary>Post's preferences file for the relay.</summary>
+    public const string DashPreferences = "dashRelay";
+
+    /// <summary>The book of the wrist's acts, so a duplicated act stays done once across a restart.</summary>
+    public const string DashActsKey = "acts";
+
     // ---- the installer's registered names ----
 
     public const string UpdateListenerName = "com.storyworthtelling.focusphone.launcher.point.UpdateListenerService";

@@ -395,6 +395,20 @@ public class FrozenInvariantsTests
             $"{PolicyContext.CommunicationPackage}.MessageBridgeListener", "Name ="));
     }
 
+    // Post's ear for Dash on the watch (P14 B2). Play services delivers a Data Layer message to the listener the
+    // manifest names, and the platform keeps a component by its registered name: move the class and the watch's asks
+    // and acts reach nothing, with no error anywhere. Its name is a literal in WatchIdentity, beside the paths it hears.
+    [Fact]
+    public void DashListenerComponentNameIsFrozen()
+    {
+        Assert.Equal($"{PolicyContext.CommunicationPackage}.DashListener", Watch.Domain.WatchIdentity.DashListenerName);
+
+        var registering = EnumerateRepoFiles("*.cs")
+            .Where(file => RepoRelative(file).Replace(Path.DirectorySeparatorChar, '/').StartsWith("FocusPhone/Post.Android/", StringComparison.Ordinal))
+            .Count(file => File.ReadAllText(file).Contains("Service(Name = WatchIdentity.DashListenerName", StringComparison.Ordinal));
+        Assert.Equal(1, registering);
+    }
+
     // The periodic email sync is enqueued with ExistingPeriodicWorkPolicy.Keep, so on
     // an upgraded device the request WorkManager already persisted wins — and it names
     // the worker by JNI class name. Move the class and Keep hands the sync to a name

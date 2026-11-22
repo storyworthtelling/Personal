@@ -1545,3 +1545,178 @@ than a copy:**
   could both act. B2 should handle one message at a time.
 - **The relay reads whatever items B2 hands it:** like the Mailbox, it sees only the cache pages read, so a correspondence
   older than them is not on the wrist.
+
+# Chunk B2 · Post's listener for Dash (the rest of W-4.1.1)
+
+Every figure below is from a real run on 22 Nov 2026. As in B1, the red runs were taken with the tests written and the
+new pure code present only as stubs (methods threw `NotImplementedException`; new constants were empty strings or zero;
+the two new `DashOutcome` members existed so the tests compiled), and with none of the head's code written yet. Nothing in
+this chunk has met a watch, the Data Layer or a phone.
+
+## What it is
+
+**The phone's send road, in one place.** The cascade that lived in `MailboxArea` (`DeliverText`, `SendWithoutBridge`,
+`SendGroupMms` and the picture path in `OnActivityResult`) is now:
+- `Codex.Domain/Post/TextCascade` (pure): `Text(routes, recipients, conversation, words, bridgeConnected, canSendSms)` tries
+  the bridge when `TextSend.Choose` says so (the conversation given, else one found or started), then takes
+  `TextSend.WithoutBridge`: a plain text to a person, one MMS to a group, or `Unavailable`. `Media(...)` is the bridge,
+  then an MMS to one person or a group (as the Mailbox always sent pictures, with no SMS permission check). It returns a
+  `TextDelivery` (the route, whether the bridge was tried, and the failure kept whole) over an `ITextRoutes` seam.
+- `Post.Android/TextCourier`: the routes (`GmBridgeClient`, `SmsSender`, `MmsSender`) and the same key actions and failure
+  lines the Mailbox had (`TextSending.FromTap()` for a tap; `FromWrist()` is `KeyAction.Unwatched`, since a wrist's send is
+  not a tap). `MailboxArea` reads the permission and starts the key action on the UI thread as before, runs
+  `TextCourier.Deliver` off it and says what happened in the same dog-ears (`Delivered`). The one difference: the plain
+  text or MMS fallback is now handed to the platform from the background thread too, not the UI thread (neither
+  `SmsSender` nor `MmsSender` needs the UI thread; the listener has none).
+
+**Also out of `MailboxArea`, behaviour identical, so the listener uses the Mailbox's own code:**
+- `SourceDeletes`: `Held`, the process's one `DeleteBuffer` (the Mailbox's was per area), and `Commit`, the channel-specific
+  delete that was `CommitDelete` and its five helpers. A delete held from the wrist is gone from the Mailbox at once, and
+  the other way round.
+- `MailboxSources`: the live tail (`ReadLiveTail`, and the same read in `LoadOpenThread`) and `CachePageSize`.
+- `Syncs.Later(context, delay)`, which `Syncs.After` now calls.
+
+**Post's listener, in `Post.Android/Dash`:**
+- `DashListener`, a `WearableListenerService` registered as `com.storyworthtelling.focusphone.communication.DashListener`
+  (`WatchIdentity.DashListenerName`), with one filter per Dash path from `WatchIdentity`. It takes each message off Play
+  services' thread (`Task.Run`) and waits for it at most `DashReplies.TurnWait`, so the process stays while an act is
+  carried out; were it ever called on the main thread it would not block.
+- `Resources/values/wear.xml`: Post advertises `post-relay` (`WatchIdentity.PostCapability`), so Dash can find the phone.
+- `DashCarrier`: decodes for the path (`DashCodec`), logs the receipt, then one message at a time (the `UpdateRunGate`
+  Flyleaf's update runs use, waited for at most `DashReplies.GateWait`, else `DASH …: Busy`) asks `DashInbox` what to do and
+  carries it out: answers from the snapshot; a send through `TextCourier.Deliver` (waiting up to `BridgeWait` for a paired
+  bridge to come up, since the message may itself have started Post); a filing through `Filing.File`; a delete held in
+  `SourceDeletes.Held` (`DashHolds`); an undo through `Filing.Unfile` or the buffer's `Undo`; a read through
+  `ReadStateStore.MarkRead`; a note through the cache's `Upsert`; and the sync each plan owes through `Syncs.Later`.
+- `DashSnapshots.Relay`: the snapshot from the stores `ReadPageAndBuild` reads (live tail and first cache page, hidden,
+  spam, the shared buffer, tombstones, identity links, read stamps, group names, the address book's names).
+- `DashBook`: the book in `dashRelay`/`acts` (`WatchIdentity.DashPreferences`, `DashActsKey`), read once a process and
+  written whole after every change (`Commit`, not `Apply`). A book that will not read starts a new one, said once.
+- `DashHolds`: a held delete commits when its window closes, through `SourceDeletes.Commit`, and is settled in the book;
+  `Resume` (from `PostApplication`, once a process, off the main thread) holds again every delete the book still owes, or
+  carries it out if its window has closed.
+
+**The pure half's new pieces (`Codex.Infrastructure/Dash`, tested in `Codex.Tests`):**
+- `DashInbox.Turn(message, relay, acts, conditions)`: each message becomes a `DashAnswer` (people, a thread, mail), a
+  `DashSendTurn`, a `DashActTurn`, a `DashUndoTurn`, a `DashReadTurn`, a `DashNoteTurn` or a `DashNoTurn` (an unknown
+  thread, or the watch's half of a contract arriving at Post). The Mailbox is read only for a message that needs it.
+  `Delivered` puts a send's outcome in the book; `OutcomeOf` says it as the watch hears it.
+- `DashActs`: a send is an act (`DashActKind.Send`): recorded before it is carried out, answered from the book if heard
+  again, never undone. `Owed()` / `Settle()` for deletes across a restart. `ActedItem` keeps a mail's message id.
+- `DashActsCodec`: the book as JSON with an integer `v`, frozen words, a timeline kind as the cache's own number.
+- `DashReplies`: the watch-unreachable rule and the waits.
+
+## Tests written first
+
+- `Codex.Tests/Post/TextCascadeTests.cs` (14): `TheBridgeLeads`, `ANewConversationStartsOnTheBridge`,
+  `ARefusedBridgeFallsToAPlainText`, `NoConversationFallsBack`, `ARefusedBridgeToAGroupIsOneMms`,
+  `WithTheBridgeDownAPersonGetsAPlainText`, `WithTheBridgeDownAGroupIsOneMms`, `NothingCanCarryItSaysSo`,
+  `ARefusedBridgeWithNoTextIsUnavailableAfterTrying`, `AFailedTextKeepsItsCause`, `AFailedMmsKeepsItsCause`,
+  `APictureGoesByTheBridgeFirst`, `APictureWithoutTheBridgeIsAnMms`, `AFailedPictureKeepsItsCause`.
+- `Codex.Tests/Dash/DashInboxTests.cs` (26 with theory rows): the asks (`PeopleWaitingIsAnswered`, `AConversationIsAnswered`,
+  `AnUnknownConversationIsNotAnswered`, `MailLinesAreAnswered`, `AnAnswerArrivingAtPostIsLeftAlone` ×4), the send
+  (`ASendIsCarriedOutOnce`, `ASendHeardWhileItIsCarriedOutIsNotSentAgain`, `ASendNothingCanCarryIsAnsweredAtOnce`,
+  `ASendToNobodyIsAnsweredAtOnce`, `TheAnswerIsWhatThePhoneDid` ×7), the acts (`AFileFromTheWristIsAFiling`,
+  `ADeleteFromTheWristIsHeld`, `ADeletedMailKeepsWhatItsDeleteNeeds`, `AnUndoNeedsNoMailbox`, `TheSameActTwiceIsDoneOnce`),
+  `AReadIsMarked`, `ANoteIsKept`.
+- `Codex.Tests/Dash/DashActsTests.cs` (9): `ADeleteIsOwedUntilSettled`, `ATakenBackDeleteIsNotOwed`,
+  `ALateUndoLeavesTheDeleteOwed`, `AFilingIsNeverOwed`, `ASendKeepsItsOutcome`, `ASendThatNeverFinishedIsAnsweredFailed`,
+  `ASendCannotBeUndone`, `AnActIsNoSend`, `AnActedItemIsWhatADeleteNeeds`.
+- `Codex.Tests/Dash/DashActsCodecTests.cs` (20 with rows): `TheBookRoundTrips`, `TheBookComesBackAfterARestart`,
+  `AnOwedDeleteIsStillOwedAfterARestart`, `NothingStoredIsAnEmptyBook` ×2, `ADamagedBookIsUnread` ×13, `ANewerBookIsUnread`,
+  `TheWordsAreFrozen`.
+- `Codex.Tests/Dash/DashRepliesTests.cs` (5): `AnAnswerIsTriedOnce`, `AMissedAnswerIsCounted`,
+  `ALandedAnswerStartsTheCountAgain`, `MissesFromManyThreadsAreEachCounted`, `EveryWaitIsBoundedByTheTurn`.
+- `Codex.Tests/Guard/DashRelayGuardTests.cs`: `TheMailboxUsesTheSharedRules` now asks for `TextCourier.Deliver(`,
+  `TextCourier.DeliverMedia(`, `SourceDeletes.Held`, `SourceDeletes.Commit(` and `MailboxSources.LiveTail(` in place of the
+  two `TextSend` rows (the cascade calls those now); new: `TheMailboxNoLongerDeletesItself`, `ThePhoneSendsTextsInOnePlace`
+  (no route called outside the courier; the courier runs the cascade; the cascade calls `TextSend`),
+  `PostRegistersItsListenerByName` (the service, the action, all nine paths), `PostAdvertisesItsCapability`,
+  `TheListenerCarriesThePlansThroughPostsOwnCode` ×14, `EveryDataLayerWaitIsBounded`, `AnAnswerIsSentOnceAndAMissIsCounted`
+  (one `SendMessageAsync` in all of Post), `TheListenerTakesOneMessageAtATime`, `TheListenerWorksOffTheMainThread`,
+  `TheActsSurviveARestart`, `PostReadsTheWatchsCodec`; `TheDashPathsAreNotCopied` now also covers the listener's name, the
+  capability and the preferences file.
+- `Codex.Tests/Guard/FrozenInvariantsTests.cs`: `DashListenerComponentNameIsFrozen` (the value, and exactly one Post file
+  registering it by `Service(Name = WatchIdentity.DashListenerName`).
+- `Watch.Tests/Guard/WatchInvariantsTests.cs`: `PostsHalfIsFrozen`. `Watch.Tests/Dash/DashLogLinesTests.cs`:
+  `AMissedAnswerIsACount`.
+- `RepoGuards.Tests/DashLogsCarryNoPayloadTests.cs`: `TheListenerLogsOnlyDashLines` (every logger call in
+  `Post.Android/Dash` is `HeadLog.Info`/`Warn` with a `DashLogLines` line or a plain literal, or `HeadLog.Quiet` with a plain
+  literal and the exception; nothing interpolated, no other logger), and its own `TheListenerRuleSeesAPayload` ×8,
+  `TheListenerRuleLeavesItsLinesAlone` ×4, `TheCallsAreReadWhole`.
+
+## Red
+
+- **`Watch.Tests`: 609 tests, 1 failed, 608 passed:** `PostsHalfIsFrozen`, `Assert.Equal() Failure: Strings differ` (the
+  stub's empty name). `AMissedAnswerIsACount` passed on the stubs: the two outcomes had to exist for it to compile, and the
+  line's shape is B1's `Outcome`.
+- **`FocusPhone/Codex.Tests`: 3309 tests, 105 failed, 3204 passed.** The 105: `DashRelayGuardTests` 30, `DashInboxTests`
+  26, `DashActsCodecTests` 20, `TextCascadeTests` 14, `DashActsTests` 9, `DashRepliesTests` 5,
+  `FrozenInvariantsTests.DashListenerComponentNameIsFrozen` 1. First errors: `NotImplementedException` 70 (and one inside an
+  `AggregateException`, the parallel count), `Assert.Contains() Failure: Sub-string not found` 21 (the Mailbox and the
+  missing head), `Assert.Equal() Failure: Values differ` 4 (the zero waits, `Attempts`, and `ALateUndoLeavesTheDeleteOwed`:
+  B1's book marked a late undo taken, so a second one said `Again`), and one each of `FileNotFoundException` (no
+  `wear.xml`), `DirectoryNotFoundException`, "The listener has no OnMessageReceived", `Assert.Single()` (no file registers
+  the listener), `Assert.NotEmpty()` (no Data Layer call), `Assert.Matches()` (no gate), `Strings differ`,
+  `Assert.DoesNotContain()` (`CommitDelete` still in the Mailbox) and `Assert.All() Failure: 3 out of 12` (the empty names).
+- **`RepoGuards.Tests`: 414 tests, 1 failed:** `TheListenerLogsOnlyDashLines`, `DirectoryNotFoundException`
+  (`Post.Android/Dash` did not exist). Once green, a probe was planted for one run: a method in `DashBook.cs` calling
+  `HeadLog.Info(Tag, $"DASH sent {words}")`, `HeadLog.Warn(Tag, "DASH stopped", e)` and `PostDiagnostics.LogInfo(Tag, words)`.
+  `DashLogsCarryNoPayloadTests`: 27 tests, 1 failed, `TheListenerLogsOnlyDashLines`, naming all three calls. The probe was
+  removed.
+- **`Storyworthtelling.Updates.Tests`: 193 passed, 0 failed** (no workflow filter needed a change: `build-post.yml` already
+  watches `Watch/Watch.Domain/**`, which Post now names directly).
+
+## Green
+
+- **On the way:** `Codex.Tests` read 3309 with 1 failed, `NativeTextAttachTests.WithoutTheBridgeAOneToOneTextGoesThroughSmsSender`
+  ("MailboxArea.cs has no method named SendWithoutBridge"): an older guard that read the send from the Mailbox. It now reads
+  the Mailbox's `DeliverText` handing the text, the key action and the permission to `TextCourier.Deliver`, and the
+  courier's `SendText` calling `SmsSender.Send(context, number, text, sending)`; which route is taken is `TextCascadeTests`'.
+- **`Watch.Tests`: 609 passed, 0 failed. `FocusPhone/Codex.Tests`: 3309 passed, 0 failed. `RepoGuards.Tests`: 414 passed,
+  0 failed. `Storyworthtelling.Updates.Tests`: 193 passed, 0 failed.** `LogLoopReader.Tests`: 117 passed. `FaceStudio.Tests`:
+  29 passed. `leakscan --ci` over the chunk's diff: "no personal-data shapes in the added lines".
+- **Compiled here:** `dotnet build FocusPhone/Post.Android/Post.Android.csproj -p:AndroidSdkDirectory=/opt/android-sdk-min
+  -p:AndroidUseApkSigner=false`: **Build succeeded, 0 errors**, with the Wearable aars fetched. No warning names a file this
+  chunk added or changed. Two new NU1608 warnings (Lifecycle.Service 2.9.1 beside Lifecycle.Runtime 2.11, Tracing.Ktx 1.3
+  beside Tracing 2.0) come with the Wearable binding and LiveData 2.11; Flyleaf's restored graph has the same three
+  versions, and `.github/scripts/check-dependency-graph.py FocusPhone/Post.Android` finds nothing missing. Flyleaf was not
+  rebuilt: no central version moved.
+
+## Decisions made in this chunk
+
+- **Post sends the wrist only answers.** People waiting, a conversation, mail lines and a send's outcome go back on the
+  node that asked, once, waited for at most 15 s. An answer that does not land is logged by contract and type
+  (`CONTRACT dash/people: not sent, TimeoutException`) and counted (`DASH dash/people: Unreached 3`, since the last that
+  landed), and dropped: no queue, no retry. The wrist asks again when it is near; a send asked again is answered from the
+  book. So "nothing goes to the watch while it is unreachable" holds by construction.
+- **A send is in the book before it goes.** Heard again, it is answered as it went and never sent twice. A send the
+  process lost while carrying it out is answered `failed`: Post cannot tell whether it went, and a second copy of a text
+  is worse than a "didn't go" the owner can redo. Overturnable.
+- **An unknown conversation is not answered** (logged `DASH dash/thread: Unknown`); the wrist's own wait says it.
+- **A send waits up to 10 s for a paired bridge,** nudging it with `ConnectIfPaired`, because the message may itself have
+  started Post's process; past that it takes the phone's fallback as the phone would. Unmeasured.
+- **The waits:** a turn 60 s, the gate 30 s, the bridge 10 s (looked at every 500 ms), an answer 15 s. Chosen, not measured.
+- **One delete buffer for the process.** The Mailbox's buffer was per area; it is now `SourceDeletes.Held`, shared by the
+  Mailbox's two views and the wrist. A side effect: a delete held in the window survives the Mailbox being rebuilt (a
+  rotation), where it used to reappear until committed.
+- **A held delete outlives the process through the book.** The act records each item's kind, source id and (for mail) its
+  message id; `DashHolds.Resume` holds it again or carries it out at the next start. A late undo no longer marks an act
+  taken, so a delete whose window closed before it was carried out stays owed.
+- **The wrist's MMS "sent" is the platform's acceptance**, as on the phone: a carrier refusal later is the Mailbox's
+  existing dog-ear (`PendingMmsSendFailureStore`), and the wrist is not told.
+- **Acts are carried out, then the book is written; a send's book is written first.** A filing or delete repeated after
+  a crash is harmless; a send repeated is not.
+- **`WearableListenerService`, not a `MessageClient` listener,** so a message from the wrist starts Post when it is not
+  running, as Flyleaf's report listener does.
+- **The fallback send now runs off the UI thread** in the Mailbox too (see above).
+
+## Not done, not verified
+
+- **Nothing here has met a watch, the Data Layer or a phone:** whether Play services binds the listener for the nine
+  paths, whether a reply on `SourceNodeId` lands, the capability being found, the bridge coming up within the wait, and
+  the hold and commit across a real process death. There is no Dash app on the watch yet (release B's later chunks).
+- **Pre-existing, not changed:** `SourceDeletes.Commit`'s failure line names the item's source id (as `CommitDelete` did),
+  and a notification's source id can hold a number. A wrist's delete now reaches that line too. Worth its own fix.
+- **W-4.1.2 (tokens and the vault on the watch) is not started.**
+- **The open Mailbox does not redraw after an act from the wrist;** it shows it at its next reload.

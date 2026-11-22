@@ -139,6 +139,19 @@ public class WatchInvariantsTests
     }
 
     [Fact]
+    public void PostsHalfIsFrozen()
+    {
+        // Post's listener for Dash (P14 B2): Play services delivers to it by its registered name, Dash finds the phone by
+        // the capability, and the book of the wrist's acts is kept on the phone under these names.
+        Assert.Equal("com.storyworthtelling.focusphone.communication.DashListener", WatchIdentity.DashListenerName);
+        Assert.StartsWith(WatchIdentity.DashPackage + ".", WatchIdentity.DashListenerName, StringComparison.Ordinal);
+        Assert.Equal("post-relay", WatchIdentity.PostCapability);
+        Assert.NotEqual(WatchIdentity.InstallerCapability, WatchIdentity.PostCapability);
+        Assert.Equal("dashRelay", WatchIdentity.DashPreferences);
+        Assert.Equal("acts", WatchIdentity.DashActsKey);
+    }
+
+    [Fact]
     public void TheInstallerAdvertisesItsCapability()
     {
         var wear = Text(Installer("Resources", "values", "wear.xml"));
