@@ -29,6 +29,7 @@ public static class PulpLogLines
     {
         LockedOpenHandOff.ResultStarted => "LOCKED OPEN started by Flyleaf",
         null => "LOCKED OPEN no answer from Flyleaf; opened plainly",
+        LockedOpenHandOff.ResultNoAnswer => "LOCKED OPEN no answer from Flyleaf’s receiver; opened plainly",
         { } code => string.Create(CultureInfo.InvariantCulture, $"LOCKED OPEN refused by Flyleaf (answer {code}); opened plainly"),
     };
 
