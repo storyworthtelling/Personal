@@ -149,7 +149,10 @@ public class PlaybackService : MediaLibraryService
     /// </summary>
     private void EnsureTidalSession()
     {
-        if (tidalMediaSession is not null || tidalBuild is { IsCompleted: false } || browseTree is not { } tree)
+        // A Player that failed to construct fails the same way again in this process (and used to leak
+        // its cache's folder lock doing it), so it is not asked for twice.
+        if (tidalMediaSession is not null || tidalBuild is { IsCompleted: false } || browseTree is not { } tree
+            || TidalPlayerFactory.GaveUp)
         {
             return;
         }
