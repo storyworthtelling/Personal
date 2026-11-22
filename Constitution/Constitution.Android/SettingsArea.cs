@@ -689,6 +689,14 @@ public sealed class SettingsArea(Activity host)
                 signInStatus = $"Signed in as {email}.";
                 settled = true;
             }
+            catch (GoogleAccountPickerCancelledException)
+            {
+                // Backing out of the picker is the person's answer: the action is settled, nothing is a failure.
+                signing.Succeeded();
+                signInStatus = ConnectionFailure.NoAccountChosen;
+                settled = true;
+                return;
+            }
             catch (Exception e) when (ConnectionTrail.Expecting(Host, ConnectionAct.SignIn, e,
                 e is InvalidOperationException or OperationCanceledException or TimeoutException or IOException
                     or Java.Lang.Exception))
