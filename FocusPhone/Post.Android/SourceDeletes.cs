@@ -45,8 +45,8 @@ internal static class SourceDeletes
             }
             catch (Exception e)
             {
-                Android.Util.Log.Warn("FocusPhoneComm", $"Delete of {item.Kind}:{item.SourceId} failed: {e}");
-                PostDiagnostics.LogWarning("Delete", $"Delete of {item.Kind}:{item.SourceId} failed", e);
+                Android.Util.Log.Warn("FocusPhoneComm", $"Delete of a {item.Kind} failed: {e.GetType().Name}");
+                PostDiagnostics.LogWarning("Delete", $"Delete of a {item.Kind} failed", e);
             }
         });
     }

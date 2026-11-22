@@ -1720,3 +1720,7 @@ this chunk has met a watch, the Data Layer or a phone.
   and a notification's source id can hold a number. A wrist's delete now reaches that line too. Worth its own fix.
 - **W-4.1.2 (tokens and the vault on the watch) is not started.**
 - **The open Mailbox does not redraw after an act from the wrist;** it shows it at its next reload.
+
+### B2 follow-up · the delete commit names no source id
+
+`SourceDeletes.Commit`'s failure line logged `{item.Kind}:{item.SourceId}`, and a notification's source id can hold a phone number; deletes from the wrist reach it now. Red: `DashLogsCarryNoPayloadTests.ADeleteFailureNamesNoSourceId`, RepoGuards filter 1 total, 1 failed. Green: the line names the kind only (logcat the exception's type name), RepoGuards 415, 0 failed; Post builds.

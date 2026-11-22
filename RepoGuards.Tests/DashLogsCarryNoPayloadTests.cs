@@ -144,6 +144,15 @@ public partial class DashLogsCarryNoPayloadTests
         Assert.DoesNotMatch(LogCall(), sample);
     }
 
+    // A delete from the wrist reaches the shared delete commit, and a notification's source id can hold a number.
+    [Fact]
+    public void ADeleteFailureNamesNoSourceId()
+    {
+        var code = Code(Read("FocusPhone/Post.Android/SourceDeletes.cs"));
+
+        Assert.DoesNotContain("item.SourceId}", code);
+    }
+
     private static string Code(string source) => Regex.Replace(source, @"///.*|//.*", string.Empty);
 
     private static string Read(string relative) =>
