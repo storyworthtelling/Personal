@@ -11,7 +11,7 @@ namespace Codex.Infrastructure.Music;
 /// the async send and block. That is safe here because the scanner drives these reads
 /// on <c>Task.Run</c> pool threads with no captured synchronization context.
 ///
-/// A refused read throws <see cref="DriveReadException"/> with the status and keeps it as
+/// A 401 forgets the token and asks the range once more with a fresh one. A refused read throws <see cref="DriveReadException"/> with the status and keeps it as
 /// <see cref="LastFailure"/>: TagLib rethrows a reader's exception wrapped in its own, so the
 /// scanner reads the status from here rather than from what reaches it.
 /// </summary>
@@ -59,8 +59,22 @@ public sealed class DriveSeekableStream : Stream
 
         var last = Math.Min(position + count, length) - 1;
         var token = getToken().GetAwaiter().GetResult();
+        var response = Send(token, last);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // The kit's rule: a rejected token is forgotten wherever it was issued, or it is handed out
+            // again for the rest of its life and every read after this one is refused too. Asked once more.
+            response.Dispose();
+            forgetToken(token);
+            token = getToken().GetAwaiter().GetResult();
+            response = Send(token, last);
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                forgetToken(token);
+            }
+        }
 
-        using var response = Send(token, last);
+        using var answered = response;
         if (!response.IsSuccessStatusCode)
         {
             LastFailure = new DriveReadException((int)response.StatusCode);
