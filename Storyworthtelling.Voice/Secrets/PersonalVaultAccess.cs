@@ -97,7 +97,7 @@ public sealed class PersonalVaultAccess
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                Tell(VaultTrail.Published(VaultTrail.Personal, "WriteFailed", e));
+                Tell(VaultTrail.Published(VaultTrail.Personal, "WriteFailed", e, VaultWriteException.OutcomeOf(e)));
                 return false;
             }
         }

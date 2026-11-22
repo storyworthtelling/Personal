@@ -18,13 +18,20 @@ public interface ISecretsVaultStore
         SaveAsync(vault, passphrase, cancellationToken);
 }
 
-/// <summary>A sealed write that did not land: refused, conflicted, not confirmed or failed. Never carries the vault.</summary>
+/// <summary>
+/// A sealed write that did not land: refused, conflicted, not confirmed or failed. Never carries the vault. When the
+/// upload itself failed, what Drive threw is the inner exception, so a log can say how.
+/// </summary>
 public sealed class VaultWriteException(SealedWriteResult result)
-    : IOException(result.Detail ?? $"The vault was not written ({result.Outcome}).")
+    : IOException(result.Detail ?? $"The vault was not written ({result.Outcome}).", result.Error)
 {
     public SealedWriteResult Result { get; } = result;
 
     public bool IsConflict => Result.Outcome == SealedWriteOutcome.Conflict;
+
+    /// <summary>The write's outcome as one word for a trail line, or null when the failure was not a sealed write's.</summary>
+    public static string? OutcomeOf(Exception? failure) =>
+        failure is VaultWriteException written ? written.Result.Outcome.ToString() : null;
 }
 
 public enum SecretsVaultStatus

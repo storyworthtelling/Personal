@@ -62,7 +62,7 @@ public sealed class SecretsVaultService
     public async Task<SecretsVaultPublishResult> PublishAsync(Func<SecretsVault, SecretsVault> merge, CancellationToken cancellationToken)
     {
         var (result, failure) = await PublishOnce(merge, cancellationToken);
-        Tell(VaultTrail.Published(VaultTrail.Shared, result.Status.ToString(), failure));
+        Tell(VaultTrail.Published(VaultTrail.Shared, result.Status.ToString(), failure, VaultWriteException.OutcomeOf(failure)));
         return result;
     }
 
