@@ -80,6 +80,8 @@ public sealed class Checkbox : View
         picked = value;
         Describe();
         Invalidate();
+        // A redraw is no layout change and the box has no words, so the tap watch would judge the tick dead.
+        TapWatch.Status();
     }
 
     protected override void OnDraw(Canvas canvas)
