@@ -77,12 +77,16 @@ public sealed record ConstitutionRestoreResult(
 /// <param name="Shared">How writing the household's shared vault went.</param>
 /// <param name="Personal">How writing this person's own vault went.</param>
 /// <param name="SharedDetail">When the shared write failed: the failure's type and message, passphrase removed.</param>
+/// <param name="SharedFailure">When the shared write failed with an exception: its type name, for the trail (never its message).</param>
+/// <param name="PersonalFailure">When the personal write failed with an exception: its type name, for the trail (never its message).</param>
 /// <param name="PersonalDetail">When the personal write failed: the failure's type and message, passphrase removed.</param>
 public sealed record ConstitutionPublishResult(
     VaultWriteOutcome Shared,
     VaultWriteOutcome Personal,
     string? SharedDetail = null,
-    string? PersonalDetail = null)
+    string? PersonalDetail = null,
+    string? SharedFailure = null,
+    string? PersonalFailure = null)
 {
     /// <summary>
     /// Whether the owner has something to act on: a backup that was meant to happen and did not. Another

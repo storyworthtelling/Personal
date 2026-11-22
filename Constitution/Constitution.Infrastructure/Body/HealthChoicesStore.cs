@@ -44,7 +44,16 @@ public sealed class HealthChoicesStore
 
         connections.HealthConnectChoicesJson = json;
         var result = await publish([VaultField.HealthConnectChoices], cancellationToken).ConfigureAwait(false);
-        log.Outcome($"health choices saved; vault publish {result?.Status.ToString().ToLowerInvariant() ?? "queued"}");
+        // The choices live in the personal vault, so that side is the one to report: the run's own status says
+        // Published whenever a publish ran, even when the personal write failed.
+        if (result?.Publish is { } published)
+        {
+            log.Outcome($"health choices saved; vault publish personal {ConstitutionVaultSync.Words(published.Personal)}{ConstitutionVaultSync.Why(published.PersonalFailure)}");
+        }
+        else
+        {
+            log.Outcome($"health choices saved; vault publish {result?.Status.ToString().ToLowerInvariant() ?? "queued"}");
+        }
     }
 
     /// <summary>Brings the saved choices into line with what the platform grants now, and saves them if that changed anything.</summary>
