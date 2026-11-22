@@ -48,4 +48,37 @@ public class VaultTrailTests
         Assert.True(problem);
         Assert.Equal("VAULT shared restore: Unreachable (System.InvalidOperationException < System.Net.Http.HttpRequestException)", line);
     }
+
+    [Fact]
+    public void AFailedPublishCarriesItsOutcomeWordBesideTheTypes()
+    {
+        var failure = new IOException("The file couldn’t be written: token ya29.example-secret",
+            new HttpRequestException("403 for /drive/v3/files/example"));
+
+        var (problem, line) = VaultTrail.Published(VaultTrail.Shared, "WriteFailed", failure, "Failed");
+
+        Assert.True(problem);
+        Assert.Equal("VAULT shared publish: WriteFailed [Failed] (System.IO.IOException < System.Net.Http.HttpRequestException)", line);
+        Assert.DoesNotContain("ya29", line);
+        Assert.DoesNotContain("403", line);
+    }
+
+    [Theory]
+    [InlineData("Drive said no: 403 for /drive/v3")]
+    [InlineData("two words")]
+    [InlineData("")]
+    public void ADetailThatIsNotOneWordIsLeftOut(string detail)
+    {
+        var (_, line) = VaultTrail.Published(VaultTrail.Personal, "WriteFailed", detail: detail);
+
+        Assert.Equal("VAULT personal publish: WriteFailed", line);
+    }
+
+    [Fact]
+    public void ARestoreCanCarryADetailWordToo()
+    {
+        var (_, line) = VaultTrail.Restored(VaultTrail.Shared, "Corrupt", detail: "NewerFormat");
+
+        Assert.Equal("VAULT shared restore: Corrupt [NewerFormat]", line);
+    }
 }
