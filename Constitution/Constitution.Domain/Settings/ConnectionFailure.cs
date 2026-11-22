@@ -18,6 +18,9 @@ public enum ConnectionAct
 /// </summary>
 public static class ConnectionFailure
 {
+    /// <summary>What a sign-in row says when the person backed out of the account picker: an answer, not a failure.</summary>
+    public const string NoAccountChosen = "No account was chosen.";
+
     /// <summary>
     /// The sentence a row is left with. Never empty, never a stack trace, and never a raw message:
     /// messages come from the network stack and the Google client and are not ours to vouch for as free

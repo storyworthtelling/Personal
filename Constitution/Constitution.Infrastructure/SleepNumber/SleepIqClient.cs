@@ -36,7 +36,8 @@ namespace Constitution.Infrastructure.SleepNumber;
 ///
 /// <para><b>The log</b> gets one phrase per call outcome: the endpoint label and the status code
 /// (<c>sleepiq sign-in: 200</c>), plus a reason built only from this class's own constants when the shape was wrong
-/// (<c>sleepiq sleepers: unexpected shape (no sleepers list)</c>) or the exception type when offline. Never a body,
+/// (<c>sleepiq sleepers: unexpected shape (no sleepers list)</c>) or the exception type when offline; a sleep-data entry
+/// with no days list also names its plain-word keys and their value kinds, counting any other key. Never a body,
 /// token, id, name, reading or exception message.</para>
 ///
 /// <para>Not thread-safe: one worker calls it at a time.</para>
@@ -363,6 +364,54 @@ public sealed class SleepIqClient : ISleepIqClient
         Reading,
     }
 
+    // A plain word for a key: only such a key is named on the line. A key with a digit or anything else in it may be
+    // a date or an id, which is a value (O7), so it is counted instead.
+    private static readonly System.Text.RegularExpressions.Regex PlainKey = new(
+        "^[A-Za-z]{1,40}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    private const int NamedKeysAtMost = 12;
+
+    // An entry's shape for the trail: its plain keys and the kind of value each holds, in the reply's order, never a value.
+    private static string EntryShape(JsonElement entry)
+    {
+        if (entry.ValueKind != JsonValueKind.Object)
+        {
+            return $"entry is {entry.ValueKind}";
+        }
+
+        var named = new List<string>();
+        var unnamed = 0;
+        var more = 0;
+        foreach (var property in entry.EnumerateObject())
+        {
+            if (!PlainKey.IsMatch(property.Name))
+            {
+                unnamed++;
+            }
+            else if (named.Count < NamedKeysAtMost)
+            {
+                named.Add($"{property.Name}:{property.Value.ValueKind}");
+            }
+            else
+            {
+                more++;
+            }
+        }
+
+        var parts = new List<string>(named);
+        if (more > 0)
+        {
+            parts.Add($"{more} more");
+        }
+
+        if (unnamed > 0)
+        {
+            parts.Add($"{unnamed} unnamed");
+        }
+
+        return parts.Count == 0 ? "entry has no keys" : "entry keys: " + string.Join(", ", parts);
+    }
+
     private static NightParse ParseNight(JsonElement root, DateOnly day, out TimeSpan asleep, out string reason)
     {
         asleep = TimeSpan.Zero;
@@ -380,7 +429,7 @@ public sealed class SleepIqClient : ISleepIqClient
                 || !sleeper.TryGetProperty("days", out var days)
                 || days.ValueKind != JsonValueKind.Array)
             {
-                reason = "no days list";
+                reason = "no days list; " + EntryShape(sleeper);
                 return NightParse.WrongShape;
             }
 

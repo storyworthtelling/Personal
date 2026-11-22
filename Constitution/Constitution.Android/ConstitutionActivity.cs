@@ -303,6 +303,8 @@ public abstract class ConstitutionActivity : Activity
             return;
         }
 
+        binder.SetTabsEnabled(true);
+
         if (waitingOpen)
         {
             RenderWaiting();
@@ -366,6 +368,8 @@ public abstract class ConstitutionActivity : Activity
         frame.SetWell(well);
         frame.SetBar(firstRun.BuildBar());
 
+        // No tab leads anywhere until first run is done, so none can be taken (a tap used to redraw this page).
+        binder.SetTabsEnabled(false);
         binder.SetActive(-1);
         TabLettering.Apply(binder, visible, -1);
     }

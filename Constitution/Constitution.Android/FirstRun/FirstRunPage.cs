@@ -115,6 +115,14 @@ public sealed class FirstRunPage(Activity host, Action changed)
                 note = null;
                 settled = true;
             }
+            catch (GoogleAccountPickerCancelledException)
+            {
+                // Backing out of the picker is the person's answer: the action is settled, nothing is a failure.
+                signing.Succeeded();
+                note = ConnectionFailure.NoAccountChosen;
+                settled = true;
+                return;
+            }
             catch (Exception e) when (ConnectionTrail.Expecting(host, ConnectionAct.SignIn, e,
                 e is InvalidOperationException or OperationCanceledException or TimeoutException or IOException
                     or Java.Lang.Exception))

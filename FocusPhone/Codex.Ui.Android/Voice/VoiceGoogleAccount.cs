@@ -158,7 +158,7 @@ public sealed class VoiceGoogleAccount
         if (resultCode != Result.Ok || data is null)
         {
             Finish(t => t.AccountCancelled(DateTimeOffset.Now));
-            tcs.TrySetException(new InvalidOperationException("No account was picked."));
+            tcs.TrySetException(new GoogleAccountPickerCancelledException("No account was picked."));
             return;
         }
 
@@ -166,7 +166,7 @@ public sealed class VoiceGoogleAccount
         if (string.IsNullOrEmpty(email))
         {
             Finish(t => t.AccountCancelled(DateTimeOffset.Now));
-            tcs.TrySetException(new InvalidOperationException("No account was returned from the picker."));
+            tcs.TrySetException(new GoogleAccountPickerCancelledException("No account was returned from the picker."));
         }
         else
         {
@@ -247,5 +247,17 @@ public sealed class VoiceGoogleAccount
                 tcs.TrySetException(ex);
             }
         }
+    }
+}
+
+/// <summary>
+/// The account picker came back with no account: the person backed out of it. An
+/// <see cref="InvalidOperationException"/>, so a caller that treats every sign-in stop alike still catches it,
+/// while one that knows a cancel is an answer rather than a failure can catch this first.
+/// </summary>
+public sealed class GoogleAccountPickerCancelledException : InvalidOperationException
+{
+    public GoogleAccountPickerCancelledException(string message) : base(message)
+    {
     }
 }

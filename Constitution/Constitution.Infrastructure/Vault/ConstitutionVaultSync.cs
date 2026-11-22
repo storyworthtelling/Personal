@@ -145,11 +145,11 @@ public sealed class ConstitutionVaultSync
         var changes = changed.ToHashSet();
         var shared = await PublishSharedAsync(passphrase, changes, cancellationToken);
         var personal = await PublishPersonalAsync(passphrase, changes, cancellationToken);
-        log.Outcome($"vault publish: shared {Words(shared.Outcome)}, personal {Words(personal.Outcome)}");
-        return new ConstitutionPublishResult(shared.Outcome, personal.Outcome, shared.Detail, personal.Detail);
+        log.Outcome($"vault publish: shared {Words(shared.Outcome)}{Why(shared.Failure)}, personal {Words(personal.Outcome)}{Why(personal.Failure)}");
+        return new ConstitutionPublishResult(shared.Outcome, personal.Outcome, shared.Detail, personal.Detail, shared.Failure, personal.Failure);
     }
 
-    private async Task<(VaultWriteOutcome Outcome, string? Detail)> PublishSharedAsync(
+    private async Task<(VaultWriteOutcome Outcome, string? Detail, string? Failure)> PublishSharedAsync(
         string passphrase, IReadOnlySet<VaultField> changes, CancellationToken cancellationToken)
     {
         // One snapshot, taken before the first await: the merge runs after the vault has been read, and
@@ -163,7 +163,7 @@ public sealed class ConstitutionVaultSync
         if (string.IsNullOrEmpty(login) && string.IsNullOrEmpty(word) && string.IsNullOrEmpty(remarkable)
             && string.IsNullOrEmpty(claude) && string.IsNullOrEmpty(gemini))
         {
-            return (VaultWriteOutcome.NothingToPublish, null);
+            return (VaultWriteOutcome.NothingToPublish, null, null);
         }
 
         // Ownership is the whole rule for the shared vault, so an install that cannot say which account
@@ -173,7 +173,7 @@ public sealed class ConstitutionVaultSync
         var account = signedInAccount();
         if (string.IsNullOrWhiteSpace(account))
         {
-            return (VaultWriteOutcome.RefusedUnknownAccount, null);
+            return (VaultWriteOutcome.RefusedUnknownAccount, null, null);
         }
 
         // The service is the one choke point for "never over a vault it could not read" and for
@@ -201,22 +201,23 @@ public sealed class ConstitutionVaultSync
 
             return published.Status switch
             {
-                SecretsVaultPublishStatus.Published => (VaultWriteOutcome.Published, null),
-                SecretsVaultPublishStatus.NoPassphrase => (VaultWriteOutcome.NoPassphrase, null),
-                SecretsVaultPublishStatus.VaultUnreadable => (VaultWriteOutcome.RefusedUnreadable, null),
-                SecretsVaultPublishStatus.ReadOnly => (VaultWriteOutcome.RefusedNotOwner, null),
-                SecretsVaultPublishStatus.WriteFailed => (VaultWriteOutcome.Failed, published.Error is null ? null : Redact(published.Error, passphrase)),
+                SecretsVaultPublishStatus.Published => (VaultWriteOutcome.Published, null, null),
+                SecretsVaultPublishStatus.NoPassphrase => (VaultWriteOutcome.NoPassphrase, null, null),
+                SecretsVaultPublishStatus.VaultUnreadable => (VaultWriteOutcome.RefusedUnreadable, null, null),
+                SecretsVaultPublishStatus.ReadOnly => (VaultWriteOutcome.RefusedNotOwner, null, null),
+                // The service hands back only its sentence, not the exception, so there is no type to name here.
+                SecretsVaultPublishStatus.WriteFailed => (VaultWriteOutcome.Failed, published.Error is null ? null : Redact(published.Error, passphrase), null),
                 _ => throw new ArgumentOutOfRangeException(nameof(published), published.Status, "Not a publish status this sync knows."),
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // The service does not catch a failed read of the vault (no network, no Drive access).
-            return (VaultWriteOutcome.Failed, Describe(ex, passphrase));
+            return (VaultWriteOutcome.Failed, Describe(ex, passphrase), FailureName(ex));
         }
     }
 
-    private async Task<(VaultWriteOutcome Outcome, string? Detail)> PublishPersonalAsync(
+    private async Task<(VaultWriteOutcome Outcome, string? Detail, string? Failure)> PublishPersonalAsync(
         string passphrase, IReadOnlySet<VaultField> changes, CancellationToken cancellationToken)
     {
         // One snapshot, taken before the first await, as for the shared vault.
@@ -224,7 +225,7 @@ public sealed class ConstitutionVaultSync
         var side = connections.SleeperSide;
         if (string.IsNullOrEmpty(choices) && string.IsNullOrEmpty(side))
         {
-            return (VaultWriteOutcome.NothingToPublish, null);
+            return (VaultWriteOutcome.NothingToPublish, null, null);
         }
 
         try
@@ -232,7 +233,7 @@ public sealed class ConstitutionVaultSync
             var loaded = await personalStore.LoadAsync(passphrase, cancellationToken);
             if (loaded.Status is PersonalVaultStatus.WrongPassphrase or PersonalVaultStatus.Corrupt)
             {
-                return (VaultWriteOutcome.RefusedUnreadable, null);
+                return (VaultWriteOutcome.RefusedUnreadable, null, null);
             }
 
             // Only a changed value, or one the vault lacks, is ours to say. Otherwise there is nothing to
@@ -245,18 +246,18 @@ public sealed class ConstitutionVaultSync
             var writesSide = !string.IsNullOrEmpty(side) && (sideChanged || string.IsNullOrEmpty(loaded.Vault.SleeperSide));
             if (!writesChoices && !writesSide)
             {
-                return (VaultWriteOutcome.NothingToPublish, null);
+                return (VaultWriteOutcome.NothingToPublish, null, null);
             }
 
             // Merged into whatever is there: Score's sign-in, Foreword's calendar choices and work
             // schedule are not ours, and an Empty status hands back a blank vault to start from.
             await personalStore.SaveAsync(
                 loaded.Vault with { HealthConnectChoicesJson = chosenChoices, SleeperSide = chosenSide }, passphrase, cancellationToken);
-            return (VaultWriteOutcome.Published, null);
+            return (VaultWriteOutcome.Published, null, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return (VaultWriteOutcome.Failed, Describe(ex, passphrase));
+            return (VaultWriteOutcome.Failed, Describe(ex, passphrase), FailureName(ex));
         }
     }
 
@@ -367,7 +368,15 @@ public sealed class ConstitutionVaultSync
         }
     }
 
-    private static string Words(VaultWriteOutcome outcome)
+    // A failed side's exception type, for the trail; never its message, which comes from the Drive client and the HTTP stack.
+    internal static string Why(string? failure) => failure is null ? string.Empty : $" ({failure})";
+
+    // The type, and for a sealed write that did not land, how it ended (an enum of the file rule's own, never a value).
+    private static string FailureName(Exception ex) => ex is VaultWriteException refused
+        ? $"{ex.GetType().Name}, {refused.Result.Outcome.ToString().ToLowerInvariant()}"
+        : ex.GetType().Name;
+
+    internal static string Words(VaultWriteOutcome outcome)
     {
         switch (outcome)
         {
