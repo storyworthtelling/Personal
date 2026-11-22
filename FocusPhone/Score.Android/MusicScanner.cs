@@ -4,6 +4,7 @@ using Codex.Domain.Music;
 using Codex.Infrastructure.Music;
 using Codex.Infrastructure.Storage;
 using Codex.Ui.Http;
+using Storyworthtelling.Google.Android;
 
 namespace Score;
 
@@ -105,6 +106,7 @@ public sealed class MusicScanner
         var added = 0;
         var changed = 0;
         var fullyDrained = true;
+        var failures = new ScanFailureTally(total);
         foreach (var batch in toRead.Chunk(MaxConcurrentReads))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -145,13 +147,23 @@ public sealed class MusicScanner
             // Only a file that actually succeeded counts toward the outcome — a read
             // exhausted after every retry (see ReadFileAsync) left the cache untouched
             // for it, so it is neither newly added nor actually changed this run.
+            var fileNumber = done;
             foreach (var (file, result) in batch.Zip(results))
             {
+                fileNumber++;
                 if (result.Tracks.Count == 0)
                 {
+                    // One short line for each of the first few, then only counted (the summary below).
+                    var line = failures.Failed(fileNumber, result.Failure?.Status, result.Failure?.Kind ?? "Unknown", ReadAttempts);
+                    if (line is not null)
+                    {
+                        AudioDiagnostics.LogWarning("MusicScanner", line);
+                    }
+
                     continue;
                 }
 
+                failures.Succeeded();
                 if (addedIds.Contains(file.Id))
                 {
                     added++;
@@ -164,6 +176,20 @@ public sealed class MusicScanner
 
             done += batch.Length;
             onProgress(done, total);
+
+            failures.EndBatch();
+            if (failures.Tripped)
+            {
+                // Drive is refusing every read, not the files being bad: stop asking, keep what this run
+                // committed, and let the worker try again later rather than hammer it for the whole budget.
+                fullyDrained = false;
+                break;
+            }
+        }
+
+        if (failures.Summary() is { } summary)
+        {
+            AudioDiagnostics.LogWarning("MusicScanner", summary);
         }
 
         if (!fullyDrained)
@@ -196,17 +222,16 @@ public sealed class MusicScanner
     private const int ReadAttempts = 2;
 
     // Empty Tracks means the file could not be read at all after every retry (skipped; the rest
-    // of the library still scans). One Track is the ordinary case. More than one means the
-    // hidden-track pass found — and split off — a bonus track.
+    // of the library still scans), and Failure says how: the HTTP status Drive refused it with when
+    // there was one, else the failure's type name. One Track is the ordinary case. More than one
+    // means the hidden-track pass found — and split off — a bonus track.
     //
-    // Every failed attempt used to be swallowed silently with no log and no retry — with 6400+
-    // files read in bounded-parallel batches, that meant a normal transient failure vanished
-    // with no trace, and which handful of files happened to be unlucky was effectively random
-    // per run: a full rescan of unchanged Drive content landed a different subset every time.
-    private async Task<(IReadOnlyList<Track> Tracks, MusicFileVersion Version)> ReadFileAsync(
+    // A failure is counted by the caller's ScanFailureTally, never logged here: one warning per file,
+    // with its name, its Drive id and a stack, filled the log when every read started failing.
+    private async Task<(IReadOnlyList<Track> Tracks, MusicFileVersion Version, ReadFailure? Failure)> ReadFileAsync(
         DriveAudioFile file, HttpClient http, CancellationToken cancellationToken)
     {
-        Exception? lastFailure = null;
+        ReadFailure? failure = null;
         for (var attempt = 1; attempt <= ReadAttempts; attempt++)
         {
             if (attempt > 1)
@@ -214,32 +239,67 @@ public sealed class MusicScanner
                 await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
             }
 
+            DriveSeekableStream? stream = null;
+            DriveSeekableStream? decodeStream = null;
             try
             {
                 Track track;
-                using (var stream = new DriveSeekableStream(file.Id, file.Size, tokens, http))
+                using (stream = Open(file, http))
                 {
-                    track = await Task.Run(() => tagReader.Read(file.Id, file.Name, stream), cancellationToken);
+                    var tagStream = stream;
+                    track = await Task.Run(() => tagReader.Read(file.Id, file.Name, tagStream), cancellationToken);
                 }
 
                 var version = new MusicFileVersion(file.ModifiedTime.UtcTicks, file.Size);
                 if (!hiddenTrackPass.Value.IsWorthScanning(track))
                 {
-                    return ([track], version);
+                    return ([track], version, null);
                 }
 
-                using var decodeStream = new DriveSeekableStream(file.Id, file.Size, tokens, http);
-                var tracks = await hiddenTrackPass.Value.RunAsync(track, decodeStream, cancellationToken);
-                return (tracks, version);
+                using (decodeStream = Open(file, http))
+                {
+                    var tracks = await hiddenTrackPass.Value.RunAsync(track, decodeStream, cancellationToken);
+                    return (tracks, version, null);
+                }
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
-                lastFailure = e;
+                failure = ReadFailure.From(e, decodeStream?.LastFailure ?? stream?.LastFailure);
             }
         }
 
-        AudioDiagnostics.LogWarning(
-            "MusicScanner", $"Couldn’t read {file.Name} (id={file.Id}) after {ReadAttempts} attempts.", lastFailure);
-        return ([], default);
+        return ([], default, failure);
+    }
+
+    private DriveSeekableStream Open(DriveAudioFile file, HttpClient http) =>
+        new(file.Id, file.Size, tokens.GetAccessToken, DeviceAccountTokens.ForgetEverywhere, http);
+
+    /// <summary>How a file's read failed: Drive's status when it refused, else the innermost exception's type name.</summary>
+    private sealed record ReadFailure(int? Status, string Kind)
+    {
+        public static ReadFailure From(Exception thrown, DriveReadException? refusal)
+        {
+            refusal ??= Find(thrown);
+            var innermost = thrown;
+            while (innermost.InnerException is not null)
+            {
+                innermost = innermost.InnerException;
+            }
+
+            return new ReadFailure(refusal?.Status, innermost.GetType().Name);
+        }
+
+        private static DriveReadException? Find(Exception? thrown)
+        {
+            for (; thrown is not null; thrown = thrown.InnerException)
+            {
+                if (thrown is DriveReadException refusal)
+                {
+                    return refusal;
+                }
+            }
+
+            return null;
+        }
     }
 }

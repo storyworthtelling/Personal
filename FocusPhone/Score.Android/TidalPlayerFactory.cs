@@ -63,9 +63,24 @@ internal static class TidalPlayerFactory
     private const string CacheFolder = "tidal";
     private const long CacheSizeBytes = 2_000_000_000L; // matches CacheProvider.Internal's own 2.gigabytes default
 
+    // Media3 allows one SimpleCache per folder per process, and a dropped one still holds its folder:
+    // a second over "tidal" threw IllegalStateException and crashed the app. Opened once, like Downloads.Cache.
+    private static SimpleCache? cache;
+
+    /// <summary>
+    /// Set once the Player itself failed to construct. Nothing about a second try in the same process
+    /// differs from the first, so the service does not ask again until the process restarts.
+    /// </summary>
+    internal static bool GaveUp { get; private set; }
+
     public static Player? Create(
         Application application, TidalCredentialsProvider credentialsProvider, string appVersion)
     {
+        if (GaveUp)
+        {
+            return null;
+        }
+
         Android.Util.Log.Debug(LogTag, "Building Player config objects via raw JNI...");
 
         if (TidalKotlinBridge.NewDurationDataClass<BufferConfiguration>(
@@ -103,7 +118,7 @@ internal static class TidalPlayerFactory
             return null;
         }
 
-        var cache = new SimpleCache(
+        cache ??= new SimpleCache(
             new Java.IO.File(application.FilesDir, CacheFolder),
             new LeastRecentlyUsedCacheEvictor(CacheSizeBytes),
             new StandaloneDatabaseProvider(application));
@@ -136,6 +151,7 @@ internal static class TidalPlayerFactory
         catch (Exception e)
         {
             AudioDiagnostics.LogWarning(LogTag, $"new Player(...) threw: {e}");
+            GaveUp = true;
             return null;
         }
     }
