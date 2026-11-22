@@ -169,60 +169,72 @@ public class PlaybackService : MediaLibraryService
     private async Task BuildTidalSessionAsync(MediaBrowseTree tree)
     {
         const string logTag = "PlaybackService.Tidal";
-        var account = new TidalAccountStore(this).Load();
-        if (account is null)
+        try
         {
-            Android.Util.Log.Debug(logTag, "No stored TIDAL account; skipping the TIDAL session.");
-            return;
-        }
-
-        // Called by TidalCredentialsProvider each time the SDK asks for fresh credentials, not just
-        // once here — TidalAccessTokenProvider refreshes on demand over the Player's lifetime, the
-        // same contract ICredentialsProvider.GetCredentials documents.
-        var tokenProvider = new TidalAccessTokenProvider(this);
-        var probe = await tokenProvider.RefreshAsync(CancellationToken.None);
-        if (probe.Status != TidalTokenPollStatus.Success)
-        {
-            HeadLog.Warn(logTag, $"Stored TIDAL refresh token did not exchange (status={probe.Status}); " +
-                "skipping the TIDAL session.");
-            return;
-        }
-
-        var credentialsProvider = new TidalCredentialsProvider(() => tokenProvider.RefreshAsync(CancellationToken.None, fresh: true));
-        var tidalPlayer = TidalPlayerFactory.Create(Application!, credentialsProvider, appVersion: "1.0.0");
-        if (tidalPlayer is null)
-        {
-            AudioDiagnostics.LogWarning(logTag, "TidalPlayerFactory.Create returned null; skipping the TIDAL session.");
-            return;
-        }
-
-        // Session/player construction has to happen on the application looper's thread — everything
-        // else in this service already runs on the main thread by Service-lifecycle default, so this
-        // is the one place that has to hop back to it explicitly, having done the async vault/network
-        // work off it.
-        var ready = new TaskCompletionSource();
-        handler?.Post(() =>
-        {
-            try
+            var account = new TidalAccountStore(this).Load();
+            if (account is null)
             {
-                var bridge = new TidalPlaybackBridge(tidalPlayer);
-                var sessionPlayer = new TidalMediaSessionPlayer(Looper.MainLooper!, bridge);
-                tidalBridge = bridge;
-                tidalMediaSession = new MediaLibrarySession.Builder(this, sessionPlayer, new LibraryCallback(tree))
-                    .SetId(TidalSessionId)!
-                    .Build();
-                Android.Util.Log.Debug(logTag, "TIDAL session built.");
+                Android.Util.Log.Debug(logTag, "No stored TIDAL account; skipping the TIDAL session.");
+                return;
             }
-            catch (Exception e)
+
+            // Called by TidalCredentialsProvider each time the SDK asks for fresh credentials, not just
+            // once here — TidalAccessTokenProvider refreshes on demand over the Player's lifetime, the
+            // same contract ICredentialsProvider.GetCredentials documents.
+            var tokenProvider = new TidalAccessTokenProvider(this);
+            var probe = await tokenProvider.RefreshAsync(CancellationToken.None);
+            if (probe.Status != TidalTokenPollStatus.Success)
             {
-                AudioDiagnostics.LogWarning(logTag, $"Building the TIDAL session threw: {e}");
+                HeadLog.Warn(logTag, $"Stored TIDAL refresh token did not exchange (status={probe.Status}); " +
+                    "skipping the TIDAL session.");
+                return;
             }
-            finally
+
+            var credentialsProvider = new TidalCredentialsProvider(() => tokenProvider.RefreshAsync(CancellationToken.None, fresh: true));
+            var tidalPlayer = TidalPlayerFactory.Create(Application!, credentialsProvider, appVersion: "1.0.0");
+            if (tidalPlayer is null)
             {
-                ready.SetResult();
+                AudioDiagnostics.LogWarning(logTag, "TidalPlayerFactory.Create returned null; skipping the TIDAL session.");
+                return;
             }
-        });
-        await ready.Task;
+
+            // Session/player construction has to happen on the application looper's thread — everything
+            // else in this service already runs on the main thread by Service-lifecycle default, so this
+            // is the one place that has to hop back to it explicitly, having done the async vault/network
+            // work off it.
+            var ready = new TaskCompletionSource();
+            handler?.Post(() =>
+            {
+                try
+                {
+                    var bridge = new TidalPlaybackBridge(tidalPlayer);
+                    var sessionPlayer = new TidalMediaSessionPlayer(Looper.MainLooper!, bridge);
+                    tidalBridge = bridge;
+                    tidalMediaSession = new MediaLibrarySession.Builder(this, sessionPlayer, new LibraryCallback(tree))
+                        .SetId(TidalSessionId)!
+                        .Build();
+                    Android.Util.Log.Debug(logTag, "TIDAL session built.");
+                }
+                catch (Exception e)
+                {
+                    AudioDiagnostics.LogWarning(logTag, $"Building the TIDAL session threw: {e}");
+                }
+                finally
+                {
+                    ready.SetResult();
+                }
+            });
+            await ready.Task;
+        }
+        catch (Exception e)
+        {
+            // Nothing awaits this task, so a throw here (the token refresh offline, its host not resolving)
+            // went unobserved and was recorded as a crash. One line instead; the task then completes, which
+            // is what leaves EnsureTidalSession free to build again the next time Score asks for the session
+            // (clearing the field from here could race a build already started after it).
+            HeadLog.Warn(logTag, "TIDAL session not built: "
+                + Storyworthtelling.Diagnostics.PlainError.Describe(e, "TIDAL"));
+        }
     }
 
     // Bind the saved equalizer curve + loudness boost to the player's current audio session. Cheap to call
