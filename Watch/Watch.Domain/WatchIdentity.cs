@@ -75,6 +75,15 @@ public static class WatchIdentity
     public static readonly IReadOnlyList<string> DashPaths =
         [DashPeoplePath, DashThreadPath, DashSendPath, DashFilePath, DashDeletePath, DashUndoPath, DashReadPath, DashCallNotePath, DashMailPath];
 
+    // ---- the handed-over Google token (plan §2.4, §2.5, P14 W-4.1.2) ----
+
+    /// <summary>
+    /// A phone app ↔ its watch app (the Data Layer joins only one package to itself), over <c>MessageClient</c>: the watch
+    /// app asks when it needs a token and the phone answers on the same path. Only a read-only Drive token crosses
+    /// (<c>KeyCodec</c>), for Wave's streaming; Dash needs none, since Post relays the mail lines.
+    /// </summary>
+    public const string GoogleKeysPath = "/keys/google";
+
     // ---- Post's half of Dash (P14 B2): the phone end of the same contracts ----
 
     /// <summary>What Post advertises (its <c>android_wear_capabilities</c>), so Dash can find the phone that carries the texts.</summary>

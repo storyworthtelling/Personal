@@ -133,6 +133,16 @@ public class WatchInvariantsTests
     }
 
     [Fact]
+    public void KeysPathIsFrozen()
+    {
+        // The handed-over token's one path (P14 W-4.1.2): a phone app and its watch app each hear it by this name.
+        Assert.Equal("/keys/google", WatchIdentity.GoogleKeysPath);
+        Assert.DoesNotContain(WatchIdentity.GoogleKeysPath, WatchIdentity.DashPaths);
+        Assert.NotEqual(WatchIdentity.UpdateApkPath, WatchIdentity.GoogleKeysPath);
+        Assert.NotEqual(WatchIdentity.UpdateInstalledPath, WatchIdentity.GoogleKeysPath);
+    }
+
+    [Fact]
     public void TheCapabilityIsFrozen()
     {
         Assert.Equal("point-installer", WatchIdentity.InstallerCapability);

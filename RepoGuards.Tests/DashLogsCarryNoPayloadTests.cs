@@ -13,12 +13,23 @@ namespace RepoGuards.Tests;
 /// <c>Post.Android/Dash</c> is <c>HeadLog.Info</c> or <c>HeadLog.Warn</c> with a <c>DashLogLines</c> line or a plain
 /// literal, or <c>HeadLog.Quiet</c> with a plain literal and the exception, whose shape is written and never its
 /// message. Nothing is interpolated, and no other logger is called.</para>
+///
+/// <para>The handed-over token's contract (B3, <c>Watch.Domain/Keys</c>) is held to the same rule, with the token as its
+/// payload: its codec and hold log nothing, and <c>KeyLogLines</c> takes no message and writes a failure by its type alone.</para>
 /// </summary>
 public partial class DashLogsCarryNoPayloadTests
 {
-    private static readonly string[] Folders = ["Watch/Watch.Domain/Dash", "FocusPhone/Codex.Infrastructure/Dash"];
+    private static readonly string[] Folders = ["Watch/Watch.Domain/Dash", "FocusPhone/Codex.Infrastructure/Dash", "Watch/Watch.Domain/Keys"];
 
     private const string Lines = "Watch/Watch.Domain/Dash/DashLogLines.cs";
+
+    // The handed-over token's lines (P14 W-4.1.2): the same rule, and the token is the payload.
+    private const string KeyLines = "Watch/Watch.Domain/Keys/KeyLogLines.cs";
+
+    private static readonly string[] KeyHoles = ["contract", "read.Version", "KeyCodec.Version", "reader", "outcome", "typeName"];
+
+    private static readonly string[] KeyParameters =
+        ["string path", "Exception failure", "ContractRead<KeyMessage> read", "KeyEnd reader", "KeyOutcome outcome"];
 
     private const string Listener = "FocusPhone/Post.Android/Dash";
 
@@ -38,6 +49,8 @@ public partial class DashLogsCarryNoPayloadTests
         var sources = Folders.SelectMany(Sources).ToList();
         Assert.Contains(sources, source => source.Path.EndsWith("DashRelay.cs", StringComparison.Ordinal));
         Assert.Contains(sources, source => source.Path.EndsWith("DashCodec.cs", StringComparison.Ordinal));
+        Assert.Contains(sources, source => source.Path.EndsWith("KeyCodec.cs", StringComparison.Ordinal));
+        Assert.Contains(sources, source => source.Path.EndsWith("TokenHold.cs", StringComparison.Ordinal));
 
         var calls = sources
             .SelectMany(source => LogCall().Matches(Code(source.Text)).Select(match => $"{source.Path}: {match.Value}"))
@@ -73,6 +86,35 @@ public partial class DashLogsCarryNoPayloadTests
             .ToList();
 
         Assert.True(parameters.Count == 0, "A Dash log line that takes more than a path, a read, a word or a count:\n" + string.Join("\n", parameters));
+    }
+
+    [Fact]
+    public void TheKeyLinesAreFilledFromNoPayload()
+    {
+        var code = Code(Read(KeyLines));
+        var holes = Interpolated().Matches(code)
+            .SelectMany(literal => Hole().Matches(literal.Value).Select(hole => hole.Groups["value"].Value.Trim()))
+            .ToList();
+
+        Assert.NotEmpty(holes);
+        var other = holes.Where(hole => !KeyHoles.Contains(hole, StringComparer.Ordinal)).Distinct().ToList();
+        Assert.True(other.Count == 0, "A keys log line filled from something other than a path, version, word or type name:\n" + string.Join("\n", other));
+    }
+
+    [Fact]
+    public void TheKeyLinesTakeNoToken()
+    {
+        var code = Code(Read(KeyLines));
+        var signatures = PublicMethod().Matches(code).ToList();
+
+        Assert.NotEmpty(signatures);
+        var parameters = signatures
+            .SelectMany(signature => signature.Groups["parameters"].Value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Where(parameter => !KeyParameters.Contains(parameter, StringComparer.Ordinal))
+            .Distinct()
+            .ToList();
+
+        Assert.True(parameters.Count == 0, "A keys log line that takes more than a path, a read, a word or a type name:\n" + string.Join("\n", parameters));
     }
 
     [Fact]

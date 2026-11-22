@@ -1724,3 +1724,165 @@ this chunk has met a watch, the Data Layer or a phone.
 ### B2 follow-up · the delete commit names no source id
 
 `SourceDeletes.Commit`'s failure line logged `{item.Kind}:{item.SourceId}`, and a notification's source id can hold a phone number; deletes from the wrist reach it now. Red: `DashLogsCarryNoPayloadTests.ADeleteFailureNamesNoSourceId`, RepoGuards filter 1 total, 1 failed. Green: the line names the kind only (logcat the exception's type name), RepoGuards 415, 0 failed; Post builds.
+
+# Chunk B3 · tokens and the vault on the watch (W-4.1.2)
+
+Every figure below is from a real run on 22 Nov 2026. As in B1 and B2, the red runs were taken with the tests written and
+the new code present only as stubs: methods threw `NotImplementedException`, and new constants were empty strings or zero
+(`WatchIdentity.GoogleKeysPath` was `""`). No Android code was written in this chunk, and nothing in it has met a watch.
+
+## What W-4.1.2 asked, and what B3 did with each part
+
+The plan (§2.4, A38, A61) has two halves: the **vault passphrase** typed once on the watch in Dash and kept with the
+watch's Keystore, and **Google tokens** handed over from the phone (Post a Gmail token, Score a Drive token, each hourly,
+held in memory and in Keystore-encrypted storage). Its named tests are `KeyHandoffTests.TokenNeverLogged` and
+`PassphraseKeptInKeystoreOnly`. The brief for B3 was to build the narrowest version that works and to stop and report
+rather than put the passphrase on the watch.
+
+**The passphrase: stopped, not built, for the owner to rule on.** What one passphrase opens is not "what lives in the
+vault for the watch" (TF §4) but the whole of it: the shared vault holds every app's keys (Claude, Gemini, Plaid, NYT,
+reMarkable, Pulp's three, the GitHub update token, TIDAL's app credentials), the Gmail app password and the Messages
+bridge session, and the Sleep Number login; the personal vault holds the TIDAL refresh token and per-install choices.
+Reading either also takes a Drive token, which W-6.1.2 puts on the wrist, so the two together leave every household
+key one download from the watch. And since the technical finding, every use TF §4 named for it has gone: tokens are
+handed over (A61), TIDAL plays through the phone (A62, A73), the Rolodex is Post's (PC6), zone limits are computed on
+the phone and only the numbers travel (A24, W-8.1.3), and the phone is always on (A67). The music folder id
+(`MusicSecrets.FolderId`) and the vault's Drive file ids are plain facts the phone can send. So nothing on the watch
+needs the vault. **Asked of the owner:** retire A38's passphrase on the watch, and with it W-5.1.8 (Dash's first-run
+passphrase screen, drawn in `design/screens-r1.html`) and the plan's `PassphraseKeptInKeystoreOnly`; or confirm A38 and
+say what on the watch it is for. Until then `TheWatchHoldsNoVaultTests` keeps the vault off the watch, so building it is
+a decision rather than a drift. The plan, `WATCH-DESIGN.md` §11 and the mockup are not edited: they wait for the ruling.
+
+**The Gmail token: not handed over.** Dash needs none: Post fetches the mail and relays people-only lines on
+`dash/mail` (B1), the phone doing the network work. So the contract has no Gmail scope and Post's side never names it.
+
+**The Drive token: its contract built, the pure half, in `Watch/Watch.Domain/Keys`** (BCL only), for Wave's streaming
+(W-6.1.2) in release C, where the phone's sender and the watch's holder will be wired. Its pieces:
+- `WatchIdentity.GoogleKeysPath` = `/keys/google`, frozen. The Data Layer joins a package only to itself, so Score's
+  messages reach Wave and Post's reach Dash; one path serves any phone app and its watch app.
+- `AccessToken`: a token of a bearer token's shape (RFC 6750's characters, 20 to 2048), whose `ToString()` is
+  `[access token]`, so interpolation, a record's own text, an exception or a joined list never prints it (the rule
+  Foreword's prayer text uses). Its value is `internal` (the codec writes it) and leaves only as `BearerHeader()`.
+  Value equality, so a refused token can be let go without touching one handed over since.
+- `KeyMessages`: `TokenAsk(scope)` from the watch; `TokenHandoff(scope, token, life)` or `TokenNone(scope, why)` from the
+  phone. `TokenScope` has one member, `DriveReadOnly`. `why` is `sign-in` or `failed`. The life is a duration, not an
+  instant, so the two clocks need not agree.
+- `KeyCodec`: UTF-8 JSON `{v, kind, …}` on `/keys/google` only. A newer `v` is refused first; each kind carries exactly
+  its own fields once each (stricter than Dash's codec: nothing rides beside a token by any name); a scope other than
+  `drive.readonly`, a token of the wrong shape, or a life outside 1 to 2,700 whole seconds refuses the whole message, and
+  the phone cannot write a life past it (`ArgumentOutOfRangeException`, whose message names the seconds, not the token).
+- `KeyLimits`: 4 KB a message; the longest hold 45 minutes, equal to the phone's own reuse window
+  (`CachedAccessToken.DefaultLifetime`, held equal by a guard); ask again 5 minutes before the end; asks a minute apart.
+- `TokenHold`: the watch app's one token, in memory only, behind a lock. `Take` holds a handoff for its life; `Current`
+  lets the token go once its life is over (gone, not hidden, so a clock stepping back does not bring it back);
+  `Refused` lets it go when the phone has none; `Forget` lets it go when Google refuses it, unless another has been handed
+  over since; `AskDue` says to ask when none is held or the one held is nearly done, and not within a minute of the last
+  ask, so a phone handing over the short end of its own token does not start a storm.
+- `KeyLogLines`: `CONTRACT keys/google: received v1` / `refused v2, newer than Watch reads` / `refused, unreadable` /
+  `sent v1` / `not sent, TimeoutException`, and `KEYS keys/google: Held` (asked, answered, held, sign-in, failed,
+  expired, forgotten). The failure line takes the exception and writes only its type's name: a message can hold whatever
+  the call was given, the token included.
+
+## Tests written first
+
+- `Watch/Watch.Tests/Keys/KeyHandoffTests.cs` (35 with theory rows): the plan's **`TokenNeverLogged`** (one token through
+  its own text, a handoff's, a read's, the hold's, an interpolation, a joined list, every receipt from both ends, every
+  outcome, and two failures whose messages hold the token and its header; none says the token, its digits or `Bearer`,
+  and every line has the contract's shape), `ATokenSaysItIsAToken`, `TheTokenLeavesAsAHeader`, `ATokenIsATokensShape` ×8,
+  `ALongTokenIsATokenToItsLimit`, `ATokenIsItsValue`, the hold's (`AHandedTokenIsHeldForItsLife`,
+  `PastItsTimeTheTokenIsLetGo`, `NothingIsHeldAtFirst`, `ANewerTokenReplacesTheOld`, `ARejectedTokenIsForgotten`,
+  `ATokenHandedSinceIsNotForgotten`, `ThePhoneSayingNoneLetsTheTokenGo`), the asking (`AskWhenThereIsNone`,
+  `NoAskWhileTheTokenIsGood`, `AskWhenTheTokenIsNearlyDone`, `AnAskIsNotRepeatedWithinAMinute`,
+  `AShortAnswerDoesNotStartAStorm`), `TheHoldKeepsNothingButMemory` (no property, and no member hands out text, bytes or a
+  stream), `TheTokensValueIsNotPublic`, and the lines' (`AReceiptSaysTheContractAndVersion`, `AnOutcomeIsAWord`,
+  `AFailureIsItsTypeOnly`, `OnlyTheKeysPathIsAContract` ×4, `TheContractIsThePathWithoutItsSlash`).
+- `Watch/Watch.Tests/Keys/KeyCodecTests.cs` (79 with rows): `EveryMessageRoundTrips` ×5, `EveryMessageCarriesAnIntegerV` ×5,
+  `AHandoffKeepsItsTokenAndLife`, `ARefusalKeepsWhy`, `ALifeIsWholeSeconds`, `ANewerVersionIsRefused`,
+  `ANewerVersionIsRefusedBeforeItsKindIsRead`, `AMalformedMessageIsUnreadable` ×44 (a Gmail scope, a wider Drive scope, a
+  token beside an ask or a refusal, a duplicated field, every wrong token shape and life among them), `NothingIsUnreadable`,
+  `AnUnknownFieldRefusesTheMessage`, `OnlyAReadOnlyDriveTokenCrosses`, `OnlyTheKeysPathIsRead` ×8, `TooLargeIsUnreadable`,
+  `TheFullestMessageFitsTheBudget`, `ALifeOutsideTheHoldIsNotSent` ×4, `TheWordsAreFrozen`, `TheLimitsAreTheDecidedOnes`,
+  `EveryMessageTravelsOnTheKeysPath`. Fixtures in `KeyFixtures.cs`, every token saying it is invented.
+- `Watch/Watch.Tests/Guard/WatchInvariantsTests.cs`: `KeysPathIsFrozen`.
+- `RepoGuards.Tests/TheWatchHoldsNoVaultTests.cs` (new, 22 with rows): `ThePassphraseNeverReachesTheWatch` (no shipping
+  file under `Watch/`, comments aside, names the vault, its passphrase or `Storyworthtelling.Voice`),
+  `NoWatchProjectReachesTheVaultsLibrary` (no watch project's ProjectReference closure reaches `Storyworthtelling.Voice`),
+  `ThePhonesWatchHalvesNameNoVault` (Post's relay and listener, Flyleaf's watch half), `DashIsHandedNoToken` (nothing on
+  Post's side names the keys contract), `ATokenLeavesOnlyAsAHeader` (`BearerHeader(` read nowhere but its own folder and
+  the tests; release C adds Wave's one HTTP seam to the list), `TheTokensValueStaysInItsAssembly` (no `InternalsVisibleTo`
+  on the watch), `TheWristKeepsATokenNoLongerThanThePhone` (45 = 45), and the guard's own `TheGuardSeesTheVault` ×7,
+  `TheGuardLeavesTheWatchAlone` ×3, `TheGuardSeesAHandoff` ×4, `CommentsAreNotCode`.
+- `RepoGuards.Tests/DashLogsCarryNoPayloadTests.cs`: `TheCodecAndTheRelayNeverLog` now reads `Watch/Watch.Domain/Keys`
+  too (and asks to see `KeyCodec.cs` and `TokenHold.cs`); new `TheKeyLinesAreFilledFromNoPayload` and
+  `TheKeyLinesTakeNoToken` (a keys line takes a path, a read, an end, an outcome or an exception, and nothing else).
+
+## Red
+
+- **`Watch.Tests`: 718 tests, 107 failed, 611 passed** (B2's 609, and `TheHoldKeepsNothingButMemory` and
+  `TheTokensValueIsNotPublic`, which read the stubs' members by reflection and the stubs already had the final shape). The
+  107: `KeyCodecTests` 71 (all), `KeyHandoffTests` 35 of 37, `WatchInvariantsTests.KeysPathIsFrozen` 1. First errors:
+  `NotImplementedException` 79, `TypeInitializationException` 15 (the fixtures' tokens come from the stub
+  `AccessToken.From`, so each test reading them failed in the fixture, and each `MemberData` theory counted once rather
+  than per row: 8 rows more in green), `Assert.Throws() Failure: Exception type was not an exact match` 8 (`ALifeOutsideTheHoldIsNotSent` ×4,
+  `OnlyTheKeysPathIsAContract` ×4), `Assert.Equal() Failure` 3 (the path, the limits, the version), and
+  `ArgumentOutOfRangeException` 2 (the zero `LongestLength` made the longest-token fixture's length negative).
+- **`RepoGuards.Tests`: 439 tests, 2 failed:** `TheWristKeepsATokenNoLongerThanThePhone` (45 expected, 0) and
+  `TheKeyLinesAreFilledFromNoPayload` (`Assert.NotEmpty`: the stub makes no line). The others pass on stubs because the
+  stubs name nothing, so a probe was planted for one run: `Watch/Watch.Domain/Keys/Probe.cs` (an `InternalsVisibleTo`, a
+  `VaultPassphraseAlias` constant, `Console.WriteLine(token.BearerHeader())`), a `Leak(TokenHandoff handoff)` line in
+  `KeyLogLines` writing the header, `FocusPhone/Post.Android/Dash/KeysProbe.cs` (`WatchIdentity.GoogleKeysPath`, a
+  `BearerHeader()` call, a `VaultPassphraseStore`), and `Watch/Probe/Probe.csproj` referencing `Storyworthtelling.Remarkable`
+  (which reaches `Storyworthtelling.Voice` one step on, so only the closure walk can see it). The two guard files: 52 tests,
+  **10 failed**, each naming its probe: `ThePassphraseNeverReachesTheWatch`, `NoWatchProjectReachesTheVaultsLibrary`,
+  `ThePhonesWatchHalvesNameNoVault`, `DashIsHandedNoToken`, `ATokenLeavesOnlyAsAHeader`, `TheTokensValueStaysInItsAssembly`,
+  `TheCodecAndTheRelayNeverLog`, `TheKeyLinesTakeNoToken`, `TheKeyLinesAreFilledFromNoPayload` and the still-stubbed
+  `TheWristKeepsATokenNoLongerThanThePhone`. The probes were removed.
+- **Second red (during green, the failure line taking the exception rather than a string, so no message can reach it):**
+  `KeyHandoffTests` 35 tests, 3 failed (`TokenNeverLogged`, `AnOutcomeIsAWord`, `AFailureIsItsTypeOnly`) with `NotSent`
+  stubbed; the three-row `AFailureThatIsNoTypeNameIsNotWritten` it replaced had been in the first red (so green has 724:
+  718, 8 rows more, 2 fewer).
+
+## Green
+
+- **`Watch.Tests`: 724 passed, 0 failed. `RepoGuards.Tests`: 439 passed, 0 failed** (`NoKeysTests` and
+  `InventedDataTests` over the new files included). **`FocusPhone/Codex.Tests`: 3309 passed, 0 failed.
+  `Storyworthtelling.Updates.Tests`: 193 passed, 0 failed** (no workflow filter needed a change: every workflow that
+  builds `Watch.Domain` already watches `Watch/Watch.Domain/**`, and `log-loop-guard.yml`, which runs RepoGuards, has no
+  path filter). `FaceStudio.Tests`: 29 passed. `leakscan --ci` over the chunk's diff: "no personal-data shapes in the
+  added lines".
+- **Compiled here** (`-p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false`): `Watch/Watch.Ui.Wear`,
+  `Watch/Point.Installer` and `FocusPhone/Post.Android`, each **Build succeeded, 0 errors**. No head's own file changed;
+  they were built because each compiles `Watch.Domain`.
+
+## Decisions made in this chunk (each the owner's to overturn)
+
+- **The vault passphrase stays off the watch until the owner rules** (above). Nothing in B3 asks for it, stores it or
+  sends it, and the guard holds both ends.
+- **No Gmail token:** Dash reads mail only as Post's relayed lines (A11, B1), so the narrowest is none.
+- **Only a read-only Drive token crosses.** Score's own token is full `drive` (it writes the taste summary back); the
+  phone should ask Google for a `drive.readonly` token to hand over. The cost, unverified: a token type the app has not
+  asked for before may bring one more consent screen on the phone (Android keys a consent by the token-type string).
+- **Asked for, not pushed.** The plan has each phone app hand its token over hourly while the phone is on; here the watch
+  app asks when it needs one and the phone answers once, on the node that asked, as Post's answers already go (B2). A
+  token is on the wrist only while something there uses it. The cost: the first stream after the watch app starts waits
+  for one round trip. With the phone off neither works (A67).
+- **Memory only.** The plan also keeps the token in Keystore-encrypted storage; here it is never written down, and a
+  watch app that restarts asks again. Within its life of at most 45 minutes a stored copy saves one round trip and
+  leaves a token at rest.
+- **The life is the phone's reuse window, carried as a duration:** at most 45 minutes, so the wrist never uses a token
+  longer than the phone would, and no clock agreement is needed. Renew 5 minutes before, asks a minute apart, 4 KB a
+  message: chosen, not measured.
+- **W-4.1.2 lands as the contract only.** The phone's answer (Score) and the watch's ask and hold (Wave) are Android code
+  with nothing to use them until W-6.1.2, so they are release C's, where they can be exercised. B3 adds no Data Layer
+  call, so there is no wait to bound.
+
+## Not done, not verified
+
+- **W-5.1.8 (Dash's first-run passphrase screen) is blocked** on the owner's answer about A38, and the plan's
+  `PassphraseKeptInKeystoreOnly` is not written. The plan (§2.4, §4's Keystore alias, W-4.1.2, W-5.1.8), `WATCH-DESIGN.md`
+  §11 and the screens mockup still describe the passphrase on the watch and the hourly Gmail token.
+- **Nothing asks and nothing answers yet:** no head sends or receives on `/keys/google`. Score's half (fetching a
+  read-only token, answering an ask, `sign-in` when Google wants consent) and Wave's (asking, holding, `Forget` on a 401,
+  the one `BearerHeader()` reader) come with W-6.1.2.
+- **Unverified:** whether AccountManager hands Score a `drive.readonly` token beside its `drive` consent without another
+  screen, Google's token lifetime on the watch's clock, and a keys message's round trip over Bluetooth or the cloud relay.
