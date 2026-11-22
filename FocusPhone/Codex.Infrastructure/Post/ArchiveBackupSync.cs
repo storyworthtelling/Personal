@@ -74,7 +74,25 @@ public sealed class ArchiveBackupSync
         this.passphrase = passphrase;
     }
 
+    // One sync at a time in the process. The launch restore and every PostSync run each build their own instance, and
+    // two running at once each read the phone's archive before the other had restored, so both downloaded the backup
+    // and restored the same ghosts. A caller that waited finds the marker the first left, and stops there.
+    private static readonly SemaphoreSlim OneAtATime = new(1, 1);
+
     public async Task<ArchiveSyncResult> SyncAsync(FilingStore filing, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await OneAtATime.WaitAsync(cancellationToken);
+        try
+        {
+            return await SyncOnceAsync(filing, now, cancellationToken);
+        }
+        finally
+        {
+            OneAtATime.Release();
+        }
+    }
+
+    private async Task<ArchiveSyncResult> SyncOnceAsync(FilingStore filing, DateTimeOffset now, CancellationToken cancellationToken)
     {
         if (marker?.Read() is { } confirmed && revision is not null && !string.IsNullOrEmpty(passphrase()))
         {
