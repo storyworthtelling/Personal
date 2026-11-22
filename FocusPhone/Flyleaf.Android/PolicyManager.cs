@@ -5,6 +5,7 @@ using Android.Content.PM;
 using Android.Net;
 using Android.OS;
 using Android.Util;
+using Codex.Domain.Diagnostics;
 using Codex.Domain.Policy;
 using Codex.Ui;
 using Codex.Domain.Unlock;
@@ -264,22 +265,21 @@ public static class PolicyManager
     private static PolicyEvent Event(PolicyEventKind kind, string summary) =>
         new(DateTimeOffset.UtcNow, kind, summary);
 
-    // A readable one-liner for a thrown Java exception: its type, its message, and (crucially) its
-    // wrapped cause's type + message — because a bare RuntimeException often carries the real reason
-    // only on its cause. Walks up to two causes deep so the log names the actual failure.
+    // A readable one-liner for a thrown Java exception: its Java class (not the .NET wrapper's type), its
+    // message, its top frames as class.method, and the same for each cause — because a bare RuntimeException
+    // often carries the real reason only on its cause, or only in where it was thrown from.
     private static string DescribeThrowable(Java.Lang.Throwable e)
     {
-        static string One(Java.Lang.Throwable t) =>
-            $"{t.GetType().Name}: {(string.IsNullOrEmpty(t.Message) ? "(no message)" : t.Message)}";
-
-        var text = One(e);
-        var cause = e.Cause;
-        for (var depth = 0; cause is not null && depth < 2; depth++)
+        var chain = new List<JavaThrowableLink>();
+        for (Java.Lang.Throwable? t = e; t is not null && chain.Count <= JavaThrowableText.MaxCauses; t = t.Cause)
         {
-            text += $" <- {One(cause)}";
-            cause = cause.Cause;
+            var frames = (t.GetStackTrace() ?? [])
+                .Take(JavaThrowableText.FramesPerLink)
+                .Select(frame => $"{frame.ClassName}.{frame.MethodName}")
+                .ToList();
+            chain.Add(new JavaThrowableLink(t.Class.Name, t.Message, frames));
         }
-        return text;
+        return JavaThrowableText.Describe(chain);
     }
 
     /// <summary>

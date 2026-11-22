@@ -45,6 +45,7 @@ public class HomeActivity : Activity
     private LinearLayout? callBar;
     private Button? callButton;
     private const int RequestBrowserRoleCode = 4200;
+    private const int RequestUninstallCode = 4201;
 
     // The Google account is used for the vault-backed update-token restore and the cover-load
     // voiced hello. Best-effort: both no-op until a Google account is signed in.
@@ -446,26 +447,54 @@ public class HomeActivity : Activity
         LaunchVisibleUninstaller(package);
     }
 
+    // The package handed to the system uninstaller, until its activity result answers (one at a time).
+    private static string? visibleUninstallPackage;
+
+    // Started for a result, in this task: the uninstaller's answer is what settles the key action and the notice.
     private void LaunchVisibleUninstaller(string package)
     {
         var uri = Android.Net.Uri.Parse("package:" + package);
+        visibleUninstallPackage = package;
         try
         {
-            StartActivity(new Intent(Intent.ActionUninstallPackage, uri).SetFlags(ActivityFlags.NewTask));
+            StartActivityForResult(
+                new Intent(Intent.ActionUninstallPackage, uri).PutExtra(Intent.ExtraReturnResult, true), RequestUninstallCode);
         }
         catch (Android.Content.ActivityNotFoundException)
         {
             try
             {
-                StartActivity(new Intent(Intent.ActionDelete, uri).SetFlags(ActivityFlags.NewTask));
+                StartActivityForResult(
+                    new Intent(Intent.ActionDelete, uri).PutExtra(Intent.ExtraReturnResult, true), RequestUninstallCode);
             }
             catch (Android.Content.ActivityNotFoundException)
             {
                 // No uninstaller available (unusual); nothing more we can do from the launcher.
-                DogEar.SetNotice(this, root!, UninstallNoticeKey,
-                    new DogEar.Notice("Couldn’t uninstall", "No uninstaller is available on this device.", PaperTheme.ProblemMark));
+                visibleUninstallPackage = null;
+                SettleVisibleUninstall(package, VisibleUninstall.Unavailable);
             }
         }
+    }
+
+    private void SettleVisibleUninstall(string package, UninstallVerdict verdict)
+    {
+        if (PendingUninstalls.TryRemove(package, out var action))
+        {
+            if (verdict.Succeeded)
+            {
+                action.Succeeded();
+            }
+            else
+            {
+                action.Failed(verdict.Reason ?? "refused");
+            }
+        }
+        DogEar.SetNotice(this, root!, UninstallNoticeKey, verdict.ShowsProblem
+            ? new DogEar.Notice("Couldn’t uninstall", verdict == VisibleUninstall.Unavailable
+                ? "No uninstaller is available on this device."
+                : "The system uninstaller didn’t remove it.", PaperTheme.ProblemMark)
+            : null);
+        ReloadScene();
     }
 
     private void ShowShelfPicker(string package, string label)
@@ -592,6 +621,11 @@ public class HomeActivity : Activity
         if (requestCode == RequestBrowserRoleCode)
         {
             UpdateSetDefaultBrowserButton();
+        }
+        else if (requestCode == RequestUninstallCode && visibleUninstallPackage is { } package)
+        {
+            visibleUninstallPackage = null;
+            SettleVisibleUninstall(package, VisibleUninstall.Read((int)resultCode));
         }
     }
 
