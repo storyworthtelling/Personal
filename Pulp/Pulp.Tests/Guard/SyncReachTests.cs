@@ -78,6 +78,30 @@ public class SyncReachTests
         Assert.Contains("LandingCheck.Window", landings);
     }
 
+    // A notice with a button the page could not serve threw from ToDogEar, inside a posted Settle, and
+    // crashed the app; the exception's words carried the notice's headline, a watched title.
+    [Fact]
+    public void ANoticeButtonWithNoHandlerIsDroppedNotThrown()
+    {
+        var notices = Text("Pulp.Android/Components/PulpNotices.cs");
+        var toDogEar = notices[notices.IndexOf("private static DogEar.Notice ToDogEar", StringComparison.Ordinal)..];
+
+        Assert.DoesNotContain("throw new ArgumentException", toDogEar);
+        Assert.DoesNotContain("notice.Headline}", toDogEar);
+        Assert.Contains("canReopen:", notices);
+    }
+
+    [Fact]
+    public void EachSettledLandingIsCaughtOnItsOwnAndLoggedByShape()
+    {
+        var landings = Text("Pulp.Android/HandOffs/Landings.cs");
+        var settle = landings[landings.IndexOf("private static void Settle", StringComparison.Ordinal)..];
+
+        Assert.Contains("catch (Exception", settle);
+        Assert.Contains("HeadLog.Quiet(", settle);
+        Assert.DoesNotContain("TitleName}", settle);
+    }
+
     // W7.5 (owner's ruling): the weekly refresh had frozen names and no worker; it now runs, daily, under them.
     [Fact]
     public void TheWeeklyRefreshIsScheduledUnderItsFrozenNames()

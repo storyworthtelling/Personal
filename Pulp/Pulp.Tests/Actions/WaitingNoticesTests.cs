@@ -46,6 +46,33 @@ public class WaitingNoticesTests
         Assert.Equal(WaitingNotices.HandOffKey(Saltmarsh), notice.Key);
     }
 
+    // A sports hand-off has nothing to reopen: the notice offered "Open" anyway and the head threw on the
+    // main thread when it found no handler. Whether a notice can offer the title is decided here.
+    [Theory]
+    [InlineData(Landing.NotSeen)]
+    [InlineData(Landing.LandedElsewhere)]
+    public void ALandingNothingCanReopenOffersNoButton(Landing landing)
+    {
+        var game = new TitleId("game-invented-fc");
+        var notice = WaitingNotices.AfterLanding(landing, "Lanternbox", "Invented FC at Example FC", game, Tonight, canReopen: false);
+
+        Assert.NotNull(notice);
+        Assert.Equal(NoticeAction.None, notice.Action);
+        Assert.Null(notice.ActionLabel);
+    }
+
+    [Theory]
+    [InlineData(Landing.NotSeen)]
+    [InlineData(Landing.LandedElsewhere)]
+    public void ALandingThatCanReopenOffersTheTitle(Landing landing)
+    {
+        var notice = WaitingNotices.AfterLanding(landing, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true);
+
+        Assert.NotNull(notice);
+        Assert.Equal(NoticeAction.OpenTitle, notice.Action);
+        Assert.Equal("Open Saltmarsh", notice.ActionLabel);
+    }
+
     [Theory]
     [InlineData(Landing.Landed)]
     [InlineData(Landing.Unknown)]
