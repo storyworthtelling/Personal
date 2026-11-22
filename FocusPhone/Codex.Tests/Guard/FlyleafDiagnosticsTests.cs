@@ -29,6 +29,18 @@ public partial class FlyleafDiagnosticsTests
         Assert.Contains("HeadLog.Info(Tag, $\"Policy applied:", LogLoopSource.File(Policy), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AThrownPolicyCallIsDescribedByItsJavaClassAndFrames()
+    {
+        var source = LogLoopSource.File(Policy);
+        var body = Regex.Match(source, @"private static string DescribeThrowable\(Java\.Lang\.Throwable e\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline);
+
+        Assert.True(body.Success, "PolicyManager.DescribeThrowable not found.");
+        Assert.Contains("JavaThrowableText.Describe(", body.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.Contains(".Class.Name", body.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetType().Name", body.Groups["body"].Value, StringComparison.Ordinal);
+    }
+
     // A Log.Warn/Info/Error that is not HeadLog's.
     [GeneratedRegex(@"(?<![A-Za-z])Log\.(?:Warn|Info|Error|Debug)\(")]
     private static partial Regex LogcatOnly();
