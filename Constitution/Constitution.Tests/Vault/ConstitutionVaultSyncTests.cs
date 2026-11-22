@@ -564,7 +564,7 @@ public class ConstitutionVaultSyncTests
         Assert.Equal(VaultWriteOutcome.Failed, result.Shared);
         Assert.Equal(VaultWriteOutcome.Failed, result.Personal);
         Assert.True(result.NeedsAttention);
-        Assert.Contains("HttpRequestException", result.SharedDetail);
+        Assert.DoesNotContain("HttpRequestException", result.SharedDetail);
         Assert.Contains("no network", result.SharedDetail);
         Assert.Contains("HttpRequestException", result.PersonalDetail);
         Assert.Equal(0, cloud.SharedDrive.Writes);

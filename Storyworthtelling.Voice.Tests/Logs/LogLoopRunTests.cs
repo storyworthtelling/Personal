@@ -101,11 +101,67 @@ public sealed class LogLoopRunTests : IDisposable
         Assert.Contains("LogFolderNotSharedException", result.Error);
     }
 
+    // Which phone this is was read from the vault; a read that failed on the network labelled the whole owner batch
+    // "unknown" and turned off creating the folder. The last answer is kept and stands in for a read that fails.
+    [Fact]
+    public async Task APhoneReadThatFailsUsesTheLastKnownPhone()
+    {
+        var run = Run();
+        Assert.Equal(LogPhone.Owner, await run.PhoneAsync(_ => Task.FromResult(LogPhone.Owner), CancellationToken.None));
+
+        var phone = await run.PhoneAsync(_ => throw new HttpRequestException("network down"), CancellationToken.None);
+
+        Assert.Equal(LogPhone.Owner, phone);
+        var (problem, line) = lines.Last();
+        Assert.True(problem);
+        Assert.Contains("using the last known phone", line);
+        Assert.DoesNotContain("network down", line);
+    }
+
+    [Fact]
+    public async Task AnUnknownAnswerUsesTheLastKnownPhoneToo()
+    {
+        var run = Run();
+        await run.PhoneAsync(_ => Task.FromResult(LogPhone.Partner), CancellationToken.None);
+
+        Assert.Equal(LogPhone.Partner, await run.PhoneAsync(_ => Task.FromResult(LogPhone.Unknown), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AFreshInstallWhoseReadFailsUploadsAsUnknown()
+    {
+        var phone = await Run().PhoneAsync(_ => throw new HttpRequestException("network down"), CancellationToken.None);
+
+        Assert.Equal(LogPhone.Unknown, phone);
+        Assert.Null(state.LastPhone);
+        Assert.Contains(lines, entry => entry.Problem && entry.Line.Contains("uploading as unknown"));
+    }
+
+    [Fact]
+    public async Task ANewAnswerReplacesTheStoredOne()
+    {
+        var run = Run();
+        await run.PhoneAsync(_ => Task.FromResult(LogPhone.Owner), CancellationToken.None);
+
+        Assert.Equal(LogPhone.Partner, await run.PhoneAsync(_ => Task.FromResult(LogPhone.Partner), CancellationToken.None));
+        Assert.Equal(LogPhone.Partner, state.LastPhone);
+    }
+
+    [Fact]
+    public async Task ACancelledReadIsNotCoveredUp()
+    {
+        state.LastPhone = LogPhone.Owner;
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            Run().PhoneAsync(_ => throw new OperationCanceledException(), CancellationToken.None));
+    }
+
     private sealed class MemoryState : ILogLoopState
     {
         public string? InstallId { get; set; }
         public string? UploadHistory { get; set; }
         public bool WaitingForPassphrase { get; set; }
+        public string? LastPhone { get; set; }
     }
 
     private sealed class MemoryFolder : IDriveLogFolder

@@ -111,18 +111,9 @@ public static class MauiLogLoop
         }
         try
         {
-            string phone;
-            try
-            {
-                phone = await setup.Phone(cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception e) when (e is not OperationCanceledException)
-            {
-                log.Write("LogUpload", LogLevel.Warning, $"Couldn’t tell which phone this is ({e.GetType().Name}); uploading as unknown.", null);
-                phone = LogPhone.Unknown;
-            }
-            var folder = new DriveLogFolder(setup.Drive, mayCreateFolder: LogPhoneRole.MayCreateFolder(phone));
             var run = Run();
+            var phone = await run.PhoneAsync(setup.Phone, cancellationToken).ConfigureAwait(false);
+            var folder = new DriveLogFolder(setup.Drive, mayCreateFolder: LogPhoneRole.MayCreateFolder(phone));
             var install = run.Install(setup.App, phone, AppInfo.Current.VersionString, long.TryParse(AppInfo.Current.BuildString, out var code) ? code : 0);
             return await run.RunAsync(folder, log.Outbox, install, [log.LivePath], setup.Passphrase(), cancellationToken).ConfigureAwait(false);
         }
@@ -197,6 +188,12 @@ public static class MauiLogLoop
         {
             get => Preferences.Default.Get("logLoop.waitingForPassphrase", false);
             set => Preferences.Default.Set("logLoop.waitingForPassphrase", value);
+        }
+
+        public string? LastPhone
+        {
+            get => Preferences.Default.Get<string?>("logLoop.lastPhone", null);
+            set => Preferences.Default.Set("logLoop.lastPhone", value);
         }
     }
 

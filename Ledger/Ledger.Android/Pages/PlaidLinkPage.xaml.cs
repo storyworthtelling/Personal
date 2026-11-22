@@ -534,7 +534,7 @@ public partial class PlaidLinkPage : LedgerBinderPage
             // silently un-saved token doesn't quietly force a re-link after the next reset.
             SecretsVaultPublishResult backup;
             try { backup = await vaultSync.PublishAsync(CancellationToken.None); }
-            catch (Exception ex) { backup = SecretsVaultPublishResult.WriteFailed(ex.Message); }
+            catch (Exception ex) { backup = SecretsVaultPublishResult.WriteFailed(ex); }
             // This page leaves next, so the notice is carried to the dog-ear of the page it lands on
             // (audit W8.2b: it was an alert in front of a connection that had already worked).
             if (backup.NeedsAttention)

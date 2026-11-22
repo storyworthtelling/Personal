@@ -1,3 +1,6 @@
+using Storyworthtelling.Diagnostics;
+using Storyworthtelling.Voice.Health;
+
 namespace Storyworthtelling.Voice.Secrets;
 
 public enum SecretsVaultPublishStatus
@@ -32,6 +35,29 @@ public sealed record SecretsVaultPublishResult(SecretsVaultPublishStatus Status,
     public static SecretsVaultPublishResult NoPassphrase { get; } = new(SecretsVaultPublishStatus.NoPassphrase);
     public static SecretsVaultPublishResult VaultUnreadable { get; } = new(SecretsVaultPublishStatus.VaultUnreadable);
     public static SecretsVaultPublishResult WriteFailed(string error) => new(SecretsVaultPublishStatus.WriteFailed, error);
+
+    /// <summary>
+    /// A backup that failed with <paramref name="failure"/>: its cause in plain words (never the exception's type or
+    /// message as written), and <see cref="ScopeLikely"/> only when Google turned the request away.
+    /// </summary>
+    public static SecretsVaultPublishResult WriteFailed(Exception failure) =>
+        new(SecretsVaultPublishStatus.WriteFailed, Sentence(PlainError.Describe(failure, "Google")))
+        {
+            ScopeLikely = AuthFailure.IsCredentialRejection(failure),
+        };
+
+    /// <summary>Google refused the request (401 or 403), so the Drive scope may need granting again.</summary>
+    public bool ScopeLikely { get; init; }
+
+    private static string Sentence(string words)
+    {
+        if (string.IsNullOrWhiteSpace(words))
+        {
+            return "Drive couldn’t be reached.";
+        }
+
+        return words.EndsWith('.') || words.EndsWith('…') ? words : words + ".";
+    }
     public static SecretsVaultPublishResult ReadOnly { get; } = new(SecretsVaultPublishStatus.ReadOnly);
 
     /// <summary>The reason a vault written by a newer app is refused, so the message can say "update".</summary>
@@ -57,10 +83,12 @@ public sealed record SecretsVaultPublishResult(SecretsVaultPublishStatus Status,
         SecretsVaultPublishStatus.VaultUnreadable =>
             "Couldn’t back up to the vault: the passphrase doesn’t match the vault already on Drive. " +
             "Your settings are saved on this device; fix the passphrase to back it up.",
-        SecretsVaultPublishStatus.WriteFailed =>
+        SecretsVaultPublishStatus.WriteFailed when ScopeLikely =>
             $"Couldn’t back up to the vault: {Error} " +
             "Your settings are saved on this device. This usually means Drive access needs the full-access " +
             "scope re-granted — sign in again, then Save.",
+        SecretsVaultPublishStatus.WriteFailed =>
+            $"Couldn’t back up to the vault: {Error} Your settings are saved on this device.",
         _ => string.Empty
     };
 }
