@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Foreword.Domain.Models;
 using Foreword.Infrastructure.Nyt;
@@ -140,5 +141,67 @@ public class NytArticleClientTests
             {
                 Content = new ByteArrayContent(FakeImageBytes)
             });
+    }
+}
+
+/// <summary>
+/// An article page with no __NEXT_DATA__ script is the ordinary case now: the HTML fallback reads the body. Warning
+/// about the missing script on every article, every morning, buried the one warning that matters (no body at all),
+/// so the script's absence is a debug line, and it does not name the article.
+/// </summary>
+public class NytArticleLoggingTests
+{
+    private const string ArticleUrl = "https://example.com/2026/01/02/world/an-invented-story.html";
+
+    [Fact]
+    public async Task APageReadByTheHtmlFallbackWarnsAboutNothing()
+    {
+        var logger = new ListLogger();
+        var client = new NytArticleClient(new FakePageFetcher(@"<!DOCTYPE html><html><body>
+            <h1>An invented headline</h1>
+            <section name=""articleBody""><p>The first invented paragraph.</p><p>The second invented paragraph.</p></section>
+        </body></html>"), new HttpClient(new NoImages()), logger);
+
+        var article = await client.GetArticle(ArticleUrl);
+
+        Assert.Equal(2, article.Body.OfType<TextBlock>().Count());
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Message.Contains("__NEXT_DATA__") && entry.Message.Contains(ArticleUrl));
+    }
+
+    [Fact]
+    public async Task APageWithNoScriptAndNoBodyWarnsOnce()
+    {
+        var logger = new ListLogger();
+        var client = new NytArticleClient(new FakePageFetcher("<!DOCTYPE html><html><body><h1>An invented headline</h1></body></html>"),
+            new HttpClient(new NoImages()), logger);
+
+        var article = await client.GetArticle(ArticleUrl);
+
+        Assert.Empty(article.Body);
+        Assert.Single(logger.Entries, entry => entry.Level >= LogLevel.Warning);
+    }
+
+    private sealed class FakePageFetcher(string html) : IArticlePageFetcher
+    {
+        public Task<string> FetchPageHtmlAsync(string url) => Task.FromResult(html);
+    }
+
+    private sealed class NoImages : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+    }
+
+    private sealed class ListLogger : ILogger<NytArticleClient>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception)));
     }
 }
