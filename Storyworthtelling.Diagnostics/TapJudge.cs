@@ -104,6 +104,7 @@ public sealed class TapJudge
     private readonly List<Burst> bursts = [];
     private readonly Dictionary<string, RunningAction> actions = new(StringComparer.Ordinal);
     private long lastActionStartedMs = long.MinValue;
+    private long lastChangeMs = long.MinValue;
     private string lastScreen = string.Empty;
 
     public IReadOnlyList<TapRecord> Recent => ring.ToList();
@@ -111,14 +112,13 @@ public sealed class TapJudge
     /// <summary>Whether anything is waiting to mature — the hook keeps ticking while this is true.</summary>
     public bool HasPending => pendingDead.Count > 0 || bursts.Count > 0 || actions.Count > 0;
 
-    public IReadOnlyList<TapVerdict> Tap(long atMs, string screen, string control, TapPoint point, bool enabled, bool isControl) =>
-        Tap(atMs, screen, control, point, enabled, isControl, resultVisible: true);
-
     /// <summary>
-    /// As above; with <paramref name="resultVisible"/> false the tap landed where the hooks cannot see a change
-    /// (inside a web page), so it is never judged dead, though it still counts toward a repeated burst.
+    /// A tap, fed at lift. With <paramref name="resultVisible"/> false the tap landed where the hooks cannot see a
+    /// change (inside a web page), so it is never judged dead, though it still counts toward a repeated burst.
+    /// <paramref name="pressedAtMs"/> is when the finger went down: a change at or after it (a long press opens its
+    /// card or dialog before lift) has already answered the tap, so it is not a dead candidate.
     /// </summary>
-    public IReadOnlyList<TapVerdict> Tap(long atMs, string screen, string control, TapPoint point, bool enabled, bool isControl, bool resultVisible)
+    public IReadOnlyList<TapVerdict> Tap(long atMs, string screen, string control, TapPoint point, bool enabled, bool isControl, bool resultVisible = true, long? pressedAtMs = null)
     {
         var verdicts = Settle(atMs);
         lastScreen = screen;
@@ -139,7 +139,8 @@ public sealed class TapJudge
         burst.Add(atMs, enabled, isControl);
 
         var actionRunning = actions.Values.Any(a => a.DeadlineMs > atMs);
-        if (resultVisible && enabled && isControl && !actionRunning && (firstOfBurst || !burst.HasDeadCandidate))
+        var answeredWhilePressed = pressedAtMs is { } pressed && lastChangeMs >= pressed;
+        if (resultVisible && enabled && isControl && !actionRunning && !answeredWhilePressed && (firstOfBurst || !burst.HasDeadCandidate))
         {
             pendingDead.Add(new PendingDead(atMs, screen, control, burst, atMs));
             burst.HasDeadCandidate = true;
@@ -151,9 +152,16 @@ public sealed class TapJudge
     {
         var verdicts = Settle(atMs);
         lastScreen = screen;
+        lastChangeMs = atMs;
         pendingDead.Clear();
         return verdicts;
     }
+
+    /// <summary>
+    /// The watched window lost focus: the tap's answer opened in another window (another app, a platform dialog,
+    /// the system's picker), where the layout fingerprint cannot see it. That is a change, like any other.
+    /// </summary>
+    public IReadOnlyList<TapVerdict> WindowLeft(long atMs) => SomethingChanged(atMs);
 
     public IReadOnlyList<TapVerdict> ContentChanged(long atMs, string screen) => SomethingChanged(atMs);
 
@@ -164,6 +172,7 @@ public sealed class TapJudge
         var verdicts = Settle(atMs);
         actions[actionId] = new RunningAction(atMs, atMs + (long)within.TotalMilliseconds, lastScreen);
         lastActionStartedMs = atMs;
+        lastChangeMs = atMs;
         pendingDead.Clear();
         return verdicts;
     }
@@ -216,6 +225,7 @@ public sealed class TapJudge
     private List<TapVerdict> SomethingChanged(long atMs)
     {
         var verdicts = Settle(atMs);
+        lastChangeMs = atMs;
         pendingDead.Clear();
         return verdicts;
     }

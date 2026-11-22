@@ -148,6 +148,8 @@ public static class TapWatch
             }
         }
         var longPress = down is not null && up.EventTime - down.Time >= ViewConfiguration.LongPressTimeout;
+        // MotionEvent times are on the uptime clock, the same one the core was installed with.
+        long? pressedAt = down?.Time;
 
         var hit = Deepest(root, (int)x, (int)y);
         if (hit is null)
@@ -164,7 +166,7 @@ public static class TapWatch
             // A touch sink only keeps taps from falling through: not a control, and named by its type alone,
             // since its first text is a card's title (often a person).
             var sink = TapWatchCore.ControlName(null, null, control.GetType().Name) + (longPress ? " (long press)" : string.Empty);
-            watch.Touched(sink, new TapPoint(x, y), control.Enabled, false);
+            watch.Touched(sink, new TapPoint(x, y), control.Enabled, false, textEntry: false, pressedAtMs: pressedAt);
             Schedule();
             return;
         }
@@ -177,7 +179,7 @@ public static class TapWatch
         }
         else
         {
-            watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null, textEntry: IsTextEntry(target));
+            watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null, textEntry: IsTextEntry(target), pressedAtMs: pressedAt);
         }
         Schedule();
     }
@@ -425,7 +427,9 @@ public static class TapWatch
         public bool OnSearchRequested(SearchEvent? searchEvent) => inner.OnSearchRequested(searchEvent);
         public void OnWindowAttributesChanged(WindowManagerLayoutParams? attrs) => inner.OnWindowAttributesChanged(attrs);
         // Back on this activity without it being created again (home from the browser it opened): its screen is
-        // the one showing again, or every tap here would be judged on the screen created last.
+        // the one showing again, or every tap here would be judged on the screen created last. Losing focus is a
+        // tap's answer opening in another window (another app, a platform dialog, the system's picker), which the
+        // layout fingerprint cannot see.
         public void OnWindowFocusChanged(bool hasFocus)
         {
             if (hasFocus)
@@ -438,6 +442,18 @@ public static class TapWatch
                 catch (Exception ex)
                 {
                     Android.Util.Log.Warn("TapWatch", $"Screen return failed: {ex.Message}");
+                }
+            }
+            else
+            {
+                try
+                {
+                    core?.WindowLeft();
+                    Schedule();
+                }
+                catch (Exception ex)
+                {
+                    Android.Util.Log.Warn("TapWatch", $"Window left failed: {ex.Message}");
                 }
             }
             inner.OnWindowFocusChanged(hasFocus);

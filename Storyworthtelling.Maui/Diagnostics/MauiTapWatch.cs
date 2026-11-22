@@ -166,7 +166,8 @@ public static class MauiTapWatch
         }
         var target = control ?? hit;
         var name = Name(target, activity) + (longPress ? " (long press)" : string.Empty);
-        watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null, textEntry: IsTextEntry(target));
+        // MotionEvent times are on the uptime clock, the same one the core was installed with.
+        watch.Touched(name, new TapPoint(x, y), target.Enabled, control is not null, textEntry: IsTextEntry(target), pressedAtMs: start?.Time);
         Schedule();
     }
 

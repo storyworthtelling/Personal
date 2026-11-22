@@ -183,10 +183,11 @@ public sealed class TapWatchCore
 
     /// <summary>
     /// As above; a tap on a text field (<paramref name="textEntry"/>) is never a dead candidate, since placing the
-    /// cursor or raising the keyboard changes nothing the layout fingerprint sees.
+    /// cursor or raising the keyboard changes nothing the layout fingerprint sees. <paramref name="pressedAtMs"/> is
+    /// when the finger went down, on this watch's clock: a change since then has already answered the tap.
     /// </summary>
-    public void Touched(string control, TapPoint point, bool enabled, bool isControl, bool textEntry) =>
-        Feed(j => j.Tap(clock(), screen, control, point, enabled, isControl, resultVisible: !textEntry));
+    public void Touched(string control, TapPoint point, bool enabled, bool isControl, bool textEntry, long? pressedAtMs = null) =>
+        Feed(j => j.Tap(clock(), screen, control, point, enabled, isControl, resultVisible: !textEntry, pressedAtMs: pressedAtMs));
 
     /// <summary>
     /// A tap on something whose response the hooks cannot see (web content): never judged dead, still counted for
@@ -198,6 +199,9 @@ public sealed class TapWatchCore
     public void ContentChanged() => Feed(j => j.ContentChanged(clock(), screen));
 
     public void StatusChanged() => Feed(j => j.StatusChanged(clock(), screen));
+
+    /// <summary>The watched window lost focus: a tap's answer opened in another window, which is a change.</summary>
+    public void WindowLeft() => Feed(j => j.WindowLeft(clock()));
 
     public void Tick() => Feed(j => j.Tick(clock()));
 
