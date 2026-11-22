@@ -86,7 +86,8 @@ public class NytArticleClient : INytArticleClient
         var script = document.QuerySelector("script#__NEXT_DATA__");
         if (script == null)
         {
-            logger.LogWarning("No __NEXT_DATA__ script found for {Url}", url);
+            // The ordinary case now: the HTML fallback reads the body, and warns itself when it finds none.
+            logger.LogDebug("No __NEXT_DATA__ script on the page; trying the HTML body");
             return [];
         }
 
