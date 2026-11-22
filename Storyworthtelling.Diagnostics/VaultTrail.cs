@@ -19,12 +19,25 @@ public static class VaultTrail
     /// A restore is a problem unless the vault opened: an empty vault after a reset is exactly the case to see. No
     /// passphrase yet is the app not taking part, which is said but not flagged.
     /// </summary>
-    public static (bool Problem, string Line) Restored(string vault, string status, Exception? failure = null) =>
-        (status is not ("Loaded" or "NoPassphrase"), Line(vault, "restore", status, failure));
+    /// <param name="detail">One enum word saying more about the outcome (a sealed write's outcome, say), printed in
+    /// brackets. Anything that is not a single word is left out, so a message can never ride in here.</param>
+    public static (bool Problem, string Line) Restored(string vault, string status, Exception? failure = null, string? detail = null) =>
+        (status is not ("Loaded" or "NoPassphrase"), Line(vault, "restore", status, failure, detail));
 
-    public static (bool Problem, string Line) Published(string vault, string status, Exception? failure = null) =>
-        (!QuietPublishes.Contains(status), Line(vault, "publish", status, failure));
+    public static (bool Problem, string Line) Published(string vault, string status, Exception? failure = null, string? detail = null) =>
+        (!QuietPublishes.Contains(status), Line(vault, "publish", status, failure, detail));
 
-    private static string Line(string vault, string action, string status, Exception? failure) =>
-        failure is null ? $"VAULT {vault} {action}: {status}" : $"VAULT {vault} {action}: {status} ({ExceptionShape.TypeChain(failure)})";
+    private static string Line(string vault, string action, string status, Exception? failure, string? detail)
+    {
+        var line = $"VAULT {vault} {action}: {status}";
+        if (IsWord(detail))
+        {
+            line += $" [{detail}]";
+        }
+
+        return failure is null ? line : $"{line} ({ExceptionShape.TypeChain(failure)})";
+    }
+
+    private static bool IsWord(string? detail) =>
+        !string.IsNullOrEmpty(detail) && detail.Length <= 40 && detail.All(char.IsAsciiLetterOrDigit);
 }
