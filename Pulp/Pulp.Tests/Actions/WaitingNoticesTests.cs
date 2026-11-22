@@ -22,7 +22,7 @@ public class WaitingNoticesTests
     [Fact]
     public void LandedElsewhereIsAProblemWithTheHandOffSentenceAndOpensTheTitle()
     {
-        var notice = WaitingNotices.AfterLanding(Landing.LandedElsewhere, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight);
+        var notice = WaitingNotices.AfterLanding(Landing.LandedElsewhere, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true);
 
         Assert.NotNull(notice);
         Assert.Equal("Lanternbox opened, but not on Saltmarsh", notice.Headline);
@@ -37,7 +37,7 @@ public class WaitingNoticesTests
     [Fact]
     public void NotSeenIsHedgedAndQuiet()
     {
-        var notice = WaitingNotices.AfterLanding(Landing.NotSeen, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight);
+        var notice = WaitingNotices.AfterLanding(Landing.NotSeen, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true);
 
         Assert.NotNull(notice);
         Assert.Equal("Lanternbox may not have opened on Saltmarsh", notice.Headline);
@@ -77,7 +77,7 @@ public class WaitingNoticesTests
     [InlineData(Landing.Landed)]
     [InlineData(Landing.Unknown)]
     public void ALandingThatWorkedOrCannotBeToldLeavesNothing(Landing landing) =>
-        Assert.Null(WaitingNotices.AfterLanding(landing, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight));
+        Assert.Null(WaitingNotices.AfterLanding(landing, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true));
 
     [Theory]
     [InlineData(StartRefusal.Hidden)]
@@ -189,8 +189,8 @@ public class WaitingNoticesTests
         }
 
         yield return WaitingNotices.NotInstalled("Lanternbox", Saltmarsh, Tonight);
-        yield return WaitingNotices.AfterLanding(Landing.LandedElsewhere, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight)!;
-        yield return WaitingNotices.AfterLanding(Landing.NotSeen, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight)!;
+        yield return WaitingNotices.AfterLanding(Landing.LandedElsewhere, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true)!;
+        yield return WaitingNotices.AfterLanding(Landing.NotSeen, "Lanternbox", "Saltmarsh", Saltmarsh, Tonight, canReopen: true)!;
         yield return WaitingNotices.KeyRejected("availability", "availability", Tonight);
         yield return WaitingNotices.SportsFeedUnreachable("league-east", "Eastern Rowing League", Tonight);
         yield return WaitingNotices.HouseholdUnreadable(Tonight);
