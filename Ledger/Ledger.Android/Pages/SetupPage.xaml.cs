@@ -413,7 +413,7 @@ public partial class SetupPage : LedgerBinderPage
 
         SecretsVaultPublishResult result;
         try { result = await vaultSync.PublishAsync(CancellationToken.None); }
-        catch (Exception ex) { result = SecretsVaultPublishResult.WriteFailed(ex.Message); }
+        catch (Exception ex) { result = SecretsVaultPublishResult.WriteFailed(ex); }
         if (result.NeedsAttention)
         {
             // Behind the fold, not an alert (audit W8.2b): settings still saved here, so this is a thing to know.

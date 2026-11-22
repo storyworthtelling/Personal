@@ -95,7 +95,9 @@ public class SecretsVaultServiceTests
         Assert.Equal(SecretsVaultPublishStatus.WriteFailed, result.Status);
         Assert.True(result.NeedsAttention);
         Assert.False(result.Succeeded);
-        Assert.Contains("403", result.Message);
+        // In plain words now, never the exception's own message (screens don't show one).
+        Assert.Contains("Google refused the request.", result.Message);
+        Assert.DoesNotContain("InvalidOperationException", result.Message);
     }
 
     [Fact]

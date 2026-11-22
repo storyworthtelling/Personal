@@ -21,4 +21,27 @@ public static class AuthFailure
 
         return false;
     }
+
+    /// <summary>
+    /// Whether anything in <paramref name="failure"/>'s chain is an HTTP credential rejection: an HttpClient status or the
+    /// Google client's own. A failure with no status at all (no account signed in, no network) is not one.
+    /// </summary>
+    public static bool IsCredentialRejection(Exception failure)
+    {
+        for (Exception? current = failure; current is not null; current = current.InnerException)
+        {
+            var rejected = current switch
+            {
+                HttpRequestException { StatusCode: { } status } => IsHttpCredentialRejection((int)status, null),
+                Google.GoogleApiException google => IsHttpCredentialRejection((int)google.HttpStatusCode, google.Message),
+                _ => false,
+            };
+            if (rejected)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
