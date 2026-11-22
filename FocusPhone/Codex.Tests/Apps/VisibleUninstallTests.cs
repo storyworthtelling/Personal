@@ -23,7 +23,7 @@ public class VisibleUninstallTests
         var verdict = VisibleUninstall.Read(VisibleUninstall.ResultCanceled);
 
         Assert.False(verdict.Succeeded);
-        Assert.Equal("cancelled", verdict.Reason);
+        Assert.Equal("canceled", verdict.Reason);
         Assert.False(verdict.ShowsProblem);
     }
 

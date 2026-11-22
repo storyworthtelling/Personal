@@ -22,7 +22,7 @@ public static class VisibleUninstall
     public static UninstallVerdict Read(int resultCode) => resultCode switch
     {
         ResultOk => new UninstallVerdict(true, null, false),
-        ResultCanceled => new UninstallVerdict(false, "cancelled", false),
+        ResultCanceled => new UninstallVerdict(false, "canceled", false),
         _ => new UninstallVerdict(false, "refused", true),
     };
 }
