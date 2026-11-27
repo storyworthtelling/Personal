@@ -91,4 +91,24 @@ public class HouseholdImportTests
         Assert.Equal(new TimeOnly(20, 0), rhythm.Bedtime);
         Assert.Equal(new TimeOnly(18, 0), rhythm.DinnerStart);
     }
+
+    [Fact]
+    public void SomeoneRemovedInForewordIsNotBroughtBack()
+    {
+        var document = new HouseholdPeopleEditor(canEdit: true).Remove(Household.WithFour(), "lee", Household.Next(), Household.Writer).Document;
+
+        var edit = Import(document, PeopleApps.Foreword, new ImportedPerson("lee", "Lee", false, null, false, null));
+
+        Assert.DoesNotContain(HouseholdPeople.From(edit.Document).People, person => person.Name == "Lee");
+    }
+
+    [Fact]
+    public void ANameAlreadyLinkedElsewhereIsNotAddedAgain()
+    {
+        var linked = Import(Household.WithFour(), PeopleApps.Foreword, new ImportedPerson("Sam", "Sam", false, null, false, null)).Document;
+
+        var edit = Import(linked, PeopleApps.Foreword, new ImportedPerson("sam-2", "Sam", false, null, false, null));
+
+        Assert.Single(HouseholdPeople.From(edit.Document).People, person => person.Name == "Sam");
+    }
 }

@@ -173,7 +173,8 @@ public sealed class PulpServices
                 () => SharedHouseholdSync.MayCreateFile(HouseholdFileRole)),
             new Storyworthtelling.People.PeopleInstallStore(peopleFolder),
             new Storyworthtelling.People.PeopleFileSeams(
-                () => VaultPassphraseStore.IsSet, () => VoiceGoogleAccount.IsSignedIn, () => HouseholdFileRole, () => DateTimeOffset.UtcNow));
+                () => VaultPassphraseStore.IsSet, () => VoiceGoogleAccount.IsSignedIn, () => HouseholdFileRole, () => DateTimeOffset.UtcNow),
+            Storyworthtelling.People.PeopleFileAccess.Reader);
         usageFile = new IndexUsageFilePublisher(
             new DriveIndexUsageStore(
                 new DriveTextFile(DriveFactory(account), IndexUsageFile.FileName, SharedDriveFileIds.Store, readCache: DriveReadCache.Shared),
@@ -272,30 +273,16 @@ public sealed class PulpServices
     public bool ForewordOwns => people.People.People.Count > 0;
 
     /// <summary>
-    /// One round with the household Foreword owns: meet it in Drive; on the owner's phone bring Pulp's own viewers into it once (linked
-    /// by name, or kept under their viewer ids); then make Pulp's viewers its mirror (<see cref="HouseholdMirror"/>). Never throws.
+    /// One round with the household Foreword owns: read it from Drive (Pulp never writes it back), then make Pulp's viewers its mirror
+    /// (<see cref="HouseholdMirror"/>). Never throws.
     /// </summary>
     public async Task FollowHouseholdAsync(CancellationToken cancellationToken)
     {
         try
         {
+            // Pulp only reads the household (PeopleFileAccess.Reader); Foreword owns its people.
             await people.ReadAsync(cancellationToken);
-            var standing = await people.SyncAsync(cancellationToken);
-            if (people.CanEdit && standing.State == Storyworthtelling.People.PeopleFileState.Synced)
-            {
-                var mine = HouseholdMirror.ForImport(await HouseholdAsync(cancellationToken));
-                var wrote = false;
-                await people.EditAsync((editor, document, next, writer) =>
-                {
-                    var changed = editor.Import(document, Storyworthtelling.People.PeopleApps.Pulp, mine, next, writer).Document;
-                    wrote = !changed.ContentEquals(document);
-                    return new Storyworthtelling.People.PeopleEdit(changed, null);
-                }, cancellationToken);
-                if (wrote)
-                {
-                    await people.SyncAsync(cancellationToken);
-                }
-            }
+            await people.SyncAsync(cancellationToken);
 
             var household = people.People;
             if (household.People.Count > 0 && HouseholdFileRole != HouseholdFileRole.SharedWith)

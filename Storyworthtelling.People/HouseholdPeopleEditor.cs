@@ -100,9 +100,10 @@ public sealed class HouseholdPeopleEditor(bool canEdit)
     }
 
     /// <summary>
-    /// Brings an app's own people into the household once. A person the app already linked is left alone; a person of the same name is
-    /// linked and has only its blank fields filled (never Foreword's choices changed); anyone else is added with the app's own id (or
-    /// <c>id-app</c> when that id is taken), so the app's records about them still name them. Running it again changes nothing.
+    /// Brings Foreword's own columns into the household once (only Foreword imports; every other app reads). A person already linked is
+    /// left alone; a person of the same name is linked if not yet linked, has only its blank fields filled (never the household's choices
+    /// changed), and is never added a second time; someone removed from the household is not brought back; anyone else is added with the
+    /// local id (or <c>id-app</c> when that id is taken). Running it again changes nothing.
     /// </summary>
     public PeopleEdit Import(HouseholdDocument document, string app, IReadOnlyList<ImportedPerson> people, Func<HlcTimestamp> nextStamp, string writer)
     {
@@ -123,8 +124,20 @@ public sealed class HouseholdPeopleEditor(bool canEdit)
                 continue;
             }
 
-            if (household.FindByName(incoming.Name) is { } same && !same.Links.ContainsKey(app))
+            // Someone Foreword removed stays removed: the app's copy of them is older than the removal.
+            if (document.Find(PeopleRecords.KeyOf(incoming.LocalId.Trim().ToLowerInvariant())) is { IsTombstone: true })
             {
+                continue;
+            }
+
+            if (household.FindByName(incoming.Name) is { } same)
+            {
+                // A person of that name is already here: linked if they aren't yet, and never added a second time.
+                if (same.Links.ContainsKey(app))
+                {
+                    continue;
+                }
+
                 var filled = same with
                 {
                     Birthdate = same.Birthdate ?? incoming.Birthdate,
@@ -139,6 +152,10 @@ public sealed class HouseholdPeopleEditor(bool canEdit)
             if (document.Find(PeopleRecords.KeyOf(id)) is not null)
             {
                 id = id + "-" + app;
+                if (document.Find(PeopleRecords.KeyOf(id)) is not null)
+                {
+                    continue;
+                }
             }
 
             var added = new HouseholdPerson(id, incoming.Name, incoming.IsChild, incoming.Birthdate, incoming.OnPickup && !incoming.IsChild, incoming.GoogleAddress, null)

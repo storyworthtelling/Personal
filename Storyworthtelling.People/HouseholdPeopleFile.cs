@@ -29,6 +29,17 @@ public sealed record PeopleStanding(PeopleFileState State, DateTimeOffset? LastS
     public static PeopleStanding NotCompared { get; } = new(PeopleFileState.NotCompared, null, string.Empty);
 }
 
+/// <summary>
+/// Which app holds the file. <b>Foreword owns the household</b> and is the only <see cref="Owner"/>; every other app is a
+/// <see cref="Reader"/>, which never edits, never creates the file and never writes to Drive: its copy is Drive's, replaced whole on each
+/// pass, so a stale copy kept from before can never put someone back that Foreword removed.
+/// </summary>
+public enum PeopleFileAccess
+{
+    Owner,
+    Reader,
+}
+
 /// <summary>What the app tells the file about the phone it is on, read live. The passphrase is only ever asked whether it is there.</summary>
 public sealed record PeopleFileSeams(Func<bool> HasPassphrase, Func<bool> HasAccount, Func<HouseholdFileRole> Role, Func<DateTimeOffset> Now);
 
@@ -51,14 +62,16 @@ public sealed class HouseholdPeopleFile
     private readonly DriveHouseholdStore shared;
     private readonly PeopleInstallStore install;
     private readonly PeopleFileSeams seams;
+    private readonly PeopleFileAccess access;
     private readonly SemaphoreSlim editGate = new(1, 1);
     private readonly SemaphoreSlim passGate = new(1, 1);
     private PeopleStanding standing = PeopleStanding.NotCompared;
     private HouseholdDocument? latest;
     private string? installId;
 
-    public HouseholdPeopleFile(IHouseholdStore local, DriveHouseholdStore shared, PeopleInstallStore install, PeopleFileSeams seams)
+    public HouseholdPeopleFile(IHouseholdStore local, DriveHouseholdStore shared, PeopleInstallStore install, PeopleFileSeams seams, PeopleFileAccess access)
     {
+        this.access = access;
         this.local = local ?? throw new ArgumentNullException(nameof(local));
         this.shared = shared ?? throw new ArgumentNullException(nameof(shared));
         this.install = install ?? throw new ArgumentNullException(nameof(install));
@@ -75,8 +88,8 @@ public sealed class HouseholdPeopleFile
 
     public string InstallId => installId ??= install.Load().InstallId;
 
-    /// <summary>Whether this phone may change the household: the owner's (or, before the vault is read, an unknown) role.</summary>
-    public bool CanEdit => seams.Role() != HouseholdFileRole.SharedWith;
+    /// <summary>Whether this phone may change the household: Foreword, on the owner's (or, before the vault is read, an unknown) role.</summary>
+    public bool CanEdit => access == PeopleFileAccess.Owner && seams.Role() != HouseholdFileRole.SharedWith;
 
     /// <summary>The household as this phone's copy last read it; empty before the first read.</summary>
     public HouseholdPeople People => Volatile.Read(ref latest) is { } document ? HouseholdPeople.From(document) : HouseholdPeople.Empty;
@@ -168,6 +181,11 @@ public sealed class HouseholdPeopleFile
                 return new PeopleStanding(PeopleFileState.LocalOnly, last, NoAccountSentence);
             }
 
+            if (access == PeopleFileAccess.Reader)
+            {
+                return await ReadOnlyPassAsync(last, cancellationToken);
+            }
+
             var result = await shared.PublishAsync(mine, cancellationToken);
             await AdoptAsync(result.Held, cancellationToken);
             return result.Outcome switch
@@ -193,6 +211,34 @@ public sealed class HouseholdPeopleFile
             // Drive unreachable, a refused token, a timeout: the transport's types can't be listed; the next pass tries again.
             return new PeopleStanding(PeopleFileState.Offline, last, OfflineSentence);
         }
+    }
+
+    // A reader's pass: Drive's household replaces this phone's copy whole. Nothing is written to Drive, and a missing file is waited for.
+    private async Task<PeopleStanding> ReadOnlyPassAsync(DateTimeOffset? last, CancellationToken cancellationToken)
+    {
+        var held = await shared.LoadAsync(cancellationToken);
+        if (held.Records.Count == 0)
+        {
+            return new PeopleStanding(PeopleFileState.WaitingForShare, last, WaitingSentence);
+        }
+
+        await editGate.WaitAsync(cancellationToken);
+        try
+        {
+            var now = await local.LoadAsync(cancellationToken);
+            if (!held.ContentEquals(now))
+            {
+                await local.SaveAsync(held, cancellationToken);
+            }
+
+            Volatile.Write(ref latest, held);
+        }
+        finally
+        {
+            editGate.Release();
+        }
+
+        return new PeopleStanding(PeopleFileState.Synced, seams.Now(), string.Empty);
     }
 
     private static string WaitingSentence =>
