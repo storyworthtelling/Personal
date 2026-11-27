@@ -171,3 +171,20 @@ public sealed record DashMail(IReadOnlyList<DashMailLine> Mail) : DashMessage
 {
     public override string Path => WatchIdentity.DashMailPath;
 }
+
+// ---- dash/photo (P14 B5, W-5.1.3) ----
+
+/// <summary>Dash asking for one photo of a conversation, by its attachment id (<see cref="DashIds.Attachment"/>).</summary>
+public sealed record DashPhotoAsk(string Id) : DashMessage
+{
+    public override string Path => WatchIdentity.DashPhotoPath;
+}
+
+/// <summary>
+/// Post's answer: the photo, shrunk and re-encoded on the phone as a JPEG of at most <see cref="DashLimits.PhotoBytes"/>
+/// (<see cref="PhotoFit"/>), so it carries none of the picture's own metadata. Held in memory on the wrist, never written down.
+/// </summary>
+public sealed record DashPhoto(string Id, byte[] Jpeg) : DashMessage
+{
+    public override string Path => WatchIdentity.DashPhotoPath;
+}

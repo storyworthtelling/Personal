@@ -28,13 +28,16 @@ public static class DashWaits
 
     /// <summary>A send carried out and answered.</summary>
     public static readonly TimeSpan SendAnswer = TimeSpan.FromSeconds(80);
+
+    /// <summary>A photo fetched by the phone, shrunk and answered (B5).</summary>
+    public static readonly TimeSpan Photo = TimeSpan.FromSeconds(30);
 }
 
 /// <summary>
 /// The wrist's half of Dash's exchange (W-5.1.1, W-5.1.2). Post answers on the path it was asked on, once, to the node
 /// that asked, and nothing else (B2): so the wrist matches each answer to the ask it is waiting for, People waiting by
-/// its path, a conversation by its key, a send by the wrist's own name for it. A read, a file, a delete, an undo and a
-/// note are told, and nothing answers them.
+/// its path, a conversation by its key, a send by the wrist's own name for it, a photo by its attachment id (B5). A read,
+/// a file, a delete, an undo and a note are told, and nothing answers them.
 /// </summary>
 public static class DashExchange
 {
@@ -44,6 +47,7 @@ public static class DashExchange
         DashThreadAsk ask => new DashTicket(ask.Path, ask.Key),
         DashSend send => new DashTicket(send.Path, send.Id),
         DashMailAsk ask => new DashTicket(ask.Path, null),
+        DashPhotoAsk ask => new DashTicket(ask.Path, ask.Id),
         _ => null,
     };
 
@@ -53,8 +57,14 @@ public static class DashExchange
         DashThread thread => new DashTicket(thread.Path, thread.Key),
         DashSent sent => new DashTicket(sent.Path, sent.Id),
         DashMail mail => new DashTicket(mail.Path, null),
+        DashPhoto photo => new DashTicket(photo.Path, photo.Id),
         _ => null,
     };
 
-    public static TimeSpan WaitFor(DashMessage asked) => asked is DashSend ? DashWaits.SendAnswer : DashWaits.Answer;
+    public static TimeSpan WaitFor(DashMessage asked) => asked switch
+    {
+        DashSend => DashWaits.SendAnswer,
+        DashPhotoAsk => DashWaits.Photo,
+        _ => DashWaits.Answer,
+    };
 }

@@ -5,7 +5,8 @@ using Watch.Domain.Updates;
 namespace Watch.Domain.Dash;
 
 /// <summary>
-/// Dash's message codec (plan §2.5): UTF-8 JSON with an integer <c>v</c> and a <c>kind</c>, one shape per contract.
+/// Dash's message codec (plan §2.5): UTF-8 JSON with an integer <c>v</c> and a <c>kind</c>, one shape per contract. A
+/// photo's JPEG crosses as base64 in its own message (<c>dash/photo</c>, B5), refused unless it is a JPEG within its budget.
 /// A message is read for the path it arrived on, so an ask on <c>dash/thread</c> is never taken for one on
 /// <c>dash/people</c>. A newer <c>v</c> is refused before anything else is read; a missing, mistyped, over-long or
 /// out-of-place field refuses the whole message.
@@ -29,6 +30,7 @@ public static class DashCodec
     public const string ReadKind = "read";
     public const string NoteKind = "note";
     public const string MailKind = "mail";
+    public const string PhotoKind = "photo";
 
     // Wire words, frozen: the fields.
     public const string PeopleField = "people";
@@ -57,6 +59,7 @@ public static class DashCodec
     public const string NumberField = "number";
     public const string MailField = "mail";
     public const string SubjectField = "subject";
+    public const string JpegField = "jpeg";
 
     // Wire words, frozen, in each enum's order.
     private static readonly string[] MessageTypeWords = ["text", "call", "voicemail", "note"];
@@ -129,6 +132,15 @@ public static class DashCodec
                 case DashMail mail:
                     writer.WriteString(KindField, MailKind);
                     WriteMail(writer, mail);
+                    break;
+                case DashPhotoAsk ask:
+                    writer.WriteString(KindField, AskKind);
+                    writer.WriteString(IdField, ask.Id);
+                    break;
+                case DashPhoto photo:
+                    writer.WriteString(KindField, PhotoKind);
+                    writer.WriteString(IdField, photo.Id);
+                    writer.WriteBase64String(JpegField, photo.Jpeg);
                     break;
                 default:
                     throw new ArgumentException($"{message.GetType().Name} is not a Dash message.", nameof(message));
@@ -308,6 +320,8 @@ public static class DashCodec
         (WatchIdentity.DashCallNotePath, NoteKind) => ReadNote(root),
         (WatchIdentity.DashMailPath, AskKind) => new DashMailAsk(),
         (WatchIdentity.DashMailPath, MailKind) => ReadMail(root),
+        (WatchIdentity.DashPhotoPath, AskKind) => Id(root, IdField, DashIds.IsAttachment, out var photo) ? new DashPhotoAsk(photo) : null,
+        (WatchIdentity.DashPhotoPath, PhotoKind) => ReadPhoto(root),
         _ => null,
     };
 
@@ -446,6 +460,22 @@ public static class DashCodec
         }
         return new DashMail(lines);
     }
+
+    // A photo's id and its JPEG, as base64: no more than the budget, and a JPEG by its own first bytes.
+    private static DashPhoto? ReadPhoto(JsonElement root)
+    {
+        if (!Id(root, IdField, DashIds.IsAttachment, out var id)
+            || !root.TryGetProperty(JpegField, out var said) || said.ValueKind != JsonValueKind.String
+            || !said.TryGetBytesFromBase64(out var jpeg)
+            || jpeg is null || jpeg.Length > DashLimits.PhotoBytes || !IsJpeg(jpeg))
+        {
+            return null;
+        }
+        return new DashPhoto(id, jpeg);
+    }
+
+    // A JPEG opens with its start-of-image marker and the first byte of the marker after it.
+    private static bool IsJpeg(byte[] bytes) => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
 
     // ---- fields ----
 

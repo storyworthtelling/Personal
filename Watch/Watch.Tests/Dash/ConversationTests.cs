@@ -6,7 +6,8 @@ namespace Watch.Tests.Dash;
 /// <summary>
 /// A conversation (W-5.1.1, A10, A14; mock: A conversation): the last few messages, oldest first, the owner's on the
 /// right; reading it on the wrist reads it on the phone, through the newest message shown; a reply the wrist sent shows
-/// at once and gives way to Post's own copy when it comes.
+/// at once and gives way to Post's own copy when it comes. A photo is shown as the mockup draws it (mock: A group text
+/// with a photo, W-5.1.3), fetched on its own by its id, newest first.
 /// </summary>
 public class ConversationTests
 {
@@ -143,5 +144,96 @@ public class ConversationTests
     {
         Assert.Equal(DashWords.Reply, Conversation.ReplyLabel(Lee));
         Assert.Equal(DashWords.ReplyToAll, Conversation.ReplyLabel(GroupThread));
+    }
+
+    // ---- photos (W-5.1.3) ----
+
+    private static DashThreadMessage Picture(string id, int minute, string words, params DashAttachment[] attachments) =>
+        new(id, T0.AddMinutes(minute), Incoming: true, DashMessageType.Text, words, null, attachments);
+
+    [Fact]
+    public void APhotoIsShownAsTheMockupDrawsIt()
+    {
+        // Robin's photo in the group: the picture, and no bubble saying "Photo" under it; the video beside it is named.
+        var robin = Conversation.Bubbles(GroupThread, [])[1];
+
+        Assert.Equal([PhotoId], robin.Photos);
+        Assert.False(robin.Said);
+        Assert.Equal("Photo", robin.Words);
+        Assert.Equal("Robin", robin.From);
+    }
+
+    [Fact]
+    public void APhotoWithWordsKeepsThem()
+    {
+        var thread = Lee with { Messages = [Picture("m0000000000000007", -1, "Look at the oranges.", new DashAttachment(PhotoId, DashAttachmentType.Photo))] };
+
+        var bubble = Assert.Single(Conversation.Bubbles(thread, []));
+
+        Assert.Equal([PhotoId], bubble.Photos);
+        Assert.True(bubble.Said);
+        Assert.Equal("Look at the oranges.", bubble.Words);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("Photo")]
+    public void APhotoWithNoWordsOfItsOwnHasNoBubble(string words)
+    {
+        var thread = Lee with { Messages = [Picture("m0000000000000007", -1, words, new DashAttachment(PhotoId, DashAttachmentType.Photo))] };
+
+        Assert.False(Assert.Single(Conversation.Bubbles(thread, [])).Said);
+    }
+
+    [Fact]
+    public void EveryPhotoOfAMessageIsShownAndNothingElse()
+    {
+        var thread = Lee with
+        {
+            Messages =
+            [
+                Picture("m0000000000000007", -1, "", new DashAttachment("a0000000000000001", DashAttachmentType.Photo),
+                    new DashAttachment("a0000000000000002", DashAttachmentType.Video), new DashAttachment("a0000000000000003", DashAttachmentType.Photo)),
+            ],
+        };
+
+        Assert.Equal(["a0000000000000001", "a0000000000000003"], Assert.Single(Conversation.Bubbles(thread, [])).Photos);
+    }
+
+    [Fact]
+    public void AMessageWithNoPhotoIsAlwaysSaid()
+    {
+        Assert.All(Conversation.Bubbles(GroupThread, []).Where(bubble => bubble.Photos.Count == 0), bubble =>
+        {
+            Assert.True(bubble.Said);
+            Assert.Empty(bubble.Photos);
+        });
+    }
+
+    [Fact]
+    public void PhotosAreAskedForNewestFirst()
+    {
+        var thread = Lee with
+        {
+            Messages =
+            [
+                Picture("m0000000000000007", -9, "", new DashAttachment("a0000000000000001", DashAttachmentType.Photo)),
+                Picture("m0000000000000008", -3, "", new DashAttachment("a0000000000000002", DashAttachmentType.Photo),
+                    new DashAttachment("a0000000000000003", DashAttachmentType.Photo)),
+                Picture("m0000000000000009", -1, "", new DashAttachment("a0000000000000004", DashAttachmentType.Photo)),
+            ],
+        };
+
+        var asked = Conversation.PhotosToAsk(Conversation.Bubbles(thread, []), id => id == "a0000000000000004");
+
+        Assert.Equal(["a0000000000000002", "a0000000000000003", "a0000000000000001"], asked);
+    }
+
+    [Fact]
+    public void TheSameBubblesAreEqual()
+    {
+        // Two answers that say the same are the same conversation, photos and all.
+        Assert.Equal(Conversation.Bubbles(GroupThread, []), Conversation.Bubbles(GroupThread with { Messages = [.. GroupThread.Messages] }, []));
     }
 }

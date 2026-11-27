@@ -2,9 +2,25 @@ namespace Watch.Domain.Dash;
 
 /// <summary>
 /// One message as the conversation draws it (mock: A conversation): the owner's on the right in Dash's quieter glass,
-/// everyone else's on the left on the card, and in a group the sender's name over theirs.
+/// everyone else's on the left on the card, and in a group the sender's name over theirs. A message's photos are drawn
+/// as the mockup's picture (mock: A group text with a photo), over its words if it has any of its own.
 /// </summary>
-public sealed record Bubble(string Id, bool Mine, string Words, string? From, DateTimeOffset At);
+public sealed record Bubble(string Id, bool Mine, string Words, string? From, DateTimeOffset At)
+{
+    /// <summary>The message's photos by attachment id, in Post's order (W-5.1.3): each drawn as the mockup's picture.</summary>
+    public IReadOnlyList<string> Photos { get; init; } = [];
+
+    /// <summary>Whether the message has words of its own to draw in a bubble; a photo with none is the picture alone.</summary>
+    public bool Said { get; init; } = true;
+
+    // Two answers that say the same are the same conversation: the photos are compared by what they hold, not by list.
+    public bool Equals(Bubble? other) =>
+        other is not null
+        && Id == other.Id && Mine == other.Mine && Words == other.Words && From == other.From && At == other.At && Said == other.Said
+        && Photos.SequenceEqual(other.Photos, StringComparer.Ordinal);
+
+    public override int GetHashCode() => HashCode.Combine(Id, Mine, Words, From, At, Said, Photos.Count);
+}
 
 /// <summary>A reply the wrist sent and Post answered as sent, shown until Post's own copy of it comes in a conversation.</summary>
 public sealed record SentHere(string Id, string Words, DateTimeOffset At);
@@ -24,7 +40,11 @@ public static class Conversation
     {
         var bubbles = thread.Messages
             .OrderBy(message => message.At)
-            .Select(message => new Bubble(message.Id, !message.Incoming, WordsOf(message), thread.Group && message.Incoming ? message.From : null, message.At))
+            .Select(message => new Bubble(message.Id, !message.Incoming, WordsOf(message), thread.Group && message.Incoming ? message.From : null, message.At)
+            {
+                Photos = PhotosOf(message),
+                Said = PhotosOf(message).Count == 0 || HasWordsOfItsOwn(message),
+            })
             .ToList();
         bubbles.AddRange(StillOwed(thread, sentHere).Select(sent => new Bubble(sent.Id, true, sent.Words, null, sent.At)));
         return bubbles;
@@ -43,8 +63,20 @@ public static class Conversation
     public static DashRead? ReadFor(DashThread thread) =>
         thread.Messages.Count == 0 ? null : new DashRead(thread.Key, thread.Messages.Max(message => message.At));
 
+    /// <summary>The photos still to fetch, newest message first, so the ones by the Reply pill come first (B5).</summary>
+    public static IReadOnlyList<string> PhotosToAsk(IReadOnlyList<Bubble> bubbles, Func<string, bool> held) =>
+        bubbles.Reverse().SelectMany(bubble => bubble.Photos).Where(id => !held(id)).Distinct(StringComparer.Ordinal).ToList();
+
     /// <summary>The one action (mock): Reply, or Reply to all in a group.</summary>
     public static string ReplyLabel(DashThread thread) => thread.Group ? DashWords.ReplyToAll : DashWords.Reply;
+
+    private static IReadOnlyList<string> PhotosOf(DashThreadMessage message) =>
+        message.Attachments.Where(attachment => attachment.Type == DashAttachmentType.Photo).Select(attachment => attachment.Id).ToList();
+
+    // Words beside a photo, not the word that only says what it is ("Photo", from a phone that wrote its stand-in).
+    private static bool HasWordsOfItsOwn(DashThreadMessage message) =>
+        !string.IsNullOrWhiteSpace(message.Text)
+        && !string.Equals(message.Text.Trim(), WordsOf(message with { Text = string.Empty }), StringComparison.Ordinal);
 
     // Post words every message its own way ("Missed call", "Photo"); a message that crossed with none is said by what it is.
     private static string WordsOf(DashThreadMessage message)

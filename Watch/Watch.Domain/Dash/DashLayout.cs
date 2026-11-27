@@ -90,4 +90,42 @@ public static class DashLayout
     public const double SecondaryCentre = 1.62;
 
     public const double SecondaryOffset = 0.34;
+
+    // ---- B5: a group's photo (mock: A group text with a photo) ----
+
+    public const double PhotoWidth = 1.0;
+
+    public const double PhotoHeight = 0.6;
+
+    public const double PhotoCorner = 0.06;
+
+    /// <summary>Where the mockup draws its one photo's top.</summary>
+    public const double PhotoTop = 0.54;
+
+    /// <summary>From a photo's foot to its caption's centre ("Robin · 1 h").</summary>
+    public const double CaptionCentre = 0.1;
+
+    /// <summary>A group's Reply to all, under the photo's caption.</summary>
+    public const double ReplyToAllCentre = 1.52;
+
+    // ---- B5: the Undo ring (mock: Filed, with Undo) ----
+
+    public const double UndoGlyphCentre = 0.62;
+
+    /// <summary>"Lee filed".</summary>
+    public const double UndoTitleCentre = 1.18;
+
+    /// <summary>"Tap to undo".</summary>
+    public const double UndoPromptCentre = 1.4;
+
+    // ---- B5: the choice before an act, on After the call's layout (no mockup draws it) ----
+
+    public const double ActTitleCentre = 0.66;
+
+    public const double ActPillCentre = 1.18;
+
+    public const double ActPillWidth = 1.0;
+
+    /// <summary>The quieter choice under the pill ("Delete"), where After the call puts "Not now".</summary>
+    public const double ActChoiceCentre = 1.48;
 }

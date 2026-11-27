@@ -2105,3 +2105,29 @@ no longer draws it (its row keeps the name in the ink when unread and the grey w
 - **Green:** `Watch.Tests` **845 passed, 0 failed.**
 - **Left as it was, for the owner to say:** the name of an unread row is still in the ink and a read one in the grey (the
   mockup draws both, and the ruling named the mark), and TalkBack still says "new" for an unread row, as the ink does.
+
+## Red 1 · the pure half (Watch.Domain)
+
+Tests written first: `Dash/DashUndoTests` (24 with rows: the act goes at once under the watch's name with the wrist's
+window; an undo inside it takes back that act, once; an undo tapped before the phone has the act waits for it; an act
+that never reached the phone, or an undo that never did, is said, and nothing is claimed), `Dash/PhotoFitTests` (29),
+`Dash/HeldPhotosTests` (5), photo rows in `DashCodecTests` (`APhotoKeepsItsBytes`, `APhotoIsItsIdAndItsJpeg`,
+`APhotoPastItsBudgetIsUnreadable`, `AFullPhotoFitsTheBudget`, nine malformed rows, two wrong-path rows, the frozen words
+and limits) and in `DashFixtures` (so every round-trip, `v` and log-line theory takes them), `ConversationTests` (seven:
+a photo drawn as the mockup draws it, with or without words of its own, newest first, equal by content),
+`DashExchangeTests` (two), `DashWordsTests` (three), `DashLayoutTests` (four), and `WatchInvariantsTests`
+(`DashPathsAreFrozen` with `/dash/photo`, `DashsNamesAreFrozen` with the act screen). `Codex.Tests`'
+`DashRelayGuardTests.PostRegistersItsListenerByName` asks for the tenth path.
+
+- **`Watch.Tests`: 941 tests, 98 failed, 843 passed.** The 98: `PhotoFitTests` 29, `DashUndoTests` 24, `DashCodecTests`
+  12, `ConversationTests` 7, `DashWordsTests` 7, `HeldPhotosTests` 5, `DashLayoutTests` 5, `DashExchangeTests` 4,
+  `WatchInvariantsTests` 3, `DashLogLinesTests` 2 (the stub's empty path counted as one of Dash's). First errors:
+  `NotImplementedException` 62, `Assert.Throws() Failure: Exception type was not an exact match` 9, `Values differ` 5,
+  `Collections differ` 4, `Assert.False() Failure` 3, `ArgumentException: Destination array was not long enough` 2,
+  `Strings differ` 2, `Assert.All() Failure` 5, and one each of `Nullable object must have a value`,
+  `AggregateException`, `Assert.True() Failure`, `Assert.NotEqual() Failure`, `not within 9 decimal places` and
+  "A box at (0.55, -0.1) of 0.9 by 0.2 runs off the round screen".
+- **`FocusPhone/Codex.Tests`: 3309 tests, 2 failed, 3307 passed:** `TheDashPathsAreNotCopied` (the stub's empty path)
+  and `PostRegistersItsListenerByName` ("DashPhotoPath" not found).
+- **Green: `Watch.Tests` 941 passed, 0 failed; `Codex.Tests` 3309 passed** (Post's listener hears `/dash/photo`; until
+  the next step it does nothing with it); `RepoGuards.Tests` 452 passed; `Storyworthtelling.Updates.Tests` 194 passed.

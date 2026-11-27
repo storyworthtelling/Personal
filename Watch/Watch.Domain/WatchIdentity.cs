@@ -71,9 +71,15 @@ public static class WatchIdentity
     /// <summary>Post → Dash: people-only mail lines (A11). Dash asks on the same path.</summary>
     public const string DashMailPath = "/dash/mail";
 
-    /// <summary>Every Dash path, in the plan's order.</summary>
+    /// <summary>
+    /// Dash → Post: one photo of a conversation, asked by its attachment id; Post answers on the same path with the picture
+    /// shrunk on the phone to fit one message (P14 B5, W-5.1.3).
+    /// </summary>
+    public const string DashPhotoPath = "/dash/photo";
+
+    /// <summary>Every Dash path, in the plan's order, then the ones added after it.</summary>
     public static readonly IReadOnlyList<string> DashPaths =
-        [DashPeoplePath, DashThreadPath, DashSendPath, DashFilePath, DashDeletePath, DashUndoPath, DashReadPath, DashCallNotePath, DashMailPath];
+        [DashPeoplePath, DashThreadPath, DashSendPath, DashFilePath, DashDeletePath, DashUndoPath, DashReadPath, DashCallNotePath, DashMailPath, DashPhotoPath];
 
     // ---- the handed-over Google token (plan §2.4, §2.5, P14 W-4.1.2) ----
 
@@ -109,7 +115,11 @@ public static class WatchIdentity
     /// <summary>A reply read back before it is sent.</summary>
     public const string DashReplyActivityName = "com.storyworthtelling.focusphone.communication.dash.ReplyActivity";
 
-    public static readonly IReadOnlyList<string> DashComponents = [DashPeopleActivityName, DashConversationActivityName, DashReplyActivityName];
+    /// <summary>Filing or deleting a correspondence, then its Undo ring (P14 B5, W-5.1.4).</summary>
+    public const string DashActActivityName = "com.storyworthtelling.focusphone.communication.dash.ActActivity";
+
+    public static readonly IReadOnlyList<string> DashComponents =
+        [DashPeopleActivityName, DashConversationActivityName, DashReplyActivityName, DashActActivityName];
 
     // ---- the installer's registered names ----
 

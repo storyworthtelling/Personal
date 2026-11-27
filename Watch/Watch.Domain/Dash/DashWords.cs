@@ -20,7 +20,8 @@ public enum DashTrouble
 /// Dash's fixed words (WD §6, A37; P14 B4): one short sentence at most, never an exclamation. Loading is a sentence
 /// that says what is happening; success is silent (the screen simply changes); an error is a quiet line that says what
 /// went wrong, in the secondary grey, never a buzz. No app is named on the watch (A48), so the phone is "your phone".
-/// The labels are the mockups' (People waiting, A conversation, Replying by voice).
+/// The labels are the mockups' (People waiting, A conversation, Replying by voice, A group text with a photo, Filed with
+/// Undo); File and Delete, the choice before an act that no mockup draws, are the phone's own words for the two acts.
 /// </summary>
 public static class DashWords
 {
@@ -51,6 +52,33 @@ public static class DashWords
 
     /// <summary>Who a reply goes to, over the words read back.</summary>
     public static string To(string name) => $"To {name}";
+
+    // ---- B5: filing and deleting (W-5.1.4), and photos (W-5.1.3) ----
+
+    public const string File = "File";
+
+    public const string Delete = "Delete";
+
+    public const string TapToUndo = "Tap to undo";
+
+    /// <summary>A row's long press, as TalkBack names it.</summary>
+    public const string FileOrDelete = "File or delete";
+
+    /// <summary>The act stands: the undo never reached the phone.</summary>
+    public const string UndoLost = "The undo didn’t reach your phone.";
+
+    /// <summary>A photo, asked for.</summary>
+    public const string OpeningPhoto = "Opening the photo.";
+
+    public static string Filed(string name) => $"{name} filed";
+
+    public static string Deleted(string name) => $"{name} deleted";
+
+    /// <summary>Under a photo (mock: "Robin · 1 h"): who sent it in a group, and when.</summary>
+    public static string Caption(string? from, string when) => from is null ? when : $"{from} · {when}";
+
+    /// <summary>A photo as TalkBack reads it.</summary>
+    public static string Photo(string? from, string when) => from is null ? $"Photo, {when}" : $"Photo from {from}, {when}";
 
     public static string For(DashTrouble trouble) => trouble switch
     {

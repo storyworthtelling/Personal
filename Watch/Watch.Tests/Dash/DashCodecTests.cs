@@ -69,6 +69,50 @@ public class DashCodecTests
         Assert.Equal((CallId, (string?)null, "Robin can take Juniper on Thursday."), (note.Call, note.Number, note.Text));
     }
 
+    [Fact]
+    public void APhotoKeepsItsBytes()
+    {
+        var ask = Assert.IsType<DashPhotoAsk>(DashCodec.Decode(WatchIdentity.DashPhotoPath, DashCodec.Encode(Messages["photo ask"])).Message);
+        var photo = Assert.IsType<DashPhoto>(DashCodec.Decode(WatchIdentity.DashPhotoPath, DashCodec.Encode(Messages["photo"])).Message);
+
+        Assert.Equal(PhotoId, ask.Id);
+        Assert.Equal(PhotoId, photo.Id);
+        Assert.Equal(Jpeg, photo.Jpeg);
+    }
+
+    [Fact]
+    public void APhotoIsItsIdAndItsJpeg()
+    {
+        // The narrowest addition (B5): which photo, and its bytes as base64; no name, no size, no place it was taken.
+        using var document = JsonDocument.Parse(DashCodec.Encode(Messages["photo"]));
+        var root = document.RootElement;
+
+        Assert.Equal(["v", "kind", "id", "jpeg"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("photo", root.GetProperty("kind").GetString());
+        Assert.Equal(Convert.ToBase64String(Jpeg), root.GetProperty("jpeg").GetString());
+    }
+
+    [Fact]
+    public void APhotoPastItsBudgetIsUnreadable()
+    {
+        var jpeg = new byte[DashLimits.PhotoBytes + 1];
+        Jpeg.CopyTo(jpeg, 0);
+
+        Assert.Equal(ContractRefusal.Unreadable, DashCodec.Decode(WatchIdentity.DashPhotoPath, DashCodec.Encode(new DashPhoto(PhotoId, jpeg))).Refusal);
+    }
+
+    [Fact]
+    public void AFullPhotoFitsTheBudget()
+    {
+        var jpeg = new byte[DashLimits.PhotoBytes];
+        Jpeg.CopyTo(jpeg, 0);
+
+        var bytes = DashCodec.Encode(new DashPhoto(PhotoId, jpeg));
+
+        Assert.True(bytes.Length <= DashLimits.MaxBytes, $"{bytes.Length} bytes");
+        Assert.True(DashCodec.Decode(WatchIdentity.DashPhotoPath, bytes).Accepted);
+    }
+
     [Theory]
     [MemberData(nameof(DashFixtures.Names), MemberType = typeof(DashFixtures))]
     public void EveryMessageCarriesAnIntegerV(string name)
@@ -199,6 +243,16 @@ public class DashCodecTests
         { "/dash/mail", "{\"v\":1,\"kind\":\"mail\",\"mail\":[{\"id\":\"m0123456789abcdef\",\"from\":\"\",\"subject\":\"Plans\",\"at\":1}]}" },
         { "/dash/mail", "{\"v\":1,\"kind\":\"mail\",\"mail\":[{\"id\":\"m0123456789abcdef\",\"from\":\"Sam\",\"at\":1}]}" },
         { "/dash/mail", "{\"v\":1,\"kind\":\"mail\",\"mail\":[{\"id\":\"m0123456789abcdef\",\"from\":\"Sam\",\"subject\":\"Plans\"}]}" },
+        // A photo.
+        { "/dash/photo", "{\"v\":1,\"kind\":\"ask\"}" },
+        { "/dash/photo", "{\"v\":1,\"kind\":\"ask\",\"id\":\"m0123456789abcdef\"}" },
+        { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"a0123456789abcdef\"}" },
+        { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"jpeg\":\"/9j/4AAQ\"}" },
+        { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"c0123456789abcdef\",\"jpeg\":\"/9j/4AAQ\"}" },
+        { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"a0123456789abcdef\",\"jpeg\":\"not base64\"}" },
+        { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"a0123456789abcdef\",\"jpeg\":\"\"}" },
+        { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"a0123456789abcdef\",\"jpeg\":\"iVBORw0KGgo=\"}" },
+        { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"a0123456789abcdef\",\"jpeg\":7}" },
     };
 
     [Theory]
@@ -225,6 +279,8 @@ public class DashCodecTests
     [InlineData("file a correspondence", "/dash/delete")]
     [InlineData("delete a message", "/dash/file")]
     [InlineData("mail", "/dash/people")]
+    [InlineData("photo ask", "/dash/thread")]
+    [InlineData("photo", "/dash/people")]
     [InlineData("people ask", "/update/installed")]
     [InlineData("people ask", "/dash/elsewhere")]
     [InlineData("people ask", null)]
@@ -311,6 +367,7 @@ public class DashCodecTests
         Assert.Equal(40, DashLimits.Number);
         Assert.Equal(TimeSpan.FromMinutes(2), DashLimits.MaxWindow);
         Assert.Equal(64 * 1024, DashLimits.MaxBytes);
+        Assert.Equal(40 * 1024, DashLimits.PhotoBytes);
     }
 
     [Fact]
@@ -320,7 +377,7 @@ public class DashCodecTests
         [
             DashCodec.VersionField, DashCodec.KindField, DashCodec.AskKind, DashCodec.PeopleKind, DashCodec.ThreadKind, DashCodec.SendKind,
             DashCodec.ResultKind, DashCodec.FileKind, DashCodec.DeleteKind, DashCodec.UndoKind, DashCodec.ReadKind, DashCodec.NoteKind,
-            DashCodec.MailKind,
+            DashCodec.MailKind, DashCodec.PhotoKind,
         ];
         string[] fields =
         [
@@ -329,12 +386,13 @@ public class DashCodecTests
             DashCodec.IncomingField, DashCodec.TypeField, DashCodec.TextField, DashCodec.FromField, DashCodec.AttachmentsField,
             DashCodec.ToField, DashCodec.OutcomeField, DashCodec.IdsField, DashCodec.WindowField, DashCodec.ActField,
             DashCodec.ThroughField, DashCodec.CallField, DashCodec.NumberField, DashCodec.MailField, DashCodec.SubjectField,
+            DashCodec.JpegField,
         ];
 
-        Assert.Equal(["v", "kind", "ask", "people", "thread", "send", "result", "file", "delete", "undo", "read", "note", "mail"], envelope);
+        Assert.Equal(["v", "kind", "ask", "people", "thread", "send", "result", "file", "delete", "undo", "read", "note", "mail", "photo"], envelope);
         Assert.Equal(
             ["people", "key", "name", "line", "at", "unread", "group", "title", "members", "messages", "id", "incoming", "type", "text",
-                "from", "attachments", "to", "outcome", "ids", "window", "act", "through", "call", "number", "mail", "subject"],
+                "from", "attachments", "to", "outcome", "ids", "window", "act", "through", "call", "number", "mail", "subject", "jpeg"],
             fields);
     }
 

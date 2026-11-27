@@ -16,6 +16,9 @@ internal static class DashFixtures
 
     public static readonly DateTimeOffset T0 = new(2026, 11, 21, 16, 20, 0, 0, TimeSpan.Zero);
 
+    /// <summary>The start of a JPEG (its SOI marker, then an APP0 marker) and a few bytes: not a picture, but a JPEG's shape.</summary>
+    public static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0xFF, 0xD9];
+
     public static readonly DashPeople People = new(
     [
         new DashPerson(LeeKey, "Lee", "Running late. I’ll be at the field by four.", T0, Unread: true, Group: false),
@@ -58,6 +61,8 @@ internal static class DashFixtures
         ["read"] = new DashRead(LeeKey, T0),
         ["note on a call"] = new DashCallNote(CallId, null, "Robin can take Juniper on Thursday."),
         ["note on a number"] = new DashCallNote(null, "+1 212-555-0103", "Call back about the dentist."),
+        ["photo ask"] = new DashPhotoAsk(PhotoId),
+        ["photo"] = new DashPhoto(PhotoId, Jpeg),
         ["mail ask"] = new DashMailAsk(),
         ["mail"] = new DashMail(
         [

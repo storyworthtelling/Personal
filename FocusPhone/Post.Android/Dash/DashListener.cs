@@ -13,7 +13,7 @@ using Watch.Domain.Updates;
 namespace Post;
 
 /// <summary>
-/// Post's ear for Dash on the watch (P14 W-4.1.1, B2): Play services binds it for a message on any of Dash's nine paths
+/// Post's ear for Dash on the watch (P14 W-4.1.1, B2): Play services binds it for a message on any of Dash's paths
 /// (<see cref="WatchIdentity.DashPaths"/>), sent by Dash, which carries Post's package and signature. Each message is
 /// taken off Play services' thread and waited for here, so the service and its process stay while the act is carried
 /// out, and never past its turn (<see cref="DashReplies.TurnWait"/>). Everything it does is <see cref="DashCarrier"/>'s.
@@ -28,6 +28,7 @@ namespace Post;
 [IntentFilter([MessageClient.ActionMessageReceived], DataScheme = "wear", DataHost = "*", DataPath = WatchIdentity.DashReadPath)]
 [IntentFilter([MessageClient.ActionMessageReceived], DataScheme = "wear", DataHost = "*", DataPath = WatchIdentity.DashCallNotePath)]
 [IntentFilter([MessageClient.ActionMessageReceived], DataScheme = "wear", DataHost = "*", DataPath = WatchIdentity.DashMailPath)]
+[IntentFilter([MessageClient.ActionMessageReceived], DataScheme = "wear", DataHost = "*", DataPath = WatchIdentity.DashPhotoPath)]
 public sealed class DashListener : WearableListenerService
 {
     private const string Tag = "Dash";  // not copy: a log tag

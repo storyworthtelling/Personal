@@ -3,8 +3,9 @@ using Watch.Domain.Dash;
 namespace Watch.Tests.Dash;
 
 /// <summary>
-/// Dash's screens as the mockups draw them (mock: People waiting, A conversation, Replying by voice), in fractions of
-/// the round screen's radius: every row, bubble, pill and word the mockups place sits inside the circle.
+/// Dash's screens as the mockups draw them (mock: People waiting, A conversation, Replying by voice, A group text with a
+/// photo, Filed with Undo; and the choice before an act, on After the call's layout), in fractions of the round screen's
+/// radius: every row, bubble, picture, ring, pill and word the mockups place sits inside the circle.
 /// </summary>
 public class DashLayoutTests
 {
@@ -45,7 +46,8 @@ public class DashLayoutTests
     {
         foreach (var (width, centre) in new[]
         {
-            (DashLayout.ReplyWidth, DashLayout.ReplyCentre), (DashLayout.ReplyToAllWidth, DashLayout.ReplyCentre), (DashLayout.SendWidth, DashLayout.SendCentre),
+            (DashLayout.ReplyWidth, DashLayout.ReplyCentre), (DashLayout.ReplyToAllWidth, DashLayout.ReplyToAllCentre), (DashLayout.SendWidth, DashLayout.SendCentre),
+            (DashLayout.ActPillWidth, DashLayout.ActPillCentre),
         })
         {
             BoxInside(1 - width / 2, centre - DashLayout.PillHeight / 2, width, DashLayout.PillHeight);
@@ -71,5 +73,44 @@ public class DashLayoutTests
     {
         Assert.True(DashLayout.TimeCentre < DashLayout.GlyphTop);
         Assert.True(DashLayout.GlyphTop + DashLayout.GlyphSide < DashLayout.FirstRow - DashLayout.RowHeight / 2);
+    }
+
+    // ---- B5: a group's photo, the Undo ring, and the choice before an act ----
+
+    [Fact]
+    public void TheMockupsPhotoSitsInsideTheCircle()
+    {
+        Assert.Equal((1.0, 0.6, 0.06, 0.54), (DashLayout.PhotoWidth, DashLayout.PhotoHeight, DashLayout.PhotoCorner, DashLayout.PhotoTop));
+        BoxInside(1 - DashLayout.PhotoWidth / 2, DashLayout.PhotoTop, DashLayout.PhotoWidth, DashLayout.PhotoHeight);
+        Assert.True(Inside(1, DashLayout.PhotoTop + DashLayout.PhotoHeight + DashLayout.CaptionCentre));
+    }
+
+    [Fact]
+    public void AGroupsReplyToAllIsWhereTheMockupDrawsIt()
+    {
+        // mock: A group text with a photo draws Reply to all higher than A conversation draws Reply, under the caption.
+        Assert.Equal(1.52, DashLayout.ReplyToAllCentre, 9);
+        Assert.True(DashLayout.ReplyToAllCentre - DashLayout.PillHeight / 2 > DashLayout.PhotoTop + DashLayout.PhotoHeight + DashLayout.CaptionCentre);
+    }
+
+    [Fact]
+    public void TheUndoRingSitsInsideTheCircleAboveItsWords()
+    {
+        var ring = Watch.Domain.Kit.GlyphGeometry.UndoGlyph * Watch.Domain.Kit.GlyphGeometry.UndoRingRadius;
+
+        Assert.Equal((0.62, 1.18, 1.4), (DashLayout.UndoGlyphCentre, DashLayout.UndoTitleCentre, DashLayout.UndoPromptCentre));
+        Assert.True(Inside(1, DashLayout.UndoGlyphCentre - ring) && Inside(1 - ring, DashLayout.UndoGlyphCentre) && Inside(1 + ring, DashLayout.UndoGlyphCentre));
+        Assert.True(DashLayout.UndoGlyphCentre + ring < DashLayout.UndoTitleCentre);
+        Assert.True(DashLayout.UndoTitleCentre < DashLayout.UndoPromptCentre && Inside(1, DashLayout.UndoPromptCentre));
+    }
+
+    [Fact]
+    public void TheChoiceBeforeAnActIsBelowItsName()
+    {
+        // After the call's layout: the name, then the pill, then the quieter choice under it.
+        Assert.True(DashLayout.GlyphTop + DashLayout.GlyphSide < DashLayout.ActTitleCentre);
+        Assert.True(DashLayout.ActTitleCentre < DashLayout.ActPillCentre - DashLayout.PillHeight / 2);
+        Assert.True(DashLayout.ActChoiceCentre > DashLayout.ActPillCentre + DashLayout.PillHeight / 2);
+        Assert.True(Inside(1, DashLayout.ActChoiceCentre));
     }
 }

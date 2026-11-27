@@ -39,6 +39,26 @@ public class DashExchangeTests
         Assert.NotEqual(asked, DashExchange.Answers(new DashSent("send-2", DashSendOutcome.Sent)));
     }
 
+    [Fact]
+    public void APhotoIsAnsweredOnlyForItsId()
+    {
+        // A conversation asks for each of its photos on its own (W-5.1.3), so each answer finds the one ask it is for.
+        var asked = DashExchange.Awaits(new DashPhotoAsk(PhotoId));
+
+        Assert.Equal(asked, DashExchange.Answers(new DashPhoto(PhotoId, Jpeg)));
+        Assert.NotEqual(asked, DashExchange.Answers(new DashPhoto("a0000000000000001", Jpeg)));
+        Assert.True(asked!.Value.IsOn(WatchIdentity.DashPhotoPath));
+    }
+
+    [Fact]
+    public void APhotoWaitsLongerThanAConversation()
+    {
+        // Post fetches the picture (through Google Messages, or from the phone's own store) and shrinks it before it answers.
+        Assert.Equal(TimeSpan.FromSeconds(30), DashWaits.Photo);
+        Assert.Equal(DashWaits.Photo, DashExchange.WaitFor(new DashPhotoAsk(PhotoId)));
+        Assert.True(DashWaits.Photo > DashWaits.Answer);
+    }
+
     [Theory]
     [InlineData("read")]
     [InlineData("file a correspondence")]
@@ -51,6 +71,7 @@ public class DashExchangeTests
     [InlineData("people ask")]
     [InlineData("thread ask")]
     [InlineData("mail ask")]
+    [InlineData("photo ask")]
     [InlineData("reply")]
     [InlineData("read")]
     public void WhatTheWristSendsIsNoAnswer(string name) => Assert.Null(DashExchange.Answers(Messages[name]));
@@ -64,6 +85,7 @@ public class DashExchangeTests
             (new DashThreadAsk(GroupKey), GroupThread),
             (new DashSend("send-1", LeeKey, [], "On my way."), new DashSent("send-1", DashSendOutcome.Sent)),
             (new DashMailAsk(), Messages["mail"]),
+            (new DashPhotoAsk(PhotoId), Messages["photo"]),
         })
         {
             Assert.Equal(asked.Path, DashExchange.Awaits(asked)!.Value.Path);
@@ -95,7 +117,7 @@ public class DashExchangeTests
     {
         TimeSpan[] waits =
         [
-            DashWaits.Find, DashWaits.Deliver, DashWaits.Answer, DashWaits.SendAnswer,
+            DashWaits.Find, DashWaits.Deliver, DashWaits.Answer, DashWaits.SendAnswer, DashWaits.Photo,
             DashExchange.WaitFor(new DashPeopleAsk()), DashExchange.WaitFor(Messages["reply"]),
         ];
 

@@ -4,7 +4,8 @@ namespace Watch.Domain.Dash;
 /// How much one Dash message carries. Both ends hold to these: Post cuts to them before it encodes, and
 /// <see cref="DashCodec"/> refuses a message past any of them. They are chosen, not measured: a wrist shows a few rows
 /// and a few lines, and every message stays under <see cref="MaxBytes"/>, well inside the 100 KB the Data Layer documents
-/// for a data item (a message's own limit was not found documented; the device run says).
+/// for a data item (a message's own limit was not found documented; the device run says). A photo is shrunk on the
+/// phone to <see cref="PhotoBytes"/> so that it, too, crosses as one message (B5).
 /// </summary>
 public static class DashLimits
 {
@@ -49,4 +50,7 @@ public static class DashLimits
 
     /// <summary>The most one encoded message may be.</summary>
     public const int MaxBytes = 64 * 1024;
+
+    /// <summary>A photo's JPEG, shrunk on the phone to fit (B5): bytes. Written as base64 it still leaves the message under <see cref="MaxBytes"/>.</summary>
+    public const int PhotoBytes = 40 * 1024;
 }

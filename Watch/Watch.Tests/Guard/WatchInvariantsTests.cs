@@ -27,6 +27,7 @@ public class WatchInvariantsTests
     private static readonly string[] ExpectedDashPaths =
     [
         "/dash/people", "/dash/thread", "/dash/send", "/dash/file", "/dash/delete", "/dash/undo", "/dash/read", "/dash/call-note", "/dash/mail",
+        "/dash/photo",
     ];
 
     private static readonly string[] ExpectedInstallerComponents =
@@ -121,6 +122,8 @@ public class WatchInvariantsTests
         Assert.Equal("/dash/read", WatchIdentity.DashReadPath);
         Assert.Equal("/dash/call-note", WatchIdentity.DashCallNotePath);
         Assert.Equal("/dash/mail", WatchIdentity.DashMailPath);
+        // B5: one photo of a conversation, asked by its id and answered shrunk to fit (W-5.1.3).
+        Assert.Equal("/dash/photo", WatchIdentity.DashPhotoPath);
         Assert.Equal(ExpectedDashPaths, WatchIdentity.DashPaths);
     }
 
@@ -166,6 +169,7 @@ public class WatchInvariantsTests
         "com.storyworthtelling.focusphone.communication.dash.PeopleActivity",
         "com.storyworthtelling.focusphone.communication.dash.ConversationActivity",
         "com.storyworthtelling.focusphone.communication.dash.ReplyActivity",
+        "com.storyworthtelling.focusphone.communication.dash.ActActivity",
     ];
 
     [Fact]
@@ -176,6 +180,8 @@ public class WatchInvariantsTests
         Assert.Equal("com.storyworthtelling.focusphone.communication.dash.PeopleActivity", WatchIdentity.DashPeopleActivityName);
         Assert.Equal("com.storyworthtelling.focusphone.communication.dash.ConversationActivity", WatchIdentity.DashConversationActivityName);
         Assert.Equal("com.storyworthtelling.focusphone.communication.dash.ReplyActivity", WatchIdentity.DashReplyActivityName);
+        // B5: filing or deleting a correspondence, and its Undo ring (W-5.1.4).
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.ActActivity", WatchIdentity.DashActActivityName);
         Assert.Equal(ExpectedDashComponents, WatchIdentity.DashComponents);
         Assert.All(WatchIdentity.DashComponents, name => Assert.StartsWith(WatchIdentity.DashPackage + ".dash.", name, StringComparison.Ordinal));
         Assert.DoesNotContain(WatchIdentity.DashListenerName, WatchIdentity.DashComponents);
