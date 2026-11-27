@@ -481,6 +481,30 @@ public class WatchInvariantsTests
     }
 
     [Fact]
+    public void PeopleWaitingDrawsNoUnreadMark()
+    {
+        // Owner's ruling (27 Nov 2026): WD §1's "no unread marks" wins over the mockup's rule down a row's edge. A row
+        // draws nothing in Dash's colour, and the layout places no rule.
+        Assert.DoesNotContain(typeof(Watch.Domain.Dash.DashLayout).GetFields(), field => field.Name.Contains("Unread", StringComparison.Ordinal));
+
+        var row = Code(Dash("PersonRowView.cs"));
+        Assert.DoesNotContain("WatchApp.Dash", row, StringComparison.Ordinal);
+        Assert.DoesNotContain("DrawRect(", row, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheMockupDrawsNoUnreadMark()
+    {
+        // The mockups are the specification, so the ruling is drawn there too: People waiting's row has no rule.
+        var mockup = Text(Path.Combine(WatchFiles.RepoRoot(), "Watch", "design", "screens-r1.html"));
+        var row = Regex.Match(mockup, @"function row\([^)]*\)\s*\{(?<body>[\s\S]*?)\n\}");
+
+        Assert.True(row.Success, "The mockup has no row.");
+        Assert.DoesNotContain("fillRect(", row.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.DoesNotContain("marks the unread", mockup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheIdsAreNotCopiedIntoDash()
     {
         var copied = DashSources()

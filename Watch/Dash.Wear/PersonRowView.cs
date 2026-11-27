@@ -13,9 +13,9 @@ namespace Dash.Wear;
 
 /// <summary>
 /// One row of People waiting (mock: <c>row</c>): on the card, the name at the top left in the ink when unread and the
-/// grey when not, when it came at the top right, the one line under it, and the unread marked by a thin rule in Dash's
-/// colour down the left edge. No count, no badge (WD §1). A tap opens the conversation; TalkBack reads who, whether it
-/// is new, when and the line (<see cref="DashWords.Row"/>).
+/// grey when not, when it came at the top right, and the one line under it. No mark, no count, no badge (WD §1; the
+/// owner's ruling of 27 Nov 2026 took the mockup's unread rule away). A tap opens the conversation; TalkBack reads who,
+/// whether it is new, when and the line (<see cref="DashWords.Row"/>).
 /// </summary>
 public sealed class PersonRowView : View
 {
@@ -54,7 +54,7 @@ public sealed class PersonRowView : View
         var width = MeasureSpec.GetSize(widthMeasureSpec);
         using var name = Name();
         using var line = Line();
-        var words = LineOf(name) + LineOf(line) + Px(DashLayout.UnreadRule);
+        var words = LineOf(name) + LineOf(line) + Px(DashLayout.RowGap);
         var height = Math.Max(Px(DashLayout.RowHeight), (int)Math.Ceiling(words) + Px(DashLayout.RowPadding) * 2);
         SetMeasuredDimension(width, Math.Max(height, (int)Math.Ceiling(WatchPaints.TouchTarget(Context!))));
     }
@@ -73,18 +73,11 @@ public sealed class PersonRowView : View
             canvas.DrawRoundRect(new RectF(0, 0, Width, Height), corner, corner, card);
         }
 
-        if (row.Unread)
-        {
-            var inset = Px(DashLayout.UnreadInset);
-            using var rule = new Paint(PaintFlags.AntiAlias) { Color = WatchPaints.Of(WatchPaints.Glass(WatchApp.Dash, WatchPaints.Now())) };
-            canvas.DrawRect(0, inset, Math.Max(1, Px(DashLayout.UnreadRule)), Height - inset, rule);
-        }
-
         var pad = Px(DashLayout.RowPadding);
         using var name = Name();
         using var when = When();
         using var line = Line();
-        var gap = Px(DashLayout.UnreadRule);
+        var gap = Px(DashLayout.RowGap);
         var block = LineOf(name) + gap + LineOf(line);
         var top = (Height - block) / 2f;
 

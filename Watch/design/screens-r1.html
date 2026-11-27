@@ -102,7 +102,6 @@ function row(c, R, y, name, line, when, col, unread = false) {
   t(c, fit(c, name, w * 0.62, R * 0.085, 600), x + R * 0.06, y - h * 0.18, R * 0.085, unread ? INK : SOFT, 600, "left");
   t(c, when, x + w - R * 0.06, y - h * 0.18, R * 0.065, SOFT, 400, "right");
   t(c, fit(c, line, w - R * 0.12, R * 0.075), x + R * 0.06, y + h * 0.2, R * 0.075, SOFT, 400, "left");
-  if (unread) { c.fillStyle = col; c.fillRect(x, y - h / 2 + R * 0.06, R * 0.014, h - R * 0.12); }
 }
 function ring(c, R, frac, col, r = 0.93, w = 0.03) {
   c.lineCap = "round"; c.lineWidth = R * w; c.strokeStyle = FAINT; c.beginPath(); c.arc(R, R, R * r, 0, TAU); c.stroke();
@@ -164,7 +163,7 @@ const SECTIONS = [
     ] },
   { tag: "Dash", title: "Calls, texts and mail", about: "Dash opens on People waiting (A14). Texts go out through Post on the phone (A67). Replies are by voice or keyboard (A10). A call is the system's own Phone screen, and Dash asks for the call note afterwards (A13).",
     screens: [
-      { name: "People waiting", note: "Newest first; a rule in Dash's colour marks the unread (A14)", draw(c, R) { head(c, R, "Dash", "");
+      { name: "People waiting", note: "Newest first; no unread mark (WD §1, the owner's ruling of 27 Nov 2026) (A14)", draw(c, R) { head(c, R, "Dash", "");
         const col = day("Dash", 1, 0.08);
         row(c, R, R * 0.62, "Lee", "Running late. I'll be at the field by four.", "2 min", col, true);
         row(c, R, R * 0.98, "Robin", "Photo", "1 h", col, true);

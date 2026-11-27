@@ -2086,3 +2086,22 @@ the workflow, and FaceStudio's `DashIcon` a stub.
 - `Watch.Tests`: **843 passed, 0 failed.** `Tools/FaceStudio.Tests`: 38 passed. `FocusPhone/Codex.Tests`: 3309 passed.
   `RepoGuards.Tests`: 452 passed. `Storyworthtelling.Updates.Tests`: 194 passed.
 - `Watch/Dash.Wear`, `Watch/Watch.Ui.Wear` and `Watch/Point.Installer` compile here with 0 warnings and 0 errors.
+
+# Chunk B5 · filing and deleting, undo-first; group texts and photos (W-5.1.4, W-5.1.3)
+
+Every figure below is from a real run on 27 Nov 2026. As before, each red run was taken with the tests written and the
+new code present only as stubs: methods threw `NotImplementedException`, new constants were empty strings or zero.
+
+## Owner's ruling (27 Nov 2026): People waiting draws no unread mark
+
+B4 drew the approved mockup's rule in Dash's colour down an unread row's edge, against WD §1's "no unread marks", and
+asked. The owner's answer: the design doc wins. The rule is gone from `PersonRowView`, `DashLayout` has no `UnreadRule`
+or `UnreadInset` (the gap between a row's name and its line is `RowGap`, the same 0.014), and `design/screens-r1.html`
+no longer draws it (its row keeps the name in the ink when unread and the grey when not; its caption cites the ruling).
+
+- **Red:** `Watch.Tests` **845 tests, 2 failed, 843 passed**: `WatchInvariantsTests.PeopleWaitingDrawsNoUnreadMark`
+  (`Assert.DoesNotContain() Failure: Filter matched in collection`, `Double UnreadRule`) and `TheMockupDrawsNoUnreadMark`
+  (`Sub-string found`, the row's `fillRect(`).
+- **Green:** `Watch.Tests` **845 passed, 0 failed.**
+- **Left as it was, for the owner to say:** the name of an unread row is still in the ink and a read one in the grey (the
+  mockup draws both, and the ruling named the mark), and TalkBack still says "new" for an unread row, as the ink does.

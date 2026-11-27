@@ -4,7 +4,8 @@ namespace Watch.Domain.Dash;
 
 /// <summary>
 /// One row of People waiting (WD §11; mock: People waiting): the name, the one line under it, when it came in the
-/// watch's own words, whether the rule in Dash's colour marks it unread, and Post's key for the correspondence.
+/// watch's own words, whether it is unread (the name in the ink rather than the grey; no mark, by the owner's ruling of
+/// 27 Nov 2026), and Post's key for the correspondence.
 /// </summary>
 public sealed record PersonRow(string Key, string Name, string Line, string When, bool Unread, bool Group);
 

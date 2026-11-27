@@ -5,7 +5,7 @@ namespace Watch.Tests.Dash;
 
 /// <summary>
 /// People waiting (W-5.1.1, A14; mock: People waiting): newest first, a person their name and one line, the time it
-/// came said relatively, and the unread marked by a rule in Dash's colour. No counts.
+/// came said relatively. No counts and no unread mark (the owner's ruling of 27 Nov 2026).
 /// </summary>
 public class PeopleWaitingTests
 {

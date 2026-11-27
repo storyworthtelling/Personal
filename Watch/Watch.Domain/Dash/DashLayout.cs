@@ -37,10 +37,11 @@ public static class DashLayout
     /// <summary>The words' inset from the row's edges.</summary>
     public const double RowPadding = 0.06;
 
-    /// <summary>The unread rule down the row's left edge, and how far it stops short of the row's top and foot.</summary>
-    public const double UnreadRule = 0.014;
-
-    public const double UnreadInset = 0.06;
+    /// <summary>
+    /// The space between a row's name and its line. No unread mark is drawn (owner's ruling, 27 Nov 2026: WD §1's "no
+    /// unread marks" wins over the mockup's rule down a row's edge).
+    /// </summary>
+    public const double RowGap = 0.014;
 
     // ---- a conversation's bubbles ----
 
