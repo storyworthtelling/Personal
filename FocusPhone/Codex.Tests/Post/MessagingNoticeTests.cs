@@ -22,6 +22,19 @@ public class MessagingNoticeTests
     private static MessagingNotice Group(params NoticeMessage[] messages) =>
         new("conv-42", "Book club", IsGroup: true, messages);
 
+    // An RCS picture or clip comes through a notification as a message with a type and no words;
+    // it used to map to a blank row, so a group's media looked like nothing had arrived.
+    [Fact]
+    public void AMessageWithMediaAndNoWordsSaysWhatItIs()
+    {
+        var items = MessagingNoticeMapper.Map(
+            Group(new NoticeMessage("Avery Example", T0, null, "image/jpeg"),
+                new NoticeMessage("Blake Example", T0 + 1000, "", "video/mp4")),
+            KeyFor);
+
+        Assert.Equal(["Photo", "Video"], items.Select(item => item.Snippet).ToArray());
+    }
+
     [Fact]
     public void GroupMessages_ThreadOnTheConversationNotTheSender()
     {

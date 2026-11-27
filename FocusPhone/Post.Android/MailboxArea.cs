@@ -832,10 +832,16 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
             return;
         }
 
+        // The duplicate copies the merge was hiding behind these (an RCS notification copy, a
+        // one-to-one fallback SMS) must go with them, or they surface as the thread once the
+        // provider copy is hidden.
+        var twins = NearDuplicateCollapser.Twins(liveItems.Concat(cachedItems).ToList(), filed);
+
         foreach (var item in filed)
         {
             Filing.File(Host, item, now);
         }
+        Filing.HideTwins(Host, twins);
 
         ReloadThreads();
         DogEar.Show(Host, Overlay, $"Filed {row.Title}.", onUndo: () =>
@@ -1230,10 +1236,22 @@ public sealed class MailboxArea(Activity host) : PostArea(host)
         BuildActionRow();
     }
 
+    // In a group the arrow does not say which member spoke, so the name leads.
+    private string SenderPrefix(TimelineItem item)
+    {
+        if (!openIsGroup || item.Kind != TimelineItemKind.Message)
+        {
+            return "";
+        }
+        var sender = GroupSender.Label(item, key => ContactNameResolver.DisplayName(Host, key));
+        return sender is null ? "" : sender + " · ";
+    }
+
     private List<PaperListRow> BuildOpenRows() => openItems
         .Select(item => new PaperListRow(
             TimelineItemFormatter.Describe(item),
-            $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.LocalDateTime, DateTime.Now)}",
+            SenderPrefix(item)
+            + $"{(item.Incoming ? "←" : "→")} {RelativeTime.Format(item.TimestampUtc.LocalDateTime, DateTime.Now)}",
             Picked: openSelection.Contains(item.SourceId),
             Links: item.Kind != TimelineItemKind.Email))
         .ToList();
