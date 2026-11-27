@@ -171,9 +171,41 @@ public class DashRelayGuardTests
     [InlineData("PhotoFit.Sizes(")]
     [InlineData("PhotoFit.TurnFor(")]
     [InlineData("PhotoFit.Qualities")]
+    [InlineData("ContactPicker.People(")]
+    [InlineData("new RolodexRelay(")]
+    [InlineData("DashContacts.Rolodex(context)")]
     public void TheListenerCarriesThePlansThroughPostsOwnCode(string call)
     {
         Assert.Contains(call, DashHalf(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheWristsRolodexIsThePhones()
+    {
+        // B6 (PC6): one address book, Post's. The wrist is shown the phone's own Rolodex, read as the Rolodex area reads it,
+        // and a contact's numbers are put in one order for both, so a new text from the wrist reaches the number the phone's
+        // Rolodex would text.
+        var picker = Code($"{Post}/ContactPicker.cs");
+        var rolodex = Code($"{Post}/RolodexArea.cs");
+
+        Assert.Contains("RolodexNumbers.Order(", picker, StringComparison.Ordinal);
+        Assert.Contains("new ContactNumber(value, primary, type)", picker, StringComparison.Ordinal);
+        Assert.Contains("\"is_super_primary\", \"is_primary\", \"data2\"", picker, StringComparison.Ordinal);
+        Assert.Contains("ContactPicker.People(Host)", rolodex, StringComparison.Ordinal);
+        Assert.Contains("(\"Text\", Channel.Text, person.Phones[0])", rolodex, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheWristIsShownNoNumberFromTheBook()
+    {
+        // The owner's ruling (B6): names and digest ids only. The head hands the relay what the picker read, and the relay
+        // alone decides what crosses; nothing in Post's half writes a number or an address into a contact.
+        var contacts = PostSources().Single(source => source.Path == $"{Post}/Dash/DashContacts.cs").Text;
+
+        Assert.Contains("new RolodexPerson(", contacts, StringComparison.Ordinal);
+        Assert.DoesNotContain("new DashContact(", DashHalf(), StringComparison.Ordinal);
+        Assert.DoesNotContain("new DashRolodex(", DashHalf(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Emails", contacts, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -119,7 +119,7 @@ internal static class DashCarrier
 
         var acts = DashBook.Acts(context);
         var conditions = new DashConditions(DateTimeOffset.UtcNow, DogEar.UndoWindow(context), bridge.IsConnected, TextCourier.CanSendSms(context));
-        switch (DashInbox.Turn(message, () => DashSnapshots.Relay(context), acts, conditions))
+        switch (DashInbox.Turn(message, () => DashSnapshots.Relay(context), () => DashContacts.Rolodex(context), acts, conditions))
         {
             case DashAnswer answer:
                 HeadLog.Info(Tag, DashLogLines.Outcome(answer.Path, answer.Outcome, answer.Count));

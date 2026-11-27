@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Provider;
+using Codex.Domain.Post;
 
 namespace Post;
 
@@ -19,11 +20,14 @@ public static class ContactPicker
 
     /// <summary>
     /// Device contacts grouped into people (phones + emails under one contact id),
-    /// so New can pick a person and then offer the channels that person has.
+    /// so New can pick a person and then offer the channels that person has. A person's
+    /// phones are in the Rolodex's one order (<see cref="RolodexNumbers"/>: the one the
+    /// contacts app marks primary, then a mobile, then the rest), so the number the Rolodex
+    /// texts first is the one a new text from the watch goes to (P14 B6).
     /// </summary>
     public static IReadOnlyList<Person> People(Context context)
     {
-        var byId = new Dictionary<long, (string Name, List<string> Phones, List<string> Emails)>();
+        var byId = new Dictionary<long, (string Name, List<ContactNumber> Phones, List<string> Emails)>();
         Gather(context, ContactsContract.CommonDataKinds.Phone.ContentUri!,
             ContactsContract.CommonDataKinds.Phone.Number, isEmail: false, byId);
         Gather(context, ContactsContract.CommonDataKinds.Email.ContentUri!,
@@ -34,7 +38,7 @@ public static class ContactPicker
         return byId
             .Where(entry => entry.Value.Phones.Count > 0 || entry.Value.Emails.Count > 0)
             .Select(entry => new Person(
-                entry.Value.Name, entry.Value.Phones, entry.Value.Emails,
+                entry.Value.Name, RolodexNumbers.Order(entry.Value.Phones), entry.Value.Emails,
                 entry.Key, withPhoto.Contains(entry.Key)))
             .OrderBy(person => person.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
@@ -214,12 +218,14 @@ public static class ContactPicker
         return (total, withoutPhoto);
     }
 
+    // "is_super_primary", "is_primary" and "data2" are Data.IS_SUPER_PRIMARY, Data.IS_PRIMARY and
+    // Phone.TYPE (an email's TYPE for an email row, unread); the bindings name the columns only as strings.
     private static void Gather(
         Context context, Android.Net.Uri uri, string? valueColumn, bool isEmail,
-        Dictionary<long, (string Name, List<string> Phones, List<string> Emails)> byId)
+        Dictionary<long, (string Name, List<ContactNumber> Phones, List<string> Emails)> byId)
     {
         using var cursor = context.ContentResolver!.Query(
-            uri, ["contact_id", "display_name", valueColumn], null, null, null);
+            uri, ["contact_id", "display_name", valueColumn, "is_super_primary", "is_primary", "data2"], null, null, null);
         while (cursor is not null && cursor.MoveToNext())
         {
             var id = cursor.GetLong(0);
@@ -234,11 +240,19 @@ public static class ContactPicker
                 person = (string.IsNullOrWhiteSpace(name) ? value : name!, [], []);
                 byId[id] = person;
             }
-            var list = isEmail ? person.Emails : person.Phones;
-            if (!list.Contains(value))
+            if (isEmail)
             {
-                list.Add(value);
+                if (!person.Emails.Contains(value))
+                {
+                    person.Emails.Add(value);
+                }
+                continue;
             }
+
+            // A number listed twice is put in order once (RolodexNumbers), primary if either row says so.
+            var primary = (!cursor.IsNull(3) && cursor.GetInt(3) != 0) || (!cursor.IsNull(4) && cursor.GetInt(4) != 0);
+            var type = cursor.IsNull(5) ? 0 : cursor.GetInt(5);
+            person.Phones.Add(new ContactNumber(value, primary, type));
         }
     }
 }

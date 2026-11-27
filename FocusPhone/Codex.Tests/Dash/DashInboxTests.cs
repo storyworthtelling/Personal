@@ -45,6 +45,15 @@ public class DashInboxTests
     // A relay the turn must not need: an undo, and an answer arriving at Post, are decided without the Mailbox.
     private static DashRelay NoRelay() => throw new InvalidOperationException("The Mailbox was read for a message that needs none.");
 
+    // The Rolodex the turn must not need (B6): only a Rolodex ask and a new text to a contact read the address book.
+    private static RolodexRelay NoRolodex() => throw new InvalidOperationException("The address book was read for a message that needs none.");
+
+    private static readonly RolodexPerson LeeInTheBook = new(7, "Lee", ["+1 212-555-0101"]);
+
+    private static RolodexRelay Book() => new([LeeInTheBook, new RolodexPerson(8, "Robin", [Robin])]);
+
+    private static string ContactOf(long contact) => DashIds.Contact(contact.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
     private static string KeyOf(string threadKey) => DashIds.Correspondence(threadKey);
 
     // ---- asks ----
@@ -52,7 +61,7 @@ public class DashInboxTests
     [Fact]
     public void PeopleWaitingIsAnswered()
     {
-        var turn = DashInbox.Turn(new DashPeopleAsk(), () => Relay(Text(Lee, -2), Text(Robin, -9)), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashPeopleAsk(), () => Relay(Text(Lee, -2), Text(Robin, -9)), NoRolodex, new DashActs(), Now);
 
         var answer = Assert.IsType<DashAnswer>(turn);
         var people = Assert.IsType<DashPeople>(answer.Reply);
@@ -63,7 +72,7 @@ public class DashInboxTests
     [Fact]
     public void AConversationIsAnswered()
     {
-        var turn = DashInbox.Turn(new DashThreadAsk(KeyOf(Lee)), () => Relay(Text(Lee, -9), Text(Lee, -2)), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashThreadAsk(KeyOf(Lee)), () => Relay(Text(Lee, -9), Text(Lee, -2)), NoRolodex, new DashActs(), Now);
 
         var answer = Assert.IsType<DashAnswer>(turn);
         var thread = Assert.IsType<DashThread>(answer.Reply);
@@ -74,7 +83,7 @@ public class DashInboxTests
     [Fact]
     public void AnUnknownConversationIsNotAnswered()
     {
-        var turn = DashInbox.Turn(new DashThreadAsk(KeyOf(Robin)), () => Relay(Text(Lee, -2)), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashThreadAsk(KeyOf(Robin)), () => Relay(Text(Lee, -2)), NoRolodex, new DashActs(), Now);
 
         var none = Assert.IsType<DashNoTurn>(turn);
         Assert.Equal((WatchIdentity.DashThreadPath, DashOutcome.Unknown), (none.Path, none.Outcome));
@@ -83,7 +92,7 @@ public class DashInboxTests
     [Fact]
     public void MailLinesAreAnswered()
     {
-        var turn = DashInbox.Turn(new DashMailAsk(), () => Relay(Mail(LeeMail, -3), Text(Lee, -2)), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashMailAsk(), () => Relay(Mail(LeeMail, -3), Text(Lee, -2)), NoRolodex, new DashActs(), Now);
 
         var answer = Assert.IsType<DashAnswer>(turn);
         Assert.Single(Assert.IsType<DashMail>(answer.Reply).Mail);
@@ -94,7 +103,7 @@ public class DashInboxTests
     [MemberData(nameof(Answers))]
     public void AnAnswerArrivingAtPostIsLeftAlone(DashMessage message)
     {
-        var turn = DashInbox.Turn(message, NoRelay, new DashActs(), Now);
+        var turn = DashInbox.Turn(message, NoRelay, NoRolodex, new DashActs(), Now);
 
         var none = Assert.IsType<DashNoTurn>(turn);
         Assert.Equal((message.Path, (DashOutcome?)null), (none.Path, none.Outcome));
@@ -107,6 +116,7 @@ public class DashInboxTests
         new DashSent("send-1", DashSendOutcome.Sent),
         new DashMail([]),
         new DashPhoto(DashIds.Attachment("sms:2125550101:-2", "part:7"), [0xFF, 0xD8, 0xFF, 0xD9]),
+        new DashRolodex(0, 1, DashIds.Edition("none"), []),
     ];
 
     // ---- dash/send ----
@@ -117,14 +127,14 @@ public class DashInboxTests
         var acts = new DashActs();
         var send = new DashSend("send-1", KeyOf(Lee), [], "On my way.");
 
-        var first = Assert.IsType<DashSendTurn>(DashInbox.Turn(send, () => Relay(Text(Lee, -2)), acts, Now));
+        var first = Assert.IsType<DashSendTurn>(DashInbox.Turn(send, () => Relay(Text(Lee, -2)), NoRolodex, acts, Now));
         Assert.Equal([Lee], first.Plan.Recipients);
 
         var answer = DashInbox.Delivered(send, new TextDelivery(TextSendPath.NativeSms, BridgeTried: false), acts);
         Assert.Equal(new DashSent("send-1", DashSendOutcome.Sent), answer);
 
         // The same send heard again is answered as it went, and nothing is sent twice.
-        var again = Assert.IsType<DashAnswer>(DashInbox.Turn(send, NoRelay, acts, Now));
+        var again = Assert.IsType<DashAnswer>(DashInbox.Turn(send, NoRelay, NoRolodex, acts, Now));
         Assert.Equal(new DashSent("send-1", DashSendOutcome.Sent), again.Reply);
         Assert.Equal(DashOutcome.Again, again.Outcome);
     }
@@ -134,9 +144,9 @@ public class DashInboxTests
     {
         var acts = new DashActs();
         var send = new DashSend("send-1", KeyOf(Lee), [], "On my way.");
-        DashInbox.Turn(send, () => Relay(Text(Lee, -2)), acts, Now);
+        DashInbox.Turn(send, () => Relay(Text(Lee, -2)), NoRolodex, acts, Now);
 
-        var again = Assert.IsType<DashAnswer>(DashInbox.Turn(send, NoRelay, acts, Now));
+        var again = Assert.IsType<DashAnswer>(DashInbox.Turn(send, NoRelay, NoRolodex, acts, Now));
 
         Assert.Equal(new DashSent("send-1", DashSendOutcome.Failed), again.Reply);
     }
@@ -148,7 +158,7 @@ public class DashInboxTests
         var acts = new DashActs();
         var send = new DashSend("send-1", KeyOf(Lee), [], "On my way.");
 
-        var answer = Assert.IsType<DashAnswer>(DashInbox.Turn(send, () => Relay(Text(Lee, -2)), acts, Now with { BridgeConnected = bridge, CanSendSms = sms }));
+        var answer = Assert.IsType<DashAnswer>(DashInbox.Turn(send, () => Relay(Text(Lee, -2)), NoRolodex, acts, Now with { BridgeConnected = bridge, CanSendSms = sms }));
 
         Assert.Equal((new DashSent("send-1", said), logged), (answer.Reply, answer.Outcome));
         Assert.Equal(said, acts.SendAnswer("send-1"));
@@ -160,7 +170,7 @@ public class DashInboxTests
         var acts = new DashActs();
         var send = new DashSend("send-1", KeyOf(Robin), [], "On my way.");
 
-        var answer = Assert.IsType<DashAnswer>(DashInbox.Turn(send, () => Relay(Text(Lee, -2)), acts, Now));
+        var answer = Assert.IsType<DashAnswer>(DashInbox.Turn(send, () => Relay(Text(Lee, -2)), NoRolodex, acts, Now));
 
         Assert.Equal((new DashSent("send-1", DashSendOutcome.Nowhere), DashOutcome.Nowhere), (answer.Reply, answer.Outcome));
         Assert.Equal(DashSendOutcome.Nowhere, acts.SendAnswer("send-1"));
@@ -186,7 +196,7 @@ public class DashInboxTests
     [Fact]
     public void AFileFromTheWristIsAFiling()
     {
-        var turn = DashInbox.Turn(new DashFile("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -9), Call(Lee, -2)), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashFile("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -9), Call(Lee, -2)), NoRolodex, new DashActs(), Now);
 
         var act = Assert.IsType<DashActTurn>(turn);
         Assert.Equal((WatchIdentity.DashFilePath, "act-1", DashActKind.File, DashOutcome.Filed, 2), (act.Path, act.Act, act.Kind, act.Plan.Outcome, act.Plan.Items.Count));
@@ -196,7 +206,7 @@ public class DashInboxTests
     public void ADeleteFromTheWristIsHeld()
     {
         var acts = new DashActs();
-        var turn = DashInbox.Turn(new DashDelete("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -2)), acts, Now);
+        var turn = DashInbox.Turn(new DashDelete("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -2)), NoRolodex, acts, Now);
 
         var act = Assert.IsType<DashActTurn>(turn);
         Assert.Equal((WatchIdentity.DashDeletePath, DashActKind.Delete, DashOutcome.Held), (act.Path, act.Kind, act.Plan.Outcome));
@@ -210,7 +220,7 @@ public class DashInboxTests
         var mail = Mail(LeeMail, -3);
         var acts = new DashActs();
 
-        DashInbox.Turn(new DashDelete("act-1", null, [DashIds.Message(mail.SourceId)], Six), () => Relay(mail), acts, Now);
+        DashInbox.Turn(new DashDelete("act-1", null, [DashIds.Message(mail.SourceId)], Six), () => Relay(mail), NoRolodex, acts, Now);
 
         Assert.Equal(new ActedItem(TimelineItemKind.Email, mail.SourceId, "<-3@example.com>"), acts.Owed().Single().Items.Single());
     }
@@ -219,9 +229,9 @@ public class DashInboxTests
     public void AnUndoNeedsNoMailbox()
     {
         var acts = new DashActs();
-        DashInbox.Turn(new DashFile("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -2)), acts, Now);
+        DashInbox.Turn(new DashFile("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -2)), NoRolodex, acts, Now);
 
-        var turn = DashInbox.Turn(new DashUndo("act-1"), NoRelay, acts, Now with { Now = T0.AddSeconds(3) });
+        var turn = DashInbox.Turn(new DashUndo("act-1"), NoRelay, NoRolodex, acts, Now with { Now = T0.AddSeconds(3) });
 
         var undo = Assert.IsType<DashUndoTurn>(turn);
         Assert.Equal((DashOutcome.TakenBack, DashActKind.File, 1), (undo.Plan.Outcome, undo.Plan.Kind, undo.Plan.Items.Count));
@@ -232,9 +242,9 @@ public class DashInboxTests
     {
         var acts = new DashActs();
         var file = new DashFile("act-1", KeyOf(Lee), [], Six);
-        DashInbox.Turn(file, () => Relay(Text(Lee, -2)), acts, Now);
+        DashInbox.Turn(file, () => Relay(Text(Lee, -2)), NoRolodex, acts, Now);
 
-        var again = Assert.IsType<DashActTurn>(DashInbox.Turn(file, () => Relay(Text(Lee, -2)), acts, Now));
+        var again = Assert.IsType<DashActTurn>(DashInbox.Turn(file, () => Relay(Text(Lee, -2)), NoRolodex, acts, Now));
 
         Assert.Equal(DashOutcome.Again, again.Plan.Outcome);
         Assert.Empty(again.Plan.Items);
@@ -254,7 +264,7 @@ public class DashInboxTests
     {
         var picture = Picture(Lee, -2);
 
-        var turn = DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(Text(Lee, -9), picture), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(Text(Lee, -9), picture), NoRolodex, new DashActs(), Now);
 
         var photo = Assert.IsType<DashPhotoTurn>(turn);
         Assert.Equal((PhotoOf(picture), picture.SourceId, "part:7"), (photo.Ask.Id, photo.Plan.Item.SourceId, photo.Plan.Attachment.Id));
@@ -264,7 +274,7 @@ public class DashInboxTests
     [Fact]
     public void AnUnknownPhotoIsNotAnswered()
     {
-        var turn = DashInbox.Turn(new DashPhotoAsk(DashIds.Attachment("sms:elsewhere", "part:1")), () => Relay(Picture(Lee, -2)), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashPhotoAsk(DashIds.Attachment("sms:elsewhere", "part:1")), () => Relay(Picture(Lee, -2)), NoRolodex, new DashActs(), Now);
 
         var none = Assert.IsType<DashNoTurn>(turn);
         Assert.Equal((WatchIdentity.DashPhotoPath, (DashOutcome?)DashOutcome.Unknown), (none.Path, none.Outcome));
@@ -274,7 +284,7 @@ public class DashInboxTests
     public void AShrunkPhotoIsTheAnswer()
     {
         var picture = Picture(Lee, -2);
-        var turn = Assert.IsType<DashPhotoTurn>(DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(picture), new DashActs(), Now));
+        var turn = Assert.IsType<DashPhotoTurn>(DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(picture), NoRolodex, new DashActs(), Now));
 
         var answer = Assert.IsType<DashAnswer>(DashInbox.Photo(turn, Shrunk));
 
@@ -287,7 +297,7 @@ public class DashInboxTests
     public void APhotoThatWouldNotShrinkIsNotAnswered()
     {
         var picture = Picture(Lee, -2);
-        var turn = Assert.IsType<DashPhotoTurn>(DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(picture), new DashActs(), Now));
+        var turn = Assert.IsType<DashPhotoTurn>(DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(picture), NoRolodex, new DashActs(), Now));
         var tooLarge = new byte[DashLimits.PhotoBytes + 1];
         Shrunk.CopyTo(tooLarge, 0);
 
@@ -303,8 +313,8 @@ public class DashInboxTests
         // comes first is kept, so the act that follows it is done never rather than done for good.
         var acts = new DashActs();
 
-        var undo = Assert.IsType<DashUndoTurn>(DashInbox.Turn(new DashUndo("act-1"), NoRelay, acts, Now));
-        var late = Assert.IsType<DashActTurn>(DashInbox.Turn(new DashFile("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -2)), acts, Now));
+        var undo = Assert.IsType<DashUndoTurn>(DashInbox.Turn(new DashUndo("act-1"), NoRelay, NoRolodex, acts, Now));
+        var late = Assert.IsType<DashActTurn>(DashInbox.Turn(new DashFile("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -2)), NoRolodex, acts, Now));
 
         Assert.Equal(DashOutcome.Unknown, undo.Plan.Outcome);
         Assert.Equal(DashOutcome.Again, late.Plan.Outcome);
@@ -319,7 +329,7 @@ public class DashInboxTests
     {
         var items = new[] { Text(Lee, -9), Text(Lee, -2) };
 
-        var turn = DashInbox.Turn(new DashRead(KeyOf(Lee), items[1].TimestampUtc), () => Relay(items), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashRead(KeyOf(Lee), items[1].TimestampUtc), () => Relay(items), NoRolodex, new DashActs(), Now);
 
         var read = Assert.IsType<DashReadTurn>(turn);
         Assert.Equal((DashOutcome.Marked, Lee, items[1].TimestampUtc), (read.Plan.Outcome, read.Plan.ThreadKey, read.Plan.Stamp));
@@ -330,10 +340,93 @@ public class DashInboxTests
     {
         var call = Call(Lee, -5);
 
-        var turn = DashInbox.Turn(new DashCallNote(DashIds.Message(call.SourceId), null, "Pick up at four."), () => Relay(call), new DashActs(), Now);
+        var turn = DashInbox.Turn(new DashCallNote(DashIds.Message(call.SourceId), null, "Pick up at four."), () => Relay(call), NoRolodex, new DashActs(), Now);
 
         var note = Assert.IsType<DashNoteTurn>(turn);
         Assert.Equal(DashOutcome.Kept, note.Plan.Outcome);
         Assert.Equal((Lee, "Pick up at four."), (note.Plan.Note!.ContactKey, note.Plan.Note.Snippet));
+    }
+
+    // ---- B6: the Rolodex, and a new text to a contact ----
+
+    [Fact]
+    public void TheRolodexIsAnswered()
+    {
+        var turn = DashInbox.Turn(new DashRolodexAsk(0), NoRelay, Book, new DashActs(), Now);
+
+        var answer = Assert.IsType<DashAnswer>(turn);
+        var page = Assert.IsType<DashRolodex>(answer.Reply);
+        Assert.Equal(["Lee", "Robin"], page.Contacts.Select(contact => contact.Name));
+        Assert.Equal((WatchIdentity.DashRolodexPath, DashOutcome.Answered, 2), (answer.Path, answer.Outcome, answer.Count));
+    }
+
+    [Fact]
+    public void APagePastTheLastIsNotAnswered()
+    {
+        var none = Assert.IsType<DashNoTurn>(DashInbox.Turn(new DashRolodexAsk(1), NoRelay, Book, new DashActs(), Now));
+
+        Assert.Equal((WatchIdentity.DashRolodexPath, DashOutcome.Unknown), (none.Path, none.Outcome));
+    }
+
+    [Fact]
+    public void ANewTextGoesToTheContactsNumber()
+    {
+        // The wrist names the contact; Post finds the number on the phone and takes the phone's own road, as a reply does.
+        var send = new DashSend("send-1", null, [], "Running five minutes late.") { Contact = ContactOf(7) };
+
+        var turn = Assert.IsType<DashSendTurn>(DashInbox.Turn(send, NoRelay, Book, new DashActs(), Now));
+
+        Assert.Equal(["+1 212-555-0101"], turn.Plan.Recipients);
+        Assert.Null(turn.Plan.ConversationId);
+        Assert.Equal((false, TextSendPath.NativeSms, (DashSendOutcome?)null), (turn.Plan.TryBridge, turn.Plan.Otherwise, turn.Plan.Refused));
+    }
+
+    [Fact]
+    public void ANewTextTriesTheBridgeFirst()
+    {
+        var send = new DashSend("send-1", null, [], "On my way.") { Contact = ContactOf(8) };
+
+        var turn = Assert.IsType<DashSendTurn>(DashInbox.Turn(send, NoRelay, Book, new DashActs(), Now with { BridgeConnected = true }));
+
+        Assert.Equal([Robin], turn.Plan.Recipients);
+        Assert.True(turn.Plan.TryBridge);
+    }
+
+    [Fact]
+    public void ANewTextToSomeoneUnknownIsNowhere()
+    {
+        var acts = new DashActs();
+        var send = new DashSend("send-1", null, [], "On my way.") { Contact = ContactOf(99) };
+
+        var answer = Assert.IsType<DashAnswer>(DashInbox.Turn(send, NoRelay, Book, acts, Now));
+
+        Assert.Equal(new DashSent("send-1", DashSendOutcome.Nowhere), answer.Reply);
+        Assert.Equal(DashOutcome.Nowhere, answer.Outcome);
+        Assert.Equal(DashSendOutcome.Nowhere, acts.SendAnswer("send-1"));
+    }
+
+    [Fact]
+    public void ANewTextWithNothingToCarryItIsNoRoute()
+    {
+        var send = new DashSend("send-1", null, [], "On my way.") { Contact = ContactOf(7) };
+
+        var answer = Assert.IsType<DashAnswer>(DashInbox.Turn(send, NoRelay, Book, new DashActs(), Now with { CanSendSms = false }));
+
+        Assert.Equal(new DashSent("send-1", DashSendOutcome.NoRoute), answer.Reply);
+    }
+
+    [Fact]
+    public void ANewTextIsSentOnce()
+    {
+        // The same rule as a reply's (B2): heard again under the same name, it is answered from the book, never sent again.
+        var acts = new DashActs();
+        var send = new DashSend("send-1", null, [], "On my way.") { Contact = ContactOf(7) };
+        var first = Assert.IsType<DashSendTurn>(DashInbox.Turn(send, NoRelay, Book, acts, Now));
+        DashInbox.Delivered(send, new TextDelivery(TextSendPath.NativeSms, BridgeTried: false, Failure: null), acts);
+
+        var again = Assert.IsType<DashAnswer>(DashInbox.Turn(send, NoRelay, NoRolodex, acts, Now));
+
+        Assert.NotNull(first);
+        Assert.Equal((new DashSent("send-1", DashSendOutcome.Sent), DashOutcome.Again), (again.Reply, again.Outcome));
     }
 }

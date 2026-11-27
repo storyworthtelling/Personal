@@ -43,13 +43,14 @@ public sealed record DashNoTurn(string Path, DashOutcome? Outcome) : DashTurn(Pa
 /// <summary>
 /// Post's listener's decisions (P14 B2), pure: each message from the wrist becomes an answer from the Mailbox's own view,
 /// or one of <see cref="DashRelay"/>'s plans for the head to carry out through Post's own code. The Mailbox is read only
-/// for a message that needs it (an undo needs only the book). A send is put in the book before it is carried out and
+/// for a message that needs it (an undo needs only the book), and the address book (<see cref="RolodexRelay"/>, B6) only
+/// for a page of the Rolodex or a new text to one of its contacts. A send is put in the book before it is carried out and
 /// answered from the book if it is heard again, so a duplicated send never goes twice; the head serialises messages, so
 /// the book's look and its write are one step.
 /// </summary>
 public static class DashInbox
 {
-    public static DashTurn Turn(DashMessage message, Func<DashRelay> relay, DashActs acts, DashConditions conditions)
+    public static DashTurn Turn(DashMessage message, Func<DashRelay> relay, Func<RolodexRelay> rolodex, DashActs acts, DashConditions conditions)
     {
         switch (message)
         {
@@ -64,7 +65,7 @@ public static class DashInbox
                 var mail = relay().Mail();
                 return new DashAnswer(message.Path, mail, DashOutcome.Answered, mail.Mail.Count);
             case DashSend send:
-                return Send(send, relay, acts, conditions);
+                return Send(send, relay, rolodex, acts, conditions);
             case DashFile file:
                 return new DashActTurn(message.Path, file.Id, DashActKind.File, relay().File(file, conditions.Now, conditions.PhoneWindow, acts));
             case DashDelete delete:
@@ -73,6 +74,11 @@ public static class DashInbox
                 return new DashUndoTurn(DashRelay.Undo(undo, conditions.Now, acts));
             case DashRead read:
                 return new DashReadTurn(relay().Read(read));
+            case DashRolodexAsk ask:
+                // The phone's whole Rolodex, a page at a time (B6); a page past the last is not answered.
+                return rolodex().Page(ask.Page) is { } page
+                    ? new DashAnswer(message.Path, page, DashOutcome.Answered, page.Contacts.Count)
+                    : new DashNoTurn(message.Path, DashOutcome.Unknown);
             case DashPhotoAsk photo:
                 return relay().Photo(photo) is { } plan
                     ? new DashPhotoTurn(photo, plan)
@@ -109,7 +115,7 @@ public static class DashInbox
         : delivery.Path == TextSendPath.Unavailable && !delivery.BridgeTried ? DashSendOutcome.NoRoute
         : DashSendOutcome.Failed;
 
-    private static DashTurn Send(DashSend send, Func<DashRelay> relay, DashActs acts, DashConditions conditions)
+    private static DashTurn Send(DashSend send, Func<DashRelay> relay, Func<RolodexRelay> rolodex, DashActs acts, DashConditions conditions)
     {
         if (acts.Knows(send.Id))
         {
@@ -117,7 +123,10 @@ public static class DashInbox
             return new DashAnswer(send.Path, new DashSent(send.Id, acts.SendAnswer(send.Id) ?? DashSendOutcome.Failed), DashOutcome.Again, 0);
         }
 
-        var plan = relay().Send(send, conditions.BridgeConnected, conditions.CanSendSms);
+        // A new text to a contact (B6) is found in the Rolodex, the Mailbox unread; a reply or numbers go by the relay.
+        var plan = send.Contact is { } contact
+            ? DashRelay.NewText(rolodex().NumberOf(contact), conditions.BridgeConnected, conditions.CanSendSms)
+            : relay().Send(send, conditions.BridgeConnected, conditions.CanSendSms);
         acts.Sending(send.Id, conditions.Now);
         if (plan.Refused is { } refused)
         {

@@ -155,19 +155,24 @@ public sealed partial class DashRelay
         }
         else
         {
-            if (send.To.Count == 0 || !send.To.All(Dialable))
+            // Numbers, never beside a contact: a new text to a contact is the Rolodex's to resolve (NewText).
+            if (send.Contact is not null || send.To.Count == 0 || !send.To.All(Dialable))
             {
                 return Refused(DashSendOutcome.Nowhere);
             }
             recipients = send.To;
         }
 
-        var tryBridge = TextSend.Choose(bridgeConnected, canSendSms) == TextSendPath.Bridge;
-        var otherwise = TextSend.WithoutBridge(recipients.Count, canSendSms);
-        return !tryBridge && otherwise == TextSendPath.Unavailable
-            ? Refused(DashSendOutcome.NoRoute)
-            : new DashSendPlan(recipients, conversation, tryBridge, otherwise, null);
+        return Route(recipients, conversation, bridgeConnected, canSendSms);
     }
+
+    /// <summary>
+    /// A new text from the wrist to one contact of the Rolodex (B6), once the Rolodex has found its number
+    /// (<see cref="RolodexRelay.NumberOf"/>): the phone's own road, as a new text to that number would go from the phone,
+    /// the bridge finding or starting its conversation. No number is nowhere.
+    /// </summary>
+    public static DashSendPlan NewText(string? number, bool bridgeConnected, bool canSendSms) =>
+        number is not null && Dialable(number) ? Route([number], null, bridgeConnected, canSendSms) : Refused(DashSendOutcome.Nowhere);
 
     /// <summary>
     /// Filing from the wrist is filing on the phone: each message is filed as the Mailbox files it (ghost kept, tombstone
@@ -355,12 +360,12 @@ public sealed partial class DashRelay
     private static bool IsNote(TimelineItem item) => Codex.Domain.Post.CallNote.IsNote(item);
 
     // A number as typed or dictated: digits, with the plus, brackets, spaces, dots and hyphens people put between them.
-    private static bool Dialable(string number) => number.Any(char.IsAsciiDigit) && DialableNumber().IsMatch(number);
+    internal static bool Dialable(string number) => number.Any(char.IsAsciiDigit) && DialableNumber().IsMatch(number);
 
-    private static string OneLine(string text) => Spaces().Replace(text, " ").Trim();
+    internal static string OneLine(string text) => Spaces().Replace(text, " ").Trim();
 
     // At most the longest, cut at a whole character with an ellipsis to say so.
-    private static string Cut(string text, int longest)
+    internal static string Cut(string text, int longest)
     {
         if (text.Length <= longest)
         {
@@ -373,6 +378,15 @@ public sealed partial class DashRelay
             end--;
         }
         return text[..end].TrimEnd() + "…";
+    }
+
+    private static DashSendPlan Route(IReadOnlyList<string> recipients, string? conversation, bool bridgeConnected, bool canSendSms)
+    {
+        var tryBridge = TextSend.Choose(bridgeConnected, canSendSms) == TextSendPath.Bridge;
+        var otherwise = TextSend.WithoutBridge(recipients.Count, canSendSms);
+        return !tryBridge && otherwise == TextSendPath.Unavailable
+            ? Refused(DashSendOutcome.NoRoute)
+            : new DashSendPlan(recipients, conversation, tryBridge, otherwise, null);
     }
 
     private static DashSendPlan Refused(DashSendOutcome outcome) => new([], null, false, TextSendPath.Unavailable, outcome);
