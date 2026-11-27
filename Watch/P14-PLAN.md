@@ -45,7 +45,7 @@ The same conventions as Constitution's plan (`Constitution/CONSTITUTION-P13-PLAN
 
 No colour hex or type size outside `WatchTokens` (WD §13) · Microsoft C# naming with **no underscores**
 in any identifier, short test names · no empty `catch` · no model identifier in any committed file ·
-**never ask for, store or log the vault passphrase** (the watch takes it on its own screen, A38) ·
+**never ask for, store or log the vault passphrase**, and the watch never holds it (owner's ruling, 27 Nov, retiring A38) ·
 frozen identifiers are string literals under guards, never `nameof` · success is a state change, a
 destructive act is undo-first (WD §9), loading is a sentence · dependencies only per CLAUDE.md, versions
 in `Directory.Packages.props` · say plainly what is not verified: "passes against fakes" is not
@@ -159,11 +159,12 @@ build and sign every watch APK and the face, with fatal **APP ID**, **FORM** (ea
 
 ### 2.4 Keys on the watch (A38, A61)
 
-- The **vault passphrase** is typed once on the watch (in Dash), kept encrypted with the watch's
-  Android Keystore, never logged (A38). It opens the vault for what lives there.
-- **Google tokens** are handed over from the phone over the Data Layer (A61): Post sends a Gmail
-  token, Score a Drive token, each hourly while the phone is on. A token is held in memory and in
-  Keystore-encrypted storage, never logged. With the phone off the token runs out within the hour,
+- **The vault passphrase never reaches the watch** (owner's ruling, 27 Nov 2026, retiring A38): one
+  passphrase opens every key in both vaults, and nothing on the watch needs it — tokens are handed over
+  (A61), TIDAL plays through the phone, Dash goes through Post. `TheWatchHoldsNoVaultTests` holds it.
+- **Google tokens** are handed over from the phone over the Data Layer (A61), as B3 built it: the watch
+  asks, Score answers with a read-only Drive token (no Gmail token: Post relays mail lines). A token is
+  held in memory only, never written down or logged. With the phone off the token runs out within the hour,
   which matches A67: the phone must be on anyway.
 
 ### 2.5 Contracts (each a Data Layer path pair, a versioned message, a codec in Watch.Domain)
@@ -315,7 +316,7 @@ contract and outcome only, never the payload (the suite's contract rule). Body v
 - **L · Tests + Device · L3 · xhigh**
 
 **W-4.1.2 · Tokens and the vault on the watch** (§2.4, A38, A61). *Tests first:*
-`KeyHandoffTests.TokenNeverLogged`, `PassphraseKeptInKeystoreOnly`. **M · Tests · L3 · high**
+`KeyHandoffTests.TokenNeverLogged` (`PassphraseKeptInKeystoreOnly` retired with A38, replaced by `TheWatchHoldsNoVaultTests`). **M · Tests · L3 · high**
 
 ### E5 — Dash: the watch app (mock: Dash)
 
@@ -327,7 +328,7 @@ or by voice (A10). **M · Owner + Device · L2 · medium**
 **W-5.1.5 · The call note** after a system call (A13). **S · Owner + Device · L2 · medium**
 **W-5.1.6 · Mail lines**, silent (A11). **S · Owner · L2 · medium**
 **W-5.1.7 · The People waiting tile**: the dash glyph, newest name in full, no count (A72). **S · Owner · L2 · medium**
-**W-5.1.8 · First run: the vault passphrase**, in the clear (A38). **S · Owner · L2 · medium**
+~~**W-5.1.8 · First run: the vault passphrase**~~ — retired by the owner's ruling (27 Nov 2026): the watch never holds the passphrase.
 **W-5.1.9 · Overnight and unknown callers**: favourites (starred in the Rolodex) and repeat callers only
 at night; unknown numbers ring on a second call within minutes (A12). Dash sets the watch's own
 Do Not Disturb rules where Wear OS lets an app; where it does not, it is a setup step in the device test
@@ -400,7 +401,7 @@ the owner's own copy; a guard fails if a PBI marked Device has no check. **M · 
 ## 4. Frozen identifiers and guards
 
 The package ids in §2.2; the face's id; every Data Layer path in §2.5; the installer's registered names;
-the Keystore alias for the passphrase; the sidecar's `form` field and its two values. Each is a string
+the sidecar's `form` field and its two values. Each is a string
 literal in one constants class, held by `WatchInvariantsTests`, never `nameof`.
 
 ## 5. Data and privacy

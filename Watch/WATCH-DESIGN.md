@@ -176,9 +176,9 @@ starting point (O4) and are settled on the wrist:
   counter and rest timer for strength). Live heart rate is the only Body value the watch ever shows
   (A29). Accent: Beat's day colour.
 - **Point** has no screens of its own besides the face. Its installer (A70) shows only the system's
-  own install prompt, once per app. The vault passphrase entry on first run (A38) lives in Dash, which
-  is the first suite app installed after the face, and shows the passphrase in the clear as the phone
-  apps do.
+  own install prompt, once per app. There is no vault passphrase entry on the watch: the watch never
+  holds the passphrase (owner's ruling, 27 Nov 2026, retiring A38), so Dash has no first-run screen
+  for it, and the passphrase screen in `design/screens-r1.html` is retired.
 
 ## 12. Accessibility
 

@@ -1886,3 +1886,10 @@ a decision rather than a drift. The plan, `WATCH-DESIGN.md` §11 and the mockup 
   the one `BearerHeader()` reader) come with W-6.1.2.
 - **Unverified:** whether AccountManager hands Score a `drive.readonly` token beside its `drive` consent without another
   screen, Google's token lifetime on the watch's clock, and a keys message's round trip over Bluetooth or the cloud relay.
+
+### Owner's ruling (27 Nov 2026): the watch never holds the vault passphrase
+
+Asked in B3's report, answered by the owner: keep the passphrase off the watch. A38 is retired, and with it
+W-5.1.8 (Dash's first-run passphrase screen) and the plan's `PassphraseKeptInKeystoreOnly`;
+`TheWatchHoldsNoVaultTests` is the standing guard. The plan (§0.3, §2.4, W-4.1.2, W-5.1.8) and `WATCH-DESIGN.md`
+are updated; the retired mockup screen in `design/screens-r1.html` is left as drawn, superseded by this ruling.
