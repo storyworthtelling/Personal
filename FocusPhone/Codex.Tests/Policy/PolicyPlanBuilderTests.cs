@@ -310,6 +310,20 @@ public class PolicyPlanBuilderTests
             plan.PermissionGrants);
     }
 
+    // The owner's report (P14 B7): Post offers a note once a call ends, and the platform tells it a call ended only
+    // through ACTION_PHONE_STATE_CHANGED, which it never delivers to an app without READ_PHONE_STATE. The call log was
+    // granted on the locked phone and this was not, so the offer depended on a runtime dialog.
+    [Fact]
+    public void Plan_GrantsReadPhoneStateSoPostHearsACallEnd()
+    {
+        var plan = PolicyPlanBuilder.Build(DefaultContext());
+
+        Assert.Equal("android.permission.READ_PHONE_STATE", PolicyContext.ReadPhoneStatePermission);
+        Assert.Contains(
+            new PermissionGrant(PolicyContext.CommunicationPackage, PolicyContext.ReadPhoneStatePermission),
+            plan.PermissionGrants);
+    }
+
     // Post's fallback when the Messages bridge is down is a plain text through the phone, and
     // Post no longer holds the texting role that used to carry SEND_SMS with it.
     [Fact]

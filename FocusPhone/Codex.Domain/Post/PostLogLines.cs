@@ -53,6 +53,22 @@ public static class PostLogLines
 
     public static string MailRoute(MailTransport route) => $"MAIL ROUTE {route}";
 
+    /// <summary>A call just ended, as the platform told Post (P14 B7): the line that shows the broadcast arrives at all.</summary>
+    public const string CallEnded = "CALL NOTE a call ended";
+
+    /// <summary>What became of a call's end (P14 B7): offered a note, or why not. No number, no name, no words.</summary>
+    public static string CallNote(CallNoteVerdict verdict) => verdict switch
+    {
+        CallNoteVerdict.Offered => "CALL NOTE offered",
+        CallNoteVerdict.NoCall => "CALL NOTE not offered: the call log had no call",
+        CallNoteVerdict.TooOld => "CALL NOTE not offered: the newest call ended too long ago",
+        CallNoteVerdict.NotAnswered => "CALL NOTE not offered: nobody answered",
+        CallNoteVerdict.Withheld => "CALL NOTE not offered: the number was withheld",
+        CallNoteVerdict.Blocked => "CALL NOTE not offered: the number is blocked",
+        CallNoteVerdict.Unreadable => "CALL NOTE not offered: the call log can’t be read",
+        _ => throw new ArgumentOutOfRangeException(nameof(verdict), verdict, "Not a verdict on a call’s end."),
+    };
+
     /// <summary>
     /// Null until the delete has failed often enough to be worth a line (the fold's own threshold), then on
     /// every tenth try after it — the sync retries every half hour, and a line each time would bury the log.

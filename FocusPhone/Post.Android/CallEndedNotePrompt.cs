@@ -1,6 +1,8 @@
 using Android.Content;
 using Android.Provider;
+using Codex.Domain.Post;
 using Codex.Domain.Timeline;
+using Codex.Ui;
 
 namespace Post;
 
@@ -12,60 +14,58 @@ namespace Post;
 /// </summary>
 internal static class CallEndedNotePrompt
 {
+    private const string Tag = "CallNote"; // not copy: a log tag
+
     // The call-log provider's write for the call that just ended can lag the
     // OFFHOOK-then-IDLE broadcast by anywhere from nothing to a couple of seconds
     // depending on the device, so this waits and retries rather than reading once.
     private static readonly TimeSpan[] RetryDelays =
         [TimeSpan.Zero, TimeSpan.FromMilliseconds(750), TimeSpan.FromSeconds(2)];
 
-    // A call-log row only counts as "the call that just ended" if it is this fresh —
-    // otherwise a slow write could hand back an earlier, unrelated call instead.
-    private static readonly TimeSpan FreshnessWindow = TimeSpan.FromSeconds(15);
-
-    // CallLog.Calls.TYPE constants (mirrors Codex.Domain.Timeline.CallRecordMapper, which
-    // only names the ones it maps). BlockedType is a documented, stable platform constant
-    // (added API 24) not bound as a named field on this Android binding's Calls class.
-    private const int TypeMissed = 3;
-    private const int TypeVoicemail = 4;
-    private const int TypeRejected = 5;
-    private const int TypeBlocked = 6;
-
     public static void Handle(Context context)
     {
-        var call = FindJustEndedCall(context);
-        if (call is null)
-        {
-            return; // Nothing fresh enough to be confident this is the call that just ended.
-        }
+        // Whether this is the call that just ended, and one someone was on, is JustEndedCall's (P14 B7): the row is judged
+        // by when the call ended, not by when it began, which is what the call log's date is.
+        var (verdict, number) = FindJustEndedCall(context);
 
         // --- The "non-spam" heuristic, and its honest limit ---
         // Android has no reliable, always-available "is this call spam" signal short of
         // building a Call Screening Service — a much larger integration than one prompt
-        // warrants. What IS checked here: a call the OWNER explicitly declined or the
-        // SYSTEM itself blocked (CallLog.Calls.TYPE), and a number already on the phone's
-        // own blocked-numbers list (the same list Post's own "Block this number" writes
-        // to). Neither of those can actually fire for a call that reached OFFHOOK in the
-        // first place — a rejected or blocked call never connects, so it never reaches
-        // this method at all — so in practice this guards edge cases (two calls arriving
-        // close together, a number blocked mid-call) rather than doing real spam
-        // detection. An answered nuisance call that was never blocked still prompts for a
-        // note; there is no honest way to tell that call apart from a wanted one here.
-        if (call.Value.Type is TypeRejected or TypeBlocked or TypeMissed or TypeVoicemail)
+        // warrants. What IS checked: a call nobody was on (JustEndedCall.Answered: missed,
+        // declined, voicemail, blocked by the system, an outgoing call nobody picked up), and a
+        // number already on the phone's own blocked-numbers list (the same list Post's own
+        // "Block this number" writes to). An answered nuisance call that was never blocked
+        // still prompts for a note; there is no honest way to tell that call apart from a
+        // wanted one here.
+        if (verdict == CallNoteVerdict.Offered && IsNumberBlocked(context, number!))
         {
-            return;
+            verdict = CallNoteVerdict.Blocked;
         }
-        if (IsNumberBlocked(context, call.Value.Number))
+
+        // Each call's end says what became of it in the weekly log, so an offer that never comes can be read there.
+        if (verdict == CallNoteVerdict.Unreadable)
+        {
+            HeadLog.Warn(Tag, PostLogLines.CallNote(verdict));
+        }
+        else
+        {
+            HeadLog.Info(Tag, PostLogLines.CallNote(verdict));
+        }
+        if (verdict != CallNoteVerdict.Offered)
         {
             return;
         }
 
-        var contactKey = ResolveContactKey(context, call.Value.Number);
+        var contactKey = ResolveContactKey(context, number!);
         var displayName = ContactNameResolver.DisplayName(context, contactKey);
-        PendingCallNoteStore.Set(context, contactKey, call.Value.Number, displayName);
+        PendingCallNoteStore.Set(context, contactKey, number!, displayName);
     }
 
-    private static (string Number, int Type)? FindJustEndedCall(Context context)
+    // The newest row, read again while the log has not caught up (JustEndedCall.ReadAgain), with its verdict and number.
+    private static (CallNoteVerdict Verdict, string? Number) FindJustEndedCall(Context context)
     {
+        var verdict = CallNoteVerdict.NoCall;
+        string? number = null;
         foreach (var delay in RetryDelays)
         {
             if (delay > TimeSpan.Zero)
@@ -73,24 +73,47 @@ internal static class CallEndedNotePrompt
                 Thread.Sleep(delay);
             }
 
-            using var cursor = context.ContentResolver!.Query(
-                CallLog.Calls.ContentUri!,
-                [CallLog.Calls.Number, CallLog.Calls.Date, CallLog.Calls.Type],
-                null, null, $"{CallLog.Calls.Date} DESC");
-            if (cursor is null || !cursor.MoveToFirst())
+            try
             {
-                continue;
+                (verdict, number) = ReadNewest(context);
             }
-
-            var number = cursor.GetString(0) ?? "";
-            var whenUtc = DateTimeOffset.FromUnixTimeMilliseconds(cursor.GetLong(1));
-            var type = cursor.GetInt(2);
-            if (number.Length > 0 && DateTimeOffset.UtcNow - whenUtc <= FreshnessWindow)
+            catch (Java.Lang.SecurityException)
             {
-                return (number, type);
+                // READ_CALL_LOG refused: the note cannot know whose call it was. Said once per process, by name.
+                HeadLog.Denied("READ_CALL_LOG");
+                return (CallNoteVerdict.Unreadable, null);
+            }
+            if (!JustEndedCall.ReadAgain(verdict))
+            {
+                break;
             }
         }
-        return null;
+        return (verdict, number);
+    }
+
+    private static (CallNoteVerdict Verdict, string? Number) ReadNewest(Context context)
+    {
+        using var cursor = context.ContentResolver!.Query(
+            CallLog.Calls.ContentUri!,
+            [CallLog.Calls.Number, CallLog.Calls.Date, CallLog.Calls.Duration, CallLog.Calls.Type],
+            null, null, $"{CallLog.Calls.Date} DESC");
+        if (cursor is null || !cursor.MoveToFirst())
+        {
+            return (CallNoteVerdict.NoCall, null);
+        }
+
+        var row = new CallLogRow(
+            DateTimeOffset.FromUnixTimeMilliseconds(cursor.GetLong(1)),
+            TimeSpan.FromSeconds(cursor.GetLong(2)),
+            cursor.GetInt(3));
+        var verdict = JustEndedCall.Judge(row, DateTimeOffset.UtcNow);
+        var number = cursor.GetString(0) ?? string.Empty;
+        if (verdict == CallNoteVerdict.Offered && number.Length == 0)
+        {
+            // A withheld number: the note would have no thread to join.
+            return (CallNoteVerdict.Withheld, null);
+        }
+        return (verdict, number);
     }
 
     private static bool IsNumberBlocked(Context context, string number)
@@ -101,10 +124,11 @@ internal static class CallEndedNotePrompt
         }
         catch (Exception e)
         {
-            // Only the default SMS/dialer app may query this; Post holds the SMS role,
-            // so it should work — but a failed check should never block the note prompt
-            // outright. Worst case here is offering it for a number that was blocked.
-            PostDiagnostics.LogWarning("CallNote", "Could not check the blocked-numbers list", e);
+            // Only the default SMS or dialer app may query this, and Google Messages holds the
+            // texting role again, so the platform may refuse it — but a failed check should never
+            // block the note prompt outright. Worst case here is offering it for a number that was
+            // blocked. Logged by its shape: the platform's words can name the number.
+            HeadLog.Quiet(Tag, "Could not check the blocked-numbers list", e);
             return false;
         }
     }

@@ -1,6 +1,8 @@
 using Android.App;
 using Android.Content;
 using Android.Telephony;
+using Codex.Domain.Post;
+using Codex.Ui;
 
 namespace Post;
 
@@ -35,6 +37,8 @@ public class CallStateReceiver : BroadcastReceiver
 {
     public const string ActionPhoneStateChanged = "android.intent.action.PHONE_STATE";
 
+    private const string Tag = "CallNote"; // not copy: a log tag
+
     private const string PreferencesName = "callState";
     private const string WasOffhookKey = "wasOffhook";
 
@@ -60,6 +64,9 @@ public class CallStateReceiver : BroadcastReceiver
         }
         prefs.Edit()!.PutBoolean(WasOffhookKey, false)!.Apply();
 
+        // The line that shows, in the weekly export, that the platform told Post a call ended at all (P14 B7).
+        HeadLog.Info(Tag, PostLogLines.CallEnded);
+
         // The call-log row for the call that just ended may not have landed yet, and
         // reading it (with a short wait-and-retry) is more work than a broadcast receiver
         // should do on its own thread — GoAsync keeps this instance alive long enough to
@@ -77,8 +84,7 @@ public class CallStateReceiver : BroadcastReceiver
                 // Never throw out of a broadcast receiver: it kills the process, and this
                 // one shares it with SmsDeliverReceiver — a missed note prompt is a far
                 // smaller loss than incoming texts failing to persist.
-                Android.Util.Log.Warn("Post", $"Call-ended handling failed: {e}");
-                PostDiagnostics.LogWarning("CallNote", "Call-ended handling failed", e);
+                HeadLog.Quiet(Tag, "Call-ended handling failed", e);
             }
             finally
             {

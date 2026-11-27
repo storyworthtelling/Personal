@@ -2465,3 +2465,74 @@ mockup file is not edited):**
   "no personal-data shapes in the added lines".
 - `Watch/Dash.Wear` and `Watch/Watch.Ui.Wear` compile here with 0 warnings and 0 errors; `FocusPhone/Post.Android`
   with 0 errors (65 warnings, none in a file this chunk touched).
+
+# Chunk B7 · the call note and the mail lines (W-5.1.5, W-5.1.6)
+
+Every figure below is from a real run on 27 Nov 2026. As before, each red run was taken with the tests written and the
+new code present only as stubs: methods threw `NotImplementedException`, and new constants were empty strings.
+
+## First, the owner's report: Post's own call note on the phone doesn't work
+
+Asked while B7 was under way, since the watch's call note uses the same rules. The owner gave no symptom, so the
+whole path was read link by link.
+
+**The path, and what each link was found to do:**
+- **How Post learns a call ended:** `CallStateReceiver`, a manifest receiver for `android.intent.action.PHONE_STATE`
+  (one of the implicit-broadcast exceptions), keeps the OFFHOOK sighting in preferences and, on the IDLE after it,
+  hands off to `CallEndedNotePrompt` on the pool. Android delivers that broadcast only to an app holding
+  READ_PHONE_STATE. Post asks for it in its launch dialog, but **Flyleaf's policy did not grant it**: the device owner
+  force-grants READ_CALL_LOG, READ_SMS, WRITE_CALL_LOG, WRITE_CONTACTS, READ_PHONE_NUMBERS and SEND_SMS, and not this
+  one. On the locked phone the offer depended on that dialog having been answered yes, and nothing would have said
+  otherwise. No notification route or call-log observer is involved; the call log is read once per call end.
+- **Finding the call that just ended (the cause):** `CallEndedNotePrompt.FindJustEndedCall` read the newest row and
+  accepted it only if `now − CallLog.Calls.Date ≤ 15 s`. **The call log's DATE is when the call began** (Telecom's
+  `CallLogManager` writes the call's creation time, when it was placed or began to ring, with the connected time as
+  DURATION). So a call that lasted more than about fifteen seconds, which is every real conversation, was "not fresh
+  enough" and silently offered nothing. Only a call of a few seconds could ever reach the prompt. This one is certain
+  from the code alone.
+- **The prompt behind the dog-ear, the writing screen, saving and showing:** read and found sound.
+  `PostActivity.CheckPendingCallNotes` raises the notice on every resume; its action (run from the Waiting page)
+  clears the slot and opens the correspondence with `WriteCallNote`, an `ActionCard.AskText` on the page's overlay,
+  which a re-render does not clear; Keep writes `CallNote.For(number, text, now)` to the timeline cache (keyed by kind
+  and source id, `note:<ms>`), which no reconcile touches (only mail is reconciled), and the open thread reloads and
+  shows it as a call item on the same correspondence (the number normalised as the call's own key). None of these
+  could be tested end to end here; they are not changed.
+- **Quiet failures found on the way:** nothing on the path logged anything when no note was offered, so the weekly
+  export could not show it. The blocked-numbers check now always throws on this phone (Google Messages holds the
+  texting role, and only the default SMS or dialer app may read the list); it was caught, and logged with the
+  exception's words. The receiver's failure line put the whole exception into logcat.
+
+**The fix (`Codex.Domain/Post/JustEndedCall`, pure):** the row is read with its DURATION and judged by its end: when it
+began, plus how long it was connected, plus up to `RingAllowance` (90 s, chosen, not measured) of ringing the log does
+not record, must fall within `Freshness` (15 s) of now (`Fresh`). A call someone was on (`Answered`) is an incoming or
+outgoing call that connected, or one answered on another device (type 7: rung on the phone, taken on the watch); a
+missed, declined, voicemail or blocked call, an unknown type, and an outgoing call nobody picked up (which the old
+rule offered) are not. `Judge` gives one `CallNoteVerdict`; a row not there yet, or the one before it, is read again
+(`ReadAgain`), as the old retries did. Flyleaf's plan now grants Post READ_PHONE_STATE.
+
+**The log lines (none carries a number, a name or a word of the call):** `CALL NOTE a call ended` (the broadcast
+arrived), then one of `CALL NOTE offered` / `not offered: the call log had no call` / `the newest call ended too long
+ago` / `nobody answered` / `the number was withheld` / `the number is blocked` / `the call log can’t be read`; and
+`PERMISSION READ_PHONE_STATE …` once a process when Post resumes without it (`HeadLog.Denied`), and the same for
+READ_CALL_LOG. The receiver's and the blocked check's failures are logged by their shape only (`HeadLog.Quiet`).
+
+- **Tests first:** `Codex.Tests/Post/JustEndedCallTests.cs` (21 with rows: `ASixMinuteCallIsJustEnded`,
+  `AnHourLongCallIsJustEnded`, `TheRingBeforeItConnectedIsAllowed`, `ACallThatEndedLongAgoIsNot`,
+  `ACallStillGoingIsNot`, `AShortCallIsStillJustEnded`, `ACallNobodyWasOnIsNotAnswered` ×5,
+  `AnOutgoingCallNobodyAnsweredIsNotAnswered`, `AConversationIsAnswered` ×2, `ACallAnsweredElsewhereIsAnswered`,
+  `NoRowIsNoCall`, `OnlyAMissingRowIsReadAgain` ×5); `PostLogLinesTests.ACallNoteSaysWhatBecameOfIt` ×7 and
+  `ACallNoteLineCarriesNoNumber`; `Post/CallNotePathTests.cs` (the head, read by content: the prompt judges through
+  `JustEndedCall` and reads the duration and has no `FreshnessWindow`, every call end and a refused call log say so,
+  a refused READ_PHONE_STATE is said, the receiver logs a failure by its shape); and
+  `PolicyPlanBuilderTests.Plan_GrantsReadPhoneStateSoPostHearsACallEnd`.
+- **Red: `FocusPhone/Codex.Tests` 3413 tests, 34 failed, 3379 passed.** The 34: `JustEndedCallTests` 21,
+  `PostLogLinesTests` 8, `CallNotePathTests` 4, `PolicyPlanBuilderTests` 1. First errors: `NotImplementedException` 29,
+  `Assert.Contains() Failure: Sub-string not found` 3 (the head untouched), `Strings differ` 1 (the empty permission),
+  `Assert.DoesNotContain() Failure: Sub-string found` 1 (`{e}` in the receiver).
+- **Green: `Codex.Tests` 3413 passed, 0 failed. `RepoGuards.Tests` 452 passed.** `FocusPhone/Post.Android` builds
+  with 0 errors and no warning in a file this fix touched.
+- **What only a device can confirm:** that Telecom writes DATE as the call's start on this phone (it is AOSP's, and the
+  first real call's log lines will say: `offered` after a long call where the old rule would have said nothing);
+  whether READ_PHONE_STATE had been granted by the launch dialog (if the export shows no `a call ended` line after a
+  call, it was not, and the next policy pass now grants it); whether the phone goes off hook at all for a call rung
+  here and answered on the watch; and the note card's keyboard opening when the card is raised from the Waiting page.

@@ -397,6 +397,13 @@ public class PostActivity : Activity
     // SingleTask means a second launch reuses this same running instance.
     private void CheckPendingCallNotes()
     {
+        // Without READ_PHONE_STATE the platform never tells Post a call ended, so no note is ever offered and nothing
+        // else would say why: said once a process, by name, in the weekly log (P14 B7).
+        if (CheckSelfPermission(Manifest.Permission.ReadPhoneState) != Permission.Granted)
+        {
+            HeadLog.Denied("READ_PHONE_STATE");
+        }
+
         var pending = PendingCallNoteStore.Get(this);
         DogEar.SetNotice(this, overlay, NoticeKeys.CallNote, pending is null
             ? null

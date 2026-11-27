@@ -96,6 +96,8 @@ public static class PolicyPlanBuilder
             new(PolicyContext.CommunicationPackage, PolicyContext.WriteCallLogPermission),
             new(PolicyContext.CommunicationPackage, PolicyContext.WriteContactsPermission),
             new(PolicyContext.CommunicationPackage, PolicyContext.ReadPhoneNumbersPermission),
+            // Hearing that a call ended, so Post can offer a note on it (P14 B7): without it the broadcast never comes.
+            new(PolicyContext.CommunicationPackage, PolicyContext.ReadPhoneStatePermission),
             new(PolicyContext.CommunicationPackage, PolicyContext.SendSmsPermission),
         };
 

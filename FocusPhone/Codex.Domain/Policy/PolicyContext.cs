@@ -98,6 +98,10 @@ public record PolicyContext(
     // replies). Android refuses the read without it, default SMS app or not.
     public const string ReadPhoneNumbersPermission = "android.permission.READ_PHONE_NUMBERS";
 
+    // What lets Post hear that a call ended (ACTION_PHONE_STATE_CHANGED, which the platform delivers only to an app holding
+    // it), so it can offer a note on the call (P14 B7). A runtime permission the device owner grants outright.
+    public const string ReadPhoneStatePermission = "android.permission.READ_PHONE_STATE";
+
     // A plain text through the phone when the Messages bridge is down. Google Messages holds
     // the texting role now, and the permissions that role carried no longer come with it, so
     // the device owner grants this one outright (hard-restricted like READ_SMS).

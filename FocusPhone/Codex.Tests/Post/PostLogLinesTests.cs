@@ -110,4 +110,28 @@ public class PostLogLinesTests
     {
         Assert.Equal(speaks, PostLogLines.OwedDeleteFailing(attempts, SourceDeleteFailure.NotConnected) is not null);
     }
+
+    // ---- the call note (the owner's report, P14 B7) ----
+
+    [Theory]
+    [InlineData(CallNoteVerdict.Offered, "CALL NOTE offered")]
+    [InlineData(CallNoteVerdict.NoCall, "CALL NOTE not offered: the call log had no call")]
+    [InlineData(CallNoteVerdict.TooOld, "CALL NOTE not offered: the newest call ended too long ago")]
+    [InlineData(CallNoteVerdict.NotAnswered, "CALL NOTE not offered: nobody answered")]
+    [InlineData(CallNoteVerdict.Withheld, "CALL NOTE not offered: the number was withheld")]
+    [InlineData(CallNoteVerdict.Blocked, "CALL NOTE not offered: the number is blocked")]
+    [InlineData(CallNoteVerdict.Unreadable, "CALL NOTE not offered: the call log can’t be read")]
+    public void ACallNoteSaysWhatBecameOfIt(CallNoteVerdict verdict, string line)
+    {
+        Assert.Equal(line, PostLogLines.CallNote(verdict));
+    }
+
+    [Fact]
+    public void ACallNoteLineCarriesNoNumber()
+    {
+        // The weekly export shows whether each call end reached Post and what became of it, and never who or what was said.
+        Assert.All(Enum.GetValues<CallNoteVerdict>().Select(PostLogLines.CallNote).Append(PostLogLines.CallEnded),
+            line => Assert.DoesNotMatch(@"\d", line));
+        Assert.Equal("CALL NOTE a call ended", PostLogLines.CallEnded);
+    }
 }
