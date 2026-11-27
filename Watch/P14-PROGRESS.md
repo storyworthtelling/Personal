@@ -2092,6 +2092,47 @@ the workflow, and FaceStudio's `DashIcon` a stub.
 Every figure below is from a real run on 27 Nov 2026. As before, each red run was taken with the tests written and the
 new code present only as stubs: methods threw `NotImplementedException`, new constants were empty strings or zero.
 
+## What it is
+
+**Filing and deleting, undo-first (W-5.1.4).**
+- A long press on a People waiting row opens `ActActivity` (registered `…communication.dash.ActActivity`,
+  `WatchIdentity.DashActActivityName`) on the choice: the time and Dash's glyph, the name, **File** pinned and
+  **Delete** under it, on After the call's layout (no mockup draws this screen). TalkBack names the row's long press
+  ("File or delete").
+- A choice is the act, with no confirmation (WD §9): `WristAct` names it `act-` and 32 hex digits, takes the watch's
+  own undo window (`UndoRingView.WindowFor`, at most the wire's two minutes), and `ActCarrier` hands Post the
+  `dash/file` or `dash/delete` for the whole correspondence on the pool. The screen becomes the mockup's Filed, with
+  Undo: the glyph and its emptying ring at 0.62 of the radius (`UndoRingView.GlyphCentre`, new in the kit), "Lee filed"
+  or "Lee deleted", and "Tap to undo" in Dash's colour where it reads at 4.5:1 and in the ink where it does not
+  (`WatchContrast.Accent`; for Dash, all day). A tap anywhere takes it back: the undo goes once the phone has the act,
+  so it never arrives first. When the ring empties, or the screen is left, the act is final and the screen goes, and
+  People waiting drops the row at once.
+- Nothing is claimed that did not happen: an act that never reached the phone leaves the row and says why in the quiet
+  line ("Your phone isn’t in reach."); an undo that never reached it says "The undo didn’t reach your phone." and the
+  act stands. The act and its undo are carried on the pool whether the screen is still there or not.
+- **Post's half:** an undo heard before its act is kept in the book as taken back (and saved), so the act that follows
+  is `Again` and never done, across a restart too.
+
+**Group texts and photos (W-5.1.3).**
+- `dash/photo` (`WatchIdentity.DashPhotoPath`, the tenth path, frozen and in Post's listener): the wrist asks
+  `{v, kind: ask, id}` with the attachment id B1 already lists; Post answers `{v, kind: photo, id, jpeg}`, the JPEG as
+  base64, at most `DashLimits.PhotoBytes` (40 KB, so the message stays under the 64 KB budget). The codec refuses a
+  photo that is not a JPEG by its first bytes, is past its budget, or carries another id.
+- Post finds the photo among the conversations the wrist is shown (never a video or file, a mail's picture, or anything
+  filed), fetches it through `AttachmentCache.Bytes`, the one fetch the Mailbox opens pictures with (Google Messages'
+  bridge, or the phone's own MMS store), and `DashPhotos.Shrink` decodes it no larger than needed, stands it upright by
+  its EXIF orientation, scales it so its shorter side is at most 240 px and its longer 640 (`PhotoFit`), and writes a
+  JPEG at the first quality from 80 down to 40 that fits, halving the size if none does. Written again, never passed
+  on, so the picture's own metadata stays on the phone; held in memory only. One that will not fetch or fit is not
+  answered (`DASH dash/photo: Unfetched`), and the wrist's 30 s wait says so. A picture's stand-in words ("Photo",
+  "Photo +1") no longer cross on a conversation; the row's line still says "Photo".
+- On the wrist, each photo is drawn in the mockup's picture (1.0 by 0.6 of the radius, its corners at 0.06, filled about
+  its centre and never stretched) with "Robin · 1 h" under it (who, in a group, and when); its words, if it has any of
+  its own, follow in a bubble. Until it comes the card says "Opening the photo.", and one that did not come says why.
+  The conversation asks one photo at a time, newest first, and holds a dozen for the process (`HeldPhotos`), so a
+  conversation opened again shows them at once. A group's Reply to all sits at 1.52 of the radius, where the mockup
+  draws it, under the caption (B4 had it at the person's 1.62).
+
 ## Owner's ruling (27 Nov 2026): People waiting draws no unread mark
 
 B4 drew the approved mockup's rule in Dash's colour down an unread row's edge, against WD §1's "no unread marks", and
@@ -2179,47 +2220,6 @@ Tests written first, with no `ActActivity`, `ActCarrier` or `PhotoView` in `Watc
 - **Compiled here** (`-p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false`): `Watch/Dash.Wear` and
   `Watch/Watch.Ui.Wear`, each **Build succeeded, 0 warnings, 0 errors**; `FocusPhone/Post.Android` **Build succeeded,
   0 errors** (65 warnings, none in a file this chunk touched).
-
-## What it is
-
-**Filing and deleting, undo-first (W-5.1.4).**
-- A long press on a People waiting row opens `ActActivity` (registered `…communication.dash.ActActivity`,
-  `WatchIdentity.DashActActivityName`) on the choice: the time and Dash's glyph, the name, **File** pinned and
-  **Delete** under it, on After the call's layout (no mockup draws this screen). TalkBack names the row's long press
-  ("File or delete").
-- A choice is the act, with no confirmation (WD §9): `WristAct` names it `act-` and 32 hex digits, takes the watch's
-  own undo window (`UndoRingView.WindowFor`, at most the wire's two minutes), and `ActCarrier` hands Post the
-  `dash/file` or `dash/delete` for the whole correspondence on the pool. The screen becomes the mockup's Filed, with
-  Undo: the glyph and its emptying ring at 0.62 of the radius (`UndoRingView.GlyphCentre`, new in the kit), "Lee filed"
-  or "Lee deleted", and "Tap to undo" in Dash's colour where it reads at 4.5:1 and in the ink where it does not
-  (`WatchContrast.Accent`; for Dash, all day). A tap anywhere takes it back: the undo goes once the phone has the act,
-  so it never arrives first. When the ring empties, or the screen is left, the act is final and the screen goes, and
-  People waiting drops the row at once.
-- Nothing is claimed that did not happen: an act that never reached the phone leaves the row and says why in the quiet
-  line ("Your phone isn’t in reach."); an undo that never reached it says "The undo didn’t reach your phone." and the
-  act stands. The act and its undo are carried on the pool whether the screen is still there or not.
-- **Post's half:** an undo heard before its act is kept in the book as taken back (and saved), so the act that follows
-  is `Again` and never done, across a restart too.
-
-**Group texts and photos (W-5.1.3).**
-- `dash/photo` (`WatchIdentity.DashPhotoPath`, the tenth path, frozen and in Post's listener): the wrist asks
-  `{v, kind: ask, id}` with the attachment id B1 already lists; Post answers `{v, kind: photo, id, jpeg}`, the JPEG as
-  base64, at most `DashLimits.PhotoBytes` (40 KB, so the message stays under the 64 KB budget). The codec refuses a
-  photo that is not a JPEG by its first bytes, is past its budget, or carries another id.
-- Post finds the photo among the conversations the wrist is shown (never a video or file, a mail's picture, or anything
-  filed), fetches it through `AttachmentCache.Bytes`, the one fetch the Mailbox opens pictures with (Google Messages'
-  bridge, or the phone's own MMS store), and `DashPhotos.Shrink` decodes it no larger than needed, stands it upright by
-  its EXIF orientation, scales it so its shorter side is at most 240 px and its longer 640 (`PhotoFit`), and writes a
-  JPEG at the first quality from 80 down to 40 that fits, halving the size if none does. Written again, never passed
-  on, so the picture's own metadata stays on the phone; held in memory only. One that will not fetch or fit is not
-  answered (`DASH dash/photo: Unfetched`), and the wrist's 30 s wait says so. A picture's stand-in words ("Photo",
-  "Photo +1") no longer cross on a conversation; the row's line still says "Photo".
-- On the wrist, each photo is drawn in the mockup's picture (1.0 by 0.6 of the radius, its corners at 0.06, filled about
-  its centre and never stretched) with "Robin · 1 h" under it (who, in a group, and when); its words, if it has any of
-  its own, follow in a bubble. Until it comes the card says "Opening the photo.", and one that did not come says why.
-  The conversation asks one photo at a time, newest first, and holds a dozen for the process (`HeldPhotos`), so a
-  conversation opened again shows them at once. A group's Reply to all sits at 1.52 of the radius, where the mockup
-  draws it, under the caption (B4 had it at the person's 1.62).
 
 ## Decisions made in this chunk (each the owner's to overturn)
 
