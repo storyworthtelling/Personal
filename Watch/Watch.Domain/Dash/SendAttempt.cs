@@ -11,9 +11,9 @@ public enum SendCheck
 /// <summary>
 /// A reply from the wrist (W-5.1.2, A10): dictated or typed, the same on the wire, into one correspondence (a person or
 /// a group; Post works out who and how, B1's <c>ReplyTarget</c>), or a new text to one contact of the Rolodex (B6), whose
-/// <see cref="Key"/> is then the contact's id and whose number Post finds on the phone. The watch names each send (<see cref="Id"/>), and
-/// Post keeps every send in its book under that name and answers it again from there (B2), so a send asked again under
-/// the same name is never sent twice. Hence <see cref="Again"/>: with no answer the same name goes again, since the
+/// <see cref="Key"/> is then the contact's id and whose number Post finds on the phone. The watch names each send
+/// (<see cref="Id"/>), and Post keeps every send in its book under that name and answers it again from there (B2), so a
+/// send asked again under the same name is never sent twice. Hence <see cref="Again"/>: with no answer the same name goes again, since the
 /// text may already have gone; once Post has answered, trying again is a new send.
 /// </summary>
 public sealed record SendAttempt(string Id, string Key, string Text)
