@@ -141,8 +141,9 @@ public static class SuiteVersionBands
 
         // The watch (P14), keyed by package and form because each watch app shares its phone app's package. Nothing was
         // published before build-watch.yml: the installer's first copy is installed by hand from that workflow's artifact
-        // (A78). Dash, Wave and Beat join here at the watch band when their projects land.
+        // (A78). Dash, Wave and Beat join here at the watch band when their projects land: Dash (Post's package) in B4.
         new("com.storyworthtelling.focusphone.launcher", WatchBand, 0, ApkForm.Watch),
+        new("com.storyworthtelling.focusphone.communication", WatchBand, 0, ApkForm.Watch),
         new("com.storyworthtelling.watch.point", WatchBand, 0, ApkForm.Watch),
     ];
 }

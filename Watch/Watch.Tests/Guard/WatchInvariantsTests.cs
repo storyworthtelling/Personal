@@ -343,6 +343,237 @@ public class WatchInvariantsTests
         Assert.True(copied.Count == 0, "Use WatchIdentity rather than a copy:\n" + string.Join("\n", copied));
     }
 
+    // ---- Dash on the watch (P14 B4): Post's package, so the Data Layer joins the two by package and signature ----
+
+    private static string Dash(params string[] parts) =>
+        Path.Combine([WatchFiles.RepoRoot(), "Watch", "Dash.Wear", .. parts]);
+
+    private static IEnumerable<string> DashSources() =>
+        Directory.Exists(Dash())
+            ? Directory.EnumerateFiles(Dash(), "*.cs", SearchOption.AllDirectories).Where(path => !WatchFiles.IsBuildOutput(path))
+            : [];
+
+    // Every Dash source, without its comments, as one text.
+    private static string DashCode()
+    {
+        var sources = DashSources().ToList();
+        Assert.True(sources.Count > 0, "Watch/Dash.Wear has no sources.");
+        return string.Join("\n", sources.Select(Code));
+    }
+
+    [Fact]
+    public void DashIsPostsPackage()
+    {
+        // PC1: the Data Layer delivers only between apps of one package and one signature.
+        var project = Text(Dash("Dash.Wear.csproj"));
+        Assert.Contains($"<ApplicationId>{WatchIdentity.DashPackage}</ApplicationId>", project, StringComparison.Ordinal);
+
+        var manifest = Text(Dash("Properties", "AndroidManifest.xml"));
+        Assert.Matches($"<manifest\\b[^>]*\\spackage=\"{Regex.Escape(WatchIdentity.DashPackage)}\"", manifest);
+    }
+
+    [Fact]
+    public void DashIsAWatchApp()
+    {
+        var manifest = Text(Dash("Properties", "AndroidManifest.xml"));
+
+        Assert.Matches(@"<uses-feature\s+android:name=""android\.hardware\.type\.watch""", manifest);
+        // Not standalone: it is nothing without Post on the phone (A67).
+        Assert.Matches(@"<meta-data\s+android:name=""com\.google\.android\.wearable\.standalone""\s+android:value=""false""", manifest);
+    }
+
+    [Fact]
+    public void DashAsksForNoPermission()
+    {
+        // The Data Layer needs none, and the system's own dictation and keyboard ask for what they need themselves.
+        var manifest = Text(Dash("Properties", "AndroidManifest.xml"));
+        var attributes = DashSources().Count(path => Regex.IsMatch(File.ReadAllText(path), @"\[assembly:\s*UsesPermission"));
+
+        Assert.DoesNotContain("<uses-permission", manifest, StringComparison.Ordinal);
+        Assert.Equal(0, attributes);
+    }
+
+    [Fact]
+    public void DashCanSeeTheSystemsInput()
+    {
+        // Android 11+ resolves another app's activity only for an intent the app names (W-5.1.2).
+        var manifest = Text(Dash("Properties", "AndroidManifest.xml"));
+
+        Assert.Matches(@"<intent>\s*<action\s+android:name=""android\.speech\.action\.RECOGNIZE_SPEECH""\s*/>\s*</intent>", manifest);
+        Assert.Matches(@"<intent>\s*<action\s+android:name=""android\.support\.wearable\.input\.action\.REMOTE_INPUT""\s*/>\s*</intent>", manifest);
+    }
+
+    [Theory]
+    [InlineData("DashPeopleActivityName")]
+    [InlineData("DashConversationActivityName")]
+    [InlineData("DashReplyActivityName")]
+    public void EachDashScreenIsRegisteredByItsName(string constant)
+    {
+        var registered = DashSources().Count(path => File.ReadAllText(path).Contains($"Name = WatchIdentity.{constant}", StringComparison.Ordinal));
+
+        Assert.Equal(1, registered);
+    }
+
+    [Fact]
+    public void PeopleWaitingIsTheOneWayIn()
+    {
+        // A14: Dash opens on People waiting, and it is the app's one launcher entry.
+        var launchers = DashSources().Select(File.ReadAllText).Where(source => source.Contains("MainLauncher = true", StringComparison.Ordinal)).ToList();
+
+        var people = Assert.Single(launchers);
+        Assert.Contains("Name = WatchIdentity.DashPeopleActivityName", people, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashFindsThePhoneByItsCapability()
+    {
+        var code = DashCode();
+
+        Assert.Contains("WatchIdentity.PostCapability", code, StringComparison.Ordinal);
+        Assert.Contains("CapabilityClient.FilterReachable", code, StringComparison.Ordinal);
+        Assert.Contains("RelayNodes.Choose(", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashReadsTheSameCodec()
+    {
+        // One message layout for both ends: Dash references Watch.Domain, as Post does, rather than a copy of it.
+        var project = Text(Dash("Dash.Wear.csproj"));
+        var code = DashCode();
+
+        Assert.Contains(@"..\Watch.Domain\Watch.Domain.csproj", project, StringComparison.Ordinal);
+        Assert.Contains(@"..\Watch.Ui.Wear\Watch.Ui.Wear.csproj", project, StringComparison.Ordinal);
+        Assert.Contains("<PackageReference Include=\"Xamarin.GooglePlayServices.Wearable\" />", project, StringComparison.Ordinal);
+        Assert.Contains("DashCodec.Decode(", code, StringComparison.Ordinal);
+        Assert.Contains("DashCodec.Encode(", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("JsonSerializer", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Utf8JsonWriter", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashHearsOnlyItsOwnPaths()
+    {
+        // Post answers on the path it was asked on (B2); anything else reaching the wrist's ear is left alone.
+        var ear = Assert.Single(DashSources().Select(Code), source => source.Contains("DashCodec.Decode(", StringComparison.Ordinal));
+        var check = ear.IndexOf("WatchIdentity.DashPaths.Contains(", StringComparison.Ordinal);
+        var decode = ear.IndexOf("DashCodec.Decode(", StringComparison.Ordinal);
+
+        Assert.True(check >= 0 && decode > check, "Dash decodes a message before checking it came on one of its paths.");
+        Assert.Contains("DashLogLines.Receipt(", ear, StringComparison.Ordinal);
+        Assert.Contains("DashEnd.Dash", ear, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashMatchesEachAnswerToItsAsk()
+    {
+        var link = Assert.Single(DashSources().Select(Code), source => source.Contains("SendMessageAsync(", StringComparison.Ordinal));
+
+        Assert.Contains("DashExchange.Awaits(", link, StringComparison.Ordinal);
+        Assert.Contains("DashExchange.Answers(", link, StringComparison.Ordinal);
+        Assert.Contains("DashExchange.WaitFor(", link, StringComparison.Ordinal);
+        // An ask is waited for before it is sent, so an answer that comes back at once still finds it.
+        var waiting = link.IndexOf("DashExchange.Awaits(", StringComparison.Ordinal);
+        var sending = link.IndexOf("SendMessageAsync(", StringComparison.Ordinal);
+        Assert.True(waiting >= 0 && sending > waiting, "Dash sends an ask before it waits for the answer.");
+    }
+
+    [Fact]
+    public void TheIdsAreNotCopiedIntoDash()
+    {
+        var copied = DashSources()
+            .Where(path => Regex.IsMatch(File.ReadAllText(path), @"""(com\.storyworthtelling\.[\w.]+|/dash/[\w/-]*|post-relay)"""))
+            .Select(path => Path.GetRelativePath(WatchFiles.RepoRoot(), path))
+            .ToList();
+
+        Assert.NotEmpty(DashSources());
+        Assert.True(copied.Count == 0, "Use WatchIdentity rather than a copy:\n" + string.Join("\n", copied));
+    }
+
+    [Fact]
+    public void EveryDashDataLayerWaitIsBounded()
+    {
+        // A Data Layer call that never answers must not hold a screen for good (as release A learned on the phone).
+        string[] calls = ["GetCapabilityAsync(", "SendMessageAsync("];
+        var lines = DashSources().SelectMany(path => Code(path).Split('\n').Select((line, index) => (Path: Path.GetFileName(path), Line: line, Number: index + 1))).ToList();
+
+        var waits = lines.Where(entry => calls.Any(call => entry.Line.Contains(call, StringComparison.Ordinal))).ToList();
+        var unbounded = waits.Where(entry => !entry.Line.Contains("BoundedAsync(", StringComparison.Ordinal)).Select(entry => $"{entry.Path}:{entry.Number}: {entry.Line.Trim()}").ToList();
+
+        Assert.Equal(calls.Length, calls.Count(call => waits.Any(entry => entry.Line.Contains(call, StringComparison.Ordinal))));
+        Assert.True(unbounded.Count == 0, "A Data Layer call waited for with no bound:\n" + string.Join("\n", unbounded));
+        Assert.Contains(".WaitAsync(", DashCode(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashWaitsOffTheMainThread()
+    {
+        // Every ask and tell a screen makes runs on the pool, and only its answer comes back to the screen.
+        var screens = DashSources().Where(path => Path.GetFileName(path).EndsWith("Activity.cs", StringComparison.Ordinal)).ToList();
+        Assert.Equal(3, screens.Count);
+
+        var calls = screens.SelectMany(path => Code(path).Split('\n').Where(line => Regex.IsMatch(line, @"\.(AskAsync|TellAsync)\(")).Select(line => (Path: Path.GetFileName(path), Line: line))).ToList();
+        Assert.NotEmpty(calls);
+        var onTheScreen = calls.Where(call => !call.Line.Contains("Task.Run(", StringComparison.Ordinal)).Select(call => $"{call.Path}: {call.Line.Trim()}").ToList();
+        Assert.True(onTheScreen.Count == 0, "A Data Layer wait started on the main thread:\n" + string.Join("\n", onTheScreen));
+    }
+
+    [Fact]
+    public void DashRepliesThroughTheSystemsInput()
+    {
+        // W-5.1.2: dictation or the keyboard, both the system's own.
+        var code = DashCode();
+
+        Assert.Contains("RecognizerIntent.ActionRecognizeSpeech", code, StringComparison.Ordinal);
+        Assert.Contains("RemoteInput.GetResultsFromIntent(", code, StringComparison.Ordinal);
+        Assert.Contains("SendAttempt.Reply(", code, StringComparison.Ordinal);
+        Assert.Contains(".Again(", code, StringComparison.Ordinal);
+        Assert.Contains("DashWords.For(", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashTellsThePhoneWhatItRead()
+    {
+        // A14: read on the watch is read on the phone, through what the wrist drew.
+        Assert.Contains("Conversation.ReadFor(", DashCode(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashNeverConfirmsOrToasts()
+    {
+        // WD §6, §9: success is silent and an error a quiet line; there are no dialogs and no toasts.
+        var code = DashCode();
+
+        Assert.DoesNotContain("AlertDialog", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Toast", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Vibrator", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashCarriesPlexMono()
+    {
+        // WD §5: the watch's one family. The kit reads it from the app's assets; an app that draws words carries it.
+        var project = Text(Dash("Dash.Wear.csproj"));
+        foreach (var weight in new[] { "Regular", "Medium", "SemiBold" })
+        {
+            Assert.Matches($@"<AndroidAsset\s+Include=""\.\.\\Fonts\\IBMPlexMono-{weight}\.ttf""\s+Link=""Assets\\fonts\\IBMPlexMono-{weight}\.ttf""\s*/>", project);
+        }
+
+        var kit = Directory.EnumerateFiles(Path.Combine(WatchFiles.RepoRoot(), "Watch", "Watch.Ui.Wear"), "*.cs", SearchOption.AllDirectories)
+            .Where(path => !WatchFiles.IsBuildOutput(path)).Select(Code);
+        Assert.Contains(kit, source => source.Contains("Typeface.CreateFromAsset(", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DashCarriesItsIcon()
+    {
+        // The glyph on a round black icon (WD §3), generated by FaceStudio from the kit's own geometry.
+        foreach (var density in new[] { "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi" })
+        {
+            Assert.True(File.Exists(Dash("Resources", $"mipmap-{density}", "ic_launcher.png")), $"Dash has no {density} icon.");
+        }
+        Assert.Contains("Icon = \"@mipmap/ic_launcher\"", DashCode(), StringComparison.Ordinal);
+    }
+
     // ---- the form words (A4's, held on the watch's side too) ----
 
     [Fact]
@@ -571,6 +802,8 @@ public class WatchInvariantsTests
         var workflow = Text(Path.Combine(WatchFiles.RepoRoot(), ".github", "workflows", "build-watch.yml"));
 
         Assert.Matches($@"(?m)^\s+Watch/Point\.Installer/Point\.Installer\.csproj {Regex.Escape(WatchIdentity.InstallerPackage)}\s*$", workflow);
+        Assert.Matches($@"(?m)^\s+Watch/Dash\.Wear/Dash\.Wear\.csproj {Regex.Escape(WatchIdentity.DashPackage)}\s*$", workflow);
+        Assert.Matches($@"(?m)^\s+Watch/Dash\.Wear/Dash\.Wear\.csproj {Regex.Escape(WatchIdentity.DashPackage)}\s*$", workflow);
         Assert.Contains($"FACE_PACKAGE: {WatchIdentity.FacePackage}", workflow, StringComparison.Ordinal);
     }
 }

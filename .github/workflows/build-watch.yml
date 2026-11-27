@@ -1,6 +1,6 @@
 name: Build watch APKs
 
-# The watch (P14 W-3.2.1, plan §2.3): the Point installer and Point, the face, today; Dash, Wave and Beat as they land.
+# The watch (P14 W-3.2.1, plan §2.3): the Point installer, Dash (B4) and Point, the face, today; Wave and Beat as they land.
 # A watch app carries its phone app's package (PC1), so everything here is published as a watch APK, numbered in band 11
 # (PC4), checked back out of the APK itself before it leaves, and published to watch-latest, the watch's own release, never
 # to apps-latest: every Flyleaf and Score already on a phone installs whatever .apk apps-latest carries, by package
@@ -72,6 +72,7 @@ jobs:
       # here and its publish folder in the two lists at the end; CiHygieneTests fails while either is missing.
       WATCH_HEADS: |
         Watch/Point.Installer/Point.Installer.csproj com.storyworthtelling.focusphone.launcher
+        Watch/Dash.Wear/Dash.Wear.csproj com.storyworthtelling.focusphone.communication
     steps:
       - uses: actions/checkout@v4
 
@@ -148,8 +149,9 @@ jobs:
             echo "${signed[0]} $package app" >> "$RUNNER_TEMP/watch-apks.txt"
           done <<< "$WATCH_HEADS"
 
-      # FaceStudio writes the face (which must then be what is committed) and packs it unsigned; it is aligned before it
-      # is signed, since the signature covers the alignment, and verified. The passwords come from the environment.
+      # FaceStudio writes the face and Dash's icon (which must then be what is committed) and packs the face unsigned; it is
+      # aligned before it is signed, since the signature covers the alignment, and verified. The passwords come from the
+      # environment.
       - name: Build the signed face
         env:
           VERSION_CODE: ${{ steps.version.outputs.code }}
@@ -162,8 +164,8 @@ jobs:
           OUT=$(dirname "$FACE_APK")
           mkdir -p "$OUT"
           dotnet run --project Tools/FaceStudio -- --repo-root . --apk "$OUT/unsigned.apk" --version-code "$VERSION_CODE" --version-name "$DISPLAY_VERSION"
-          git diff --exit-code -- Watch/Point.Face || {
-            echo "FAIL: FaceStudio's face differs from the committed one; run the tool and commit what it writes."
+          git diff --exit-code -- Watch/Point.Face Watch/Dash.Wear/Resources || {
+            echo "FAIL: FaceStudio's face or Dash's icon differs from the committed one; run the tool and commit what it writes."
             exit 1
           }
           "$BUILD_TOOLS/zipalign" -f -p 4 "$OUT/unsigned.apk" "$OUT/aligned.apk"
@@ -280,8 +282,9 @@ jobs:
           echo "=== END ICON CHECK ==="
 
       # Fatal: the face draws its date in the watch's own IBM Plex Mono Medium (A57), embedded as res/font/plexmono.ttf,
-      # and it must be that file byte for byte. The installer draws no text. The kit's own Plex Mono asset is packaged
-      # by the first app that draws with it (Dash), and this check names it when it does.
+      # and it must be that file byte for byte. An app that draws words (Dash, B4) carries the kit's Plex Mono as
+      # assets/fonts/IBMPlexMono-Regular.ttf, -Medium.ttf and -SemiBold.ttf, each the file in Watch/Fonts byte for byte.
+      # The installer draws no text.
       - name: FONT CHECK
         run: |
           set -e
@@ -296,6 +299,24 @@ jobs:
                 exit 1
               fi
               echo "ok: Plex Mono Medium, byte for byte"
+            elif unzip -l "$apk" | grep -q " assets/fonts/"; then
+              for weight in Regular Medium SemiBold; do
+                case "$weight" in
+                  Regular) ASSET=assets/fonts/IBMPlexMono-Regular.ttf ;;
+                  Medium) ASSET=assets/fonts/IBMPlexMono-Medium.ttf ;;
+                  SemiBold) ASSET=assets/fonts/IBMPlexMono-SemiBold.ttf ;;
+                esac
+                WANT_WEIGHT=$(sha256sum < "Watch/Fonts/IBMPlexMono-$weight.ttf" | cut -d' ' -f1)
+                GOT=$(unzip -p "$apk" "$ASSET" | sha256sum | cut -d' ' -f1)
+                if [ "$GOT" != "$WANT_WEIGHT" ]; then
+                  echo "FAIL: $apk's $ASSET is not Watch/Fonts/IBMPlexMono-$weight.ttf."
+                  exit 1
+                fi
+                echo "ok: $ASSET, byte for byte"
+              done
+            elif [ "$package" = com.storyworthtelling.focusphone.communication ]; then
+              echo "FAIL: Dash draws words, but $apk carries no assets/fonts/."
+              exit 1
             else
               echo "ok: draws no text of its own"
             fi
@@ -314,6 +335,7 @@ jobs:
           name: Watch-Android
           path: |
             Watch/Point.Installer/bin/Release/net10.0-android/publish/*-Signed.apk
+            Watch/Dash.Wear/bin/Release/net10.0-android/publish/*-Signed.apk
             Watch/Point.Face/bin/Release/*-Signed.apk
           if-no-files-found: error
           retention-days: 90
@@ -331,4 +353,5 @@ jobs:
           release: watch-latest
           apks: |
             Watch/Point.Installer/bin/Release/net10.0-android/publish/*-Signed.apk
+            Watch/Dash.Wear/bin/Release/net10.0-android/publish/*-Signed.apk
             Watch/Point.Face/bin/Release/*-Signed.apk

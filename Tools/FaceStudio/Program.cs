@@ -4,7 +4,8 @@ namespace FaceStudio;
 
 /// <summary>
 /// <c>dotnet run --project Tools/FaceStudio -- --repo-root . [--apk path] [--version-code n] [--version-name s]</c>:
-/// writes the face into <see cref="FaceFiles.Folder"/>, and with <c>--apk</c> packs it into an unsigned APK.
+/// writes the face into <see cref="FaceFiles.Folder"/> and Dash's launcher icon into <see cref="DashIcon.Folder"/>, and with
+/// <c>--apk</c> packs the face into an unsigned APK.
 /// </summary>
 public static class Program
 {
@@ -21,6 +22,8 @@ public static class Program
         var folder = Path.Combine(root, FaceFiles.Folder);
         FaceFiles.Write(root, folder);
         Console.WriteLine($"Wrote the face to {FaceFiles.Folder}.");
+        DashIcon.Write(root);
+        Console.WriteLine($"Wrote Dash's icon to {DashIcon.Folder}.");
 
         if (!options.TryGetValue("--apk", out var apk))
         {

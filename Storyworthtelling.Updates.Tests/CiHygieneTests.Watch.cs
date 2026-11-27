@@ -81,8 +81,10 @@ public partial class CiHygieneTests
             Assert.True(upload.Contains(folder, StringComparison.Ordinal), $"build-watch.yml doesn't keep {folder} as an artifact.");
         }
 
-        // The face: FaceStudio packs it, and it goes up from its own bin folder under its own package.
+        // The face: FaceStudio packs it, and it goes up from its own bin folder under its own package. FaceStudio also draws
+        // Dash's icon (B4), so what it writes there must be what is committed too.
         Assert.Contains("dotnet run --project Tools/FaceStudio -- --repo-root . --apk", build, StringComparison.Ordinal);
+        Assert.Contains("git diff --exit-code -- Watch/Point.Face Watch/Dash.Wear/Resources", Step(build, "Build the signed face"), StringComparison.Ordinal);
         Assert.Contains($"FACE_PACKAGE: {FacePackage()}", build, StringComparison.Ordinal);
         Assert.Contains($"FACE_APK: {FaceApkFolder}{FacePackage()}-Signed.apk", build, StringComparison.Ordinal);
         Assert.Contains(FaceApkFolder, publish, StringComparison.Ordinal);
@@ -189,11 +191,17 @@ public partial class CiHygieneTests
         Assert.Contains("watch_face_info.xml", icon, StringComparison.Ordinal);
         Assert.Contains("preview.png", icon, StringComparison.Ordinal);
 
-        // The face carries the watch's own Plex Mono, byte for byte.
+        // The face carries the watch's own Plex Mono, byte for byte; so does every app that draws words (Dash, B4), as the
+        // kit's assets.
         var font = Step(build, "FONT CHECK");
         Assert.Contains("res/font/plexmono.ttf", font, StringComparison.Ordinal);
         Assert.Contains("Watch/Fonts/IBMPlexMono-Medium.ttf", font, StringComparison.Ordinal);
         Assert.Contains("sha256sum", font, StringComparison.Ordinal);
+        foreach (var weight in new[] { "Regular", "Medium", "SemiBold" })
+        {
+            Assert.Contains($"assets/fonts/IBMPlexMono-{weight}.ttf", font, StringComparison.Ordinal);
+        }
+        Assert.Contains("Watch/Fonts/IBMPlexMono-$weight.ttf", font, StringComparison.Ordinal);
     }
 
     [Fact]

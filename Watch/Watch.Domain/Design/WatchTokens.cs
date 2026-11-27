@@ -173,6 +173,22 @@ public static class WatchTokens
         public const double DateSize = 0.08;
     }
 
+    /// <summary>
+    /// An app's launcher icon (WD §3; glyph studies: "the glyph sits on a black disc like a Wear OS icon"): the ground's
+    /// black disc, a thin rim, and the glyph glowing in its own colour. FaceStudio draws Dash's from these (P14 B4).
+    /// </summary>
+    public static class Icon
+    {
+        /// <summary>The disc's thin rim (glyph studies: hsl 210 10% 20%).</summary>
+        public static Oklch Rim { get; } = new(0.318, 0.012, 248.2);
+
+        /// <summary>The rim's width, as a fraction of the icon's side.</summary>
+        public const double RimStroke = 0.01;
+
+        /// <summary>The glow's light where it leaves the glyph's edge, fading to nothing over the kit's glow.</summary>
+        public const double GlowAlpha = 0.5;
+    }
+
     /// <summary>Motion durations in milliseconds (WD §8). Reduced motion and always-on remove all of it.</summary>
     public static class Motion
     {

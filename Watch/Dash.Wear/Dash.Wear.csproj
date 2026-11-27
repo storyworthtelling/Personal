@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Dash on the watch (P14 E5; W-5.1.1, W-5.1.2): People waiting, a conversation, and a reply by dictation or the
+    keyboard, every one of them asked of Post on the phone over the Data Layer. It keeps no copy of anyone's texts (A9),
+    holds no key and asks for no vault passphrase (the owner's ruling, 27 Nov 2026). It carries Post's package (PC1):
+    the Data Layer delivers only between apps of one package and one signature.
+
+    The rules and the wire are Watch.Domain's (DashCodec, DashExchange, PeopleWaiting, Conversation, SendAttempt); the
+    words and colours its tokens'; the views the kit's. This head asks, draws and hands the system's input the reply.
+    SupportedOSPlatformVersion is the suite's one minimum; both watches run Wear OS 6 (API 36). RuntimeIdentifiers: a
+    watch whose system runs 32-bit userspace refuses an APK without armeabi-v7a code (release A fix round), so 32-bit ARM
+    is named beside 64-bit.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Dash.Wear</RootNamespace>
+    <ApplicationId>com.storyworthtelling.focusphone.communication</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
+    <SupportedOSPlatformVersion>34</SupportedOSPlatformVersion>
+    <RuntimeIdentifiers>android-arm;android-arm64</RuntimeIdentifiers>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Watch.Domain\Watch.Domain.csproj" />
+    <ProjectReference Include="..\Watch.Ui.Wear\Watch.Ui.Wear.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The Data Layer (MessageClient, CapabilityClient), Microsoft's binding of play-services-wearable: CLAUDE.md's
+         dependency rule 2, and required to talk to the phone at all. The same package and version as the installer. -->
+    <PackageReference Include="Xamarin.GooglePlayServices.Wearable" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The watch's own family (WD §5), which the kit reads from assets/fonts/; the workflow's FONT CHECK reads each back. -->
+    <AndroidAsset Include="..\Fonts\IBMPlexMono-Regular.ttf" Link="Assets\fonts\IBMPlexMono-Regular.ttf" />
+    <AndroidAsset Include="..\Fonts\IBMPlexMono-Medium.ttf" Link="Assets\fonts\IBMPlexMono-Medium.ttf" />
+    <AndroidAsset Include="..\Fonts\IBMPlexMono-SemiBold.ttf" Link="Assets\fonts\IBMPlexMono-SemiBold.ttf" />
+  </ItemGroup>
+</Project>

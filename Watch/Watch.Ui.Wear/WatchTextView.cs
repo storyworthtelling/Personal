@@ -38,6 +38,7 @@ public class WatchTextView : TextView
     private const string LogTag = "WatchText"; // not copy: a logcat tag
 
     private WatchType type = WatchType.Line;
+    private bool body;
 
     public WatchTextView(Context context)
         : base(context)
@@ -67,6 +68,12 @@ public class WatchTextView : TextView
         }
     }
 
+    /// <summary>Which of Plex Mono's weights the words are set in (mock: 400 words, 500 labels, 600 names).</summary>
+    public WatchWeight Weight
+    {
+        set => Typeface = WatchFonts.Of(Context!, value);
+    }
+
     /// <summary>Ink for primary words, Soft for the quiet line.</summary>
     public WatchTone Tone
     {
@@ -93,12 +100,27 @@ public class WatchTextView : TextView
         set => Text = value;
     }
 
+    /// <summary>
+    /// A person's own words (a message, a reply read back): not the watch's copy, so not held to one sentence or two
+    /// lines. They wrap to as many lines as they take and are never shrunk or cut.
+    /// </summary>
+    public string Body
+    {
+        set
+        {
+            body = true;
+            SetMaxLines(int.MaxValue);
+            Ellipsize = null;
+            Text = value;
+        }
+    }
+
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
     {
         base.OnMeasure(widthMeasureSpec, heightMeasureSpec);
         var width = MeasuredWidth - PaddingLeft - PaddingRight;
         var text = Text ?? "";
-        if (width <= 0 || text.Length == 0 || Paint is not { } paint)
+        if (body || width <= 0 || text.Length == 0 || Paint is not { } paint)
         {
             return;
         }
@@ -122,7 +144,7 @@ public class WatchTextView : TextView
 
     private void Setup()
     {
-        Typeface = Typeface.Create(WatchTokens.Typeface, TypefaceStyle.Normal);
+        Typeface = WatchFonts.Of(Context!, WatchWeight.Regular);
         Type = WatchType.Line;
         Tone = WatchTone.Ink;
         SetMaxLines(WatchText.MaxLines);
@@ -133,7 +155,7 @@ public class WatchTextView : TextView
         Gravity = GravityFlags.Center;
     }
 
-    private static float SizeOf(WatchType type) => type switch
+    internal static float SizeOf(WatchType type) => type switch
     {
         WatchType.Glance => WatchTokens.Type.Glance,
         WatchType.Small => WatchTokens.Type.Small,

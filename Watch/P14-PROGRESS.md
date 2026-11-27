@@ -1916,3 +1916,49 @@ nothing of it survived, and this chunk started clean.)
   matched to the owner's own text five minutes older, since the slack for the phone's clock was five minutes and the
   match included its edge. The slack is now two minutes (`Conversation.ClockSlack`).
 - **Green: `Watch.Tests` 822 passed, 0 failed.**
+
+## Red 2 · the head's guards, the kit, the workflow, the band table and the icon
+
+Written with no `Watch/Dash.Wear` folder, no `WatchPillView` in the kit, Dash's line missing from the band table and
+the workflow, and FaceStudio's `DashIcon` a stub.
+
+- **`Watch.Tests`: 843 tests, 23 failed, 820 passed.** The 23: `WatchInvariantsTests` 21 (the Dash head's guards, and
+  `TheWatchWorkflowChecksEveryFrozenPackage` asking for Dash's line in `WATCH_HEADS`) and `WatchA11yTests` 2
+  (`TheGuardSeesTheKit`, no `WatchPillView`; `TheGuardSeesDash`). First errors: `Values differ` 5, "Watch/Dash.Wear has
+  no sources." 4, "…AndroidManifest.xml isn’t there." 3, "…Dash.Wear.csproj isn’t there." 3, `Assert.Single()` 3,
+  `Assert.Matches()` 1, `Assert.All()` 2, "Dash has no mdpi icon." 1, `Assert.NotEmpty()` 1.
+- **`FaceStudio.Tests`: 38 tests, 9 failed, 29 passed:** `DashIconTests`, all nine, `NotImplementedException`.
+- **`RepoGuards.Tests`: 452 tests, 4 failed:** `TheWristLogsOnlyDashLines` and `TheWristsLogWritesTheLineAndTheShapeOnly`
+  (`DirectoryNotFoundException`), `TheWatchHoldsNoVaultTests.ThePassphraseNeverReachesTheWatch` (it now asks to see
+  Dash's project), and `NoKeysTests.NoKeyShapedLiteralInTheRepository`, which was a real finding against this chunk's own
+  test: `SendAttemptTests` named its two Guids by 32-digit hex literals. They are now made from counted bytes. The wrist
+  rule's own self-tests (11 rows) pass, being pure.
+- **`Storyworthtelling.Updates.Tests`: 194 tests, 4 failed:** `MainBuildsEveryWatchAppAndTheFace` (no `git diff` over
+  Dash's icon), `TheWatchChecksAreFatalAndComeBeforeAnyApkLeaves` (no check of Dash's font assets),
+  `SuiteVersionBandsTests.EveryWatchApkIsInTheWatchBand` and `DashKeepsPostsPhoneBand`.
+- **Probes, once green:** a `Probe.cs` planted in `Watch/Dash.Wear` with `Android.Util.Log.Warn("Dash", words)`, a
+  `"vault"` literal and a tappable `ProbeView` with no description failed `TheWristLogsOnlyDashLines`,
+  `ThePassphraseNeverReachesTheWatch` and three `WatchA11yTests` (`EveryViewDescribesItself`, `EveryViewSaysWhatItIs`,
+  `ATappableViewCanBeTappedByTalkBack`), each naming the probe; with the platform call taken out,
+  `TheWristLogsOnlyDashLines` named `DashLog.Info($"DASH sent {words}")` and `DashLog.Quiet(words, e)`. The probe was
+  removed.
+
+## Green
+
+- **On the way:** two existing guards went red as the head landed, each a deliberate edit:
+  `VersionCodeTests.NoTwoAppsShareABandUnlessTheyShareAWorkflow` (194, 1 failed) records band 11's members and now
+  names Dash, and `Codex.Tests` `FrozenInvariantsTests.CommunicationCsprojDeclaresFrozenApplicationId` (3309, 1 failed)
+  allowed one csproj Post's package; it now allows the phone's one and `Watch/Dash.Wear` on the watch, as
+  `LauncherCsprojDeclaresFrozenApplicationId` allows the installer. Building the head first failed on three `CS1503`/
+  `CS0019` (a helper named `Height` hid `View.Height`); renamed `LineOf`.
+- **`Watch.Tests`: 843 passed, 0 failed. `Tools/FaceStudio.Tests`: 38 passed. `FocusPhone/Codex.Tests`: 3309 passed.
+  `RepoGuards.Tests`: 452 passed. `Storyworthtelling.Updates.Tests`: 194 passed.** `leakscan --ci` over the chunk's diff:
+  "no personal-data shapes in the added lines".
+- **Compiled here** (`-p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false`): `Watch/Dash.Wear`,
+  `Watch/Watch.Ui.Wear` and `Watch/Point.Installer`, each **Build succeeded, 0 warnings, 0 errors** (the Wearable aars
+  fetched from dl.google.com). Dash's debug APK, read back with aapt2 and unzip: package
+  `com.storyworthtelling.focusphone.communication`, `uses-feature android.hardware.type.watch`, the launchable activity
+  `…communication.dash.PeopleActivity`, an icon at all five densities, `lib/armeabi-v7a/` and `lib/arm64-v8a/`, and
+  `assets/fonts/IBMPlexMono-{Regular,Medium,SemiBold}.ttf`. Its permissions are none of its own: the debug build adds
+  INTERNET for the debugger, and AndroidX's manifest adds its `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, as on the
+  installer.

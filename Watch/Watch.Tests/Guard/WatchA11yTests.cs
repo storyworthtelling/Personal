@@ -5,11 +5,14 @@ namespace Watch.Tests.Guard;
 /// <summary>
 /// WD §12 and P14 W-1.2.1: every view the watch kit draws describes itself to TalkBack, and a view a
 /// finger can tap also offers that act to TalkBack (after <c>RepoGuards.Tests/AccessibilityTests</c>).
-/// The guard reads <c>Watch/Watch.Ui.Wear</c> by content, so it runs with no Android workload.
+/// The guard reads <c>Watch/Watch.Ui.Wear</c> and Dash's own views by content, so it runs with no Android workload.
 /// </summary>
 public partial class WatchA11yTests
 {
-    private static readonly string[] Kit = ["WaveView", "DashGlyphView", "RingView", "UndoRingView", "WatchTextView"];
+    private static readonly string[] Kit = ["WaveView", "DashGlyphView", "RingView", "UndoRingView", "WatchTextView", "WatchPillView"];
+
+    // Dash's own drawn views (P14 B4): the rule reads the apps as well as the kit.
+    private static readonly string[] DashViews = ["PersonRowView"];
 
     [Fact]
     public void TheGuardSeesTheKit()
@@ -17,6 +20,14 @@ public partial class WatchA11yTests
         var views = Views().Select(view => view.Name).ToList();
 
         Assert.All(Kit, name => Assert.Contains(name, views));
+    }
+
+    [Fact]
+    public void TheGuardSeesDash()
+    {
+        var views = Views().Where(view => view.Path.StartsWith(Path.Combine("Watch", "Dash.Wear"), StringComparison.Ordinal)).Select(view => view.Name).ToList();
+
+        Assert.All(DashViews, name => Assert.Contains(name, views));
     }
 
     [Fact]
@@ -56,12 +67,8 @@ public partial class WatchA11yTests
     private static IEnumerable<(string Path, string Name, string Source)> Views()
     {
         var root = WatchFiles.RepoRoot();
-        var kit = Path.Combine(root, "Watch", "Watch.Ui.Wear");
-        if (!Directory.Exists(kit))
-        {
-            yield break;
-        }
-        foreach (var path in Directory.EnumerateFiles(kit, "*.cs", SearchOption.AllDirectories).Where(path => !WatchFiles.IsBuildOutput(path)))
+        var folders = new[] { Path.Combine(root, "Watch", "Watch.Ui.Wear"), Path.Combine(root, "Watch", "Dash.Wear") }.Where(Directory.Exists);
+        foreach (var path in folders.SelectMany(folder => Directory.EnumerateFiles(folder, "*.cs", SearchOption.AllDirectories)).Where(path => !WatchFiles.IsBuildOutput(path)))
         {
             var source = File.ReadAllText(path);
             foreach (Match match in ViewClass().Matches(source))

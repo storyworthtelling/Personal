@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dash's manifest (P14 B4). Its screens are declared by attributes under their frozen names (WatchIdentity); what no
+  attribute expresses is here. WatchInvariantsTests reads this file: the package, the watch feature, no permissions, and
+  the system input it may see.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.storyworthtelling.focusphone.communication">
+  <!-- A watch app, by Wear OS's own marker. It also keeps this APK off the phone, where it would replace Post. -->
+  <uses-feature android:name="android.hardware.type.watch" />
+
+  <!-- Android 11+ resolves another app's activity only for an intent the app names: the system's dictation, and the
+       system's input screen with its keyboard (W-5.1.2). -->
+  <queries>
+    <intent>
+      <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+    </intent>
+    <intent>
+      <action android:name="android.support.wearable.input.action.REMOTE_INPUT" />
+    </intent>
+  </queries>
+
+  <application>
+    <!-- Not standalone: it is nothing without Post on the phone (A67). -->
+    <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
+  </application>
+</manifest>

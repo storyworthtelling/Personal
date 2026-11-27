@@ -1,5 +1,8 @@
 using Android.Content;
 using Android.Graphics;
+using Android.Graphics.Drawables;
+using Android.Text;
+using Android.Util;
 using Watch.Domain.Design;
 
 namespace Watch.Ui.Wear;
@@ -7,9 +10,9 @@ namespace Watch.Ui.Wear;
 /// <summary>
 /// The kit's one way to turn a token into paint (WD §2, §13): every colour comes from
 /// <see cref="WatchTokens"/> or <see cref="DayColour"/> through <see cref="Srgb"/>, and glass glows in
-/// its own colour. A painter holds no colour of its own.
+/// its own colour. A painter holds no colour of its own. Public, so an app's own views paint the same way.
 /// </summary>
-internal static class WatchPaints
+public static class WatchPaints
 {
     /// <summary>The colour of a token, with <paramref name="alpha"/> from 0 to 1.</summary>
     public static Color Of(Oklch colour, double alpha = 1) => new(Srgb.Argb(colour, alpha));
@@ -60,4 +63,30 @@ internal static class WatchPaints
 
     /// <summary>A touch target's side in pixels (WD §12: at least 48 dp).</summary>
     public static float TouchTarget(Context context) => WatchTokens.TouchTargetDp * (context.Resources?.DisplayMetrics?.Density ?? 1);
+
+    /// <summary>One of the three type sizes (WD §5), in pixels on this screen.</summary>
+    public static float SizeOf(Context context, WatchType type) =>
+        TypedValue.ApplyDimension(ComplexUnitType.Sp, WatchTextView.SizeOf(type), context.Resources?.DisplayMetrics);
+
+    /// <summary>Words drawn on a canvas: Plex Mono at one of the three sizes, in one of the tokens.</summary>
+    public static TextPaint Words(Context context, WatchType type, WatchWeight weight, Oklch colour, double alpha = 1)
+    {
+        var paint = new TextPaint(PaintFlags.AntiAlias)
+        {
+            Color = Of(colour, alpha),
+        };
+        paint.SetTypeface(WatchFonts.Of(context, weight));
+        paint.TextSize = SizeOf(context, type);
+        return paint;
+    }
+
+    /// <summary>A filled shape with round corners, for a card or a message (WD §2: the system's own cards are the one grey ground).</summary>
+    public static GradientDrawable Rounded(Oklch colour, float corner, double alpha = 1)
+    {
+        var shape = new GradientDrawable();
+        shape.SetShape(ShapeType.Rectangle);
+        shape.SetCornerRadius(corner);
+        shape.SetColor(Of(colour, alpha));
+        return shape;
+    }
 }

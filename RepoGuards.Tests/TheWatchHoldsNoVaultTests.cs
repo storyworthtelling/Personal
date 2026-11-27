@@ -42,6 +42,9 @@ public partial class TheWatchHoldsNoVaultTests
         var files = WatchCode().ToList();
         Assert.Contains(files, file => file.Path == "Watch/Watch.Domain/Keys/KeyCodec.cs");
         Assert.Contains(files, file => file.Path == "Watch/Point.Installer/Point.Installer.csproj");
+        // Dash (B4) asks for no passphrase on first run: W-5.1.8 is retired (owner's ruling, 27 Nov 2026).
+        Assert.Contains(files, file => file.Path == "Watch/Dash.Wear/Dash.Wear.csproj");
+        Assert.Contains(files, file => file.Path == "Watch/Dash.Wear/PostLink.cs");
 
         var named = files.Where(file => VaultWord().IsMatch(file.Code)).Select(file => file.Path).ToList();
 

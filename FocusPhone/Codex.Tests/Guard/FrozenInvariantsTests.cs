@@ -342,18 +342,28 @@ public class FrozenInvariantsTests
     // Exactly one head declares the frozen communication ApplicationId. Post renames
     // its folder, csproj and namespace; the package name is what a device matches an
     // update against, so it survives all three.
+    //
+    // P14 (PC1, B4): on the watch, Dash carries Post's package, because the Data Layer delivers only
+    // between apps of one package and one signature. It is the one other project allowed the id, and
+    // the update channel's form rule keeps its APK off the phone (W-3.1.1); any third copy is still a
+    // mistake.
     [Fact]
     public void CommunicationCsprojDeclaresFrozenApplicationId()
     {
         var declaring = EnumerateRepoFiles("*.csproj")
             .Where(file => File.ReadAllText(file)
                 .Contains($"<ApplicationId>{PolicyContext.CommunicationPackage}</ApplicationId>", StringComparison.Ordinal))
+            .Select(RepoRelative)
             .ToList();
+        var watch = declaring.Where(IsWatchProject).ToList();
+        var phone = declaring.Except(watch).ToList();
 
-        Assert.True(declaring.Count == 1,
-            $"Exactly one csproj must declare the frozen communication ApplicationId " +
-            $"'{PolicyContext.CommunicationPackage}'; found {declaring.Count}:\n" +
-            string.Join("\n", declaring.Select(RepoRelative)));
+        Assert.True(phone.Count == 1,
+            $"Exactly one phone csproj must declare the frozen communication ApplicationId " +
+            $"'{PolicyContext.CommunicationPackage}'; found {phone.Count}:\n" +
+            string.Join("\n", phone));
+        Assert.True(watch.All(path => path == Path.Combine("Watch", "Dash.Wear", "Dash.Wear.csproj")),
+            "Only Dash may carry Post's package on the watch:\n" + string.Join("\n", watch));
     }
 
     // The head's two SharedPreferences files hold the mail account and the sync

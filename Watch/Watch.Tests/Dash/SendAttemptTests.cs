@@ -10,8 +10,9 @@ namespace Watch.Tests.Dash;
 /// </summary>
 public class SendAttemptTests
 {
-    private static readonly Guid First = new("0123456789abcdef0123456789abcdef");
-    private static readonly Guid Second = new("fedcba9876543210fedcba9876543210");
+    // Two names made from counted bytes, so no key-shaped run of digits sits in the source (NoKeysTests).
+    private static readonly Guid First = new([.. Enumerable.Range(0, 16).Select(index => (byte)index)]);
+    private static readonly Guid Second = new([.. Enumerable.Range(16, 16).Select(index => (byte)index)]);
 
     [Fact]
     public void AReplyGoesToItsCorrespondence()
@@ -30,7 +31,8 @@ public class SendAttemptTests
         var attempt = SendAttempt.Reply(LeeKey, "On my way.", First);
 
         Assert.True(DashIds.IsAct(attempt.Id), attempt.Id);
-        Assert.Equal("send-0123456789abcdef0123456789abcdef", attempt.Id);
+        Assert.Equal("send-" + First.ToString("N"), attempt.Id);
+        Assert.Matches("^send-[0-9a-f]{32}$", attempt.Id);
     }
 
     [Fact]

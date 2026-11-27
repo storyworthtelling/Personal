@@ -18,6 +18,8 @@ public class SuiteVersionBandsTests
 
     private const string FacePackage = "com.storyworthtelling.watch.point";
 
+    private const string PostPackage = "com.storyworthtelling.focusphone.communication";
+
     [Fact]
     public void BandsAreUnique()
     {
@@ -52,8 +54,9 @@ public class SuiteVersionBandsTests
     {
         var watch = SuiteVersionBands.All.Where(a => a.Form == ApkForm.Watch).ToList();
 
-        // Non-vacuous: the installer and the face are published from build-watch.yml.
+        // Non-vacuous: the installer, Dash and the face are published from build-watch.yml.
         Assert.Contains(watch, a => a.Package == LauncherPackage);
+        Assert.Contains(watch, a => a.Package == PostPackage);
         Assert.Contains(watch, a => a.Package == FacePackage);
         Assert.All(watch, a => Assert.Equal(SuiteVersionBands.WatchBand, a.Band));
     }
@@ -78,6 +81,17 @@ public class SuiteVersionBandsTests
         Assert.Equal(
             [new AppVersionBand(LauncherPackage, 1, 100_163, ApkForm.Phone), new AppVersionBand(LauncherPackage, SuiteVersionBands.WatchBand, 0, ApkForm.Watch)],
             launcher);
+    }
+
+    [Fact]
+    public void DashKeepsPostsPhoneBand()
+    {
+        // Dash is Post's package on the watch (P14 PC1, B4): its watch entry sits beside Post's phone entry, which stays.
+        var post = SuiteVersionBands.All.Where(a => a.Package == PostPackage).OrderBy(a => a.Form).ToList();
+
+        Assert.Equal(
+            [new AppVersionBand(PostPackage, 1, 200_051, ApkForm.Phone), new AppVersionBand(PostPackage, SuiteVersionBands.WatchBand, 0, ApkForm.Watch)],
+            post);
     }
 
     [Fact]

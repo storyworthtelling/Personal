@@ -16,6 +16,9 @@ namespace RepoGuards.Tests;
 ///
 /// <para>The handed-over token's contract (B3, <c>Watch.Domain/Keys</c>) is held to the same rule, with the token as its
 /// payload: its codec and hold log nothing, and <c>KeyLogLines</c> takes no message and writes a failure by its type alone.</para>
+///
+/// <para>Dash on the watch (B4) is the wrist's end: it logs through its one <c>DashLog</c>, every call a
+/// <c>DashLogLines</c> line or a plain literal, and a failure by its type and frames only.</para>
 /// </summary>
 public partial class DashLogsCarryNoPayloadTests
 {
@@ -32,6 +35,11 @@ public partial class DashLogsCarryNoPayloadTests
         ["string path", "Exception failure", "ContractRead<KeyMessage> read", "KeyEnd reader", "KeyOutcome outcome"];
 
     private const string Listener = "FocusPhone/Post.Android/Dash";
+
+    // Dash on the watch (P14 B4): the wrist's half of the same contracts, logged through its one DashLog.
+    private const string Wrist = "Watch/Dash.Wear";
+
+    private const string WristLog = "Watch/Dash.Wear/DashLog.cs";
 
     // The only things a Dash line may be filled from.
     private static readonly string[] AllowedHoles = ["contract", "read.Version", "DashCodec.Version", "reader", "outcome", "count", "typeName"];
@@ -130,6 +138,64 @@ public partial class DashLogsCarryNoPayloadTests
         Assert.True(other.Count == 0,
             "Post's listener logs a DashLogLines line or a plain literal through HeadLog, and an exception only by its shape (HeadLog.Quiet):\n"
             + string.Join("\n", other));
+    }
+
+    [Fact]
+    public void TheWristLogsOnlyDashLines()
+    {
+        var sources = Sources(Wrist).ToList();
+        Assert.Contains(sources, source => source.Path == WristLog);
+        Assert.Contains(sources, source => source.Path.EndsWith("PostLink.cs", StringComparison.Ordinal));
+
+        // No logger but DashLog anywhere else on the wrist: not the platform's, the console or a trace.
+        var other = sources.Where(source => source.Path != WristLog)
+            .SelectMany(source => LogCall().Matches(Code(source.Text)).Select(match => $"{source.Path}: {match.Value}"))
+            .ToList();
+        Assert.True(other.Count == 0, "Dash on the wrist logs through DashLog only:\n" + string.Join("\n", other));
+
+        // Every DashLog call is a DashLogLines line or a plain literal, and an exception only beside a plain literal.
+        var calls = sources.SelectMany(source => WristCalls(Code(source.Text)).Select(call => (source.Path, Call: call))).ToList();
+        Assert.NotEmpty(calls);
+        var payload = calls.Where(entry => !IsWristLine(entry.Call)).Select(entry => $"{entry.Path}: {entry.Call}").ToList();
+        Assert.True(payload.Count == 0, "A wrist log line that could carry a payload:\n" + string.Join("\n", payload));
+    }
+
+    [Fact]
+    public void TheWristsLogWritesTheLineAndTheShapeOnly()
+    {
+        // DashLog hands the platform the line it was given, and for a failure the exception's type and frames, never its
+        // message, which can carry whatever the call was given.
+        var code = Code(Read(WristLog));
+        var calls = LogCalls(code).ToList();
+
+        Assert.NotEmpty(calls);
+        Assert.All(calls, call => Assert.Matches(@"^Log\.(?:Info|Warn)\(Tag, (?:line|Shape\(line, failure\))\)$", Regex.Replace(call, @"\s+", " ")));
+        Assert.Contains("GetType().FullName", code, StringComparison.Ordinal);
+        Assert.Contains(".StackTrace", code, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Message", code, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("DashLog.Info($\"Sent {send.Text}\")")]
+    [InlineData("DashLog.Info(send.Text)")]
+    [InlineData("DashLog.Warn(\"Sent \" + words)")]
+    [InlineData("DashLog.Quiet($\"Stopped on {send.Id}\", failure)")]
+    [InlineData("DashLog.Quiet(DashLogLines.Sent(path), failure)")]
+    [InlineData("DashLog.Info(DashLogLines.Sent(path), failure)")]
+    [InlineData("DashLog.Write(\"A send stopped\")")]
+    public void TheWristRuleSeesAPayload(string call)
+    {
+        Assert.False(IsWristLine(call));
+    }
+
+    [Theory]
+    [InlineData("DashLog.Info(DashLogLines.Receipt(path, read, DashEnd.Dash))")]
+    [InlineData("DashLog.Warn(DashLogLines.Outcome(path, DashOutcome.NoAnswer))")]
+    [InlineData("DashLog.Quiet(\"DASH an ask stopped\", failure)")]
+    [InlineData("DashLog.Warn(\"DASH no dictation on this watch\")")]
+    public void TheWristRuleLeavesItsLinesAlone(string call)
+    {
+        Assert.True(IsWristLine(call));
     }
 
     [Theory]
@@ -232,10 +298,37 @@ public partial class DashLogsCarryNoPayloadTests
         };
     }
 
-    // Every logger call in a source, from its name to its closing bracket, strings read as strings.
-    private static IEnumerable<string> LogCalls(string code)
+    // A wrist line: DashLog.Info or Warn with a DashLogLines line or a plain literal, or DashLog.Quiet with a plain literal and
+    // the exception; never an interpolation, a concatenation or a value.
+    private static bool IsWristLine(string call)
     {
-        foreach (Match match in LogCall().Matches(code))
+        var open = call.IndexOf('(');
+        var name = Regex.Replace(call[..open], @"\s", string.Empty);
+        var arguments = Arguments(call[(open + 1)..^1]);
+        if (call.Contains("$\"", StringComparison.Ordinal) || arguments.Count == 0)
+        {
+            return false;
+        }
+
+        var message = arguments[0];
+        var line = message.StartsWith("DashLogLines.", StringComparison.Ordinal) || PlainLiteral().IsMatch(message);
+        return name switch
+        {
+            "DashLog.Info" or "DashLog.Warn" => arguments.Count == 1 && line,
+            "DashLog.Quiet" => arguments.Count == 2 && PlainLiteral().IsMatch(message),
+            _ => false,
+        };
+    }
+
+    // Every DashLog call in a source, from its name to its closing bracket.
+    private static IEnumerable<string> WristCalls(string code) => CallsOf(code, WristCall());
+
+    // Every logger call in a source, from its name to its closing bracket, strings read as strings.
+    private static IEnumerable<string> LogCalls(string code) => CallsOf(code, LogCall());
+
+    private static IEnumerable<string> CallsOf(string code, Regex calls)
+    {
+        foreach (Match match in calls.Matches(code))
         {
             var start = match.Index;
             var open = code.IndexOf('(', start);
@@ -339,6 +432,10 @@ public partial class DashLogsCarryNoPayloadTests
     // A call to a logger: the platform's, the suite's heads', the console, a trace, or an ILogger method.
     [GeneratedRegex(@"\b(?:Log|HeadLog|Console|Trace|Debug|PostDiagnostics|DiagnosticLog)\s*\.\s*\w+\s*\(|\.Log(?:Warning|Error|Information|Debug|Trace|Critical)\s*\(|\bILogger\b")]
     private static partial Regex LogCall();
+
+    // A call to the wrist's one log.
+    [GeneratedRegex(@"\bDashLog\s*\.\s*\w+\s*\(")]
+    private static partial Regex WristCall();
 
     // An interpolated string literal on one line.
     [GeneratedRegex(@"\$""(?:[^""\\\n]|\\.)*""")]
