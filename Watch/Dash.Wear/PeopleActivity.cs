@@ -1,4 +1,5 @@
 using Android.App;
+using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -14,7 +15,8 @@ namespace Dash.Wear;
 /// People waiting, Dash's first screen (W-5.1.1, A14; mock: People waiting): the time and Dash's glyph at the top, then
 /// Post's waiting correspondences, newest first, each a name and one line. Asked of the phone each time the screen
 /// comes back, and said as a status sentence while it is on its way; nobody waiting is the faint glyph and nothing
-/// else (mock: nobody waiting). A tap opens the conversation.
+/// else (mock: nobody waiting). A tap opens the conversation; a long press offers to file or delete it, undo-first
+/// (W-5.1.4, <see cref="ActActivity"/>), and a row whose act stands leaves at once, before the phone is asked again.
 /// </summary>
 [Activity(Name = WatchIdentity.DashPeopleActivityName, MainLauncher = true, Exported = true, Icon = "@mipmap/ic_launcher")]
 public sealed class PeopleActivity : Activity
@@ -22,8 +24,11 @@ public sealed class PeopleActivity : Activity
     private Round round = null!;
     private Frame frame = null!;
     private DashGlyphView glyph = null!;
+    private const int ActRequest = 1;
+
     private LinearLayout rows = null!;
     private bool drawn;
+    private IReadOnlyList<PersonRow> shown = [];
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -44,6 +49,16 @@ public sealed class PeopleActivity : Activity
     {
         base.OnResume();
         Ask();
+    }
+
+    protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        base.OnActivityResult(requestCode, resultCode, data);
+        if (requestCode == ActRequest && resultCode == Result.Ok && ActActivity.Left(data) is { } gone)
+        {
+            // Filed or deleted: the row leaves now (WD §9), and the phone's next answer agrees.
+            Draw([.. shown.Where(row => row.Key != gone)]);
+        }
     }
 
     private void Ask()
@@ -71,6 +86,7 @@ public sealed class PeopleActivity : Activity
     private void Draw(IReadOnlyList<PersonRow> people)
     {
         drawn = true;
+        shown = people;
         glyph.Quiet = people.Count == 0;
         rows.RemoveAllViews();
         for (var index = 0; index < people.Count; index++)
@@ -79,6 +95,7 @@ public sealed class PeopleActivity : Activity
             var view = new PersonRowView(this);
             view.Show(person, round.Radius);
             view.Click += (_, _) => StartActivity(ConversationActivity.For(this, person.Key, person.Name, person.Group));
+            view.LongClick += (_, _) => StartActivityForResult(ActActivity.For(this, person.Key, person.Name), ActRequest);
             rows.AddView(view, new LinearLayout.LayoutParams(round.Px(DashLayout.RowWidth), ViewGroup.LayoutParams.WrapContent)
             {
                 Gravity = GravityFlags.CenterHorizontal,

@@ -7,6 +7,9 @@ namespace Watch.Domain.Design;
 /// </summary>
 public static class WatchContrast
 {
+    /// <summary>The ratio words keep against their ground (WD §12).</summary>
+    public const double ReadsAt = 4.5;
+
     public static double Ratio(Oklch first, Oklch second)
     {
         var one = Luminance(first);
@@ -17,6 +20,9 @@ public static class WatchContrast
     /// <summary>The words for a ground: the near-black on light glass, the ink on dark.</summary>
     public static Oklch WordsOn(Oklch ground) =>
         Ratio(WatchTokens.Neutral.OnGlass, ground) >= Ratio(WatchTokens.Neutral.Ink, ground) ? WatchTokens.Neutral.OnGlass : WatchTokens.Neutral.Ink;
+
+    /// <summary>Words in an app's own colour on black: the colour while it reads at 4.5:1, the ink when it does not (B5).</summary>
+    public static Oklch Accent(Oklch accent) => Ratio(accent, WatchTokens.Ground) >= ReadsAt ? accent : WatchTokens.Neutral.Ink;
 
     private static double Luminance(Oklch colour)
     {

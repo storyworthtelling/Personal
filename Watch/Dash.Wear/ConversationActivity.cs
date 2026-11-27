@@ -6,6 +6,7 @@ using Android.Widget;
 using Watch.Domain;
 using Watch.Domain.Dash;
 using Watch.Domain.Design;
+using Watch.Domain.Kit;
 using Watch.Ui.Wear;
 
 namespace Dash.Wear;
@@ -15,6 +16,11 @@ namespace Dash.Wear;
 /// last messages oldest first (the owner's on the right in Dash's quieter glass, everyone else's on the card, a group's
 /// senders named), and Reply, the one action, pinned at the foot. Once drawn it is read on the phone too, through the
 /// newest message the wrist drew. A reply sent from here shows at once and gives way to Post's copy when it comes.
+///
+/// <para>A photo (W-5.1.3; mock: A group text with a photo) is drawn in the mockup's picture with who sent it and when
+/// under it, and asked of the phone on its own, one at a time, newest first; the photos come back held for the process
+/// (<see cref="PhotoBook"/>), so a conversation opened again shows them at once. A group's Reply to all sits where the
+/// mockup draws it, under the caption.</para>
 /// </summary>
 [Activity(Name = WatchIdentity.DashConversationActivityName, Exported = false)]
 public sealed class ConversationActivity : Activity
@@ -32,6 +38,10 @@ public sealed class ConversationActivity : Activity
     private bool group;
     private DashThread? thread;
     private DateTimeOffset? toldThrough;
+    private IReadOnlyList<Bubble> drawn = [];
+    private readonly Dictionary<string, PhotoView> photos = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DashTrouble> unfetched = new(StringComparer.Ordinal);
+    private bool fetching;
 
     public static Intent For(Context context, string key, string title, bool group) =>
         new Intent(context, typeof(ConversationActivity))
@@ -55,7 +65,8 @@ public sealed class ConversationActivity : Activity
 
         round = new Round(this);
         var pill = (int)Math.Ceiling(WatchPaints.TouchTarget(this));
-        frame = Screens.Build(this, round, round.Px(DashLayout.TitleCentre / 2), round.Px(2 - DashLayout.ReplyCentre) + pill);
+        var replyCentre = group ? DashLayout.ReplyToAllCentre : DashLayout.ReplyCentre;
+        frame = Screens.Build(this, round, round.Px(DashLayout.TitleCentre / 2), round.Px(2 - replyCentre) + pill);
 
         heading = new WatchTextView(this) { Type = WatchType.Glance, Weight = WatchWeight.SemiBold, Label = title };
         frame.Column.AddView(heading, Wide());
@@ -70,7 +81,7 @@ public sealed class ConversationActivity : Activity
         });
 
         var label = group ? DashWords.ReplyToAll : DashWords.Reply;
-        reply = Screens.Pin(this, frame, round, label, group ? DashLayout.ReplyToAllWidth : DashLayout.ReplyWidth, DashLayout.ReplyCentre);
+        reply = Screens.Pin(this, frame, round, label, group ? DashLayout.ReplyToAllWidth : DashLayout.ReplyWidth, replyCentre);
         reply.Click += (_, _) => StartActivityForResult(ReplyActivity.For(this, key, title), ReplyRequest);
     }
 
@@ -118,6 +129,8 @@ public sealed class ConversationActivity : Activity
         }
 
         thread = shown;
+        // A fresh answer is a fresh chance for a photo that did not come last time.
+        unfetched.Clear();
         SentHereBook.Keep(key, Conversation.StillOwed(shown, SentHereBook.For(key)));
         Screens.Say(frame.Status, null);
         Draw(shown);
@@ -135,8 +148,20 @@ public sealed class ConversationActivity : Activity
         reply.Label = Conversation.ReplyLabel(shown);
 
         bubbles.RemoveAllViews();
-        foreach (var bubble in Conversation.Bubbles(shown, SentHereBook.For(key)))
+        photos.Clear();
+        drawn = Conversation.Bubbles(shown, SentHereBook.For(key));
+        foreach (var bubble in drawn)
         {
+            if (bubble.Photos.Count > 0)
+            {
+                // The picture names who sent it and when under it (mock), so its words, if any, need no name over them.
+                Pictures(bubble);
+                if (bubble.Said)
+                {
+                    bubbles.AddView(Words(bubble), Beside(bubble.Mine, round.Px(DashLayout.BubbleGap)));
+                }
+                continue;
+            }
             if (bubble.From is { } from)
             {
                 var sender = new WatchTextView(this) { Type = WatchType.Small, Tone = WatchTone.Soft, Label = from, Gravity = GravityFlags.Start };
@@ -147,6 +172,82 @@ public sealed class ConversationActivity : Activity
         // The newest is by the Reply pill.
         frame.Scroll.Post(() => frame.Scroll.FullScroll(FocusSearchDirection.Down));
         frame.Scroll.RequestFocus();
+        FetchPhotos();
+    }
+
+    // Each photo in the mockup's picture, centred, and under the last its caption: who sent it in a group, and when.
+    private void Pictures(Bubble bubble)
+    {
+        var when = WhenWords.Relative(bubble.At, DateTimeOffset.UtcNow, TimeZoneInfo.Local);
+        foreach (var id in bubble.Photos)
+        {
+            var view = new PhotoView(this);
+            view.Describe(bubble.From, when, round.Radius);
+            if (PhotoBook.Held.Get(id) is { } jpeg)
+            {
+                view.Show(jpeg);
+            }
+            else if (unfetched.TryGetValue(id, out var trouble))
+            {
+                view.Failed(trouble);
+            }
+            photos[id] = view;
+            bubbles.AddView(view, new LinearLayout.LayoutParams(round.Px(DashLayout.PhotoWidth), round.Px(DashLayout.PhotoHeight))
+            {
+                Gravity = GravityFlags.CenterHorizontal,
+                TopMargin = round.Px(DashLayout.BubbleGap),
+            });
+        }
+
+        var caption = new WatchTextView(this) { Type = WatchType.Small, Tone = WatchTone.Soft, Label = DashWords.Caption(bubble.From, when) };
+        caption.ImportantForAccessibility = ImportantForAccessibility.No;
+        bubbles.AddView(caption, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+        {
+            TopMargin = Math.Max(0, round.Px(DashLayout.CaptionCentre) - caption.LineHeight / 2),
+        });
+    }
+
+    // One photo at a time, newest first, so the phone fetches what the owner is looking at first; the rest follow.
+    private void FetchPhotos()
+    {
+        if (fetching || Conversation.PhotosToAsk(drawn, id => PhotoBook.Held.Has(id) || unfetched.ContainsKey(id)).FirstOrDefault() is not { } next)
+        {
+            return;
+        }
+
+        fetching = true;
+        var context = ApplicationContext!;
+        Screens.WhenAnswered(this, Task.Run(() => PostLink.Shared.AskAsync(context, new DashPhotoAsk(next))), reply => Fetched(next, reply));
+    }
+
+    private void Fetched(string id, DashReply reply)
+    {
+        fetching = false;
+        if (reply.Answer is DashPhoto photo)
+        {
+            PhotoBook.Held.Hold(id, photo.Jpeg);
+            if (photos.TryGetValue(id, out var shown))
+            {
+                shown.Show(photo.Jpeg);
+            }
+            FetchPhotos();
+            return;
+        }
+
+        var trouble = reply.Trouble ?? DashTrouble.Unreadable;
+        unfetched[id] = trouble;
+        photos.GetValueOrDefault(id)?.Failed(trouble);
+        if (trouble == DashTrouble.NoPhone)
+        {
+            // The phone is out of reach: every photo still waiting says so, and none is asked for until the next answer.
+            foreach (var waiting in Conversation.PhotosToAsk(drawn, held => PhotoBook.Held.Has(held) || unfetched.ContainsKey(held)))
+            {
+                unfetched[waiting] = trouble;
+                photos.GetValueOrDefault(waiting)?.Failed(trouble);
+            }
+            return;
+        }
+        FetchPhotos();
     }
 
     // Read on the wrist is read on the phone (A14), through the newest message drawn, and told once for each newer one.

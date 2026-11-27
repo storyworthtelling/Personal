@@ -413,6 +413,7 @@ public class WatchInvariantsTests
     [InlineData("DashPeopleActivityName")]
     [InlineData("DashConversationActivityName")]
     [InlineData("DashReplyActivityName")]
+    [InlineData("DashActActivityName")]
     public void EachDashScreenIsRegisteredByItsName(string constant)
     {
         var registered = DashSources().Count(path => File.ReadAllText(path).Contains($"Name = WatchIdentity.{constant}", StringComparison.Ordinal));
@@ -542,7 +543,7 @@ public class WatchInvariantsTests
     {
         // Every ask and tell a screen makes runs on the pool, and only its answer comes back to the screen.
         var screens = DashSources().Where(path => Path.GetFileName(path).EndsWith("Activity.cs", StringComparison.Ordinal)).ToList();
-        Assert.Equal(3, screens.Count);
+        Assert.Equal(4, screens.Count);
 
         var calls = screens.SelectMany(path => Code(path).Split('\n').Where(line => Regex.IsMatch(line, @"\.(AskAsync|TellAsync)\(")).Select(line => (Path: Path.GetFileName(path), Line: line))).ToList();
         Assert.NotEmpty(calls);
@@ -561,6 +562,88 @@ public class WatchInvariantsTests
         Assert.Contains("SendAttempt.Reply(", code, StringComparison.Ordinal);
         Assert.Contains(".Again(", code, StringComparison.Ordinal);
         Assert.Contains("DashWords.For(", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashFilesAndDeletesUndoFirst()
+    {
+        // W-5.1.4 (A14, WD §9, O5): a row's long press opens the choice; the act goes at once, with no confirmation, under
+        // the watch's own name and carrying the window the ring shows; a tap on the ring takes it back.
+        var people = Code(Dash("PeopleActivity.cs"));
+        var act = Code(Dash("ActActivity.cs"));
+
+        Assert.Contains(".LongClick +=", people, StringComparison.Ordinal);
+        Assert.Contains("ActActivity.For(", people, StringComparison.Ordinal);
+        Assert.Contains("WristAct.File(", act, StringComparison.Ordinal);
+        Assert.Contains("WristAct.Delete(", act, StringComparison.Ordinal);
+        Assert.Contains("UndoRingView.WindowFor(", act, StringComparison.Ordinal);
+        Assert.Contains(".Open(act.Window,", act, StringComparison.Ordinal);
+        Assert.Contains(".Undo(", act, StringComparison.Ordinal);
+        Assert.Contains(".Closed()", act, StringComparison.Ordinal);
+        Assert.Contains("DashLayout.UndoGlyphCentre", act, StringComparison.Ordinal);
+        Assert.Contains("DashWords.TapToUndo", Code(Path.Combine(WatchFiles.RepoRoot(), "Watch", "Watch.Domain", "Dash", "WristAct.cs")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnUndoIsToldEvenWhenTheScreenHasGone()
+    {
+        // The act and its undo are told on the pool whether or not the screen is still there: only drawing waits for it.
+        var act = Code(Dash("ActActivity.cs"));
+        var carrier = Code(Dash("ActCarrier.cs"));
+
+        Assert.Contains("Task.Run(() => ActCarrier.ActAsync(", act, StringComparison.Ordinal);
+        Assert.Contains("Task.Run(() => ActCarrier.UndoAsync(", act, StringComparison.Ordinal);
+        Assert.Contains(".Told(await PostLink.Shared.TellAsync(", carrier, StringComparison.Ordinal);
+        Assert.Contains(".UndoTold(await PostLink.Shared.TellAsync(", carrier, StringComparison.Ordinal);
+        Assert.DoesNotContain("Activity", carrier, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsFinishing", carrier, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARowNamesItsLongPress()
+    {
+        // TalkBack reaches the choice too (WD §12): the row's long press says what it does.
+        var row = Code(Dash("PersonRowView.cs"));
+
+        Assert.Contains("ActionLongClick", row, StringComparison.Ordinal);
+        Assert.Contains("DashWords.FileOrDelete", row, StringComparison.Ordinal);
+        Assert.Contains("LongClickable = true", row, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheUndoRingOpensForTheActsWindow()
+    {
+        // The act carries the window the ring shows (B1's dash/file and dash/delete), so the kit says it before it opens.
+        var ring = Code(Path.Combine(WatchFiles.RepoRoot(), "Watch", "Watch.Ui.Wear", "UndoRingView.cs"));
+
+        Assert.Contains("public static TimeSpan WindowFor(Context", ring, StringComparison.Ordinal);
+        Assert.Contains("public void Open(TimeSpan window, Action onUndo, Action onFinal)", ring, StringComparison.Ordinal);
+        Assert.Contains("GlyphCentre", ring, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DashShowsPhotosAsTheMockupDrawsThem()
+    {
+        // W-5.1.3 (mock: A group text with a photo): each photo asked for on its own, newest first, held for the process,
+        // drawn in the mockup's picture with who and when under it, and decoded off the main thread.
+        var conversation = Code(Dash("ConversationActivity.cs"));
+        var photo = Code(Dash("PhotoView.cs"));
+
+        Assert.Contains("new DashPhotoAsk(", conversation, StringComparison.Ordinal);
+        Assert.Contains("Conversation.PhotosToAsk(", conversation, StringComparison.Ordinal);
+        Assert.Contains("HeldPhotos", DashCode(), StringComparison.Ordinal);
+        Assert.Contains("DashWords.Caption(", conversation, StringComparison.Ordinal);
+        Assert.Contains("DashLayout.ReplyToAllCentre", conversation, StringComparison.Ordinal);
+        foreach (var figure in new[] { "DashLayout.PhotoWidth", "DashLayout.PhotoHeight", "DashLayout.CaptionCentre" })
+        {
+            Assert.Contains(figure, conversation, StringComparison.Ordinal);
+        }
+        Assert.Contains("DashLayout.PhotoCorner", photo, StringComparison.Ordinal);
+        Assert.Contains("DashWords.Photo(", photo, StringComparison.Ordinal);
+
+        var decoding = Regex.Match(photo, @"Task\.Run\((?<body>[\s\S]*?)\);");
+        Assert.True(decoding.Success && decoding.Groups["body"].Value.Contains("BitmapFactory.DecodeByteArray(", StringComparison.Ordinal),
+            "A photo is decoded on the main thread.");
     }
 
     [Fact]

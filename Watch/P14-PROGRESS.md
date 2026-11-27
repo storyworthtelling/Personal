@@ -2152,3 +2152,113 @@ the photo row in `AnAnswerArrivingAtPostIsLeftAlone`), `DashActsCodecTests.AnEar
 - **Green: `Codex.Tests` 3331 passed, 0 failed. `Watch.Tests` 941 passed. `RepoGuards.Tests` 452 passed** (the
   listener's new log calls are `DashLogLines` lines and plain literals). **Compiled here:** `FocusPhone/Post.Android`,
   **Build succeeded, 0 errors**; none of the 65 warnings names a file this step touched.
+
+## Red 3 · Dash on the watch: the act screen, the Undo ring, photos
+
+Tests written first, with no `ActActivity`, `ActCarrier` or `PhotoView` in `Watch/Dash.Wear`, the kit's
+`UndoRingView` unchanged, and `WatchContrast.Accent` a stub: in `WatchInvariantsTests`,
+`EachDashScreenIsRegisteredByItsName` (the act screen's row), `DashWaitsOffTheMainThread` (four screens),
+`DashFilesAndDeletesUndoFirst`, `AnUndoIsToldEvenWhenTheScreenHasGone`, `ARowNamesItsLongPress`,
+`TheUndoRingOpensForTheActsWindow`, `DashShowsPhotosAsTheMockupDrawsThem`; `WatchA11yTests.TheGuardSeesDash` (with
+`PhotoView`); and `Design/AccentTests` (5 with rows: words in an app's colour keep 4.5:1 on black, or take the ink).
+
+- **`Watch.Tests`: 952 tests, 13 failed, 939 passed.** The 13: `WatchInvariantsTests` 7, `AccentTests` 5,
+  `WatchA11yTests` 1. First errors: `NotImplementedException` 5, "Watch/Dash.Wear/ActActivity.cs isn’t there." 2,
+  "Watch/Dash.Wear/PhotoView.cs isn’t there." 1, `Values differ` 2 (three screens, not four), `Sub-string not found` 2,
+  `Assert.All() Failure: 1 out of 2 items` (no `PhotoView`).
+- **On the way:** two of the new guards were changed after the red run, each to read the code where it belongs rather
+  than to pass: `DashFilesAndDeletesUndoFirst` asked the act screen for `.Told(` and `.UndoTold(`, which are
+  `ActCarrier`'s (held by `AnUndoIsToldEvenWhenTheScreenHasGone`, rewritten to read the carrier, since
+  `DashWaitsOffTheMainThread` wants every tell from a screen on one `Task.Run(` line); it now asks the screen for
+  `.Undo(`. `DashShowsPhotosAsTheMockupDrawsThem` then read 952 with 1 failed (`DashWords.Photo(` not in `PhotoView`):
+  the view now says whose photo it is itself.
+- **Green: `Watch.Tests` 952 passed, 0 failed.** `Tools/FaceStudio.Tests` 38 passed. `FocusPhone/Codex.Tests` 3331
+  passed. `RepoGuards.Tests` 452 passed (the new screens log only `DashLogLines` lines and plain literals, and every
+  copy literal is curled and contracted). `Storyworthtelling.Updates.Tests` 194 passed. `leakscan --ci` over the
+  chunk's diff: "no personal-data shapes in the added lines".
+- **Compiled here** (`-p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false`): `Watch/Dash.Wear` and
+  `Watch/Watch.Ui.Wear`, each **Build succeeded, 0 warnings, 0 errors**; `FocusPhone/Post.Android` **Build succeeded,
+  0 errors** (65 warnings, none in a file this chunk touched).
+
+## What it is
+
+**Filing and deleting, undo-first (W-5.1.4).**
+- A long press on a People waiting row opens `ActActivity` (registered `…communication.dash.ActActivity`,
+  `WatchIdentity.DashActActivityName`) on the choice: the time and Dash's glyph, the name, **File** pinned and
+  **Delete** under it, on After the call's layout (no mockup draws this screen). TalkBack names the row's long press
+  ("File or delete").
+- A choice is the act, with no confirmation (WD §9): `WristAct` names it `act-` and 32 hex digits, takes the watch's
+  own undo window (`UndoRingView.WindowFor`, at most the wire's two minutes), and `ActCarrier` hands Post the
+  `dash/file` or `dash/delete` for the whole correspondence on the pool. The screen becomes the mockup's Filed, with
+  Undo: the glyph and its emptying ring at 0.62 of the radius (`UndoRingView.GlyphCentre`, new in the kit), "Lee filed"
+  or "Lee deleted", and "Tap to undo" in Dash's colour where it reads at 4.5:1 and in the ink where it does not
+  (`WatchContrast.Accent`; for Dash, all day). A tap anywhere takes it back: the undo goes once the phone has the act,
+  so it never arrives first. When the ring empties, or the screen is left, the act is final and the screen goes, and
+  People waiting drops the row at once.
+- Nothing is claimed that did not happen: an act that never reached the phone leaves the row and says why in the quiet
+  line ("Your phone isn’t in reach."); an undo that never reached it says "The undo didn’t reach your phone." and the
+  act stands. The act and its undo are carried on the pool whether the screen is still there or not.
+- **Post's half:** an undo heard before its act is kept in the book as taken back (and saved), so the act that follows
+  is `Again` and never done, across a restart too.
+
+**Group texts and photos (W-5.1.3).**
+- `dash/photo` (`WatchIdentity.DashPhotoPath`, the tenth path, frozen and in Post's listener): the wrist asks
+  `{v, kind: ask, id}` with the attachment id B1 already lists; Post answers `{v, kind: photo, id, jpeg}`, the JPEG as
+  base64, at most `DashLimits.PhotoBytes` (40 KB, so the message stays under the 64 KB budget). The codec refuses a
+  photo that is not a JPEG by its first bytes, is past its budget, or carries another id.
+- Post finds the photo among the conversations the wrist is shown (never a video or file, a mail's picture, or anything
+  filed), fetches it through `AttachmentCache.Bytes`, the one fetch the Mailbox opens pictures with (Google Messages'
+  bridge, or the phone's own MMS store), and `DashPhotos.Shrink` decodes it no larger than needed, stands it upright by
+  its EXIF orientation, scales it so its shorter side is at most 240 px and its longer 640 (`PhotoFit`), and writes a
+  JPEG at the first quality from 80 down to 40 that fits, halving the size if none does. Written again, never passed
+  on, so the picture's own metadata stays on the phone; held in memory only. One that will not fetch or fit is not
+  answered (`DASH dash/photo: Unfetched`), and the wrist's 30 s wait says so. A picture's stand-in words ("Photo",
+  "Photo +1") no longer cross on a conversation; the row's line still says "Photo".
+- On the wrist, each photo is drawn in the mockup's picture (1.0 by 0.6 of the radius, its corners at 0.06, filled about
+  its centre and never stretched) with "Robin · 1 h" under it (who, in a group, and when); its words, if it has any of
+  its own, follow in a bubble. Until it comes the card says "Opening the photo.", and one that did not come says why.
+  The conversation asks one photo at a time, newest first, and holds a dozen for the process (`HeldPhotos`), so a
+  conversation opened again shows them at once. A group's Reply to all sits at 1.52 of the radius, where the mockup
+  draws it, under the caption (B4 had it at the person's 1.62).
+
+## Decisions made in this chunk (each the owner's to overturn)
+
+- **The way in to filing is a long press on a People waiting row,** opening a choice screen no mockup draws, laid out
+  as After the call: File pinned, Delete under it. The conversation keeps Reply as its one action, as drawn. Only a
+  whole correspondence is filed or deleted from the wrist; the contract also takes single messages, and nothing on the
+  wrist asks for that yet.
+- **"Tap to undo" is in the ink, not Dash's colour,** whenever Dash's colour reads under 4.5:1 on black, which for
+  Dash's navy-to-maroon range is all day: the mockup draws it in Dash's colour (B4 made the same call for the pills).
+- **An undo is told, not answered,** as B1 and B2 built it: if the undo lands after Post's hold has closed (the
+  wrist's window, or the phone's if longer, plus 10 s), Post says `TooLate` in its own log and the act stands, while
+  the wrist believes it took it back. An answered undo would need a new answer kind on `dash/undo`.
+- **An undo heard before its act is kept,** so the act that follows is never done (Post's book). Two messages over the
+  Data Layer can cross; the wrist only sends the undo once the act was handed over, but that is not proof it landed.
+- **A row whose act stands leaves People waiting at once,** before Post is asked again, so a filed row never flashes
+  back; an act that failed, or was taken back, leaves the row where it was.
+- **Photos cross as one Data Layer message each** (base64 in the same JSON codec), not over `ChannelClient` or as an
+  asset: the narrowest addition. 40 KB of JPEG, 240 px on the shorter side, the five qualities and the 30 s wait are
+  chosen, not measured.
+- **A photo is cropped to the mockup's 5:3 box,** so a tall photo loses its top and foot. There is no tap to see the
+  whole picture, and videos and files are named ("Video", "Attachment"), not shown.
+- **Photos are held in memory for the process only, a dozen at most,** never written to the watch.
+- **Owner's ruling folded in:** People waiting draws no unread mark (see the top of this chunk).
+
+## Not done, not verified
+
+- **Nothing here has met a watch or a phone.** Unverified: the long press on a row under Wear OS's own gestures, the
+  ring's tap and its window against Android's "Time to take action", the act and undo crossing in order over Bluetooth
+  and the cloud relay, the result reaching People waiting when the act screen is swiped away, `BitmapFactory` and
+  `ExifInterface` on real MMS and Google Messages pictures, the bridge's `DownloadMedia` answering inside the 30 s wait,
+  a 40 KB message crossing as one `MessageClient` message, the cropped picture on the 41 mm and 45 mm screens, and
+  TalkBack on all of it.
+- **Not built from release B:** new texts from the Rolodex (the next chunk; the owner's answer is the whole Rolodex,
+  names and digest ids, searchable on the watch, and nothing here stands in its way), W-5.1.5 (the call note),
+  W-5.1.6 (mail lines), W-5.1.7 (the tile), W-5.1.9 (overnight callers). No buzz yet.
+
+## Chunk B5 totals
+
+- `Watch.Tests`: **952 passed, 0 failed.** `Tools/FaceStudio.Tests`: 38 passed. `FocusPhone/Codex.Tests`: 3331 passed.
+  `RepoGuards.Tests`: 452 passed. `Storyworthtelling.Updates.Tests`: 194 passed.
+- `Watch/Dash.Wear` and `Watch/Watch.Ui.Wear` compile here with 0 warnings and 0 errors; `FocusPhone/Post.Android`
+  with 0 errors.

@@ -56,6 +56,8 @@ internal static class DashExtras
     public const string Send = "send"; // not copy: an extra's name
     public const string Heard = "heard"; // not copy: an extra's name
     public const string At = "at"; // not copy: an extra's name
+    public const string Act = "act"; // not copy: an extra's name
+    public const string Left = "left"; // not copy: an extra's name
 }
 
 /// <summary>

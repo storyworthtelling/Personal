@@ -118,6 +118,27 @@ internal static class Screens
             TaskContinuationOptions.None,
             TaskScheduler.Default);
 
+    /// <summary>Work on the pool that the screen draws after, back on the screen's own thread, if the screen is still there.</summary>
+    public static void WhenDone(Activity screen, Task working, Action then) =>
+        working.ContinueWith(
+            done =>
+            {
+                if (done.IsFaulted)
+                {
+                    DashLog.Quiet("DASH work for a screen stopped", done.Exception!.GetBaseException());
+                }
+                screen.RunOnUiThread(() =>
+                {
+                    if (!screen.IsFinishing && !screen.IsDestroyed)
+                    {
+                        then();
+                    }
+                });
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.None,
+            TaskScheduler.Default);
+
     /// <summary>A tell nobody answers: what stood in the way is logged by the link, and anything unforeseen here.</summary>
     public static void Told(Task<DashTrouble?> telling) =>
         telling.ContinueWith(

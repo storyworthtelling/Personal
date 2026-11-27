@@ -14,8 +14,9 @@ namespace Dash.Wear;
 /// <summary>
 /// One row of People waiting (mock: <c>row</c>): on the card, the name at the top left in the ink when unread and the
 /// grey when not, when it came at the top right, and the one line under it. No mark, no count, no badge (WD §1; the
-/// owner's ruling of 27 Nov 2026 took the mockup's unread rule away). A tap opens the conversation; TalkBack reads who,
-/// whether it is new, when and the line (<see cref="DashWords.Row"/>).
+/// owner's ruling of 27 Nov 2026 took the mockup's unread rule away). A tap opens the conversation and a long press
+/// offers to file or delete it (W-5.1.4); TalkBack reads who, whether it is new, when and the line
+/// (<see cref="DashWords.Row"/>), and names the long press (<see cref="DashWords.FileOrDelete"/>).
 /// </summary>
 public sealed class PersonRowView : View
 {
@@ -91,15 +92,19 @@ public sealed class PersonRowView : View
     public override void OnInitializeAccessibilityNodeInfo(AccessibilityNodeInfo? info)
     {
         base.OnInitializeAccessibilityNodeInfo(info);
-        if (info is not null)
+        if (info is null)
         {
-            info.ClassName = "android.widget.Button";
+            return;
         }
+        info.ClassName = "android.widget.Button";
+        // The long press says what it does, so TalkBack's "double-tap and hold" is not a guess.
+        info.AddAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.AccessibilityAction.ActionLongClick!.Id, DashWords.FileOrDelete));
     }
 
     private void Setup()
     {
         Clickable = true;
+        LongClickable = true;
         Focusable = true;
     }
 
