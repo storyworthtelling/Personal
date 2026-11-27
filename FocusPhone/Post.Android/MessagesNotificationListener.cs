@@ -84,7 +84,8 @@ public class MessagesNotificationListener : NotificationListenerService
             style.IsGroupConversation,
             style.Messages
                 .Select(message => new NoticeMessage(
-                    message.Person?.Name?.ToString(), message.Timestamp, message.Text?.ToString()))
+                    message.Person?.Name?.ToString(), message.Timestamp, message.Text?.ToString(),
+                    message.DataMimeType))
                 .ToList());
         PostDiagnostics.LogText("Notifications", TextTrail.Notice(notice, DateTimeOffset.UtcNow));
 

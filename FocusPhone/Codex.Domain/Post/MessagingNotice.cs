@@ -3,7 +3,7 @@ using Codex.Domain.Timeline;
 namespace Codex.Domain.Post;
 
 /// <summary>One message as a Google Messages notification lists it. A null sender is the owner.</summary>
-public sealed record NoticeMessage(string? SenderName, long TimestampMs, string? Text);
+public sealed record NoticeMessage(string? SenderName, long TimestampMs, string? Text, string? MimeType = null);
 
 /// <summary>
 /// A Google Messages notification, reduced to what Post reads from it: the conversation's
@@ -56,7 +56,7 @@ public static class MessagingNoticeMapper
                 TimelineItemKind.Message,
                 contactKey,
                 DateTimeOffset.FromUnixTimeMilliseconds(message.TimestampMs),
-                message.Text,
+                TextOrMedia(message),
                 Incoming: !fromOwner,
                 // The id this listener has always used, so a message already cached under it
                 // is updated in place — and moved into its group — rather than doubled.
@@ -70,6 +70,13 @@ public static class MessagingNoticeMapper
         }
         return items;
     }
+
+    // A notification's picture or clip has a type and, often, no words; the row says what it is.
+    // The notification's own content grant does not outlive it, so there is nothing to open.
+    private static string? TextOrMedia(NoticeMessage message) =>
+        string.IsNullOrWhiteSpace(message.Text) && !string.IsNullOrEmpty(message.MimeType)
+            ? AttachmentSummary.Describe([new AttachmentRef("rcs-notice", null, message.MimeType, 0)])
+            : message.Text;
 
     /// <summary>The conversation's own name, when it is a group — offered as a title until the owner names it.</summary>
     public static string? GroupTitle(MessagingNotice notice) =>

@@ -52,6 +52,30 @@ public class NearDuplicateCollapserTests
         Assert.Equal("gm:m1", Assert.Single(result).SourceId);
     }
 
+    // Filing a group text hides the copy the Mailbox showed. The notification copy the merge had
+    // dropped is a twin of it: left alone it surfaces the moment its shadow is gone.
+    [Fact]
+    public void Twins_NamesTheCopyThatOnlyHidAsLongAsTheFiledOneWasThere()
+    {
+        var provider = Item(TimelineItemKind.Message, "5551234567", "mms:1") with { GroupId = "mms:7" };
+        var notification = Item(TimelineItemKind.Message, "5551234567", "rcs-notice", secondsAfterT0: 5)
+            with { GroupId = "rcs:shortcut" };
+        var unrelated = Item(TimelineItemKind.Message, "5559876543", "sms:2", snippet: "other");
+
+        var twins = NearDuplicateCollapser.Twins([provider, notification, unrelated], [provider]);
+
+        Assert.Equal("rcs-notice", Assert.Single(twins).SourceId);
+    }
+
+    [Fact]
+    public void Twins_IsEmptyWhenNothingWasShadowedByTheFiledItem()
+    {
+        var provider = Item(TimelineItemKind.Message, "5551234567", "sms:1");
+        var other = Item(TimelineItemKind.Message, "5559876543", "sms:2", snippet: "other");
+
+        Assert.Empty(NearDuplicateCollapser.Twins([provider, other], [provider]));
+    }
+
     [Fact]
     public void Collapse_KeepsNotificationTextWithNoProviderMatch()
     {

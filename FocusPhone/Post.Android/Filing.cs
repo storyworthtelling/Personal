@@ -47,6 +47,25 @@ internal static class Filing
     }
 
     /// <summary>
+    /// Hides the duplicate copies of a message that was just filed (see
+    /// <see cref="NearDuplicateCollapser.Twins"/>). They are not filed themselves — the ghost
+    /// already holds the message — only kept from standing in for it. Nothing is owed at the
+    /// source for them.
+    /// </summary>
+    public static void HideTwins(Context context, IEnumerable<TimelineItem> twins)
+    {
+        using var database = TimelineDatabase.Open(context);
+        foreach (var twin in twins)
+        {
+            database.Cache.Delete(twin.Kind, twin.SourceId);
+            if (twin.Kind != TimelineItemKind.Email)
+            {
+                database.Hidden.Hide(twin.Kind, twin.SourceId);
+            }
+        }
+    }
+
+    /// <summary>
     /// Takes something back out of Filed. What returns is the ghost — the source original
     /// is already gone, or is on its way to being — so it goes back into the live cache as
     /// itself, and its tombstone is withdrawn so reconcile stops suppressing it.

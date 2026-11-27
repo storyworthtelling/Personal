@@ -35,6 +35,23 @@ public static class NearDuplicateCollapser
             .ToList();
     }
 
+    /// <summary>
+    /// The items the merge was hiding only because of <paramref name="removed"/> — a copy of the
+    /// same message that yielded to one the owner has now filed. Filing hides what the Mailbox
+    /// showed, so these must be hidden with it, or they step into the gap and the correspondence
+    /// comes back under another face (a group text as a list of numbers).
+    /// </summary>
+    public static IReadOnlyList<TimelineItem> Twins(
+        IReadOnlyList<TimelineItem> pool, IReadOnlyCollection<TimelineItem> removed)
+    {
+        var distinct = pool.DistinctBy(item => (item.Kind, item.SourceId)).ToList();
+        var gone = removed.Select(item => (item.Kind, item.SourceId)).ToHashSet();
+        var shown = Collapse(distinct).Select(item => (item.Kind, item.SourceId)).ToHashSet();
+        return Collapse(distinct.Where(item => !gone.Contains((item.Kind, item.SourceId))).ToList())
+            .Where(item => !shown.Contains((item.Kind, item.SourceId)))
+            .ToList();
+    }
+
     private static bool IsProviderText(TimelineItem item) =>
         item.Kind == TimelineItemKind.Message && (HasPrefix(item, "sms:") || HasPrefix(item, "mms:"));
 
