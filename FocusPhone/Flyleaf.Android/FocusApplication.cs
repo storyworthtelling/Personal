@@ -29,6 +29,8 @@ public class FocusApplication : Application
         packageWatcher.Start();
         // A lock-task session a dead process left behind is undone before anything else runs (D297).
         LockedSessionController.EndStaleAtStart(this);
+        // A timed release the reboot cut short gets its alarm back, so its service is closed at its end (Entertainment block).
+        TimedReleaseController.OnProcessStart(this);
         UpdateService.Schedule(this);
     }
 }

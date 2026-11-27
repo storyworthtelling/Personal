@@ -70,11 +70,23 @@ public static class HardBlock
         {
             var social = IsSocialCategory(androidCategory) && !IsFirstParty(package);
             var mature = PlayRating.IsMature(ratings.RatingOf(package)) && !PlayRating.IsExempt(package);
-            if (IsNeverVisibleCategory(androidCategory) || social || mature || CuratedPackages.Contains(package))
+            if (IsNeverVisibleCategory(androidCategory) || social || mature || IsEntertainment(package, ratings)
+                || CuratedPackages.Contains(package))
             {
                 blocked.Add(package);
             }
         }
         return blocked;
     }
+
+    /// <summary>
+    /// The Entertainment block: a streaming service is hard-suspended whatever its listing says, and any other
+    /// app whose Play category is Entertainment is too. For a streaming service only a timed release
+    /// (<see cref="TimedReleaseHandoff"/>), asked by Pulp for a title it is playing, lifts it, and only for that
+    /// title's length; any other Entertainment app stays blocked. The owner's suite and the allowlist are exempt,
+    /// as they are from the rating rule.
+    /// </summary>
+    public static bool IsEntertainment(string package, RatingBook ratings) =>
+        LockedOpenCatalogue.Packages.Contains(package)
+        || (PlayRating.IsEntertainment(ratings.GenreOf(package)) && !PlayRating.IsExempt(package));
 }

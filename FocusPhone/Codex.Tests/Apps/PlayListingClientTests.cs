@@ -17,7 +17,21 @@ public class PlayListingClientTests
 
         var lookup = await new PlayListingClient(new HttpClient(handler)).LookupAsync("com.example.forum");
 
-        Assert.Equal(new PlayLookup(RatingLookupOutcome.Rated, ContentRating.Mature), lookup);
+        // A page that names no category is still a page read: its category is "", not unknown.
+        Assert.Equal(new PlayLookup(RatingLookupOutcome.Rated, ContentRating.Mature, string.Empty), lookup);
+    }
+
+    [Fact]
+    public async Task AListingReadsItsCategoryFromTheSamePage()
+    {
+        var handler = new FakeHttpMessageHandler();
+        handler.Respond(Url,
+            """<script>{"@type":"SoftwareApplication","applicationCategory":"ENTERTAINMENT"}</script><span itemprop="contentRating">Teen</span>""",
+            "text/html");
+
+        var lookup = await new PlayListingClient(new HttpClient(handler)).LookupAsync("com.example.forum");
+
+        Assert.Equal(new PlayLookup(RatingLookupOutcome.Rated, ContentRating.Teen, "ENTERTAINMENT"), lookup);
     }
 
     [Fact]

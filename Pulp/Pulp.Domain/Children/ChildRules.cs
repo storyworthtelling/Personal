@@ -75,6 +75,12 @@ public sealed record TitleFacts(TitleId Id, TitleKind Kind, ContentRating Rating
 
     /// <summary>The league a game belongs to, so a parent's league allowance can allow it (D326); null for anything that is not a game.</summary>
     public Sports.LeagueId? League { get; init; }
+
+    /// <summary>
+    /// How long the title runs, in minutes, for an episode or a film; null when the catalogue does not say (a game).
+    /// The hand-off's timed release is this long plus a grace (<c>TimedReleaseHandOff.WindowMinutes</c>).
+    /// </summary>
+    public int? RuntimeMinutes { get; init; }
 }
 
 /// <summary>

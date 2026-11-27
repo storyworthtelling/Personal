@@ -84,12 +84,28 @@ public sealed class HandOffExecutor
             return new HandOffOutcome(HandOffResult.Refused, HandOffNotice.ForRefusal(plan.Verdict.Refusal, serviceName), null);
         }
 
-        // Release G (D288): on the locked phone the same allowed intent is asked of Flyleaf, which starts it in
-        // lock task mode and says so in its answer (D301). Only the planner's own package and link cross. The
-        // plain hand-off below is the fallback in both senses: it runs at once if the ask cannot be sent, and
-        // later, once, if Flyleaf refuses or never answers, so the title still opens.
-        var pending = plan.Pending;
-        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(plan.Intent.Data.AbsoluteUri));
+        // Entertainment block: the streaming service is hard-suspended on the lockdown, so Flyleaf first lifts that
+        // hold for this title's length (plus a grace). The route below runs once Flyleaf has answered, or has not
+        // in time; where no release can be asked at all (Flyleaf absent) it runs at once, as it always did.
+        var minutes = TimedReleaseHandOff.WindowMinutes(request.Title.RuntimeMinutes);
+        if (TimedReleaseCourier.Send(host, plan.Intent.Package, plan.Intent.Data, minutes,
+                () => Route(host, plan, serviceName, handing)))
+        {
+            return new HandOffOutcome(HandOffResult.Started, null, plan.Pending);
+        }
+
+        return Route(host, plan, serviceName, handing);
+    }
+
+    // Release G (D288): on the locked phone the same allowed intent is asked of Flyleaf, which starts it in lock
+    // task mode and says so in its answer (D301). Only the planner's own package and link cross. The plain hand-off
+    // is the fallback in both senses: it runs at once if the ask cannot be sent, and later, once, if Flyleaf refuses
+    // or never answers, so the title still opens. Called at once, or from the timed release's answer.
+    private HandOffOutcome Route(
+        Activity host, HandOffPlan plan, string serviceName, Storyworthtelling.Diagnostics.KeyAction handing)
+    {
+        var pending = plan.Pending!;
+        var intent = new Intent(Intent.ActionView, Android.Net.Uri.Parse(plan.Intent!.Data.AbsoluteUri));
         intent.SetPackage(plan.Intent.Package);
 
         if (LockedOpenChoice.Decide(locked, plan.Intent.Package) == HandOffRoute.Locked
