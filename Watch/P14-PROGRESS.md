@@ -1962,3 +1962,127 @@ the workflow, and FaceStudio's `DashIcon` a stub.
   `assets/fonts/IBMPlexMono-{Regular,Medium,SemiBold}.ttf`. Its permissions are none of its own: the debug build adds
   INTERNET for the debugger, and AndroidX's manifest adds its `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, as on the
   installer.
+- **After review** (one more commit): the wrist now waits, bounded, for its listener to be registered before it sends an
+  ask (an answer can come back at once); a screen opened with no correspondence clears its key so it asks nothing
+  after finishing; the theme is `Theme.DeviceDefault.NoActionBar`; the scroll takes the crown's focus as soon as the
+  screen is built. `EveryDashDataLayerWaitIsBounded`'s file now also asks for the bounded registration. Re-run:
+  `Watch.Tests` 843 passed, `RepoGuards.Tests` 452 passed (`FixedWordingTests` caught a log literal with a straight
+  apostrophe and "was not"; it is curled and contracted), Dash built again with 0 warnings and 0 errors, and
+  `check-dependency-graph.py Watch/Dash.Wear` checked its graph and found nothing missing.
+
+## What it is
+
+**The pure half, in `Watch.Domain`** (BCL only, tested in `Watch.Tests`):
+- `Dash/PeopleWaiting`: Post's `DashPeople` as rows (`PersonRow`: key, name, line, when, unread, group), newest first
+  whatever order they crossed in, ties in Post's order.
+- `Dash/Conversation`: a `DashThread` as `Bubble`s, oldest first, the owner's marked `Mine`, a group's senders named
+  (never in a person's conversation), a message with no words said by what it is ("Call", "Voicemail", "Photo",
+  "Video", "Attachment"); `ReadFor` (the `DashRead` through the newest message drawn, none for an empty conversation);
+  `ReplyLabel` (Reply, or Reply to all in a group); and the replies sent here (`SentHere`), shown at once and dropped
+  once Post's answer carries the owner's own text with the same words stamped no more than `ClockSlack` (2 min) before
+  the wrist sent it.
+- `Dash/DashExchange`: what an ask waits for and what an answer is for (`DashTicket`: the path, and a conversation's key
+  or a send's id), so People waiting is answered by people, a conversation by its own key and a send by its own name; a
+  read, a file, a delete, an undo and a note wait for nothing. `DashWaits`: find the phone 5 s, hand it a message 10 s,
+  an answer 20 s, a send's answer 80 s (Post's 60 s turn and its 15 s answer wait, B2). Chosen, not measured.
+- `Dash/SendAttempt`: a reply into a correspondence, named `send-` and 32 hex digits by the watch; `Check` (words, at
+  most 4,000 characters); `Again`: with no answer the same name goes again, since Post answers a send it has seen from
+  its book and never sends it twice (B2); once Post has answered, trying again is a new send.
+- `Dash/RelayNodes`: the phone to ask, near before through the cloud, the same one each time among equals.
+- `Dash/DashWords`: the fixed words (status sentences, the four troubles, the send outcomes with success silent, the
+  mockups' labels, "To Lee", and a row as TalkBack reads it). No app is named (A48), so the phone is "your phone".
+- `Dash/DashLayout`: the mockups' fractions of the radius (head, rows, bubbles, pills, the reply's choices), each
+  shown to sit inside the round screen.
+- `Kit/WhenWords`: the watch's relative times as the mockups write them ("just now", "2 min", "3 h", "Yesterday", the
+  weekday, "Nov 3"), in the watch's zone.
+- `Design/WatchContrast`: the WCAG ratio, and a pill's words in whichever of the near-black and the ink reads better on
+  its glass. `WatchTokens` gained `Neutral.Card`, `Neutral.OnGlass`, `Light.Mine` (0.35) and `Icon` (the rim, its
+  stroke, the glow's alpha). `DashOutcome` gained `NoPhone` and `NoAnswer`, the wrist's own outcomes; `WatchIdentity`
+  gained Dash's three registered names (`DashComponents`).
+
+**The kit (`Watch.Ui.Wear`):** `WatchPaints` is public (an app's own views paint the same way) and gained `SizeOf`,
+`Words` (a `TextPaint` in Plex Mono at a token size) and `Rounded`; `WatchFonts` reads IBM Plex Mono from the app's
+`assets/fonts/`, falling back to the family by name for an app that carries none (the installer); `WatchTextView` takes
+a `Weight` and a `Body` (a person's own words: as many lines as they take, never cut, not held to the one-sentence rule,
+since they are not the watch's copy); `WatchPillView` (the pinned action: a capsule of the app's glass, its words in the
+better ink, at least the mockup's height, the view a whole touch target, quiet when disabled); `WatchTimeView` (the
+12-hour time at the top, A37).
+
+**Dash, `Watch/Dash.Wear`** (Post's package, PC1; band 11; android-arm and android-arm64; no permissions of its own;
+not standalone):
+- `PeopleActivity` (registered `…communication.dash.PeopleActivity`, the one launcher entry): the time and Dash's glyph,
+  "Finding who’s waiting." until the first answer, the rows (`PersonRowView`, drawn on the card: the name in the ink when
+  unread and the grey when not, when it came, the line, the unread rule), the faint glyph alone when nobody waits, and
+  a quiet line over the last rows when the phone cannot be asked again. Asked each time the screen comes back.
+- `ConversationActivity` (`…dash.ConversationActivity`): the name, a group's members, "Opening the conversation.",
+  the bubbles (the owner's in Dash's glass at 0.35 on the right, everyone else's on the card on the left), Reply (or
+  Reply to all) pinned at the foot. Once drawn it tells Post `dash/read` through the newest message drawn, once per newer
+  message, and adds a sent reply at once.
+- `ReplyActivity` (`…dash.ReplyActivity`): opens on the system's dictation (`RecognizerIntent`, prompted "To Lee");
+  the words are read back under "To Lee" with Send pinned and Keyboard (the system's wearable input screen) and Again
+  either side; "Sending." while Post carries it; when it went the screen goes and the conversation has the text; when
+  it did not, the quiet line says why ("Your phone can’t send a text right now.", "There’s nobody to send this to.",
+  "The text didn’t go.", "Your phone didn’t answer.", "Your phone isn’t in reach.") and the words stay for Send again.
+  Words and the send's name survive the screen being rebuilt.
+- `PostLink`: finds Post by `post-relay` (reachable, through `RelayNodes`), sends with `DashCodec`, and listens only
+  while an ask waits, registering before the ask goes; matches each answer by `DashExchange`; a refused answer settles
+  every ask on its path as unreadable. Every Data Layer call is bounded (`BoundedAsync`, `WaitAsync`), every ask and
+  tell runs on the pool, and the answer returns to the screen only if it is still there.
+- `DashLog`: one tag; `DashLogLines` lines or plain literals; a failure by its type and frames. `SystemInput`: the two
+  system intents (the wearable input action and extra written out as the platform reads them, not a package).
+- The icon: FaceStudio's `DashIcon` draws the kit's dash in Dash's glass at 4:20 pm (the mockups' hour) on the black
+  disc with its rim, at the five launcher densities, into `Watch/Dash.Wear/Resources/mipmap-*`; committed, held to the
+  tool by `DashIconTests`, and checked by the workflow's `git diff` beside the face.
+
+**CI:** `build-watch.yml`'s `WATCH_HEADS` has Dash's line, the upload and the publish carry its folder, the face step's
+`git diff` covers Dash's icon, and the FONT CHECK reads Dash's three Plex Mono assets back byte for byte (and fails if
+Dash carries none). `SuiteVersionBands` records Dash at band 11 as a watch APK beside Post's phone band.
+
+## Decisions made in this chunk (each the owner's to overturn)
+
+- **Relative times are the mockups' words** ("2 min", "1 h", "Yesterday"), not WD §5's example ("5 min ago") nor the
+  phones' ("2m ago"); the watch's own `WhenWords`, since the watch shares no copy with Paper & Ink (A33).
+- **A pill's words take the ink on Dash's glass.** The mockup labels its pills near-black, which on Dash's navy-to-maroon
+  glass is about 2:1; WD §12 keeps words at 4.5:1, so the label takes whichever of the near-black and the ink reads
+  better at that hour (the ink, for Dash, all day). This differs visibly from the mockup.
+- **The unread rule is drawn,** as the approved People waiting mockup draws it, though WD §1 says "no unread marks"; it
+  is a rule in the app's colour, not a count or a badge.
+- **Dash listens only while it waits.** No `WearableListenerService` and no registered listener name: an answer for a
+  screen that has gone is dropped, and the screen asks again when it comes back. A send whose answer comes after the
+  owner left the reply is not told to them.
+- **A reply opens straight into dictation** (the mockup's "Replying by voice"); Keyboard opens the system's wearable
+  input screen, not a keyboard directly (the keyboard is one choice there). With no dictation on the watch it goes to
+  the keyboard; with neither, a quiet line.
+- **A send with no answer keeps its name** (Post answers it from its book, B2); after an answer it is a new send.
+- **A reply sent here is kept for the process only,** until Post's copy of it comes, matched by the same words within
+  two minutes of the wrist's clock.
+- **A read is told once the conversation is drawn,** through its newest message, as A14 asks.
+- **Group conversations say "Reply to all" and name their senders** (both already on the wire); the photos of
+  W-5.1.3 are not shown.
+- **The icon's colour is Dash's at 4:20 pm,** the hour the mockups were approved at, since an icon cannot follow the
+  day; FaceStudio, the watch's generator, draws it rather than IconStudio (Paper & Ink's).
+- **No Mail entry on People waiting** yet: the mail lines are W-5.1.6.
+
+## Not done, not verified
+
+- **Nothing here has met a watch.** Unverified: Play services finding `post-relay` and delivering both ways between
+  Dash and Post (same package, same signature), the live listener registering in time, `RecognizerIntent` and the
+  `android.support.wearable.input.action.REMOTE_INPUT` screen on Wear OS 6 (the action is the one androidx.wear.input
+  writes; that the platform still answers it is unchecked), the theme's swipe-to-dismiss, the crown scrolling a focused
+  `ScrollView`, Plex Mono loading from assets, `TextClock` at the top, the layout on the 41 mm and 45 mm screens, the
+  rows and bubbles against the mockups on a real round screen, TalkBack, and the first `build-watch.yml` run with Dash
+  (signing, the FONT CHECK's new branch, the publish of `…communication-Signed.watch.apk`). Flyleaf will send Dash to the
+  installer once it is on `watch-latest`; the first install asks once on the wrist.
+- **W-5.1.2 is replies only.** New texts "from the Rolodex or by voice" need the Rolodex from Post (PC6), and no Dash
+  contract carries it yet (`dash/send` already takes numbers); that is a contract to add, with the owner, before the
+  screen.
+- **The waits are chosen, not measured** (5 s, 10 s, 20 s, 80 s), as is the two-minute clock slack.
+- **Not started from release B:** W-5.1.3's photos, W-5.1.4 (filing and deleting with the undo ring), W-5.1.5 (the call
+  note), W-5.1.6 (mail lines), W-5.1.7 (the tile), W-5.1.9 (overnight callers); W-5.1.8 is retired. No buzz yet: the
+  haptic plan (W-1.3.1) is not wired to anything.
+
+## Chunk B4 totals
+
+- `Watch.Tests`: **843 passed, 0 failed.** `Tools/FaceStudio.Tests`: 38 passed. `FocusPhone/Codex.Tests`: 3309 passed.
+  `RepoGuards.Tests`: 452 passed. `Storyworthtelling.Updates.Tests`: 194 passed.
+- `Watch/Dash.Wear`, `Watch/Watch.Ui.Wear` and `Watch/Point.Installer` compile here with 0 warnings and 0 errors.
