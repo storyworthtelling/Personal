@@ -25,6 +25,23 @@ public class PlanningSetupFromRosterTests
     }
 
     [Fact]
+    public void AnAdultNamedTwiceInTheHouseholdIsPlannedOnceAndTheFileStillOpens()
+    {
+        // A household with duplicates (Sam twice) wrote a setup the codec refuses (two adults sharing a name), so the family calendar
+        // never arrived. The first Sam stands for both.
+        var sam = RosterEntry.From(new RosterPerson(new PersonId("sam-2"), "sam", MemberRole.Adult, null, false, null));
+        var roster = HouseholdData.Roster();
+        var doubled = new RosterView(roster.Entries.Append(sam).ToList(), []);
+        var choices = HouseholdData.Choices() with { FamilyCalendarId = "family@example.com" };
+
+        var setup = PlanningSetupFromRoster.Build(doubled, choices).Setup!;
+
+        Assert.Single(setup.Adults, adult => adult.Name.Equals("Sam", StringComparison.OrdinalIgnoreCase));
+        var read = Assert.IsType<HouseholdSetupRead.Configured>(PlanningSetupCodec.Read(PlanningSetupCodec.Write(setup)));
+        Assert.Equal("family@example.com", read.Setup.FamilyCalendarId);
+    }
+
+    [Fact]
     public void ItRoundTripsThroughTheCodec()
     {
         var setup = PlanningSetupFromRoster.Build(HouseholdData.Roster(), HouseholdData.Choices()).Setup!;

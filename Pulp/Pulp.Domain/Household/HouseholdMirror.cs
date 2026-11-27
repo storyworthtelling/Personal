@@ -38,10 +38,11 @@ public static class HouseholdMirror
         }
 
         var view = HouseholdView.Of(document);
+        var ids = KeepingKnownIds(household, view);
         var wanted = new HashSet<ViewerId>();
         foreach (var person in household.People)
         {
-            var id = IdFor(person);
+            var id = ids[person.Id];
             wanted.Add(id);
             var existing = view.Roster?.Viewers.FirstOrDefault(viewer => viewer.Id == id);
             var rules = view.ChildRules.FirstOrDefault(child => child.Child == id);
@@ -93,13 +94,25 @@ public static class HouseholdMirror
         return document;
     }
 
-    /// <summary>The viewers Pulp holds, for the owner's phone to bring into the household once.</summary>
-    public static IReadOnlyList<ImportedPerson> ForImport(HouseholdView view)
+    // A person Pulp never linked (the copy Foreword kept when it cleaned up a duplicate) takes the viewer id of the one viewer of that
+    // name no one else keeps, so their sittings, stars and a child's rules stay theirs.
+    private static Dictionary<string, ViewerId> KeepingKnownIds(HouseholdPeople household, HouseholdView view)
     {
-        ArgumentNullException.ThrowIfNull(view);
-        return (view.Roster?.Viewers ?? [])
-            .Select(viewer => new ImportedPerson(
-                viewer.Id.Value, view.NameOf(viewer.Id), viewer.IsChild, null, false, viewer.IsChild ? null : view.GoogleAccountOf(viewer.Id)))
-            .ToList();
+        var viewers = view.Roster?.Viewers ?? [];
+        var ids = household.People.ToDictionary(person => person.Id, IdFor, StringComparer.Ordinal);
+        var claimed = ids.Values.ToHashSet();
+        foreach (var person in household.People.Where(person => !person.Links.ContainsKey(PeopleApps.Pulp)))
+        {
+            var own = ids[person.Id];
+            var named = viewers.Where(viewer => string.Equals(view.NameOf(viewer.Id), person.Name, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (viewers.All(viewer => viewer.Id != own) && named.Count == 1 && !claimed.Contains(named[0].Id))
+            {
+                claimed.Remove(own);
+                claimed.Add(named[0].Id);
+                ids[person.Id] = named[0].Id;
+            }
+        }
+
+        return ids;
     }
 }

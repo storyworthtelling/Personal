@@ -65,6 +65,18 @@ public class HouseholdMirrorTests
     }
 
     [Fact]
+    public void ADuplicateCleanedUpInForewordKeepsTheRecordsOfTheOneConstitutionKnew()
+    {
+        // Constitution knew Lee as "lee-7"; Foreword removes that copy and keeps one it never linked to Constitution.
+        var document = Mirror(HouseholdDocument.Empty, Suite(null, Sam, Lee));
+        var kept = new HouseholdPerson("p-9f0e", "Lee", false, null, false, null, "lee@example.com");
+
+        document = Mirror(document, Suite(null, Sam, kept));
+
+        Assert.Equal(new PersonId("lee-7"), RosterView.From(document).Entries.Single(entry => entry.Name == "Lee").Id);
+    }
+
+    [Fact]
     public void AnIdConstitutionCannotHoldIsMadeOneItCan()
     {
         var odd = new HouseholdPerson("Juniper Ann", "Juniper", true, null, false, null, null);
@@ -119,22 +131,6 @@ public class HouseholdMirrorTests
     }
 
     [Fact]
-    public void ThePeopleConstitutionHadAreOfferedWithTheirIdsAndBirthdates()
-    {
-        var editor = new RosterEditor(RosterRole.Owner);
-        var document = editor.Save(HouseholdDocument.Empty, new RosterPerson(new PersonId("robin-3"), "Robin", MemberRole.Child, new Birthdate(new DateOnly(2016, 4, 9)), false, null), Next(), "phone-owner").Document;
-        document = editor.Save(document, new RosterPerson(new PersonId("sam-1"), "Sam", MemberRole.Adult, null, true, "sam@example.com"), Next(), "phone-owner").Document;
-
-        var offered = HouseholdMirror.ForImport(document);
-
-        var robin = offered.Single(person => person.Name == "Robin");
-        Assert.Equal("robin-3", robin.LocalId);
-        Assert.True(robin.IsChild);
-        Assert.Equal(new DateOnly(2016, 4, 9), robin.Birthdate);
-        Assert.True(offered.Single(person => person.Name == "Sam").OnPickup);
-    }
-
-    [Fact]
     public void TheWeeksChoicesComeFromTheHouseholdAndThisPhoneKeepsWhoItDeliversFor()
     {
         var rhythm = new HouseholdRhythm
@@ -161,22 +157,5 @@ public class HouseholdMirrorTests
     public void AHouseholdWithNoChildrenSaysSo()
     {
         Assert.True(HouseholdMirror.Choices(Suite(null, Sam), new HouseholdChoices()).NoChildren);
-    }
-
-    [Fact]
-    public void ThisPhonesSetupIsTheRhythmForwordHasNotGot()
-    {
-        var setup = new PlanningSetup([new HouseholdAdult("Sam", "sam@example.com")])
-        {
-            FamilyCalendarId = "family@example.com",
-            Bedtime = new TimeOnly(19, 30),
-            DinnerStart = new TimeOnly(17, 45),
-        };
-
-        var rhythm = HouseholdMirror.Rhythm(setup);
-
-        Assert.Equal("family@example.com", rhythm.FamilyCalendarId);
-        Assert.Equal(new TimeOnly(19, 30), rhythm.Bedtime);
-        Assert.Equal(new TimeOnly(17, 45), rhythm.DinnerStart);
     }
 }

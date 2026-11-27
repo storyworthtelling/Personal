@@ -281,7 +281,8 @@ public static class MauiProgram
                     () => CredentialStore.VaultPassphrase.Length > 0,
                     () => CredentialStore.GoogleAccountEmail.Length > 0,
                     role,
-                    () => DateTimeOffset.UtcNow));
+                    () => DateTimeOffset.UtcNow),
+                Storyworthtelling.People.PeopleFileAccess.Owner);
         });
 
         // The private prayer archive: its own Drive file, encrypted with the same passphrase the

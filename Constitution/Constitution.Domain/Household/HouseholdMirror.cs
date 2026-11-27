@@ -59,8 +59,8 @@ public static class HouseholdMirror
         }
 
         var editor = new RosterEditor(RosterRole.Owner);
-        var wanted = Roster(household);
         var current = HouseholdRecords.Read(document, RosterMaps.Person).Items.ToDictionary(person => person.Id);
+        var wanted = KeepingKnownIds(Roster(household), household, current.Values.ToList());
         foreach (var person in wanted)
         {
             if (!current.TryGetValue(person.Id, out var had) || had != person)
@@ -76,16 +76,6 @@ public static class HouseholdMirror
         }
 
         return document;
-    }
-
-    /// <summary>The people Constitution's own file holds, for the owner's phone to bring into the household once.</summary>
-    public static IReadOnlyList<ImportedPerson> ForImport(HouseholdDocument document)
-    {
-        ArgumentNullException.ThrowIfNull(document);
-        return HouseholdRecords.Read(document, RosterMaps.Person).Items
-            .Select(person => new ImportedPerson(
-                person.Id.Value, person.Name, person.Role == MemberRole.Child, person.Birthdate?.Date, person.OnPickup, person.GoogleAddress))
-            .ToList();
     }
 
     /// <summary>
@@ -126,18 +116,29 @@ public static class HouseholdMirror
         };
     }
 
-    /// <summary>What this phone's setup already knew of the household's rhythm, for the owner's phone to fill Foreword's blanks with once.</summary>
-    public static HouseholdRhythm Rhythm(PlanningSetup? setup) => setup is null
-        ? HouseholdRhythm.None
-        : new HouseholdRhythm
+    // A person Constitution never linked (the copy Foreword kept when it cleaned up a duplicate) takes the id of the one roster person
+    // of that name no one else keeps, so their taste notes, ratings and meal answers stay theirs.
+    private static IReadOnlyList<RosterPerson> KeepingKnownIds(IReadOnlyList<RosterPerson> wanted, HouseholdPeople household, IReadOnlyList<RosterPerson> current)
+    {
+        var claimed = wanted.Select(person => person.Id).ToHashSet();
+        var result = new List<RosterPerson>(wanted.Count);
+        for (var i = 0; i < wanted.Count; i++)
         {
-            FamilyCalendarId = setup.FamilyCalendarId,
-            NoFamilyCalendar = setup.NoFamilyCalendar,
-            DinnerStart = setup.DinnerStart,
-            DinnerLength = setup.DinnerLength,
-            Bedtime = setup.Bedtime,
-            ZoneId = setup.ZoneId,
-        };
+            var person = wanted[i];
+            var linked = household.People[i].Links.ContainsKey(PeopleApps.Constitution);
+            var named = current.Where(had => string.Equals(had.Name, person.Name, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (!linked && !current.Any(had => had.Id == person.Id) && named.Count == 1 && !claimed.Contains(named[0].Id))
+            {
+                claimed.Remove(person.Id);
+                claimed.Add(named[0].Id);
+                person = person with { Id = named[0].Id };
+            }
+
+            result.Add(person);
+        }
+
+        return result;
+    }
 
     private static PersonId? TryId(string value)
     {

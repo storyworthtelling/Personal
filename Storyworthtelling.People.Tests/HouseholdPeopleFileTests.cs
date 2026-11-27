@@ -20,7 +20,8 @@ public class HouseholdPeopleFileTests : IDisposable
     }
 
     private HouseholdPeopleFile File(
-        HouseholdFileRole role = HouseholdFileRole.Owner, bool passphrase = true, bool account = true, string? subfolder = null, FakeDrive? shared = null)
+        HouseholdFileRole role = HouseholdFileRole.Owner, bool passphrase = true, bool account = true, string? subfolder = null, FakeDrive? shared = null,
+        PeopleFileAccess access = PeopleFileAccess.Owner)
     {
         var where = Path.Combine(folder, subfolder ?? "owner");
         var store = new DriveHouseholdStore(shared ?? drive, PeopleFile.FileName, () => passphrase ? Passphrase : string.Empty, () => role == HouseholdFileRole.Owner);
@@ -28,7 +29,71 @@ public class HouseholdPeopleFileTests : IDisposable
             new LocalHouseholdStore(where, "people.json"),
             store,
             new PeopleInstallStore(where),
-            new PeopleFileSeams(() => passphrase, () => account, () => role, () => new DateTimeOffset(2026, 11, 20, 12, 0, 0, TimeSpan.Zero)));
+            new PeopleFileSeams(() => passphrase, () => account, () => role, () => new DateTimeOffset(2026, 11, 20, 12, 0, 0, TimeSpan.Zero)),
+            access);
+    }
+
+    [Fact]
+    public async Task AReaderAppCannotEditEvenOnTheOwnersPhone()
+    {
+        var reader = File(subfolder: "constitution", access: PeopleFileAccess.Reader);
+
+        var edit = await reader.EditAsync((editor, document, next, writer) => editor.Put(document, Household.Sam(), next(), writer), CancellationToken.None);
+
+        Assert.False(reader.CanEdit);
+        Assert.False(edit.Accepted);
+        Assert.Empty(reader.People.People);
+    }
+
+    [Fact]
+    public async Task AReaderAppNeverCreatesTheFile()
+    {
+        var reader = File(subfolder: "constitution", access: PeopleFileAccess.Reader);
+
+        var standing = await reader.SyncAsync(CancellationToken.None);
+
+        Assert.Equal(PeopleFileState.WaitingForShare, standing.State);
+        Assert.Null(drive.Content);
+    }
+
+    [Fact]
+    public async Task AReaderAppTakesForewordsCopyAndWritesNothingBack()
+    {
+        var foreword = File();
+        await foreword.EditAsync((editor, document, next, writer) => editor.Put(document, Household.Sam(), next(), writer), CancellationToken.None);
+        await foreword.EditAsync((editor, document, next, writer) => editor.Put(document, Household.Lee(), next(), writer), CancellationToken.None);
+        await foreword.SyncAsync(CancellationToken.None);
+        var reader = File(subfolder: "constitution", access: PeopleFileAccess.Reader);
+        await reader.SyncAsync(CancellationToken.None);
+
+        // Foreword removes Lee; the reader's copy still has Lee, and must neither keep Lee nor send Lee back.
+        await foreword.EditAsync((editor, document, next, writer) => editor.Remove(document, "lee", next(), writer), CancellationToken.None);
+        await foreword.SyncAsync(CancellationToken.None);
+        var written = drive.Content;
+        var standing = await reader.SyncAsync(CancellationToken.None);
+
+        Assert.Equal(PeopleFileState.Synced, standing.State);
+        Assert.Equal(["Sam"], reader.People.People.Select(person => person.Name));
+        Assert.Equal(written, drive.Content);
+    }
+
+    [Fact]
+    public async Task AReaderAppsStaleCopyNeverReachesDrive()
+    {
+        // A copy this phone kept from before (an old import) holds a person Foreword never had.
+        var stale = File(subfolder: "constitution");
+        await stale.EditAsync((editor, document, next, writer) => editor.Put(document, Household.Robin(), next(), writer), CancellationToken.None);
+        var foreword = File();
+        await foreword.EditAsync((editor, document, next, writer) => editor.Put(document, Household.Sam(), next(), writer), CancellationToken.None);
+        await foreword.SyncAsync(CancellationToken.None);
+        var written = drive.Content;
+
+        var reader = File(subfolder: "constitution", access: PeopleFileAccess.Reader);
+        await reader.ReadAsync(CancellationToken.None);
+        await reader.SyncAsync(CancellationToken.None);
+
+        Assert.Equal(written, drive.Content);
+        Assert.Equal(["Sam"], reader.People.People.Select(person => person.Name));
     }
 
     [Fact]

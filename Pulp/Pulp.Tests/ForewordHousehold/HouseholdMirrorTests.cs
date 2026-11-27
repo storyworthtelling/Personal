@@ -52,6 +52,19 @@ public class HouseholdMirrorTests
     }
 
     [Fact]
+    public void ADuplicateCleanedUpInForewordKeepsTheViewerPulpKnew()
+    {
+        // Pulp knew Sam as "viewer-sam"; Foreword removes that copy and keeps one it never linked to Pulp.
+        var document = Mirror(HouseholdDocument.Empty, Suite(Sam, Robin));
+        var kept = new HouseholdPerson("p-3c1d", "Sam", false, null, true, "sam@example.com", null);
+
+        var view = HouseholdView.Of(Mirror(document, Suite(kept, Robin)));
+
+        Assert.True(view.Roster!.Contains(new ViewerId("viewer-sam")));
+        Assert.False(view.Roster.Contains(new ViewerId("p-3c1d")));
+    }
+
+    [Fact]
     public void AChildArrivesWithTheStrictestRules()
     {
         var view = HouseholdView.Of(Mirror(HouseholdDocument.Empty, Suite(Sam, Robin)));
@@ -120,22 +133,5 @@ public class HouseholdMirrorTests
         var document = Mirror(HouseholdDocument.Empty, Suite(Sam));
 
         Assert.Same(document, Mirror(document, HouseholdPeople.Empty));
-    }
-
-    [Fact]
-    public void ThePeoplePulpHadAreOfferedWithTheirIdsAndAccounts()
-    {
-        var document = PersonEdits.ApplyAll(HouseholdDocument.Empty,
-            PersonEdits.Add(new HouseholdViewer(new ViewerId("v-1"), false), new ViewerNameEntry(new ViewerId("v-1"), "Lee"), null), Next(), "phone-owner");
-        document = PersonEdits.ApplyAll(document,
-            PersonEdits.Add(new HouseholdViewer(new ViewerId("v-2"), true), new ViewerNameEntry(new ViewerId("v-2"), "Robin"), ChildRuleEdits.NewChild(new ViewerId("v-2"))), Next(), "phone-owner");
-        document = HouseholdRecords.Put(document, HouseholdMaps.AdultAccount, new AdultAccountEntry(new ViewerId("v-1"), "lee@example.com"), Next(), "phone-owner");
-
-        var offered = HouseholdMirror.ForImport(HouseholdView.Of(document));
-
-        var lee = offered.Single(person => person.Name == "Lee");
-        Assert.Equal("v-1", lee.LocalId);
-        Assert.Equal("lee@example.com", lee.GoogleAddress);
-        Assert.True(offered.Single(person => person.Name == "Robin").IsChild);
     }
 }

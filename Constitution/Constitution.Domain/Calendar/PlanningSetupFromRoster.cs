@@ -34,7 +34,10 @@ public static class PlanningSetupFromRoster
         ArgumentNullException.ThrowIfNull(roster);
         ArgumentNullException.ThrowIfNull(choices);
 
+        // A name the household holds twice is one adult here: the setup file refuses two adults sharing a name, and a refused file
+        // would leave the week with no calendars at all.
         var adults = roster.Adults
+            .DistinctBy(entry => entry.Name.Trim(), StringComparer.OrdinalIgnoreCase)
             .Select(entry => new HouseholdAdult(
                 entry.Name,
                 CalendarOf(choices, entry.Name),

@@ -16,12 +16,11 @@ namespace Constitution.Household;
 /// The household Foreword owns (<see cref="PeopleFile.FileName"/>), read on this phone. One round
 /// (<see cref="RefreshAsync"/>):
 /// <list type="number">
-/// <item>Meet the household in Drive.</item>
-/// <item>On the owner's phone, bring Constitution's own people and its rhythm into the household once. They are linked by name or kept
-/// under their own ids, so Foreword can take over without anyone being re-entered.</item>
+/// <item>Read the household from Drive. <b>Constitution only reads it</b> (<see cref="PeopleFileAccess.Reader"/>): Foreword owns the
+/// people and the rhythm, and nothing here writes either back.</item>
+/// <item>Make this phone's planning setup the household's, keeping who this phone delivers for.</item>
 /// <item>Mirror the household into Constitution's roster (<see cref="HouseholdMirror"/>, the owner's phone only, since the roster has one
 /// writer).</item>
-/// <item>Make this phone's planning setup the household's, keeping who this phone delivers for.</item>
 /// </list>
 /// It runs after every household pass and at the start of each planning worker. It never throws; a failure is logged by type.
 /// </summary>
@@ -50,7 +49,8 @@ public sealed class ConstitutionPeople
                 () => VaultPassphraseStore.Passphrase,
                 () => HouseholdSync.MayCreateFile(role())),
             new PeopleInstallStore(folder),
-            new PeopleFileSeams(() => VaultPassphraseStore.IsSet, () => VoiceGoogleAccount.IsSignedIn, role, () => DateTimeOffset.UtcNow));
+            new PeopleFileSeams(() => VaultPassphraseStore.IsSet, () => VoiceGoogleAccount.IsSignedIn, role, () => DateTimeOffset.UtcNow),
+            PeopleFileAccess.Reader);
     }
 
     /// <summary>This phone's copy of the household lives here, beside (never inside) Constitution's own household file.</summary>
@@ -78,22 +78,18 @@ public sealed class ConstitutionPeople
             var setup = new HouseholdSetupStore(context, () => service.Roster);
             await File.ReadAsync(cancellationToken);
             var standing = await File.SyncAsync(cancellationToken);
-
-            if (File.CanEdit && standing.State == PeopleFileState.Synced && await JoinTheHouseholdAsync(service, setup, cancellationToken))
-            {
-                standing = await File.SyncAsync(cancellationToken);
-            }
-
             var household = File.People;
+
+            // The week's setup follows first and on its own, so a roster that can't be mirrored never keeps the calendars from arriving.
+            Step("setup", () => setup.FollowHousehold(household));
             if (household.People.Count > 0 && service.RosterRole == RosterRole.Owner && service.BlockedSentence is null)
             {
-                await service.EditAsync(
+                await StepAsync("roster", () => service.EditAsync(
                     (document, clock, writer) => HouseholdMirror.Apply(
                         document, household, () => clock.Now(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), writer),
-                    cancellationToken);
+                    cancellationToken));
             }
 
-            setup.FollowHousehold(household);
             HeadLog.Info(LogTag, $"Household round: {standing.State}, {household.People.Count} people");
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -107,20 +103,27 @@ public sealed class ConstitutionPeople
         }
     }
 
-    // The owner's phone, once: Constitution's own people (with their ids, birthdays and pickup) and the rhythm its setup knew.
-    private async Task<bool> JoinTheHouseholdAsync(
-        Constitution.Infrastructure.Household.HouseholdFileService service, HouseholdSetupStore setup, CancellationToken cancellationToken)
+    private static void Step(string name, Action step)
     {
-        var mine = HouseholdMirror.ForImport(await service.ReadAsync(cancellationToken));
-        var known = HouseholdMirror.Rhythm(setup.Read() is HouseholdSetupRead.Configured configured ? configured.Setup : null);
-        var wrote = false;
-        await File.EditAsync((editor, document, next, writer) =>
+        try
         {
-            var changed = editor.Import(document, PeopleApps.Constitution, mine, next, writer).Document;
-            changed = editor.FillRhythm(changed, known, next(), writer).Document;
-            wrote = !changed.ContentEquals(document);
-            return new PeopleEdit(changed, null);
-        }, cancellationToken);
-        return wrote;
+            step();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            HeadLog.Warn(LogTag, $"The household {name} didn’t follow: " + exception.GetType().Name);
+        }
+    }
+
+    private static async Task StepAsync(string name, Func<Task> step)
+    {
+        try
+        {
+            await step();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            HeadLog.Warn(LogTag, $"The household {name} didn’t follow: " + exception.GetType().Name);
+        }
     }
 }
