@@ -66,6 +66,15 @@ public static class WatchTokens
 
         /// <summary>A ring's empty track; never words.</summary>
         public static Oklch Faint { get; } = new(0.417, 0.016, 238.9);
+
+        /// <summary>
+        /// The card under a row or someone else's message (mock: CARD, hsl 210 10% 11%), as the system's own cards are
+        /// drawn (WD §2): the one grey ground on the watch.
+        /// </summary>
+        public static Oklch Card { get; } = new(0.225, 0.007, 248.1);
+
+        /// <summary>A pill's words on light glass (mock: hsl 0 0% 4%); on dark glass a pill takes the ink (WatchContrast).</summary>
+        public static Oklch OnGlass { get; } = new(0.146, 0, 0);
     }
 
     /// <summary>How much light a part of a glass shape carries (mock: <c>waveLine</c>, <c>edgeMarks</c>), as alpha 0–1.</summary>
@@ -79,6 +88,9 @@ public static class WatchTokens
 
         /// <summary>A glyph with nothing behind it (mock: Tile: nobody waiting).</summary>
         public const double Quiet = 0.35;
+
+        /// <summary>The owner's own message, in the app's quieter glass (mock: A conversation, the day colour at 0.35).</summary>
+        public const double Mine = 0.35;
     }
 
     /// <summary>

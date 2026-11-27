@@ -161,6 +161,26 @@ public class WatchInvariantsTests
         Assert.Equal("acts", WatchIdentity.DashActsKey);
     }
 
+    private static readonly string[] ExpectedDashComponents =
+    [
+        "com.storyworthtelling.focusphone.communication.dash.PeopleActivity",
+        "com.storyworthtelling.focusphone.communication.dash.ConversationActivity",
+        "com.storyworthtelling.focusphone.communication.dash.ReplyActivity",
+    ];
+
+    [Fact]
+    public void DashsNamesAreFrozen()
+    {
+        // Dash on the watch (P14 B4): the launcher, and later the People waiting tile (W-5.1.7), open a screen by its
+        // registered name, so a moved class opens nothing.
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.PeopleActivity", WatchIdentity.DashPeopleActivityName);
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.ConversationActivity", WatchIdentity.DashConversationActivityName);
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.ReplyActivity", WatchIdentity.DashReplyActivityName);
+        Assert.Equal(ExpectedDashComponents, WatchIdentity.DashComponents);
+        Assert.All(WatchIdentity.DashComponents, name => Assert.StartsWith(WatchIdentity.DashPackage + ".dash.", name, StringComparison.Ordinal));
+        Assert.DoesNotContain(WatchIdentity.DashListenerName, WatchIdentity.DashComponents);
+    }
+
     [Fact]
     public void TheInstallerAdvertisesItsCapability()
     {

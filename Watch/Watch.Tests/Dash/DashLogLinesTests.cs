@@ -121,6 +121,16 @@ public class DashLogLinesTests
     }
 
     [Fact]
+    public void TheWristSaysWhatWentMissing()
+    {
+        // Dash's half (B4): no phone carrying the relay was within reach, or the phone did not answer within the wrist's
+        // wait. Each by its contract only, so a missed conversation names no key.
+        Assert.Equal("DASH dash/people: NoPhone", DashLogLines.Outcome(WatchIdentity.DashPeoplePath, DashOutcome.NoPhone));
+        Assert.Equal("DASH dash/thread: NoAnswer", DashLogLines.Outcome(WatchIdentity.DashThreadPath, DashOutcome.NoAnswer));
+        Assert.Equal("DASH dash/send: NoAnswer", DashLogLines.Outcome(WatchIdentity.DashSendPath, DashOutcome.NoAnswer));
+    }
+
+    [Fact]
     public void TheContractIsThePathWithoutItsSlash()
     {
         Assert.Equal("dash/call-note", DashLogLines.Contract(WatchIdentity.DashCallNotePath));

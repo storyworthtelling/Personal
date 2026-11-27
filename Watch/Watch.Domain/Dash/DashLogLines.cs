@@ -9,7 +9,7 @@ public enum DashEnd
     Dash,
 }
 
-/// <summary>What Post did with a message from the wrist, or what it answered.</summary>
+/// <summary>What Post did with a message from the wrist, or what it answered; and, on the wrist, what went missing.</summary>
 public enum DashOutcome
 {
     /// <summary>People waiting, a conversation or the mail lines were answered.</summary>
@@ -53,6 +53,12 @@ public enum DashOutcome
 
     /// <summary>An answer the wrist did not take: dropped and counted, never queued or tried again.</summary>
     Unreached,
+
+    /// <summary>The wrist found no phone carrying Post's relay within reach (B4): its ask went nowhere.</summary>
+    NoPhone,
+
+    /// <summary>The wrist asked and the phone did not answer within the wrist's wait (B4).</summary>
+    NoAnswer,
 }
 
 /// <summary>

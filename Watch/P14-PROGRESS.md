@@ -1893,3 +1893,26 @@ Asked in B3's report, answered by the owner: keep the passphrase off the watch. 
 W-5.1.8 (Dash's first-run passphrase screen) and the plan's `PassphraseKeptInKeystoreOnly`;
 `TheWatchHoldsNoVaultTests` is the standing guard. The plan (§0.3, §2.4, W-4.1.2, W-5.1.8) and `WATCH-DESIGN.md`
 are updated; the retired mockup screen in `design/screens-r1.html` is left as drawn, superseded by this ruling.
+
+# Chunk B4 · Dash on the watch: People waiting, a conversation, a reply (W-5.1.1, W-5.1.2)
+
+Every figure below is from a real run on 27 Nov 2026. As before, each red run was taken with the tests written and the
+new code present only as stubs: methods threw `NotImplementedException`, new constants were empty strings or zero, and
+the two new `DashOutcome` members existed so the tests compiled. (A first attempt at B4 was lost with its container;
+nothing of it survived, and this chunk started clean.)
+
+## Red 1 · the pure half (Watch.Domain)
+
+- **`Watch.Tests`: 822 tests, 95 failed, 727 passed** (B3's 724 and three that pass on the stubs: `TheWristSaysWhatWentMissing`,
+  whose two members had to exist to compile and whose shape is B1's `Outcome`, and `ThePillsSitInsideTheCircle` and
+  `TheQuieterChoicesSitInsideTheCircle`, which the zero stubs pass by putting every point at (1, 0), on the circle's
+  edge). The 95: `ConversationTests` 19, `DashExchangeTests` 18, `SendAttemptTests` 12, `WhenWordsTests` 12,
+  `DashWordsTests` 9, `NeutralTokensTests` 6, `PeopleWaitingTests` 6, `RelayNodesTests` 6, `DashLayoutTests` 6,
+  `WatchInvariantsTests.DashsNamesAreFrozen` 1. First errors: `NotImplementedException` 82, `Assert.True() Failure` 4,
+  `Strings differ` 2, "A box at (0, 0) of 0 by 0 runs off the round screen" 2, `Values are not within 9 decimal places` 2,
+  and one each of `Assert.Throws() Failure: Exception type was not an exact match`, `Assert.InRange() Failure` and
+  `Values differ`.
+- **On the way to green:** 822 with 1 failed, `AnOlderTextWithTheSameWordsIsNotTheOneSentHere`: a reply sent here was
+  matched to the owner's own text five minutes older, since the slack for the phone's clock was five minutes and the
+  match included its edge. The slack is now two minutes (`Conversation.ClockSlack`).
+- **Green: `Watch.Tests` 822 passed, 0 failed.**

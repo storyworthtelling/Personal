@@ -1,0 +1,113 @@
+using Watch.Domain;
+using Watch.Domain.Dash;
+using static Watch.Tests.Dash.DashFixtures;
+
+namespace Watch.Tests.Dash;
+
+/// <summary>
+/// How the wrist knows which of Post's answers is the one it asked for (W-5.1.1, W-5.1.2): Post answers on the path it
+/// was asked on, once (B2), so People waiting is answered by people, a conversation by its own key, a send by its own id;
+/// a read is told and answered by nothing. Every wait is bounded, and a send waits out Post's whole turn.
+/// </summary>
+public class DashExchangeTests
+{
+    [Fact]
+    public void AnAnswerFindsItsAsk()
+    {
+        Assert.Equal(DashExchange.Awaits(new DashPeopleAsk()), DashExchange.Answers(People));
+        Assert.Equal(DashExchange.Awaits(new DashPeopleAsk()), DashExchange.Answers(new DashPeople([])));
+        Assert.Equal(DashExchange.Awaits(new DashMailAsk()), DashExchange.Answers(Messages["mail"]));
+        Assert.NotNull(DashExchange.Awaits(new DashPeopleAsk()));
+    }
+
+    [Fact]
+    public void AConversationIsAnsweredOnlyForItsKey()
+    {
+        var asked = DashExchange.Awaits(new DashThreadAsk(GroupKey));
+
+        Assert.Equal(asked, DashExchange.Answers(GroupThread));
+        Assert.NotEqual(asked, DashExchange.Answers(Messages["person's thread"]));
+        Assert.NotEqual(asked, DashExchange.Answers(People));
+    }
+
+    [Fact]
+    public void ASendIsAnsweredByItsId()
+    {
+        var asked = DashExchange.Awaits(new DashSend("send-1", LeeKey, [], "On my way."));
+
+        Assert.Equal(asked, DashExchange.Answers(new DashSent("send-1", DashSendOutcome.Failed)));
+        Assert.NotEqual(asked, DashExchange.Answers(new DashSent("send-2", DashSendOutcome.Sent)));
+    }
+
+    [Theory]
+    [InlineData("read")]
+    [InlineData("file a correspondence")]
+    [InlineData("delete a message")]
+    [InlineData("undo")]
+    [InlineData("note on a call")]
+    public void ATellWaitsForNothing(string name) => Assert.Null(DashExchange.Awaits(Messages[name]));
+
+    [Theory]
+    [InlineData("people ask")]
+    [InlineData("thread ask")]
+    [InlineData("mail ask")]
+    [InlineData("reply")]
+    [InlineData("read")]
+    public void WhatTheWristSendsIsNoAnswer(string name) => Assert.Null(DashExchange.Answers(Messages[name]));
+
+    [Fact]
+    public void AnAnswerIsOnTheAsksPath()
+    {
+        foreach (var (asked, answer) in new (DashMessage, DashMessage)[]
+        {
+            (new DashPeopleAsk(), People),
+            (new DashThreadAsk(GroupKey), GroupThread),
+            (new DashSend("send-1", LeeKey, [], "On my way."), new DashSent("send-1", DashSendOutcome.Sent)),
+            (new DashMailAsk(), Messages["mail"]),
+        })
+        {
+            Assert.Equal(asked.Path, DashExchange.Awaits(asked)!.Value.Path);
+            Assert.Equal(answer.Path, DashExchange.Answers(answer)!.Value.Path);
+        }
+    }
+
+    [Fact]
+    public void ARefusalReachesEveryAskOnItsPath()
+    {
+        var people = DashExchange.Awaits(new DashPeopleAsk())!.Value;
+        var thread = DashExchange.Awaits(new DashThreadAsk(LeeKey))!.Value;
+
+        Assert.True(people.IsOn(WatchIdentity.DashPeoplePath));
+        Assert.False(thread.IsOn(WatchIdentity.DashPeoplePath));
+        Assert.True(thread.IsOn(WatchIdentity.DashThreadPath));
+    }
+
+    [Fact]
+    public void ASendWaitsOutPostsWholeTurn()
+    {
+        // Post carries a send out inside a turn of 60 s and waits 15 s for its answer to land (B2's DashReplies).
+        Assert.True(DashExchange.WaitFor(Messages["reply"]) >= TimeSpan.FromSeconds(75));
+        Assert.True(DashExchange.WaitFor(new DashPeopleAsk()) < DashExchange.WaitFor(Messages["reply"]));
+    }
+
+    [Fact]
+    public void EveryWaitIsBounded()
+    {
+        TimeSpan[] waits =
+        [
+            DashWaits.Find, DashWaits.Deliver, DashWaits.Answer, DashWaits.SendAnswer,
+            DashExchange.WaitFor(new DashPeopleAsk()), DashExchange.WaitFor(Messages["reply"]),
+        ];
+
+        Assert.All(waits, wait => Assert.InRange(wait, TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(2)));
+    }
+
+    [Fact]
+    public void TheWaitsAreTheDecidedOnes()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(5), DashWaits.Find);
+        Assert.Equal(TimeSpan.FromSeconds(10), DashWaits.Deliver);
+        Assert.Equal(TimeSpan.FromSeconds(20), DashWaits.Answer);
+        Assert.Equal(TimeSpan.FromSeconds(80), DashWaits.SendAnswer);
+    }
+}

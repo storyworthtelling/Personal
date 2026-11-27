@@ -98,6 +98,19 @@ public static class WatchIdentity
     /// <summary>The book of the wrist's acts, so a duplicated act stays done once across a restart.</summary>
     public const string DashActsKey = "acts";
 
+    // ---- Dash's registered names (P14 B4): the watch app's screens, opened by these names ----
+
+    /// <summary>People waiting, Dash's first screen and its launcher entry (A14); the People waiting tile opens it too.</summary>
+    public const string DashPeopleActivityName = "com.storyworthtelling.focusphone.communication.dash.PeopleActivity";
+
+    /// <summary>One conversation.</summary>
+    public const string DashConversationActivityName = "com.storyworthtelling.focusphone.communication.dash.ConversationActivity";
+
+    /// <summary>A reply read back before it is sent.</summary>
+    public const string DashReplyActivityName = "com.storyworthtelling.focusphone.communication.dash.ReplyActivity";
+
+    public static readonly IReadOnlyList<string> DashComponents = [DashPeopleActivityName, DashConversationActivityName, DashReplyActivityName];
+
     // ---- the installer's registered names ----
 
     public const string UpdateListenerName = "com.storyworthtelling.focusphone.launcher.point.UpdateListenerService";
