@@ -131,6 +131,9 @@ public static class DashLayout
 
     // ---- B6: New text, at the foot of People waiting where the mockup draws Mail ----
 
-    /// <summary>The centre of the entry under <paramref name="rows"/> rows: a row's pitch under the last.</summary>
-    public static double EntryCentre(int rows) => FirstRow + Math.Max(0, rows) * RowPitch;
+    /// <summary>
+    /// The gap above New text: it follows the last row as the rows follow each other, so a row's height of it is centred a
+    /// row's pitch under the last row, where the mockup draws Mail (no mockup draws New text).
+    /// </summary>
+    public const double EntryGap = RowPitch - RowHeight;
 }

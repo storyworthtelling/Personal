@@ -15,8 +15,9 @@ namespace Dash.Wear;
 /// People waiting, Dash's first screen (W-5.1.1, A14; mock: People waiting): the time and Dash's glyph at the top, then
 /// Post's waiting correspondences, newest first, each a name and one line. Asked of the phone each time the screen
 /// comes back, and said as a status sentence while it is on its way; nobody waiting is the faint glyph and nothing
-/// else (mock: nobody waiting). A tap opens the conversation; a long press offers to file or delete it, undo-first
-/// (W-5.1.4, <see cref="ActActivity"/>), and a row whose act stands leaves at once, before the phone is asked again.
+/// else (mock: nobody waiting) but New text. A tap opens the conversation; a long press offers to file or delete it,
+/// undo-first (W-5.1.4, <see cref="ActActivity"/>), and a row whose act stands leaves at once, before the phone is asked
+/// again. New text, at the foot where the mockup draws Mail, opens the Rolodex (W-5.1.2, B6; <see cref="RolodexActivity"/>).
 /// </summary>
 [Activity(Name = WatchIdentity.DashPeopleActivityName, MainLauncher = true, Exported = true, Icon = "@mipmap/ic_launcher")]
 public sealed class PeopleActivity : Activity
@@ -27,6 +28,7 @@ public sealed class PeopleActivity : Activity
     private const int ActRequest = 1;
 
     private LinearLayout rows = null!;
+    private WatchTextView newText = null!;
     private bool drawn;
     private IReadOnlyList<PersonRow> shown = [];
 
@@ -43,6 +45,17 @@ public sealed class PeopleActivity : Activity
         rows = new LinearLayout(this) { Orientation = Orientation.Vertical };
         var firstTop = DashLayout.FirstRow - DashLayout.RowHeight / 2 - DashLayout.GlyphTop - DashLayout.GlyphSide;
         frame.Column.AddView(rows, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = round.Px(firstTop) });
+
+        // A new text (W-5.1.2, B6) starts at the foot, where the mockup draws Mail, and is there with nobody waiting too.
+        newText = Screens.Choice(this, DashWords.NewText);
+        newText.Weight = WatchWeight.Medium;
+        newText.Click += (_, _) => StartActivity(RolodexActivity.For(this));
+        var target = (int)Math.Ceiling(WatchPaints.TouchTarget(this));
+        frame.Column.AddView(newText, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, target)
+        {
+            Gravity = GravityFlags.CenterHorizontal,
+            TopMargin = round.Px(DashLayout.EntryGap),
+        });
     }
 
     protected override void OnResume()

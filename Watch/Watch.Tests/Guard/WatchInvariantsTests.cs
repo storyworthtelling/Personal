@@ -419,6 +419,7 @@ public class WatchInvariantsTests
     [InlineData("DashConversationActivityName")]
     [InlineData("DashReplyActivityName")]
     [InlineData("DashActActivityName")]
+    [InlineData("DashRolodexActivityName")]
     public void EachDashScreenIsRegisteredByItsName(string constant)
     {
         var registered = DashSources().Count(path => File.ReadAllText(path).Contains($"Name = WatchIdentity.{constant}", StringComparison.Ordinal));
@@ -548,7 +549,7 @@ public class WatchInvariantsTests
     {
         // Every ask and tell a screen makes runs on the pool, and only its answer comes back to the screen.
         var screens = DashSources().Where(path => Path.GetFileName(path).EndsWith("Activity.cs", StringComparison.Ordinal)).ToList();
-        Assert.Equal(4, screens.Count);
+        Assert.Equal(5, screens.Count);
 
         var calls = screens.SelectMany(path => Code(path).Split('\n').Where(line => Regex.IsMatch(line, @"\.(AskAsync|TellAsync)\(")).Select(line => (Path: Path.GetFileName(path), Line: line))).ToList();
         Assert.NotEmpty(calls);
@@ -649,6 +650,69 @@ public class WatchInvariantsTests
         var decoding = Regex.Match(photo, @"Task\.Run\((?<body>[\s\S]*?)\);");
         Assert.True(decoding.Success && decoding.Groups["body"].Value.Contains("BitmapFactory.DecodeByteArray(", StringComparison.Ordinal),
             "A photo is decoded on the main thread.");
+    }
+
+    [Fact]
+    public void DashStartsNewTextsFromTheRolodex()
+    {
+        // W-5.1.2, B6: New text sits at People waiting's foot where the mockup draws Mail; the Rolodex is gathered from the
+        // phone a page at a time on the pool, held for the session, searched by a name typed or said through the system's
+        // input, or scrolled; a contact picked goes to the reply screen, which sends a new text to the contact's id.
+        var people = Code(Dash("PeopleActivity.cs"));
+        var rolodex = Code(Dash("RolodexActivity.cs"));
+        var carrier = Code(Dash("RolodexCarrier.cs"));
+        var reply = Code(Dash("ReplyActivity.cs"));
+
+        Assert.Contains("DashWords.NewText", people, StringComparison.Ordinal);
+        Assert.Contains("RolodexActivity.For(", people, StringComparison.Ordinal);
+        Assert.Contains("DashLayout.EntryGap", people, StringComparison.Ordinal);
+
+        Assert.Contains("Task.Run(() => RolodexCarrier.FetchAsync(", rolodex, StringComparison.Ordinal);
+        Assert.Contains("RolodexBook.Held", rolodex, StringComparison.Ordinal);
+        Assert.Contains(".Find(query)", rolodex, StringComparison.Ordinal);
+        Assert.Contains("SystemInput.Dictation(this, DashWords.WhoTo)", rolodex, StringComparison.Ordinal);
+        Assert.Contains("SystemInput.Keyboard(this, DashWords.WhoTo)", rolodex, StringComparison.Ordinal);
+        Assert.Contains("ReplyActivity.For(this, contact.Id, contact.Name)", rolodex, StringComparison.Ordinal);
+        foreach (var words in new[] { "DashWords.OpeningContacts", "DashWords.NoContacts", "DashWords.NoOneByThatName", "DashWords.SayAName", "DashWords.Everyone" })
+        {
+            Assert.Contains(words, rolodex, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("RolodexGathering.GatherAsync(", carrier, StringComparison.Ordinal);
+        Assert.Contains("PostLink.Shared.AskAsync(", carrier, StringComparison.Ordinal);
+        Assert.DoesNotContain("Activity", carrier, StringComparison.Ordinal);
+
+        Assert.Contains("SendAttempt.NewText(", reply, StringComparison.Ordinal);
+        Assert.Contains("DashIds.IsContact(", reply, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheWristHoldsTheRolodexInMemoryOnly()
+    {
+        // The brief: the watch holds the Rolodex in memory only for the session. Nothing in Dash writes anything down, and
+        // a Rolodex screen rebuilt keeps only the owner's own search, never a contact.
+        var code = DashCode();
+        foreach (var store in new[] { "GetSharedPreferences", "OpenFileOutput", "FilesDir", "CacheDir", "File.Write", "Sqlite", "PersistableBundle" })
+        {
+            Assert.DoesNotContain(store, code, StringComparison.Ordinal);
+        }
+
+        var rolodex = Code(Dash("RolodexActivity.cs"));
+        var saving = Regex.Match(rolodex, @"protected override void OnSaveInstanceState\(Bundle outState\)\s*\{(?<body>[\s\S]*?)\n    \}");
+        Assert.True(saving.Success, "The Rolodex screen keeps nothing across a rebuild.");
+        Assert.Equal(["DashExtras.Query"], Regex.Matches(saving.Groups["body"].Value, @"DashExtras\.\w+").Select(match => match.Value));
+    }
+
+    [Fact]
+    public void TheWristNeverSendsANumber()
+    {
+        // The owner's ruling (B6): the wrist is handed no number, so it sends none; every text from it is a SendAttempt,
+        // a reply into a correspondence or a new text to a contact's id.
+        var code = DashCode();
+
+        Assert.DoesNotContain("new DashSend(", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("new DashCallNote(", code, StringComparison.Ordinal);
+        Assert.Contains("attempt.Message", code, StringComparison.Ordinal);
     }
 
     [Fact]

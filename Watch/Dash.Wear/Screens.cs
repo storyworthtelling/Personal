@@ -118,6 +118,24 @@ internal static class Screens
             TaskContinuationOptions.None,
             TaskScheduler.Default);
 
+    /// <summary>The Rolodex gathered on the pool (B6), back on the screen's own thread, if the screen is still there.</summary>
+    public static void WhenFetched(Activity screen, Task<RolodexFetch> fetching, Action<RolodexFetch> show) =>
+        fetching.ContinueWith(
+            done =>
+            {
+                var fetch = done.IsFaulted ? Unfetched(done.Exception!) : done.Result;
+                screen.RunOnUiThread(() =>
+                {
+                    if (!screen.IsFinishing && !screen.IsDestroyed)
+                    {
+                        show(fetch);
+                    }
+                });
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.None,
+            TaskScheduler.Default);
+
     /// <summary>Work on the pool that the screen draws after, back on the screen's own thread, if the screen is still there.</summary>
     public static void WhenDone(Activity screen, Task working, Action then) =>
         working.ContinueWith(
@@ -146,6 +164,13 @@ internal static class Screens
             CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted,
             TaskScheduler.Default);
+
+    // The same for a gathering of the Rolodex.
+    private static RolodexFetch Unfetched(AggregateException failure)
+    {
+        DashLog.Quiet("DASH gathering the contacts stopped", failure.GetBaseException());
+        return new RolodexFetch(null, DashTrouble.NoAnswer);
+    }
 
     // Anything the link did not foresee: logged by its shape, and said as no answer.
     private static DashReply Stopped(AggregateException failure)

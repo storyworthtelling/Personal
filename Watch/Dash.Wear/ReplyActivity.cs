@@ -17,6 +17,10 @@ namespace Dash.Wear;
 ///
 /// <para>A send with no answer is sent again under the same name, so Post answers it from its book and never sends a
 /// text twice; once Post has answered, trying again is a new send (<see cref="SendAttempt.Again"/>).</para>
+///
+/// <para>A new text from the Rolodex (B6) is the same screen, opened on a contact's id rather than a correspondence's
+/// key: "To Lee" over the words, and Post finds Lee's number on the phone. When it went, the screen goes, and so does
+/// the Rolodex behind it.</para>
 /// </summary>
 [Activity(Name = WatchIdentity.DashReplyActivityName, Exported = false)]
 public sealed class ReplyActivity : Activity
@@ -52,9 +56,9 @@ public sealed class ReplyActivity : Activity
         base.OnCreate(savedInstanceState);
         key = Intent?.GetStringExtra(DashExtras.Key) ?? string.Empty;
         title = Intent?.GetStringExtra(DashExtras.Title) ?? string.Empty;
-        if (!DashIds.IsCorrespondence(key))
+        if (!DashIds.IsCorrespondence(key) && !DashIds.IsContact(key))
         {
-            DashLog.Warn("DASH a reply was opened with no correspondence");
+            DashLog.Warn("DASH a reply was opened with no correspondence or contact");
             key = string.Empty;
             Finish();
             return;
@@ -159,7 +163,8 @@ public sealed class ReplyActivity : Activity
             return;
         }
 
-        attempt = attempt?.Again(heard, Guid.NewGuid()) ?? SendAttempt.Reply(key, words, Guid.NewGuid());
+        attempt = attempt?.Again(heard, Guid.NewGuid())
+            ?? (DashIds.IsContact(key) ? SendAttempt.NewText(key, words, Guid.NewGuid()) : SendAttempt.Reply(key, words, Guid.NewGuid()));
         sending = true;
         send.Enabled = false;
         Screens.Say(frame.Status, DashWords.Sending);

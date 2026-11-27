@@ -119,10 +119,13 @@ public class DashLayoutTests
     [Fact]
     public void NewTextSitsWhereTheMockupDrawsMail()
     {
-        // mock: People waiting draws "Mail" a row's pitch under its third row, at 1.7 of the radius.
-        Assert.Equal(1.7, DashLayout.EntryCentre(3), 9);
-        Assert.Equal(DashLayout.FirstRow, DashLayout.EntryCentre(0), 9);
-        Assert.True(Inside(1, DashLayout.EntryCentre(3)));
-        Assert.True(DashLayout.EntryCentre(1) - DashLayout.RowHeight / 2 > DashLayout.FirstRow + DashLayout.RowHeight / 2);
+        // mock: People waiting draws "Mail" a row's pitch under its third row, at 1.7 of the radius: a row's height of
+        // entry, the gap under the third row, is centred there.
+        var thirdRowFoot = DashLayout.FirstRow + 2 * DashLayout.RowPitch + DashLayout.RowHeight / 2;
+        var centre = thirdRowFoot + DashLayout.EntryGap + DashLayout.RowHeight / 2;
+
+        Assert.Equal(1.7, centre, 9);
+        Assert.True(Inside(1, centre));
+        Assert.True(DashLayout.EntryGap > 0);
     }
 }

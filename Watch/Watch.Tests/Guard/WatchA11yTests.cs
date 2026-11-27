@@ -12,7 +12,7 @@ public partial class WatchA11yTests
     private static readonly string[] Kit = ["WaveView", "DashGlyphView", "RingView", "UndoRingView", "WatchTextView", "WatchPillView"];
 
     // Dash's own drawn views (P14 B4): the rule reads the apps as well as the kit.
-    private static readonly string[] DashViews = ["PersonRowView", "PhotoView"];
+    private static readonly string[] DashViews = ["PersonRowView", "PhotoView", "ContactRowView"];
 
     [Fact]
     public void TheGuardSeesTheKit()
