@@ -29,6 +29,7 @@ namespace Post;
 [IntentFilter([MessageClient.ActionMessageReceived], DataScheme = "wear", DataHost = "*", DataPath = WatchIdentity.DashCallNotePath)]
 [IntentFilter([MessageClient.ActionMessageReceived], DataScheme = "wear", DataHost = "*", DataPath = WatchIdentity.DashMailPath)]
 [IntentFilter([MessageClient.ActionMessageReceived], DataScheme = "wear", DataHost = "*", DataPath = WatchIdentity.DashPhotoPath)]
+[IntentFilter([MessageClient.ActionMessageReceived], DataScheme = "wear", DataHost = "*", DataPath = WatchIdentity.DashRolodexPath)]
 public sealed class DashListener : WearableListenerService
 {
     private const string Tag = "Dash";  // not copy: a log tag

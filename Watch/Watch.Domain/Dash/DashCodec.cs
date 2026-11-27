@@ -6,7 +6,8 @@ namespace Watch.Domain.Dash;
 
 /// <summary>
 /// Dash's message codec (plan §2.5): UTF-8 JSON with an integer <c>v</c> and a <c>kind</c>, one shape per contract. A
-/// photo's JPEG crosses as base64 in its own message (<c>dash/photo</c>, B5), refused unless it is a JPEG within its budget.
+/// photo's JPEG crosses as base64 in its own message (<c>dash/photo</c>, B5), refused unless it is a JPEG within its budget;
+/// the Rolodex a page at a time (<c>dash/rolodex</c>, B6), each contact refused unless it is an id and a name alone.
 /// A message is read for the path it arrived on, so an ask on <c>dash/thread</c> is never taken for one on
 /// <c>dash/people</c>. A newer <c>v</c> is refused before anything else is read; a missing, mistyped, over-long or
 /// out-of-place field refuses the whole message.
@@ -31,6 +32,7 @@ public static class DashCodec
     public const string NoteKind = "note";
     public const string MailKind = "mail";
     public const string PhotoKind = "photo";
+    public const string RolodexKind = "rolodex";
 
     // Wire words, frozen: the fields.
     public const string PeopleField = "people";
@@ -60,6 +62,11 @@ public static class DashCodec
     public const string MailField = "mail";
     public const string SubjectField = "subject";
     public const string JpegField = "jpeg";
+    public const string PageField = "page";
+    public const string PagesField = "pages";
+    public const string EditionField = "edition";
+    public const string ContactsField = "contacts";
+    public const string ContactField = "contact";
 
     // Wire words, frozen, in each enum's order.
     private static readonly string[] MessageTypeWords = ["text", "call", "voicemail", "note"];
@@ -101,6 +108,7 @@ public static class DashCodec
                     writer.WriteString(KindField, SendKind);
                     writer.WriteString(IdField, send.Id);
                     WriteTarget(writer, send.Key, ToField, send.To);
+                    WriteOptional(writer, ContactField, send.Contact);
                     writer.WriteString(TextField, send.Text);
                     break;
                 case DashSent sent:
@@ -141,6 +149,14 @@ public static class DashCodec
                     writer.WriteString(KindField, PhotoKind);
                     writer.WriteString(IdField, photo.Id);
                     writer.WriteBase64String(JpegField, photo.Jpeg);
+                    break;
+                case DashRolodexAsk ask:
+                    writer.WriteString(KindField, AskKind);
+                    writer.WriteNumber(PageField, ask.Page);
+                    break;
+                case DashRolodex rolodex:
+                    writer.WriteString(KindField, RolodexKind);
+                    WriteRolodex(writer, rolodex);
                     break;
                 default:
                     throw new ArgumentException($"{message.GetType().Name} is not a Dash message.", nameof(message));
@@ -266,6 +282,23 @@ public static class DashCodec
         writer.WriteEndArray();
     }
 
+    private static void WriteRolodex(Utf8JsonWriter writer, DashRolodex rolodex)
+    {
+        writer.WriteNumber(PageField, rolodex.Page);
+        writer.WriteNumber(PagesField, rolodex.Pages);
+        writer.WriteString(EditionField, rolodex.Edition);
+        writer.WritePropertyName(ContactsField);
+        writer.WriteStartArray();
+        foreach (var contact in rolodex.Contacts)
+        {
+            writer.WriteStartObject();
+            writer.WriteString(IdField, contact.Id);
+            writer.WriteString(NameField, contact.Name);
+            writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
+    }
+
     private static void WriteAct(Utf8JsonWriter writer, string kind, string id, string? key, IReadOnlyList<string> messages, TimeSpan window)
     {
         writer.WriteString(KindField, kind);
@@ -322,6 +355,8 @@ public static class DashCodec
         (WatchIdentity.DashMailPath, MailKind) => ReadMail(root),
         (WatchIdentity.DashPhotoPath, AskKind) => Id(root, IdField, DashIds.IsAttachment, out var photo) ? new DashPhotoAsk(photo) : null,
         (WatchIdentity.DashPhotoPath, PhotoKind) => ReadPhoto(root),
+        (WatchIdentity.DashRolodexPath, AskKind) => Count(root, PageField, out var page) && page < DashLimits.RolodexPages ? new DashRolodexAsk(page) : null,
+        (WatchIdentity.DashRolodexPath, RolodexKind) => ReadRolodex(root),
         _ => null,
     };
 
@@ -394,12 +429,13 @@ public static class DashCodec
         if (!Id(root, IdField, DashIds.IsAct, out var id)
             || !OptionalId(root, KeyField, DashIds.IsCorrespondence, out var key)
             || !OptionalStrings(root, ToField, DashLimits.Recipients, DashLimits.Number, out var to)
+            || !OptionalId(root, ContactField, DashIds.IsContact, out var contact)
             || !Words(root, TextField, DashLimits.SendText, out var text)
-            || (key is null) == (to.Count == 0))
+            || (key is null ? 0 : 1) + (to.Count == 0 ? 0 : 1) + (contact is null ? 0 : 1) != 1)
         {
             return null;
         }
-        return new DashSend(id, key, to, text);
+        return new DashSend(id, key, to, text) { Contact = contact };
     }
 
     private static DashSent? ReadResult(JsonElement root) =>
@@ -474,6 +510,34 @@ public static class DashCodec
         return new DashPhoto(id, jpeg);
     }
 
+    // A page of the Rolodex: its number among its pages, its edition, and each contact its id and name and nothing else,
+    // so a number or an address beside a name refuses the whole page rather than reaching the wrist (B6).
+    private static DashRolodex? ReadRolodex(JsonElement root)
+    {
+        if (!Count(root, PageField, out var page)
+            || !Count(root, PagesField, out var pages)
+            || pages < 1 || pages > DashLimits.RolodexPages || page >= pages
+            || !Id(root, EditionField, DashIds.IsEdition, out var edition)
+            || !Items(root, ContactsField, DashLimits.RolodexPage, out var entries))
+        {
+            return null;
+        }
+
+        var contacts = new List<DashContact>();
+        foreach (var entry in entries)
+        {
+            if (entry.ValueKind != JsonValueKind.Object
+                || entry.EnumerateObject().Count() != 2
+                || !Id(entry, IdField, DashIds.IsContact, out var id)
+                || !Text(entry, NameField, DashLimits.Name, out var name))
+            {
+                return null;
+            }
+            contacts.Add(new DashContact(id, name));
+        }
+        return new DashRolodex(page, pages, edition, contacts);
+    }
+
     // ---- fields ----
 
     private static bool Text(JsonElement element, string field, int longest, out string value, bool mayBeEmpty = false)
@@ -538,6 +602,13 @@ public static class DashCodec
         }
         value = DateTimeOffset.FromUnixTimeMilliseconds(milliseconds);
         return true;
+    }
+
+    // A whole number, from 0.
+    private static bool Count(JsonElement element, string field, out int value)
+    {
+        value = 0;
+        return element.TryGetProperty(field, out var said) && said.ValueKind == JsonValueKind.Number && said.TryGetInt32(out value) && value >= 0;
     }
 
     private static bool Word(JsonElement element, string field, string[] words, out int index)

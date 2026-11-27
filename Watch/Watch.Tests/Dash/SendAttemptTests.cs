@@ -88,4 +88,50 @@ public class SendAttemptTests
         Assert.True(read.Accepted);
         Assert.Equal(DashCodec.Encode(message), DashCodec.Encode(read.Message!));
     }
+
+    // ---- B6: a new text from the Rolodex ----
+
+    [Fact]
+    public void ANewTextGoesToItsContact()
+    {
+        var message = SendAttempt.NewText(LeeContact, " Running five minutes late. ", First).Message;
+
+        Assert.Equal((LeeContact, (string?)null, "Running five minutes late."), (message.Contact, message.Key, message.Text));
+        Assert.Empty(message.To);
+        Assert.True(SendAttempt.NewText(LeeContact, "Hi", First).IsNewText);
+        Assert.False(SendAttempt.Reply(LeeKey, "Hi", First).IsNewText);
+    }
+
+    [Fact]
+    public void ANewTextIsNamedAsAReplyIs()
+    {
+        var attempt = SendAttempt.NewText(LeeContact, "On my way.", First);
+
+        Assert.Equal("send-" + First.ToString("N"), attempt.Id);
+        Assert.Equal(attempt, attempt.Again(answered: null, Second));
+        Assert.NotEqual(attempt.Id, attempt.Again(DashSendOutcome.Failed, Second).Id);
+        Assert.Equal(LeeContact, attempt.Again(DashSendOutcome.Failed, Second).Message.Contact);
+    }
+
+    [Theory]
+    [InlineData(LeeKey)]
+    [InlineData("2125550101")]
+    [InlineData("")]
+    public void ANewTextNeedsAContact(string to) =>
+        Assert.Throws<ArgumentException>(() => SendAttempt.NewText(to, "On my way.", First));
+
+    [Fact]
+    public void ANewTextNeedsWords() =>
+        Assert.Throws<ArgumentException>(() => SendAttempt.NewText(LeeContact, "  ", First));
+
+    [Fact]
+    public void ANewTextTravelsOnTheSendPath()
+    {
+        var message = SendAttempt.NewText(LeeContact, "On my way.", First).Message;
+
+        var read = DashCodec.Decode(message.Path, DashCodec.Encode(message));
+
+        Assert.True(read.Accepted);
+        Assert.Equal(LeeContact, Assert.IsType<DashSend>(read.Message).Contact);
+    }
 }

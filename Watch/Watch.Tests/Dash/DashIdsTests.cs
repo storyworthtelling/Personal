@@ -69,6 +69,40 @@ public class DashIdsTests
         Assert.Equal(attachment, DashIds.IsAttachment(id));
     }
 
+    // ---- B6: the Rolodex's ids ----
+
+    [Fact]
+    public void AContactAndAnEditionAreDigestsToo()
+    {
+        // A contact is named by a digest of Post's own contact id, and a page of the Rolodex by its edition's digest.
+        Assert.Matches("^p[0-9a-f]{16}$", DashIds.Contact("42"));
+        Assert.Matches("^e[0-9a-f]{16}$", DashIds.Edition("p0123456789abcdef\tLee"));
+        Assert.Equal(Expected('p', "42"), DashIds.Contact("42"));
+        Assert.Equal(Expected('e', "p0123456789abcdef\tLee"), DashIds.Edition("p0123456789abcdef\tLee"));
+    }
+
+    [Fact]
+    public void AContactIsNeverACorrespondence()
+    {
+        Assert.NotEqual(DashIds.Contact("2125550101")[1..], DashIds.Correspondence("2125550101")[1..]);
+        Assert.DoesNotContain("5550101", DashIds.Contact("2125550101"), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("p0123456789abcdef", true, false)]
+    [InlineData("e0123456789abcdef", false, true)]
+    [InlineData("c0123456789abcdef", false, false)]
+    [InlineData("P0123456789ABCDEF", false, false)]
+    [InlineData("p0123456789abcde", false, false)]
+    [InlineData("p0123456789abcdeg", false, false)]
+    [InlineData("", false, false)]
+    [InlineData(null, false, false)]
+    public void AContactsShapeIsChecked(string? id, bool contact, bool edition)
+    {
+        Assert.Equal(contact, DashIds.IsContact(id));
+        Assert.Equal(edition, DashIds.IsEdition(id));
+    }
+
     [Theory]
     [InlineData("act-1", true)]
     [InlineData("send-2026-11-21-a", true)]

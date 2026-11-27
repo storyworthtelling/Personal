@@ -14,6 +14,11 @@ internal static class DashFixtures
     public const string CallId = "m0a1b2c3d4e5f6071";
     public const string PhotoId = "a8899aabbccddeeff";
 
+    // B6: the Rolodex (W-5.1.2): a contact is a name and an id, never a number; a page names its edition.
+    public const string LeeContact = "p0123456789abcdef";
+    public const string RobinContact = "p1122334455667788";
+    public const string Edition = "e0123456789abcdef";
+
     public static readonly DateTimeOffset T0 = new(2026, 11, 21, 16, 20, 0, 0, TimeSpan.Zero);
 
     /// <summary>The start of a JPEG (its SOI marker, then an APP0 marker) and a few bytes: not a picture, but a JPEG's shape.</summary>
@@ -63,6 +68,10 @@ internal static class DashFixtures
         ["note on a number"] = new DashCallNote(null, "+1 212-555-0103", "Call back about the dentist."),
         ["photo ask"] = new DashPhotoAsk(PhotoId),
         ["photo"] = new DashPhoto(PhotoId, Jpeg),
+        ["rolodex ask"] = new DashRolodexAsk(0),
+        ["rolodex"] = new DashRolodex(0, 2, Edition, [new DashContact(LeeContact, "Lee"), new DashContact(RobinContact, "Robin")]),
+        ["empty rolodex"] = new DashRolodex(0, 1, Edition, []),
+        ["new text to a contact"] = new DashSend("send-3", null, [], "Running five minutes late.") { Contact = LeeContact },
         ["mail ask"] = new DashMailAsk(),
         ["mail"] = new DashMail(
         [

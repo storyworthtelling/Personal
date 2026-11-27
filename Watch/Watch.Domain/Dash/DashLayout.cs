@@ -128,4 +128,9 @@ public static class DashLayout
 
     /// <summary>The quieter choice under the pill ("Delete"), where After the call puts "Not now".</summary>
     public const double ActChoiceCentre = 1.48;
+
+    // ---- B6: New text, at the foot of People waiting where the mockup draws Mail ----
+
+    /// <summary>The centre of the entry under <paramref name="rows"/> rows: a row's pitch under the last.</summary>
+    public static double EntryCentre(int rows) => FirstRow + Math.Max(0, rows) * RowPitch;
 }

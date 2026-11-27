@@ -89,6 +89,12 @@ public sealed record DashThread(string Key, string Title, bool Group, IReadOnlyL
 public sealed record DashSend(string Id, string? Key, IReadOnlyList<string> To, string Text) : DashMessage
 {
     public override string Path => WatchIdentity.DashSendPath;
+
+    /// <summary>
+    /// A new text to one of the Rolodex's contacts, by its id (<see cref="DashIds.Contact"/>; P14 B6), in place of a
+    /// correspondence or numbers: Post maps the id back to the number on the phone, so no number is the wrist's to hold.
+    /// </summary>
+    public string? Contact { get; init; }
 }
 
 /// <summary>How a send from the wrist went.</summary>
@@ -187,4 +193,28 @@ public sealed record DashPhotoAsk(string Id) : DashMessage
 public sealed record DashPhoto(string Id, byte[] Jpeg) : DashMessage
 {
     public override string Path => WatchIdentity.DashPhotoPath;
+}
+
+// ---- dash/rolodex (P14 B6, W-5.1.2) ----
+
+/// <summary>Dash asking for one page of the phone's Rolodex, from the first (0).</summary>
+public sealed record DashRolodexAsk(int Page) : DashMessage
+{
+    public override string Path => WatchIdentity.DashRolodexPath;
+}
+
+/// <summary>
+/// One contact in the phone's Rolodex (the owner's ruling, B6): its name and an opaque id (<see cref="DashIds.Contact"/>),
+/// and nothing else: never a number, an address or a photo. A new text names the id; Post maps it back to the number.
+/// </summary>
+public sealed record DashContact(string Id, string Name);
+
+/// <summary>
+/// Post's answer: one page of the Rolodex, in Post's own order (by name). <paramref name="Pages"/> says how many there
+/// are, and <paramref name="Edition"/> (<see cref="DashIds.Edition"/>) which state of the book they were cut from, so the
+/// wrist gathers pages that belong together and starts again when the book changed under it.
+/// </summary>
+public sealed record DashRolodex(int Page, int Pages, string Edition, IReadOnlyList<DashContact> Contacts) : DashMessage
+{
+    public override string Path => WatchIdentity.DashRolodexPath;
 }

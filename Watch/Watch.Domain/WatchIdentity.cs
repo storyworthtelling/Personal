@@ -77,9 +77,18 @@ public static class WatchIdentity
     /// </summary>
     public const string DashPhotoPath = "/dash/photo";
 
+    /// <summary>
+    /// Post → Dash: the phone's whole Rolodex, a page at a time, each contact its name and an id and never a number
+    /// (P14 B6, W-5.1.2; PC6). Dash asks for each page on the same path.
+    /// </summary>
+    public const string DashRolodexPath = "/dash/rolodex";
+
     /// <summary>Every Dash path, in the plan's order, then the ones added after it.</summary>
     public static readonly IReadOnlyList<string> DashPaths =
-        [DashPeoplePath, DashThreadPath, DashSendPath, DashFilePath, DashDeletePath, DashUndoPath, DashReadPath, DashCallNotePath, DashMailPath, DashPhotoPath];
+    [
+        DashPeoplePath, DashThreadPath, DashSendPath, DashFilePath, DashDeletePath, DashUndoPath, DashReadPath, DashCallNotePath, DashMailPath, DashPhotoPath,
+        DashRolodexPath,
+    ];
 
     // ---- the handed-over Google token (plan §2.4, §2.5, P14 W-4.1.2) ----
 
@@ -118,8 +127,11 @@ public static class WatchIdentity
     /// <summary>Filing or deleting a correspondence, then its Undo ring (P14 B5, W-5.1.4).</summary>
     public const string DashActActivityName = "com.storyworthtelling.focusphone.communication.dash.ActActivity";
 
+    /// <summary>A new text: the phone's Rolodex, searched by a name typed or said (P14 B6, W-5.1.2).</summary>
+    public const string DashRolodexActivityName = "com.storyworthtelling.focusphone.communication.dash.RolodexActivity";
+
     public static readonly IReadOnlyList<string> DashComponents =
-        [DashPeopleActivityName, DashConversationActivityName, DashReplyActivityName, DashActActivityName];
+        [DashPeopleActivityName, DashConversationActivityName, DashReplyActivityName, DashActActivityName, DashRolodexActivityName];
 
     // ---- the installer's registered names ----
 

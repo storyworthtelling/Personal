@@ -51,6 +51,28 @@ public class DashExchangeTests
     }
 
     [Fact]
+    public void ARolodexPageIsAnsweredOnlyForItsPage()
+    {
+        // B6: the wrist asks the Rolodex a page at a time, so each answer finds the ask for its own page.
+        var asked = DashExchange.Awaits(new DashRolodexAsk(0));
+
+        Assert.Equal(asked, DashExchange.Answers(Messages["rolodex"]));
+        Assert.NotEqual(asked, DashExchange.Answers(new DashRolodex(1, 2, Edition, [])));
+        Assert.NotEqual(DashExchange.Awaits(new DashRolodexAsk(1)), asked);
+        Assert.True(asked!.Value.IsOn(WatchIdentity.DashRolodexPath));
+        Assert.Equal(DashWaits.Answer, DashExchange.WaitFor(new DashRolodexAsk(0)));
+    }
+
+    [Fact]
+    public void ANewTextIsAnsweredByItsId()
+    {
+        var asked = DashExchange.Awaits(Messages["new text to a contact"]);
+
+        Assert.Equal(asked, DashExchange.Answers(new DashSent("send-3", DashSendOutcome.Sent)));
+        Assert.Equal(DashWaits.SendAnswer, DashExchange.WaitFor(Messages["new text to a contact"]));
+    }
+
+    [Fact]
     public void APhotoWaitsLongerThanAConversation()
     {
         // Post fetches the picture (through Google Messages, or from the phone's own store) and shrinks it before it answers.
@@ -72,7 +94,9 @@ public class DashExchangeTests
     [InlineData("thread ask")]
     [InlineData("mail ask")]
     [InlineData("photo ask")]
+    [InlineData("rolodex ask")]
     [InlineData("reply")]
+    [InlineData("new text to a contact")]
     [InlineData("read")]
     public void WhatTheWristSendsIsNoAnswer(string name) => Assert.Null(DashExchange.Answers(Messages[name]));
 

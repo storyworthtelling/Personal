@@ -134,7 +134,7 @@ public class DashRelayGuardTests
         string[] paths =
         [
             "DashPeoplePath", "DashThreadPath", "DashSendPath", "DashFilePath", "DashDeletePath", "DashUndoPath", "DashReadPath",
-            "DashCallNotePath", "DashMailPath", "DashPhotoPath",
+            "DashCallNotePath", "DashMailPath", "DashPhotoPath", "DashRolodexPath",
         ];
         Assert.Equal(WatchIdentity.DashPaths.Count, paths.Length);
         Assert.All(paths, path => Assert.Contains($"DataPath = WatchIdentity.{path}", listener, StringComparison.Ordinal));

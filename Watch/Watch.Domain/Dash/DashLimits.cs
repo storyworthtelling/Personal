@@ -53,4 +53,10 @@ public static class DashLimits
 
     /// <summary>A photo's JPEG, shrunk on the phone to fit (B5): bytes. Written as base64 it still leaves the message under <see cref="MaxBytes"/>.</summary>
     public const int PhotoBytes = 40 * 1024;
+
+    /// <summary>Contacts on one page of the Rolodex (B6): a whole page of the longest names still fits one message.</summary>
+    public const int RolodexPage = 200;
+
+    /// <summary>Pages of the Rolodex at most (B6): a book past their contacts is cut, in Post's order.</summary>
+    public const int RolodexPages = 20;
 }

@@ -36,7 +36,8 @@ public static class DashWaits
 /// <summary>
 /// The wrist's half of Dash's exchange (W-5.1.1, W-5.1.2). Post answers on the path it was asked on, once, to the node
 /// that asked, and nothing else (B2): so the wrist matches each answer to the ask it is waiting for, People waiting by
-/// its path, a conversation by its key, a send by the wrist's own name for it, a photo by its attachment id (B5). A read,
+/// its path, a conversation by its key, a send by the wrist's own name for it, a photo by its attachment id (B5), a page
+/// of the Rolodex by its number (B6). A read,
 /// a file, a delete, an undo and a note are told, and nothing answers them.
 /// </summary>
 public static class DashExchange
@@ -48,6 +49,7 @@ public static class DashExchange
         DashSend send => new DashTicket(send.Path, send.Id),
         DashMailAsk ask => new DashTicket(ask.Path, null),
         DashPhotoAsk ask => new DashTicket(ask.Path, ask.Id),
+        DashRolodexAsk ask => new DashTicket(ask.Path, PageOf(ask.Page)),
         _ => null,
     };
 
@@ -58,6 +60,7 @@ public static class DashExchange
         DashSent sent => new DashTicket(sent.Path, sent.Id),
         DashMail mail => new DashTicket(mail.Path, null),
         DashPhoto photo => new DashTicket(photo.Path, photo.Id),
+        DashRolodex rolodex => new DashTicket(rolodex.Path, PageOf(rolodex.Page)),
         _ => null,
     };
 
@@ -67,4 +70,7 @@ public static class DashExchange
         DashPhotoAsk => DashWaits.Photo,
         _ => DashWaits.Answer,
     };
+
+    // A page of the Rolodex is told from another by its number (B6).
+    private static string PageOf(int page) => page.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }

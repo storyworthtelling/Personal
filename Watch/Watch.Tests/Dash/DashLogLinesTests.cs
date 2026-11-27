@@ -24,6 +24,8 @@ public class DashLogLinesTests
         new DashSend("send-1", null, [SentinelNumber], SentinelWords),
         new DashCallNote(null, SentinelNumber, SentinelWords),
         new DashMail([new DashMailLine(TextId, SentinelName, SentinelWords, T0)]),
+        new DashRolodex(0, 1, Edition, [new DashContact(LeeContact, SentinelName)]),
+        new DashSend("send-1", null, [], SentinelWords) { Contact = LeeContact },
     ];
 
     private static readonly Regex Shape = new(
@@ -57,6 +59,7 @@ public class DashLogLinesTests
             Assert.DoesNotContain(SentinelWords, line, StringComparison.Ordinal);
             Assert.DoesNotContain("0199", line, StringComparison.Ordinal);
             Assert.DoesNotContain(LeeKey, line, StringComparison.Ordinal);
+            Assert.DoesNotContain(LeeContact, line, StringComparison.Ordinal);
             Assert.Matches(Shape, line);
         });
     }

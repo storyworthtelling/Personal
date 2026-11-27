@@ -4,7 +4,8 @@ using System.Text;
 namespace Watch.Domain.Dash;
 
 /// <summary>
-/// The ids on Dash's contracts. Post names a correspondence, a message and an attachment by a digest of its own key
+/// The ids on Dash's contracts. Post names a correspondence, a message, an attachment and a contact of its Rolodex (B6)
+/// by a digest of its own key
 /// (a letter, then sixteen hex digits of a SHA-256), so a number, an address or Post's own source id is never what the
 /// watch holds, logs or sends back, and the same thing keeps the same id from one answer to the next. It is not secrecy:
 /// a number's digest can be searched for. The watch names its own acts and sends (<see cref="IsAct"/>).
@@ -18,6 +19,8 @@ public static class DashIds
     private const char CorrespondenceLetter = 'c';
     private const char MessageLetter = 'm';
     private const char AttachmentLetter = 'a';
+    private const char ContactLetter = 'p';
+    private const char EditionLetter = 'e';
 
     public static string Correspondence(string threadKey) => Id(CorrespondenceLetter, threadKey);
 
@@ -30,6 +33,16 @@ public static class DashIds
     public static bool IsMessage(string? id) => Is(id, MessageLetter);
 
     public static bool IsAttachment(string? id) => Is(id, AttachmentLetter);
+
+    /// <summary>A contact in the phone's Rolodex, by Post's own contact id (B6).</summary>
+    public static string Contact(string contactKey) => Id(ContactLetter, contactKey);
+
+    /// <summary>One state of the Rolodex, by a digest of every contact it holds (B6).</summary>
+    public static string Edition(string value) => Id(EditionLetter, value);
+
+    public static bool IsContact(string? id) => Is(id, ContactLetter);
+
+    public static bool IsEdition(string? id) => Is(id, EditionLetter);
 
     /// <summary>An id the watch chose for an act or a send: 1 to 64 lowercase letters, digits or hyphens.</summary>
     public static bool IsAct(string? id) =>

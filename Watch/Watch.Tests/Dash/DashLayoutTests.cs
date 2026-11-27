@@ -113,4 +113,16 @@ public class DashLayoutTests
         Assert.True(DashLayout.ActChoiceCentre > DashLayout.ActPillCentre + DashLayout.PillHeight / 2);
         Assert.True(Inside(1, DashLayout.ActChoiceCentre));
     }
+
+    // ---- B6: New text, where the mockup draws People waiting's Mail ----
+
+    [Fact]
+    public void NewTextSitsWhereTheMockupDrawsMail()
+    {
+        // mock: People waiting draws "Mail" a row's pitch under its third row, at 1.7 of the radius.
+        Assert.Equal(1.7, DashLayout.EntryCentre(3), 9);
+        Assert.Equal(DashLayout.FirstRow, DashLayout.EntryCentre(0), 9);
+        Assert.True(Inside(1, DashLayout.EntryCentre(3)));
+        Assert.True(DashLayout.EntryCentre(1) - DashLayout.RowHeight / 2 > DashLayout.FirstRow + DashLayout.RowHeight / 2);
+    }
 }

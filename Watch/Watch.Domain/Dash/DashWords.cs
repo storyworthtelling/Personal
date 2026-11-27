@@ -14,6 +14,9 @@ public enum DashTrouble
 
     /// <summary>Neither the system's dictation nor its keyboard could be opened.</summary>
     NoInput,
+
+    /// <summary>The phone's Rolodex changed while its pages were asked for, again and again (B6).</summary>
+    Changing,
 }
 
 /// <summary>
@@ -22,6 +25,7 @@ public enum DashTrouble
 /// went wrong, in the secondary grey, never a buzz. No app is named on the watch (A48), so the phone is "your phone".
 /// The labels are the mockups' (People waiting, A conversation, Replying by voice, A group text with a photo, Filed with
 /// Undo); File and Delete, the choice before an act that no mockup draws, are the phone's own words for the two acts.
+/// No mockup draws a new text either (B6): its words follow the nearest drawn screens, and the phone's Rolodex.
 /// </summary>
 public static class DashWords
 {
@@ -80,12 +84,36 @@ public static class DashWords
     /// <summary>A photo as TalkBack reads it.</summary>
     public static string Photo(string? from, string when) => from is null ? $"Photo, {when}" : $"Photo from {from}, {when}";
 
+    // ---- B6: a new text from the Rolodex (W-5.1.2) ----
+
+    /// <summary>People waiting's way to start a text, where the mockup draws Mail; and the Rolodex screen's name.</summary>
+    public const string NewText = "New text";
+
+    /// <summary>Search the Rolodex by dictating a name (A10: "by voice" is the name said into the search).</summary>
+    public const string SayAName = "Say a name";
+
+    /// <summary>Leave the search: the whole Rolodex again.</summary>
+    public const string Everyone = "Everyone";
+
+    /// <summary>The system dictation's prompt for a name.</summary>
+    public const string WhoTo = "Who to?";
+
+    /// <summary>The Rolodex, asked for.</summary>
+    public const string OpeningContacts = "Opening your contacts.";
+
+    /// <summary>The phone answered with a Rolodex that holds nobody Post can text.</summary>
+    public const string NoContacts = "There’s nobody in your phone’s contacts.";
+
+    /// <summary>A search that found nobody: the phone's own Rolodex says the same.</summary>
+    public const string NoOneByThatName = "No one by that name.";
+
     public static string For(DashTrouble trouble) => trouble switch
     {
         DashTrouble.NoPhone => "Your phone isn’t in reach.",
         DashTrouble.NoAnswer => "Your phone didn’t answer.",
         DashTrouble.Unreadable => "This watch can’t read what your phone sent.",
         DashTrouble.NoInput => "This watch can’t take a reply right now.",
+        DashTrouble.Changing => "Your phone’s contacts kept changing.",
         _ => throw new ArgumentOutOfRangeException(nameof(trouble), trouble, "Not a trouble Dash knows."),
     };
 

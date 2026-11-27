@@ -113,6 +113,84 @@ public class DashCodecTests
         Assert.True(DashCodec.Decode(WatchIdentity.DashPhotoPath, bytes).Accepted);
     }
 
+    // ---- B6: the Rolodex, and a new text to a contact (W-5.1.2) ----
+
+    [Fact]
+    public void ARolodexPageKeepsEveryField()
+    {
+        var sent = (DashRolodex)Messages["rolodex"];
+
+        var read = Assert.IsType<DashRolodex>(DashCodec.Decode(WatchIdentity.DashRolodexPath, DashCodec.Encode(sent)).Message);
+
+        Assert.Equal((0, 2, Edition), (read.Page, read.Pages, read.Edition));
+        Assert.Equal(sent.Contacts, read.Contacts);
+    }
+
+    [Fact]
+    public void AContactIsItsIdAndItsName()
+    {
+        // The owner's ruling: Post sends the whole Rolodex, each contact its name and a digest id, never a number, an
+        // address or a photo. The wire has room for nothing else.
+        using var document = JsonDocument.Parse(DashCodec.Encode(Messages["rolodex"]));
+        var root = document.RootElement;
+
+        Assert.Equal(["v", "kind", "page", "pages", "edition", "contacts"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("rolodex", root.GetProperty("kind").GetString());
+        Assert.All(root.GetProperty("contacts").EnumerateArray(), contact =>
+            Assert.Equal(["id", "name"], contact.EnumerateObject().Select(property => property.Name)));
+    }
+
+    [Fact]
+    public void ARolodexAskIsItsPage()
+    {
+        using var document = JsonDocument.Parse(DashCodec.Encode(new DashRolodexAsk(3)));
+
+        Assert.Equal(["v", "kind", "page"], document.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(3, Assert.IsType<DashRolodexAsk>(DashCodec.Decode(WatchIdentity.DashRolodexPath, DashCodec.Encode(new DashRolodexAsk(3))).Message).Page);
+    }
+
+    [Fact]
+    public void ANewTextNamesItsContact()
+    {
+        // The wrist names who by the contact's id; Post maps it back to the number on the phone.
+        var bytes = DashCodec.Encode(Messages["new text to a contact"]);
+        var send = Assert.IsType<DashSend>(DashCodec.Decode(WatchIdentity.DashSendPath, bytes).Message);
+        using var document = JsonDocument.Parse(bytes);
+
+        Assert.Equal((LeeContact, (string?)null), (send.Contact, send.Key));
+        Assert.Empty(send.To);
+        Assert.Equal(["v", "kind", "id", "contact", "text"], document.RootElement.EnumerateObject().Select(property => property.Name));
+    }
+
+    [Fact]
+    public void AReplyNamesNoContact()
+    {
+        var send = Assert.IsType<DashSend>(DashCodec.Decode(WatchIdentity.DashSendPath, DashCodec.Encode(Messages["reply"])).Message);
+
+        Assert.Null(send.Contact);
+    }
+
+    [Fact]
+    public void TheFullestRolodexPageFitsTheBudget()
+    {
+        // Three bytes a character and every name at its limit: a whole page still fits one message.
+        var page = new DashRolodex(DashLimits.RolodexPages - 1, DashLimits.RolodexPages, Edition,
+            Enumerable.Range(0, DashLimits.RolodexPage).Select(index => new DashContact(LeeContact, new string('漢', DashLimits.Name))).ToList());
+
+        var bytes = DashCodec.Encode(page);
+
+        Assert.True(bytes.Length <= DashLimits.MaxBytes, $"{bytes.Length} bytes");
+        Assert.True(DashCodec.Decode(WatchIdentity.DashRolodexPath, bytes).Accepted);
+    }
+
+    [Fact]
+    public void APagePastItsSizeIsUnreadable()
+    {
+        var page = new DashRolodex(0, 1, Edition, Enumerable.Range(0, DashLimits.RolodexPage + 1).Select(index => new DashContact(LeeContact, "Lee")).ToList());
+
+        Assert.Equal(ContractRefusal.Unreadable, DashCodec.Decode(WatchIdentity.DashRolodexPath, DashCodec.Encode(page)).Refusal);
+    }
+
     [Theory]
     [MemberData(nameof(DashFixtures.Names), MemberType = typeof(DashFixtures))]
     public void EveryMessageCarriesAnIntegerV(string name)
@@ -253,6 +331,28 @@ public class DashCodecTests
         { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"a0123456789abcdef\",\"jpeg\":\"\"}" },
         { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"a0123456789abcdef\",\"jpeg\":\"iVBORw0KGgo=\"}" },
         { "/dash/photo", "{\"v\":1,\"kind\":\"photo\",\"id\":\"a0123456789abcdef\",\"jpeg\":7}" },
+        // The Rolodex (B6): an ask is its page, an answer its page of its edition, a contact its id and name and nothing else.
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"ask\"}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"ask\",\"page\":-1}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"ask\",\"page\":\"0\"}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"ask\",\"page\":1.5}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"ask\",\"page\":20}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\"}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":0,\"edition\":\"e0123456789abcdef\",\"contacts\":[]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":2,\"pages\":2,\"edition\":\"e0123456789abcdef\",\"contacts\":[]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":21,\"edition\":\"e0123456789abcdef\",\"contacts\":[]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"contacts\":[]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"c0123456789abcdef\",\"contacts\":[]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\",\"contacts\":[{\"id\":\"c0123456789abcdef\",\"name\":\"Lee\"}]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\",\"contacts\":[{\"id\":\"p0123456789abcdef\",\"name\":\"\"}]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\",\"contacts\":[{\"id\":\"p0123456789abcdef\"}]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\",\"contacts\":[{\"id\":\"p0123456789abcdef\",\"name\":\"Lee\",\"number\":\"+12125550101\"}]}" },
+        { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\",\"contacts\":[\"Lee\"]}" },
+        // A new text names one contact, and only a contact: never beside a correspondence or numbers.
+        { "/dash/send", "{\"v\":1,\"kind\":\"send\",\"id\":\"send-1\",\"key\":\"c0123456789abcdef\",\"contact\":\"p0123456789abcdef\",\"text\":\"Hi\"}" },
+        { "/dash/send", "{\"v\":1,\"kind\":\"send\",\"id\":\"send-1\",\"to\":[\"+12125550101\"],\"contact\":\"p0123456789abcdef\",\"text\":\"Hi\"}" },
+        { "/dash/send", "{\"v\":1,\"kind\":\"send\",\"id\":\"send-1\",\"contact\":\"c0123456789abcdef\",\"text\":\"Hi\"}" },
+        { "/dash/send", "{\"v\":1,\"kind\":\"send\",\"id\":\"send-1\",\"contact\":\"p0123456789abcdef\",\"text\":\" \"}" },
     };
 
     [Theory]
@@ -281,6 +381,9 @@ public class DashCodecTests
     [InlineData("mail", "/dash/people")]
     [InlineData("photo ask", "/dash/thread")]
     [InlineData("photo", "/dash/people")]
+    [InlineData("rolodex", "/dash/people")]
+    [InlineData("people ask", "/dash/rolodex")]
+    [InlineData("new text to a contact", "/dash/rolodex")]
     [InlineData("people ask", "/update/installed")]
     [InlineData("people ask", "/dash/elsewhere")]
     [InlineData("people ask", null)]
@@ -368,6 +471,8 @@ public class DashCodecTests
         Assert.Equal(TimeSpan.FromMinutes(2), DashLimits.MaxWindow);
         Assert.Equal(64 * 1024, DashLimits.MaxBytes);
         Assert.Equal(40 * 1024, DashLimits.PhotoBytes);
+        Assert.Equal(200, DashLimits.RolodexPage);
+        Assert.Equal(20, DashLimits.RolodexPages);
     }
 
     [Fact]
@@ -377,7 +482,7 @@ public class DashCodecTests
         [
             DashCodec.VersionField, DashCodec.KindField, DashCodec.AskKind, DashCodec.PeopleKind, DashCodec.ThreadKind, DashCodec.SendKind,
             DashCodec.ResultKind, DashCodec.FileKind, DashCodec.DeleteKind, DashCodec.UndoKind, DashCodec.ReadKind, DashCodec.NoteKind,
-            DashCodec.MailKind, DashCodec.PhotoKind,
+            DashCodec.MailKind, DashCodec.PhotoKind, DashCodec.RolodexKind,
         ];
         string[] fields =
         [
@@ -386,13 +491,15 @@ public class DashCodecTests
             DashCodec.IncomingField, DashCodec.TypeField, DashCodec.TextField, DashCodec.FromField, DashCodec.AttachmentsField,
             DashCodec.ToField, DashCodec.OutcomeField, DashCodec.IdsField, DashCodec.WindowField, DashCodec.ActField,
             DashCodec.ThroughField, DashCodec.CallField, DashCodec.NumberField, DashCodec.MailField, DashCodec.SubjectField,
-            DashCodec.JpegField,
+            DashCodec.JpegField, DashCodec.PageField, DashCodec.PagesField, DashCodec.EditionField, DashCodec.ContactsField,
+            DashCodec.ContactField,
         ];
 
-        Assert.Equal(["v", "kind", "ask", "people", "thread", "send", "result", "file", "delete", "undo", "read", "note", "mail", "photo"], envelope);
+        Assert.Equal(["v", "kind", "ask", "people", "thread", "send", "result", "file", "delete", "undo", "read", "note", "mail", "photo", "rolodex"], envelope);
         Assert.Equal(
             ["people", "key", "name", "line", "at", "unread", "group", "title", "members", "messages", "id", "incoming", "type", "text",
-                "from", "attachments", "to", "outcome", "ids", "window", "act", "through", "call", "number", "mail", "subject", "jpeg"],
+                "from", "attachments", "to", "outcome", "ids", "window", "act", "through", "call", "number", "mail", "subject", "jpeg",
+                "page", "pages", "edition", "contacts", "contact"],
             fields);
     }
 

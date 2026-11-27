@@ -11,7 +11,11 @@ namespace Watch.Tests.Dash;
 public class DashWordsTests
 {
     private static IEnumerable<string> Sentences() =>
-        new[] { DashWords.Finding, DashWords.Opening, DashWords.Sending, DashWords.TooLong, DashWords.UndoLost, DashWords.OpeningPhoto }
+        new[]
+            {
+                DashWords.Finding, DashWords.Opening, DashWords.Sending, DashWords.TooLong, DashWords.UndoLost, DashWords.OpeningPhoto,
+                DashWords.OpeningContacts, DashWords.NoContacts, DashWords.NoOneByThatName,
+            }
             .Concat(Enum.GetValues<DashTrouble>().Select(DashWords.For))
             .Concat(Enum.GetValues<DashSendOutcome>().Select(DashWords.For).OfType<string>());
 
@@ -19,7 +23,8 @@ public class DashWordsTests
         [
             DashWords.Reply, DashWords.ReplyToAll, DashWords.Send, DashWords.Keyboard, DashWords.Again, DashWords.To("Lee"), DashWords.File,
             DashWords.Delete, DashWords.TapToUndo, DashWords.Filed("Lee"), DashWords.Deleted("Lee"), DashWords.FileOrDelete,
-            DashWords.Caption("Robin", "1 h"), DashWords.Photo("Robin", "1 h"),
+            DashWords.Caption("Robin", "1 h"), DashWords.Photo("Robin", "1 h"), DashWords.NewText, DashWords.SayAName, DashWords.Everyone,
+            DashWords.WhoTo,
         ];
 
     [Fact]
@@ -115,5 +120,20 @@ public class DashWordsTests
     {
         Assert.Equal("Photo from Robin, 1 h", DashWords.Photo("Robin", "1 h"));
         Assert.Equal("Photo, 1 h", DashWords.Photo(null, "1 h"));
+    }
+
+    [Fact]
+    public void TheRolodexsWordsAreItsOwn()
+    {
+        // B6 (no mockup draws it; nearest drawn: People waiting's foot entry, Mail's list, Replying by voice's choices).
+        Assert.Equal("New text", DashWords.NewText);
+        Assert.Equal("Say a name", DashWords.SayAName);
+        Assert.Equal("Everyone", DashWords.Everyone);
+        Assert.Equal("Who to?", DashWords.WhoTo);
+        Assert.Equal("Opening your contacts.", DashWords.OpeningContacts);
+        Assert.Equal("There’s nobody in your phone’s contacts.", DashWords.NoContacts);
+        // The phone's own Rolodex says the same when a search finds nobody.
+        Assert.Equal("No one by that name.", DashWords.NoOneByThatName);
+        Assert.Equal("Your phone’s contacts kept changing.", DashWords.For(DashTrouble.Changing));
     }
 }
