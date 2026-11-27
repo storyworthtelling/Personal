@@ -78,14 +78,21 @@ public sealed class DashActs
     /// <summary>
     /// What an undo takes back. Inside the window, the act's messages, once: an undo heard twice takes nothing the second
     /// time. After the window, nothing: the act stands, and the wrist's ring had already said so; a delete not yet carried
-    /// out is still owed. A send is never undone.
+    /// out is still owed. A send is never undone. An undo for an act not yet heard is kept, so that act is never done.
     /// </summary>
     public DashUndoPlan Undo(string act, DateTimeOffset now)
     {
         lock (gate)
         {
             var index = acts.FindIndex(record => record.Act == act);
-            if (index < 0 || acts[index].Kind == DashActKind.Send)
+            if (index < 0)
+            {
+                // Heard before its act (two messages can cross): kept as taken back, so the act that follows is known and
+                // done never (B5). It takes nothing now, and is never owed.
+                Record(new DashActRecord(act, DashActKind.File, [], now + DashLimits.MaxWindow, Taken: true));
+                return new DashUndoPlan(DashOutcome.Unknown, DashActKind.File, []);
+            }
+            if (acts[index].Kind == DashActKind.Send)
             {
                 return new DashUndoPlan(DashOutcome.Unknown, DashActKind.File, []);
             }

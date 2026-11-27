@@ -30,23 +30,28 @@ internal static class AttachmentCache
 
         if (!file.Exists() || file.Length() == 0)
         {
-            // An MMS attachment's bytes are already on the device, in the system MMS
-            // provider — no network fetch, unlike a Gmail attachment.
-            // A Google Messages picture comes down through the bridge, which decrypts it.
-            var bytes = Codex.Domain.Post.BridgeMessageMapper.ReadAttachmentId(attachment.Id) is var (mediaId, key)
-                ? GmBridgeClient.Shared(context).DownloadMedia(mediaId, key)
-                : item.Kind == TimelineItemKind.Message
-                    ? MmsAttachments.Fetch(context, attachment)
-                    : MailAccess.Attachment(context, item, attachment);
-            if (bytes is null)
-            {
-                throw new InvalidOperationException("The message no longer carries that attachment.");
-            }
-            System.IO.File.WriteAllBytes(file.AbsolutePath!, bytes);
+            System.IO.File.WriteAllBytes(file.AbsolutePath!, Bytes(context, item, attachment));
         }
 
         return AndroidX.Core.Content.FileProvider.GetUriForFile(
             context, $"{context.PackageName}.attachments", file);
+    }
+
+    /// <summary>
+    /// The attachment's bytes, fetched where they are, and nowhere written: the one fetch the Mailbox opens a picture
+    /// with and Dash's photos are shrunk from (P14 B5). Off the main thread: it can be a network call.
+    /// </summary>
+    internal static byte[] Bytes(Context context, TimelineItem item, AttachmentRef attachment)
+    {
+        // An MMS attachment's bytes are already on the device, in the system MMS
+        // provider — no network fetch, unlike a Gmail attachment.
+        // A Google Messages picture comes down through the bridge, which decrypts it.
+        var bytes = Codex.Domain.Post.BridgeMessageMapper.ReadAttachmentId(attachment.Id) is var (mediaId, key)
+            ? GmBridgeClient.Shared(context).DownloadMedia(mediaId, key)
+            : item.Kind == TimelineItemKind.Message
+                ? MmsAttachments.Fetch(context, attachment)
+                : MailAccess.Attachment(context, item, attachment);
+        return bytes ?? throw new InvalidOperationException("The message no longer carries that attachment.");
     }
 
     // The sender chose the file name. It never becomes a path here: a name with separators

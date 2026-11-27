@@ -106,6 +106,7 @@ public class DashInboxTests
         new DashThread(DashIds.Correspondence("2125550101"), "Lee", false, [], []),
         new DashSent("send-1", DashSendOutcome.Sent),
         new DashMail([]),
+        new DashPhoto(DashIds.Attachment("sms:2125550101:-2", "part:7"), [0xFF, 0xD8, 0xFF, 0xD9]),
     ];
 
     // ---- dash/send ----
@@ -237,6 +238,78 @@ public class DashInboxTests
 
         Assert.Equal(DashOutcome.Again, again.Plan.Outcome);
         Assert.Empty(again.Plan.Items);
+    }
+
+    // ---- dash/photo (B5) ----
+
+    private static TimelineItem Picture(string who, int minute) =>
+        Text(who, minute, "") with { Attachments = [new AttachmentRef("part:7", "photo.jpg", "image/jpeg", 2_400_000)] };
+
+    private static string PhotoOf(TimelineItem item) => DashIds.Attachment(item.SourceId, item.Attachments[0].Id);
+
+    private static readonly byte[] Shrunk = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0xFF, 0xD9];
+
+    [Fact]
+    public void APhotoIsFetchedForTheWrist()
+    {
+        var picture = Picture(Lee, -2);
+
+        var turn = DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(Text(Lee, -9), picture), new DashActs(), Now);
+
+        var photo = Assert.IsType<DashPhotoTurn>(turn);
+        Assert.Equal((PhotoOf(picture), picture.SourceId, "part:7"), (photo.Ask.Id, photo.Plan.Item.SourceId, photo.Plan.Attachment.Id));
+        Assert.Equal(WatchIdentity.DashPhotoPath, photo.Path);
+    }
+
+    [Fact]
+    public void AnUnknownPhotoIsNotAnswered()
+    {
+        var turn = DashInbox.Turn(new DashPhotoAsk(DashIds.Attachment("sms:elsewhere", "part:1")), () => Relay(Picture(Lee, -2)), new DashActs(), Now);
+
+        var none = Assert.IsType<DashNoTurn>(turn);
+        Assert.Equal((WatchIdentity.DashPhotoPath, (DashOutcome?)DashOutcome.Unknown), (none.Path, none.Outcome));
+    }
+
+    [Fact]
+    public void AShrunkPhotoIsTheAnswer()
+    {
+        var picture = Picture(Lee, -2);
+        var turn = Assert.IsType<DashPhotoTurn>(DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(picture), new DashActs(), Now));
+
+        var answer = Assert.IsType<DashAnswer>(DashInbox.Photo(turn, Shrunk));
+
+        var photo = Assert.IsType<DashPhoto>(answer.Reply);
+        Assert.Equal((PhotoOf(picture), Shrunk), (photo.Id, photo.Jpeg));
+        Assert.Equal((WatchIdentity.DashPhotoPath, DashOutcome.Answered, 1), (answer.Path, answer.Outcome, answer.Count));
+    }
+
+    [Fact]
+    public void APhotoThatWouldNotShrinkIsNotAnswered()
+    {
+        var picture = Picture(Lee, -2);
+        var turn = Assert.IsType<DashPhotoTurn>(DashInbox.Turn(new DashPhotoAsk(PhotoOf(picture)), () => Relay(picture), new DashActs(), Now));
+        var tooLarge = new byte[DashLimits.PhotoBytes + 1];
+        Shrunk.CopyTo(tooLarge, 0);
+
+        Assert.Equal(DashOutcome.Unfetched, Assert.IsType<DashNoTurn>(DashInbox.Photo(turn, null)).Outcome);
+        Assert.Equal(DashOutcome.Unfetched, Assert.IsType<DashNoTurn>(DashInbox.Photo(turn, tooLarge)).Outcome);
+        Assert.Equal(DashOutcome.Unfetched, Assert.IsType<DashNoTurn>(DashInbox.Photo(turn, [0x89, 0x50, 0x4E, 0x47])).Outcome);
+    }
+
+    [Fact]
+    public void AnUndoHeardBeforeItsActKeepsItFromHappening()
+    {
+        // The wrist sends an undo only once its act has gone, but two messages may cross in either order: an undo that
+        // comes first is kept, so the act that follows it is done never rather than done for good.
+        var acts = new DashActs();
+
+        var undo = Assert.IsType<DashUndoTurn>(DashInbox.Turn(new DashUndo("act-1"), NoRelay, acts, Now));
+        var late = Assert.IsType<DashActTurn>(DashInbox.Turn(new DashFile("act-1", KeyOf(Lee), [], Six), () => Relay(Text(Lee, -2)), acts, Now));
+
+        Assert.Equal(DashOutcome.Unknown, undo.Plan.Outcome);
+        Assert.Equal(DashOutcome.Again, late.Plan.Outcome);
+        Assert.Empty(late.Plan.Items);
+        Assert.Empty(acts.Owed());
     }
 
     // ---- dash/read, dash/call-note ----

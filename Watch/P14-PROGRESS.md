@@ -2131,3 +2131,24 @@ a photo drawn as the mockup draws it, with or without words of its own, newest f
   and `PostRegistersItsListenerByName` ("DashPhotoPath" not found).
 - **Green: `Watch.Tests` 941 passed, 0 failed; `Codex.Tests` 3309 passed** (Post's listener hears `/dash/photo`; until
   the next step it does nothing with it); `RepoGuards.Tests` 452 passed; `Storyworthtelling.Updates.Tests` 194 passed.
+
+## Red 2 · Post's half: the photo, and an undo that comes first
+
+Tests written first, in `FocusPhone/Codex.Tests`: `DashRelayTests` (`APhotoIsFoundByItsId`, `AVideoIsNoPhoto`,
+`AFiledPhotoIsNotFound`, `AMailsPictureIsNotAPhotoOnTheWrist`, `APhotosStandInIsNoWordsOnTheWire` ×2,
+`APhotosOwnWordsCross`), `DashInboxTests` (`APhotoIsFetchedForTheWrist`, `AnUnknownPhotoIsNotAnswered`,
+`AShrunkPhotoIsTheAnswer`, `APhotoThatWouldNotShrinkIsNotAnswered`, `AnUndoHeardBeforeItsActKeepsItFromHappening`, and
+the photo row in `AnAnswerArrivingAtPostIsLeftAlone`), `DashActsCodecTests.AnEarlyUndoIsKeptAcrossARestart`, and
+`DashRelayGuardTests` (`TheListenerCarriesThePlansThroughPostsOwnCode` ×6 more: `AttachmentCache.Bytes(`,
+`DashInbox.Photo(`, `PhotoFit.SampleFor(`, `PhotoFit.Sizes(`, `PhotoFit.TurnFor(`, `PhotoFit.Qualities`;
+`TheWristsPhotoIsFetchedAsTheMailboxOpensOne`; `APhotoLeavesThePhoneShrunkAndReEncoded`).
+
+- **`FocusPhone/Codex.Tests`: 3331 tests, 20 failed, 3311 passed.** The 20: `DashRelayGuardTests` 8, `DashRelayTests` 6,
+  `DashInboxTests` 5, `DashActsCodecTests` 1. First errors: `NotImplementedException` 8, `Assert.Contains() Failure:
+  Sub-string not found` 7, `Strings differ` 2 (the stand-in still crossing as "Photo +1"), and one each of
+  `Sequence contains no matching element` (no `DashPhotos.cs`), `Assert.True() Failure` (no `Bytes` in
+  `AttachmentCache`) and `Values differ` (a late act carried out after its undo). `APhotosOwnWordsCross` passed on the
+  stubs: a message's own words already crossed.
+- **Green: `Codex.Tests` 3331 passed, 0 failed. `Watch.Tests` 941 passed. `RepoGuards.Tests` 452 passed** (the
+  listener's new log calls are `DashLogLines` lines and plain literals). **Compiled here:** `FocusPhone/Post.Android`,
+  **Build succeeded, 0 errors**; none of the 65 warnings names a file this step touched.

@@ -71,4 +71,7 @@ public static class PhotoFit
 
     /// <summary>Whether a JPEG of <paramref name="length"/> bytes can cross as one message.</summary>
     public static bool Fits(int length) => length is > 0 and <= DashLimits.PhotoBytes;
+
+    /// <summary>Whether the bytes open as a JPEG does: its start-of-image marker and the first byte of the marker after it.</summary>
+    public static bool IsJpeg(byte[] bytes) => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
 }

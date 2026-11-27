@@ -165,9 +165,41 @@ public class DashRelayGuardTests
     [InlineData("MailboxSources.LiveTail(")]
     [InlineData("Cache.LoadPage(")]
     [InlineData("DogEar.UndoWindow(")]
+    [InlineData("AttachmentCache.Bytes(")]
+    [InlineData("DashInbox.Photo(")]
+    [InlineData("PhotoFit.SampleFor(")]
+    [InlineData("PhotoFit.Sizes(")]
+    [InlineData("PhotoFit.TurnFor(")]
+    [InlineData("PhotoFit.Qualities")]
     public void TheListenerCarriesThePlansThroughPostsOwnCode(string call)
     {
         Assert.Contains(call, DashHalf(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheWristsPhotoIsFetchedAsTheMailboxOpensOne()
+    {
+        // B5: one fetch for a picture, whoever asks: through Google Messages, or from the phone's own MMS store.
+        var cache = Code($"{Post}/AttachmentCache.cs");
+        var fetch = Regex.Match(cache, @"public static Android\.Net\.Uri\? Fetch\([^)]*\)\s*\{(?<body>[\s\S]*?)\n    \}");
+
+        Assert.True(fetch.Success, "AttachmentCache has no Fetch.");
+        Assert.Contains("Bytes(context, item, attachment)", fetch.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.Contains("internal static byte[] Bytes(", cache, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void APhotoLeavesThePhoneShrunkAndReEncoded()
+    {
+        // Shrunk to fit one message and written again as a JPEG, so none of the picture's metadata reaches the watch, and
+        // never written down on the phone on the way.
+        var photos = PostSources().Single(source => source.Path == $"{Post}/Dash/DashPhotos.cs").Text;
+
+        Assert.Contains("Bitmap.CompressFormat.Jpeg", photos, StringComparison.Ordinal);
+        Assert.Contains("InJustDecodeBounds = true", photos, StringComparison.Ordinal);
+        Assert.Contains("ExifInterface", photos, StringComparison.Ordinal);
+        Assert.DoesNotContain("WriteAllBytes", photos, StringComparison.Ordinal);
+        Assert.DoesNotContain("CacheDir", photos, StringComparison.Ordinal);
     }
 
     [Fact]

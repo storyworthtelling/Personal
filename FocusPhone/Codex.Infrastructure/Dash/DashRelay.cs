@@ -38,12 +38,16 @@ public sealed record DashActPlan(DashOutcome Outcome, IReadOnlyList<TimelineItem
 /// <summary>A read from the wrist: the thread to stamp read, and the stamp.</summary>
 public sealed record DashReadPlan(DashOutcome Outcome, string? ThreadKey, DateTimeOffset Stamp);
 
+/// <summary>A photo the wrist asked for (B5): the message that carries it, and which of its attachments it is.</summary>
+public sealed record DashPhotoPlan(TimelineItem Item, AttachmentRef Attachment);
+
 /// <summary>A call note from the wrist, as the timeline item Post keeps it as (<see cref="CallNote"/>).</summary>
 public sealed record DashNotePlan(DashOutcome Outcome, TimelineItem? Note);
 
 /// <summary>
 /// Post's half of Dash's contracts (P14 W-4.1.1): it answers <c>dash/people</c>, <c>dash/thread</c> and <c>dash/mail</c>
-/// from the timeline as the Mailbox shows it, and turns each act from the wrist into Post's own rules: a send takes the
+/// from the timeline as the Mailbox shows it, finds a conversation's photo by its id for <c>dash/photo</c> (B5), and turns
+/// each act from the wrist into Post's own rules: a send takes the
 /// phone's own route, a file keeps the tombstone rule, a delete is held for the undo window, an undo takes back what its
 /// act took, a read on the watch is a read on the phone (A14), and a call note is kept where Post keeps call notes.
 /// Post stays the one place the texts live (A9): the watch is shown, never handed, the record. Pure: the head reads the
@@ -121,6 +125,13 @@ public sealed partial class DashRelay
                 Cut(OneLine(item.Subject ?? string.Empty), DashLimits.Subject),
                 item.TimestampUtc))
             .ToList());
+
+    /// <summary>A photo of a conversation the wrist shows (B5), by its attachment id; null for anything else.</summary>
+    public DashPhotoPlan? Photo(DashPhotoAsk ask) =>
+        waiting
+            .SelectMany(Shown)
+            .SelectMany(item => item.Attachments.Where(attachment => attachment.IsImage).Select(attachment => new DashPhotoPlan(item, attachment)))
+            .FirstOrDefault(plan => DashIds.Attachment(plan.Item.SourceId, plan.Attachment.Id) == ask.Id);
 
     // ---- what the wrist asks ----
 
@@ -295,7 +306,7 @@ public sealed partial class DashRelay
             item.TimestampUtc,
             item.Incoming,
             TypeOf(item),
-            Cut(Words(item), DashLimits.MessageText),
+            Cut(OwnWords(item), DashLimits.MessageText),
             thread.IsGroup && item.Incoming ? Cut(snapshot.NameOf(item.ContactKey), DashLimits.Name) : null,
             item.Attachments.Take(DashLimits.Attachments)
                 .Select(attachment => new DashAttachment(DashIds.Attachment(item.SourceId, attachment.Id), TypeOf(attachment)))
@@ -314,6 +325,18 @@ public sealed partial class DashRelay
         return words.Length > 0 ? words
             : item.Attachments.Count > 0 ? AttachmentSummary.Describe(item.Attachments)
             : TimelineItemFormatter.Describe(item);
+    }
+
+    // A message's words in a conversation: a picture's stand-in ("Photo", "Photo +1") is no words of its own, since the
+    // wrist says what it is and draws the picture itself (B5).
+    private static string OwnWords(TimelineItem item)
+    {
+        if (item.Kind != TimelineItemKind.Message || item.Attachments.Count == 0)
+        {
+            return Words(item);
+        }
+        var words = (item.Snippet ?? string.Empty).Trim();
+        return words == AttachmentSummary.Describe(item.Attachments) ? string.Empty : words;
     }
 
     private static DashMessageType TypeOf(TimelineItem item) => item.Kind switch

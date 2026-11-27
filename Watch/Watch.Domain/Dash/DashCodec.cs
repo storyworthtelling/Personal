@@ -467,15 +467,12 @@ public static class DashCodec
         if (!Id(root, IdField, DashIds.IsAttachment, out var id)
             || !root.TryGetProperty(JpegField, out var said) || said.ValueKind != JsonValueKind.String
             || !said.TryGetBytesFromBase64(out var jpeg)
-            || jpeg is null || jpeg.Length > DashLimits.PhotoBytes || !IsJpeg(jpeg))
+            || jpeg is null || jpeg.Length > DashLimits.PhotoBytes || !PhotoFit.IsJpeg(jpeg))
         {
             return null;
         }
         return new DashPhoto(id, jpeg);
     }
-
-    // A JPEG opens with its start-of-image marker and the first byte of the marker after it.
-    private static bool IsJpeg(byte[] bytes) => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF;
 
     // ---- fields ----
 

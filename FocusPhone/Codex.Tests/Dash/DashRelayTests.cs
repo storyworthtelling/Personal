@@ -302,6 +302,70 @@ public class DashRelayTests
             message.Attachments);
     }
 
+    // ---- dash/photo (B5) ----
+
+    private static TimelineItem Picture(string who, int minute, string words = "") =>
+        Text(who, minute, words) with { Attachments = [new AttachmentRef("part:7", "photo.jpg", "image/jpeg", 2_400_000), new AttachmentRef("part:8", "clip.mp4", "video/mp4", 9_000_000)] };
+
+    [Fact]
+    public void APhotoIsFoundByItsId()
+    {
+        var picture = Picture(Robin, -1);
+
+        var plan = Relay(Text(Lee, -3), picture).Photo(new DashPhotoAsk(DashIds.Attachment(picture.SourceId, "part:7")));
+
+        Assert.NotNull(plan);
+        Assert.Equal((picture.SourceId, "part:7"), (plan.Item.SourceId, plan.Attachment.Id));
+    }
+
+    [Fact]
+    public void AVideoIsNoPhoto()
+    {
+        var picture = Picture(Robin, -1);
+
+        Assert.Null(Relay(picture).Photo(new DashPhotoAsk(DashIds.Attachment(picture.SourceId, "part:8"))));
+    }
+
+    [Fact]
+    public void AFiledPhotoIsNotFound()
+    {
+        var picture = Picture(Robin, -1);
+        var tombstones = new Tombstones();
+        tombstones.Mark(picture.SourceId, T0);
+
+        Assert.Null(new DashRelay(Snapshot([picture], tombstones)).Photo(new DashPhotoAsk(DashIds.Attachment(picture.SourceId, "part:7"))));
+    }
+
+    [Fact]
+    public void AMailsPictureIsNotAPhotoOnTheWrist()
+    {
+        var mail = Mail(SamMail, -2, MailClass.Human) with { Attachments = [new AttachmentRef("att:1", "photo.jpg", "image/jpeg", 300_000)] };
+
+        Assert.Null(Relay(mail).Photo(new DashPhotoAsk(DashIds.Attachment(mail.SourceId, "att:1"))));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Photo +1")]
+    public void APhotosStandInIsNoWordsOnTheWire(string standIn)
+    {
+        // The wrist says "Photo" itself and draws the picture alone (W-5.1.3); the row's line still says "Photo".
+        var picture = Picture(Robin, -1, standIn);
+
+        var relay = Relay(picture);
+
+        Assert.Equal(string.Empty, Assert.Single(relay.Thread(KeyOf(Robin))!.Messages).Text);
+        Assert.Equal("Photo +1", Assert.Single(relay.People().People).Line);
+    }
+
+    [Fact]
+    public void APhotosOwnWordsCross()
+    {
+        var picture = Picture(Robin, -1, "Look at the oranges.");
+
+        Assert.Equal("Look at the oranges.", Assert.Single(Relay(picture).Thread(KeyOf(Robin))!.Messages).Text);
+    }
+
     [Fact]
     public void AnUnknownKeyHasNoThread()
     {

@@ -40,6 +40,20 @@ public class DashActsCodecTests
     }
 
     [Fact]
+    public void AnEarlyUndoIsKeptAcrossARestart()
+    {
+        // An undo heard before its act (B5) stays in the book, so the act that follows a restart is still never done.
+        var before = new DashActs();
+        before.Undo("act-9", DateTimeOffset.UnixEpoch);
+
+        var after = DashActs.From(DashActsCodec.Decode(DashActsCodec.Encode(before.All)).Records);
+
+        Assert.True(after.Knows("act-9"));
+        Assert.Empty(after.Owed());
+        Assert.Equal(DashOutcome.Again, after.Undo("act-9", DateTimeOffset.UnixEpoch).Outcome);
+    }
+
+    [Fact]
     public void TheBookComesBackAfterARestart()
     {
         var before = new DashActs();

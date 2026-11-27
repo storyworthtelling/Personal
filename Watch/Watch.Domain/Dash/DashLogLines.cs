@@ -59,6 +59,9 @@ public enum DashOutcome
 
     /// <summary>The wrist asked and the phone did not answer within the wrist's wait (B4).</summary>
     NoAnswer,
+
+    /// <summary>A photo Post has, but could not fetch or shrink to fit one message (B5): not answered.</summary>
+    Unfetched,
 }
 
 /// <summary>

@@ -28,6 +28,9 @@ public sealed record DashUndoTurn(DashUndoPlan Plan) : DashTurn(WatchIdentity.Da
 /// <summary>A read: stamp the thread read in the store the Mailbox reads.</summary>
 public sealed record DashReadTurn(DashReadPlan Plan) : DashTurn(WatchIdentity.DashReadPath);
 
+/// <summary>A photo to fetch through Post's own code, shrink to fit, and answer (<see cref="DashInbox.Photo"/>).</summary>
+public sealed record DashPhotoTurn(DashPhotoAsk Ask, DashPhotoPlan Plan) : DashTurn(WatchIdentity.DashPhotoPath);
+
 /// <summary>A call note: keep it where Post keeps call notes.</summary>
 public sealed record DashNoteTurn(DashNotePlan Plan) : DashTurn(WatchIdentity.DashCallNotePath);
 
@@ -70,6 +73,10 @@ public static class DashInbox
                 return new DashUndoTurn(DashRelay.Undo(undo, conditions.Now, acts));
             case DashRead read:
                 return new DashReadTurn(relay().Read(read));
+            case DashPhotoAsk photo:
+                return relay().Photo(photo) is { } plan
+                    ? new DashPhotoTurn(photo, plan)
+                    : new DashNoTurn(message.Path, DashOutcome.Unknown);
             case DashCallNote note:
                 return new DashNoteTurn(relay().CallNote(note, conditions.Now));
             default:
@@ -85,6 +92,12 @@ public static class DashInbox
         acts.Sent(send.Id, outcome);
         return new DashSent(send.Id, outcome);
     }
+
+    /// <summary>The photo was fetched and shrunk (or not): the answer, or nothing.</summary>
+    public static DashTurn Photo(DashPhotoTurn turn, byte[]? jpeg) =>
+        jpeg is { } shrunk && PhotoFit.Fits(shrunk.Length) && PhotoFit.IsJpeg(shrunk)
+            ? new DashAnswer(turn.Path, new DashPhoto(turn.Ask.Id, shrunk), DashOutcome.Answered, 1)
+            : new DashNoTurn(turn.Path, DashOutcome.Unfetched);
 
     /// <summary>
     /// What the wrist is told: sent when a route took it (an MMS once the platform has it, as the phone's own send);

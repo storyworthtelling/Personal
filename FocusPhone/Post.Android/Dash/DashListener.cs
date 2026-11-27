@@ -143,6 +143,9 @@ internal static class DashCarrier
             case DashNoteTurn note:
                 Keep(context, note.Plan);
                 break;
+            case DashPhotoTurn photo:
+                await AnswerPhotoAsync(context, node, photo, deadline);
+                break;
             case DashNoTurn { Outcome: { } outcome } none:
                 HeadLog.Info(Tag, DashLogLines.Outcome(none.Path, outcome));
                 break;
@@ -195,6 +198,12 @@ internal static class DashCarrier
     private static void TakeBack(Context context, DashUndoPlan plan)
     {
         HeadLog.Info(Tag, DashLogLines.Outcome(WatchIdentity.DashUndoPath, plan.Outcome, plan.Items.Count));
+        if (plan.Outcome == DashOutcome.Unknown)
+        {
+            // An undo heard before its act is kept in the book (B5), so the act that follows a restart is still never done.
+            DashBook.Save(context);
+            return;
+        }
         if (plan.Outcome != DashOutcome.TakenBack)
         {
             return;
@@ -212,6 +221,32 @@ internal static class DashCarrier
             }
         }
         DashBook.Save(context);
+    }
+
+    // A photo for the wrist (B5): fetched as the Mailbox opens one, shrunk to fit one message, and answered once; one that
+    // will not fetch or fit is not answered, and the wrist's own wait says so.
+    private static async Task AnswerPhotoAsync(Context context, string? node, DashPhotoTurn photo, RunDeadline deadline)
+    {
+        byte[]? shrunk = null;
+        try
+        {
+            shrunk = DashPhotos.Shrink(AttachmentCache.Bytes(context, photo.Plan.Item, photo.Plan.Attachment));
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or Java.Lang.Exception)
+        {
+            HeadLog.Quiet(Tag, "DASH a photo for the wrist wouldn’t fetch", e);
+        }
+
+        switch (DashInbox.Photo(photo, shrunk))
+        {
+            case DashAnswer answer:
+                HeadLog.Info(Tag, DashLogLines.Outcome(answer.Path, answer.Outcome, answer.Count));
+                await ReplyAsync(context, node, answer.Reply, deadline);
+                break;
+            case DashNoTurn { Outcome: { } outcome } none:
+                HeadLog.Warn(Tag, DashLogLines.Outcome(none.Path, outcome));
+                break;
+        }
     }
 
     // Read on the watch is read on the phone (A14), through what the wrist showed, in the store the Mailbox reads.
