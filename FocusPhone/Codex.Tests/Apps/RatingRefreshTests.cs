@@ -11,8 +11,18 @@ public class RatingRefreshTests
     private static RatingBook Book(params (string Package, RatingEntry Entry)[] entries) =>
         new(entries.ToDictionary(e => e.Package, e => e.Entry));
 
+    // The category was read with the rating ("" when the page named none), so the entry is complete.
     private static RatingEntry Rated(ContentRating rating, long version, TimeSpan age) =>
-        new(rating, version, Now - age, RatingLookupOutcome.Rated);
+        new(rating, version, Now - age, RatingLookupOutcome.Rated, string.Empty);
+
+    [Fact]
+    public void ARatedAppWhoseCategoryWasNeverRead_IsDueOnce()
+    {
+        // Rated before the Entertainment block existed: its category is unknown, so it is read again once.
+        var book = Book(("com.example.stream", new RatingEntry(ContentRating.Teen, 5, Now - TimeSpan.FromDays(3), RatingLookupOutcome.Rated)));
+
+        Assert.Equal(["com.example.stream"], RatingRefresh.Due([("com.example.stream", 5)], book, Now));
+    }
 
     [Fact]
     public void AnAppNeverLookedUp_IsDue()

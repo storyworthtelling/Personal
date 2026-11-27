@@ -24,7 +24,11 @@ public record PolicyContext(
     // of Flyleaf. Null when the platform names none.
     string? SystemRecentsPackage = null,
     // Every account type the device knows, with the package that registers it (AccountLock).
-    IReadOnlyCollection<AccountAuthenticator>? Authenticators = null)
+    IReadOnlyCollection<AccountAuthenticator>? Authenticators = null,
+    // The streaming services a timed release has lifted for the title now playing (TimedReleases). A
+    // release takes its package out of the hard suspension for the window only; the next pass after it
+    // closes suspends it again.
+    IReadOnlySet<string>? TimedReleasedPackages = null)
 {
     // Every first-party app the owner ships lives under this namespace. Anything
     // matching it is known-good: the categorizer clears it outright so a

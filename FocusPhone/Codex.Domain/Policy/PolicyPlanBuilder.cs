@@ -45,6 +45,9 @@ public static class PolicyPlanBuilder
         // the shelf (ShelfSceneBuilder filters it out of the tray), so a block never interrupts a
         // background function (sync, alarms, notifications) the owner still relies on.
         suspended.UnionWith(context.NeverVisiblePackages);
+        // A timed release (a title's window, Entertainment block) lifts the hold on its one service for
+        // that window only: it leaves the suspend set here, and the release pass un-suspends it.
+        suspended.ExceptWith(context.TimedReleasedPackages ?? new HashSet<string>(StringComparer.Ordinal));
         suspended.ExceptWith(context.OwnPackages);
         // Suspending the Play Store would break background auto-updates, and the owner installs and
         // updates apps from it, so it is neither suspended nor hidden. An earlier build hid it

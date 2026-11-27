@@ -35,9 +35,12 @@ public class PlayListingClient
             return new PlayLookup(RatingLookupOutcome.Failed, ContentRating.Unknown);
         }
 
-        var rating = PlayRating.ReadListing(await response.Content.ReadAsStringAsync());
+        var html = await response.Content.ReadAsStringAsync();
+        var rating = PlayRating.ReadListing(html);
+        // The category is read from the same page; a page that names none is still a page read ("").
+        var genre = PlayRating.ReadGenre(html) ?? string.Empty;
         return rating is ContentRating.Unknown
-            ? new PlayLookup(RatingLookupOutcome.Unreadable, ContentRating.Unknown)
-            : new PlayLookup(RatingLookupOutcome.Rated, rating);
+            ? new PlayLookup(RatingLookupOutcome.Unreadable, ContentRating.Unknown, genre)
+            : new PlayLookup(RatingLookupOutcome.Rated, rating, genre);
     }
 }

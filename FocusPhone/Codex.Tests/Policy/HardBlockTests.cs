@@ -143,16 +143,48 @@ public class HardBlockTests
         new(Codex.Domain.Apps.RatingLookupOutcome.Rated, rating);
 
     [Fact]
-    public void Detect_NeverBlocksPulpsStreamingServicesForTheirRating()
+    public void Detect_BlocksEveryPulpStreamingService_WhateverItsCategoryOrRating()
     {
-        // Pulp hands the viewer to these apps; a rating change must not take its hand-off away.
+        // Entertainment block: a streaming service is hard-suspended, so it only opens through a timed release.
         var ratings = Codex.Domain.Apps.RatingBook.Empty;
         foreach (var package in Codex.Domain.Apps.LockedOpenCatalogue.Packages)
         {
-            ratings = ratings.Record(package, 1, Rated(Codex.Domain.Apps.ContentRating.Mature), DateTimeOffset.UnixEpoch);
+            ratings = ratings.Record(package, 1, Rated(Codex.Domain.Apps.ContentRating.Teen), DateTimeOffset.UnixEpoch);
         }
 
+        Assert.Equal(
+            Codex.Domain.Apps.LockedOpenCatalogue.Packages.ToHashSet(),
+            HardBlock.Detect(Codex.Domain.Apps.LockedOpenCatalogue.Packages.Select(package => (package, Undefined)), ratings));
+    }
+
+    [Fact]
+    public void Detect_BlocksAnyEntertainmentApp_NotOnlyTheStreamingServices()
+    {
+        var ratings = Codex.Domain.Apps.RatingBook.Empty.Record("com.example.clips", 1,
+            new Codex.Domain.Apps.PlayLookup(Codex.Domain.Apps.RatingLookupOutcome.Rated, Codex.Domain.Apps.ContentRating.Everyone, "ENTERTAINMENT"),
+            DateTimeOffset.UnixEpoch);
+
+        Assert.Contains("com.example.clips", HardBlock.Detect([("com.example.clips", Productivity)], ratings));
+    }
+
+    [Fact]
+    public void Detect_LeavesAnAppOutsideEntertainmentVisible()
+    {
+        var ratings = Codex.Domain.Apps.RatingBook.Empty.Record("com.example.notes", 1,
+            new Codex.Domain.Apps.PlayLookup(Codex.Domain.Apps.RatingLookupOutcome.Rated, Codex.Domain.Apps.ContentRating.Everyone, "PRODUCTIVITY"),
+            DateTimeOffset.UnixEpoch);
+
+        Assert.Empty(HardBlock.Detect([("com.example.notes", Productivity)], ratings));
+    }
+
+    [Fact]
+    public void Detect_NeverBlocksTheSuiteOrTheAllowlistForEntertainment()
+    {
+        var ratings = Codex.Domain.Apps.RatingBook.Empty
+            .Record("com.storyworthtelling.audio", 1, new Codex.Domain.Apps.PlayLookup(Codex.Domain.Apps.RatingLookupOutcome.Rated, Codex.Domain.Apps.ContentRating.Everyone, "ENTERTAINMENT"), DateTimeOffset.UnixEpoch)
+            .Record(Codex.Domain.Policy.PolicyContext.MapsPackage, 1, new Codex.Domain.Apps.PlayLookup(Codex.Domain.Apps.RatingLookupOutcome.Rated, Codex.Domain.Apps.ContentRating.Everyone, "ENTERTAINMENT"), DateTimeOffset.UnixEpoch);
+
         Assert.Empty(HardBlock.Detect(
-            Codex.Domain.Apps.LockedOpenCatalogue.Packages.Select(package => (package, Undefined)), ratings));
+            [("com.storyworthtelling.audio", Undefined), (Codex.Domain.Policy.PolicyContext.MapsPackage, Undefined)], ratings));
     }
 }

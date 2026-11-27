@@ -61,7 +61,8 @@ public static class PolicyManager
             NeverVisiblePackages: QueryNeverVisiblePackages(context),
             AdminModeActive: adminModeActive,
             SystemRecentsPackage: QuerySystemRecentsPackage(context),
-            Authenticators: QueryAuthenticators(context));
+            Authenticators: QueryAuthenticators(context),
+            TimedReleasedPackages: Codex.Domain.Apps.TimedReleases.Active(new TimedReleaseStore(context).Load(), DateTimeOffset.UtcNow));
     }
 
     // Every account type the device knows and the package registering it, for AccountLock.

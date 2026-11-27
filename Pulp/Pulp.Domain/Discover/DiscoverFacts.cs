@@ -19,6 +19,7 @@ public static class DiscoverFacts
         {
             Homes = TitleOffers.Streams(title.Offers).Select(offer => offer.Service).Distinct().ToList(),
             Franchises = franchisesOf(title.Id) ?? [],
+            RuntimeMinutes = title.RuntimeMinutes,
         };
     }
 }
