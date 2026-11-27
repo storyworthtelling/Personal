@@ -475,6 +475,9 @@ public class WatchInvariantsTests
         var waiting = link.IndexOf("DashExchange.Awaits(", StringComparison.Ordinal);
         var sending = link.IndexOf("SendMessageAsync(", StringComparison.Ordinal);
         Assert.True(waiting >= 0 && sending > waiting, "Dash sends an ask before it waits for the answer.");
+        // And its ear is in place, waited for within a bound, before the ask goes.
+        Assert.Contains("AddListenerAsync(", link, StringComparison.Ordinal);
+        Assert.Contains("BoundedAsync(registering, DashWaits.Find)", link, StringComparison.Ordinal);
     }
 
     [Fact]

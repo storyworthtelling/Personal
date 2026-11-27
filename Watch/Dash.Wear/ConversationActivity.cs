@@ -48,6 +48,7 @@ public sealed class ConversationActivity : Activity
         if (!DashIds.IsCorrespondence(key))
         {
             DashLog.Warn("DASH a conversation was opened with no correspondence");
+            key = string.Empty;
             Finish();
             return;
         }

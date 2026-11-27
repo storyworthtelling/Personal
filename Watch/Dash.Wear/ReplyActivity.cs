@@ -55,6 +55,7 @@ public sealed class ReplyActivity : Activity
         if (!DashIds.IsCorrespondence(key))
         {
             DashLog.Warn("DASH a reply was opened with no correspondence");
+            key = string.Empty;
             Finish();
             return;
         }

@@ -59,6 +59,7 @@ internal static class Screens
         status.SetPadding(round.Px(DashLayout.RowLeft), round.Px(DashLayout.BubbleGap), round.Px(DashLayout.RowLeft), round.Px(DashLayout.BubbleGap));
 
         screen.SetContentView(root);
+        scroll.RequestFocus();
         return new Frame(root, scroll, column, status);
     }
 

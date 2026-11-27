@@ -28,7 +28,7 @@ internal sealed class PostLink : Java.Lang.Object, MessageClient.IOnMessageRecei
 {
     private readonly object gate = new();
     private readonly List<Waiting> waiting = [];
-    private bool listening;
+    private Task? listening;
 
     private PostLink()
     {
@@ -42,9 +42,10 @@ internal sealed class PostLink : Java.Lang.Object, MessageClient.IOnMessageRecei
         var ticket = DashExchange.Awaits(ask)
             ?? throw new ArgumentException("Nothing answers this message; it is told, not asked.", nameof(ask));
         var waiter = new Waiting(ticket, new TaskCompletionSource<DashMessage?>(TaskCreationOptions.RunContinuationsAsynchronously));
-        Listen(context, waiter);
+        var registering = Listen(context, waiter);
         try
         {
+            await HeardAsync(registering);
             var trouble = await DeliverAsync(context, ask);
             if (trouble is not null)
             {
@@ -138,17 +139,14 @@ internal sealed class PostLink : Java.Lang.Object, MessageClient.IOnMessageRecei
         return RelayNodes.Choose(nodes);
     }
 
-    private void Listen(Context context, Waiting waiter)
+    // The wrist listens only while it waits for an answer: the first ask to wait adds the listener, the last to finish
+    // removes it. The registration is what the ask waits on before it is sent.
+    private Task Listen(Context context, Waiting waiter)
     {
         lock (gate)
         {
             waiting.Add(waiter);
-            if (listening)
-            {
-                return;
-            }
-            listening = true;
-            WearableClass.GetMessageClient(context.ApplicationContext ?? context).AddListener(this);
+            return listening ??= WearableClass.GetMessageClient(context.ApplicationContext ?? context).AddListenerAsync(this);
         }
     }
 
@@ -157,12 +155,26 @@ internal sealed class PostLink : Java.Lang.Object, MessageClient.IOnMessageRecei
         lock (gate)
         {
             waiting.Remove(waiter);
-            if (!listening || waiting.Count > 0)
+            if (listening is null || waiting.Count > 0)
             {
                 return;
             }
-            listening = false;
+            listening = null;
             WearableClass.GetMessageClient(context.ApplicationContext ?? context).RemoveListener(this);
+        }
+    }
+
+    // An answer may come back at once, so the ask waits, bounded, for the listener to be in place before it is sent. A
+    // registration that will not finish is logged by its shape and the ask goes anyway: Play services may yet hear it.
+    private static async Task HeardAsync(Task registering)
+    {
+        try
+        {
+            await BoundedAsync(registering, DashWaits.Find);
+        }
+        catch (Exception failure)
+        {
+            DashLog.Quiet("DASH the wrist’s ear wasn’t in place in time; the ask goes anyway", failure);
         }
     }
 
@@ -175,6 +187,19 @@ internal sealed class PostLink : Java.Lang.Object, MessageClient.IOnMessageRecei
             {
                 waiter.Answer.TrySetResult(answer);
             }
+        }
+    }
+
+    private static async Task BoundedAsync(Task call, TimeSpan wait)
+    {
+        try
+        {
+            await call.WaitAsync(wait);
+        }
+        catch (TimeoutException)
+        {
+            Observe(call);
+            throw;
         }
     }
 

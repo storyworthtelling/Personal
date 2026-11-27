@@ -6,7 +6,7 @@ using Watch.Domain;
 using Watch.Domain.Dash;
 using Watch.Ui.Wear;
 
-[assembly: Application(Label = "Dash", Icon = "@mipmap/ic_launcher", AllowBackup = false, Theme = "@android:style/Theme.DeviceDefault")] // not copy: the app's name, which only the watch's settings and app list show (A48)
+[assembly: Application(Label = "Dash", Icon = "@mipmap/ic_launcher", AllowBackup = false, Theme = "@android:style/Theme.DeviceDefault.NoActionBar")] // not copy: the app's name, which only the watch's settings and app list show (A48)
 
 namespace Dash.Wear;
 
