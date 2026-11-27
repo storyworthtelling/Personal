@@ -2262,3 +2262,206 @@ Tests written first, with no `ActActivity`, `ActCarrier` or `PhotoView` in `Watc
   `RepoGuards.Tests`: 452 passed. `Storyworthtelling.Updates.Tests`: 194 passed.
 - `Watch/Dash.Wear` and `Watch/Watch.Ui.Wear` compile here with 0 warnings and 0 errors; `FocusPhone/Post.Android`
   with 0 errors.
+
+# Chunk B6 · new texts from the Rolodex or by voice (the rest of W-5.1.2)
+
+Every figure below is from a real run on 27 Nov 2026. As before, each red run was taken with the tests written and the
+new code present only as stubs: methods threw `NotImplementedException`, new constants were empty strings or zero, and
+the new `DashTrouble.Changing` and `DashSend.Contact` existed so the tests compiled. Nothing in this chunk has met a
+watch, a phone or the Data Layer.
+
+## What it is
+
+**The owner's ruling, built:** Post sends the whole Rolodex to the watch, each contact its display name and a digest
+id, never a number, an address or a photo; the watch searches it (letters typed or dictated through the system's input)
+or scrolls it as a plain list; picking a contact and dictating sends a new text, which Post maps back to the number and
+sends by the phone's one road.
+
+**The contract (`Watch.Domain/Dash`):**
+- `dash/rolodex` (`WatchIdentity.DashRolodexPath`, the eleventh path, frozen, in Post's listener): the wrist asks
+  `{v, kind: ask, page}`; Post answers `{v, kind: rolodex, page, pages, edition, contacts: [{id, name}]}`, in Post's
+  order (by name), at most `DashLimits.RolodexPage` (200) contacts a page and `RolodexPages` (20) pages, so 4,000
+  contacts at most; the fullest page of the longest three-byte names still fits 64 KB. A contact is exactly an id
+  (`DashIds.Contact`, `p` and sixteen hex digits of a digest of Post's device contact id) and a name: a contact carrying
+  any other field (a number beside a name, say), a page past its count, more than 20 pages, a wrong id or edition shape
+  refuses the whole page. `edition` (`DashIds.Edition`, `e` and a digest of every id and name shown) tells pages of one
+  state of the book from another. A newer `v` is refused first, as everywhere.
+- `dash/send` gains a third target, `contact` (`DashSend.Contact`, an init property so every existing send stands):
+  exactly one of a correspondence, numbers or a contact. Post's answer is B1's `result` on the same path.
+- `DashExchange` matches a page's answer to its ask by its page number; the wait is the ordinary 20 s.
+- `Rolodex`: the contacts, deduplicated by id, and `Find(query)`: every word of the query begins a word of the name,
+  whatever the case, accents, apostrophes ("junipers" finds "Juniper’s school") or dictation's punctuation ("Robin."),
+  names that begin with the query first, then the rest, each in Post's order; nothing asked is everyone.
+- `RolodexGathering.GatherAsync`: page 0, then each in turn; a page of another edition or page count means the book
+  changed between pages, so the wrist starts again from page 0, at most `Restarts` (2) times, then says "Your phone’s
+  contacts kept changing." (`DashTrouble.Changing`); anything standing in the way of a page stops the asking and is said.
+- `HeldRolodex`: the last whole Rolodex, in memory, locked; nothing else.
+- `SendAttempt.NewText(contact, words, name)`: a new text named `send-` and 32 hex digits like a reply, its message
+  naming the contact; `Again` keeps B4's rule (no answer: the same name again; an answer: a new send).
+- `DashWords`: New text, Say a name, Everyone, "Who to?" (the dictation's prompt), "Opening your contacts.", "There’s
+  nobody in your phone’s contacts.", and "No one by that name." (the phone's Rolodex says the same). `DashLayout.EntryGap`.
+
+**Post's half:**
+- `Codex.Domain/Post/RolodexNumbers`: a contact's numbers in one order: the one the contacts app marks primary
+  (super-primary or primary), else a mobile (`Phone.TYPE_MOBILE` or `TYPE_WORK_MOBILE`), else the contacts app's own
+  order; a number listed twice is listed once, primary if either is. `ContactPicker.People` now reads each phone row's
+  `is_super_primary`, `is_primary` and `data2` and orders a person's phones by it, so the phone's own Rolodex (its Text,
+  its Call, the number under a name) and the wrist reach the same first number.
+- `Codex.Infrastructure/Dash/RolodexRelay` (pure): the pages and `NumberOf(id)`. A contact is on the wrist only if it
+  has a number (the first of its phones that is a number) and a name of its own: the phone names a nameless contact
+  after its number or address, so a name with no letter, an `@`, or a run of seven digits or more (with the usual
+  separators) is left out. Names are one line, cut to 60 with an ellipsis, without control characters or half a
+  surrogate pair. The edition is over what the wrist is shown, so a changed number changes nothing there and is found
+  again at send time.
+- `DashInbox.Turn` takes the Rolodex beside the Mailbox (`Func<RolodexRelay>`): a page ask reads only the address book
+  (a page past the last is not answered, `DASH dash/rolodex: Unknown`); a send naming a contact reads only the address
+  book and becomes `DashRelay.NewText(number, …)`: the phone's road to that number (bridge first when it is up, finding
+  or starting its conversation; else a plain text), or `Nowhere` for an id Post no longer has. The book's same-id rule
+  holds: in the book before it goes, answered from the book if heard again.
+- `Post.Android/Dash/DashContacts`: the relay over `ContactPicker.People`; without the contacts permission the wrist is
+  shown an empty book, said once in the log. `DashListener` hears `/dash/rolodex` and hands the carrier the Rolodex.
+  Logs: `DASH dash/rolodex: Answered 200`, a count.
+
+**Dash on the watch (`Watch/Dash.Wear`; no mockup draws the flow, so it follows the nearest drawn screens and the
+mockup file is not edited):**
+- People waiting has **New text** at its foot, where the mockup draws Mail: a quieter word in the grey (Mail's weight),
+  under the rows as they follow each other, and there with nobody waiting too.
+- `RolodexActivity` (registered `…communication.dash.RolodexActivity`): "New text" at the top as Mail and a
+  conversation draw their names; the contacts as cards (`ContactRowView`: the name in the ink, a whole touch target,
+  TalkBack reads the name as a button) as People waiting's rows; **Say a name** (the system's dictation, prompted "Who
+  to?") and **Keyboard** (its input screen) pinned at the foot as Replying by voice draws Keyboard and Again. The
+  letters found are read back in the ink with **Everyone** under them. The last Rolodex gathered shows at once and a
+  fresh one is gathered on the pool each time the screen opens ("Opening your contacts." until the first); a failure
+  keeps what is shown and says why. The list draws 40 at a time and grows as the crown nears the end. The screen keeps
+  only the search across a rebuild, never a contact.
+- A contact picked opens B4's reply screen on the contact's id ("To Lee", dictation first, Send, Keyboard, Again); when
+  it went, both screens go and People waiting is where the owner was; when it did not, the reply screen says why and
+  keeps the words, as for a reply.
+- `RolodexCarrier`: the gathering, each page through `PostLink` within its bounds, on the pool; `RolodexBook.Held`.
+
+## Tests written first
+
+- `Watch/Watch.Tests/Dash/DashCodecTests.cs`: `ARolodexPageKeepsEveryField`, `AContactIsItsIdAndItsName`,
+  `ARolodexAskIsItsPage`, `ANewTextNamesItsContact`, `AReplyNamesNoContact`, `TheFullestRolodexPageFitsTheBudget`,
+  `APagePastItsSizeIsUnreadable`, 20 malformed rows (an ask with no page or a page of -1, "0", 1.5 or 20; a page with no
+  contacts, 0 pages, its page at its count, 21 pages, no or a wrong edition, a correspondence's id, an empty or missing
+  name, a number beside a name, a contact that is a string; a contact beside a correspondence or numbers, a contact that
+  is a correspondence's id, a contact with no words), three wrong-path rows, the frozen words and limits; and four
+  fixtures in `DashFixtures` (so every round-trip, `v` and log-line theory takes them).
+- `DashIdsTests` (`AContactAndAnEditionAreDigestsToo`, `AContactIsNeverACorrespondence`, `AContactsShapeIsChecked` ×8),
+  `DashExchangeTests` (`ARolodexPageIsAnsweredOnlyForItsPage`, `ANewTextIsAnsweredByItsId`, two rows),
+  `SendAttemptTests` (`ANewTextGoesToItsContact`, `ANewTextIsNamedAsAReplyIs`, `ANewTextNeedsAContact` ×3,
+  `ANewTextNeedsWords`, `ANewTextTravelsOnTheSendPath`), `DashWordsTests.TheRolodexsWordsAreItsOwn` and the sentence and
+  label lists, `DashLayoutTests.NewTextSitsWhereTheMockupDrawsMail`, `DashLogLinesTests` (a Rolodex and a new text with
+  sentinels), and the new `RolodexTests` (29 with rows: the search's twelve, the gathering's ten, the hold's three).
+- `WatchInvariantsTests`: `DashPathsAreFrozen` and `DashsNamesAreFrozen` with the new path and screen; then
+  `EachDashScreenIsRegisteredByItsName` (the Rolodex's row), `DashWaitsOffTheMainThread` (five screens),
+  `DashStartsNewTextsFromTheRolodex`, `TheWristHoldsTheRolodexInMemoryOnly` (nothing in Dash names a store; the screen
+  saves only the search) and `TheWristNeverSendsANumber` (no `new DashSend(` or `new DashCallNote(` in Dash: every text
+  is a `SendAttempt`); `WatchA11yTests.TheGuardSeesDash` with `ContactRowView`.
+- `FocusPhone/Codex.Tests/Post/RolodexNumbersTests.cs` (6), `Dash/RolodexRelayTests.cs` (29 with rows, among them
+  `NoNumberCrosses`: every page as it crosses, read for every number in every spelling and for an `@`;
+  `ANameThatIsNoNameIsLeftOut` ×8; `TheFullestPageFitsTheBudget`), `DashInboxTests` (`TheRolodexIsAnswered`,
+  `APagePastTheLastIsNotAnswered`, `ANewTextGoesToTheContactsNumber`, `ANewTextTriesTheBridgeFirst`,
+  `ANewTextToSomeoneUnknownIsNowhere`, `ANewTextWithNothingToCarryItIsNoRoute`, `ANewTextIsSentOnce`, the Rolodex row in
+  `AnAnswerArrivingAtPostIsLeftAlone`; every other turn now passes a Rolodex that throws if read), and
+  `DashRelayGuardTests` (`PostRegistersItsListenerByName` with the eleventh path,
+  `TheListenerCarriesThePlansThroughPostsOwnCode` ×3 more, `TheWristsRolodexIsThePhones`, `TheWristIsShownNoNumberFromTheBook`).
+
+## Red 1 · the contract and the wrist's pure half (Watch.Domain)
+
+- **`Watch.Tests`: 1043 tests, 78 failed, 965 passed.** The 78: `RolodexTests` 29, `DashCodecTests` 18, `DashIdsTests`
+  10, `SendAttemptTests` 7, `DashWordsTests` 6, `DashLogLinesTests` 3, `WatchInvariantsTests` 3 (`DashPathsAreFrozen`,
+  `DashsNamesAreFrozen`, and B1's `EveryDashPathIsItsOwn` over the stub's empty path), `DashExchangeTests` 1,
+  `DashLayoutTests` 1. First errors: `TypeInitializationException` 25 (`RolodexTests`' book is built by the stub's
+  constructor), `NotImplementedException` 18, `ArgumentException: … is not a Dash message` 13 (`DashRolodex` 10,
+  `DashRolodexAsk` 3), `Assert.Equal() Failure` 7, `Assert.Throws() Failure` 5, `ArgumentOutOfRangeException: Not a
+  trouble Dash knows` 5 (B4's sentence and trouble tests meeting `Changing`), `Assert.All() Failure` 2, and one each of
+  `Assert.IsType()`, `Assert.NotEqual()` and "new text to a contact: Unreadable". Passing on the stubs: the malformed
+  `/dash/rolodex` rows (the stub reads nothing there), the asks no stub answers, and `TheHoldKeepsNothingButMemory`
+  (it reads the stub's members, which had the final shape).
+- **On the way to green:** 1043 with 3 failed, `DictationsPunctuationIsIgnored` ×3: the test expected "Robin." to find
+  Robin alone, but "robin" begins Lee Robinson's "Robinson", as the rule says; the test was wrong, and now expects both.
+- **`Codex.Tests` (Post's listener must hear the new path): 3331 tests, 1 failed, 3330 passed**,
+  `PostRegistersItsListenerByName` (`DataPath = WatchIdentity.DashRolodexPath` not found). Green once the filter was in.
+- **Green: `Watch.Tests` 1043 passed, 0 failed. `Codex.Tests` 3331 passed. `RepoGuards.Tests` 452 passed.**
+
+## Red 2 · Post's half
+
+- **`FocusPhone/Codex.Tests`: 3379 tests, 47 failed, 3332 passed.** The 47: `RolodexRelayTests` 29, `DashInboxTests` 7,
+  `RolodexNumbersTests` 6, `DashRelayGuardTests` 5. First errors: `NotImplementedException` 35,
+  `InvalidOperationException: The Mailbox was read for a message that needs none.` 5 (a new text went to the Mailbox's
+  relay), `Assert.Contains() Failure: Sub-string not found` 4, and one each of `Assert.IsType()` (the Rolodex ask not
+  answered), `Sequence contains no matching element` (no `DashContacts.cs`) and `Assert.Equal()` (a page past the last
+  had no outcome).
+- **On the way:** 3379 with 6 failed: `ANewTextTriesTheBridgeFirst` compared a list inside a tuple, by reference (the
+  test was wrong; two asserts now), and the five head guards. `TheWristsRolodexIsThePhones` first asked the picker for
+  `RolodexNumbers.IsMobile(`, which `Order` calls itself; it now asks for the columns the picker reads and the
+  `ContactNumber` it builds.
+- **Green: `Codex.Tests` 3379 passed, 0 failed. `Watch.Tests` 1043 passed. `RepoGuards.Tests` 452 passed. Compiled
+  here:** `FocusPhone/Post.Android`, **Build succeeded, 0 errors**; none of the 65 warnings names a file this step touched.
+
+## Red 3 · Dash on the watch
+
+- **`Watch.Tests`: 1047 tests, 5 failed, 1042 passed:** `DashStartsNewTextsFromTheRolodex` and
+  `TheWristHoldsTheRolodexInMemoryOnly` ("Watch/Dash.Wear/RolodexActivity.cs isn’t there."),
+  `EachDashScreenIsRegisteredByItsName("DashRolodexActivityName")` (`Values differ`, 0 for 1), `DashWaitsOffTheMainThread`
+  (four screens, not five), `WatchA11yTests.TheGuardSeesDash` (no `ContactRowView`). `TheWristNeverSendsANumber` passed
+  on B5's head, which already sent only through `SendAttempt`.
+- **On the way:** red 1's `DashLayout.EntryCentre(rows)` placed New text by the mockup's fractions, which a column of
+  rows taller than drawn (each a whole touch target) cannot keep; it is now `EntryGap`, the gap the rows keep between
+  them, and the layout test shows a row's height of entry after it under the third row centred at the mockup's 1.7.
+- **Probe, once green:** `DashLog.Info($"DASH first contact {…Name}")` in `RolodexCarrier`, `Console.WriteLine(name)` in
+  `RolodexRelay` and `HeadLog.Info(Tag, $"DASH reading {context.PackageName}")` in `DashContacts`:
+  `DashLogsCarryNoPayloadTests` 43 tests, 3 failed (`TheWristLogsOnlyDashLines`, `TheCodecAndTheRelayNeverLog`,
+  `TheListenerLogsOnlyDashLines`), each naming its probe. The probes were removed.
+- **Green: `Watch.Tests` 1047 passed, 0 failed.** **Compiled here:** `Watch/Dash.Wear`, **Build succeeded, 0 warnings,
+  0 errors**.
+
+## Decisions made in this chunk (each the owner's to overturn)
+
+- **One number per contact, chosen on the phone; the wrist is shown no labels and no choice.** Post's Rolodex keeps no
+  labels (`ContactPicker` read numbers without their type and texted the first), so "by label" has nothing to pick
+  from. Post texts the contacts app's primary, else a mobile, else the first number that is a number. To keep one
+  address book, the phone's Rolodex now orders a person's numbers the same way: its Text and Call, and the number
+  under a name, are the primary or mobile one where they were the provider's first row. A visible change on the phone.
+- **A contact is named by a digest of the device contact id.** Stable while the contacts provider keeps the id; a
+  contact it re-aggregates (an account sync merging two) gets a new id, and a new text to the old one is "There’s
+  nobody to send this to." until the Rolodex is gathered again.
+- **A contact without a name of its own is left out,** since the phone names such a contact after its number or
+  address: no letter, an `@`, or a run of seven digits or more. Such a contact cannot be texted from the wrist. Two
+  contacts with one name both appear, and cannot be told apart there.
+- **200 a page, at most 20 pages (4,000 contacts), cut in Post's order past that; two restarts.** Chosen, not measured.
+- **Gathered afresh each time the screen opens,** the last one shown meanwhile; held for Dash's process only (the
+  session), never written down; a rebuilt screen keeps only the search.
+- **B1's numbers form of `dash/send` stays in the contract,** unused: the wrist is handed no number, and a guard keeps it
+  sending none.
+- **New text is on People waiting with nobody waiting too,** which amends B4's "the faint glyph and nothing else".
+- **Say a name opens dictation directly** and Keyboard the system's input screen, as the reply screen does; the
+  letters are read back with Everyone to leave the search. "By voice" is the name said into the search, as asked.
+- **A new text that went shows nowhere on the wrist at once:** both screens go, and the correspondence appears on
+  People waiting when Post shows it (a reply, by contrast, shows in its conversation at once, B4).
+- **Without the contacts permission the wrist is shown an empty book** and says nobody is in the phone's contacts; it
+  cannot tell that from a book with nobody in it. An answer carrying why would be a new field.
+- **40 contacts drawn at a time,** more as the crown nears the end, so a large book does not build thousands of views.
+
+## Not done, not verified
+
+- **Nothing here has met a watch or a phone.** Unverified: the contacts provider's `is_super_primary`, `is_primary` and
+  `data2` on this phone's accounts; how long a large book takes to cross page by page over Bluetooth or the cloud
+  relay; the dictation prompt and the input screen for a name on Wear OS 6; the list growing as the crown scrolls
+  (`ScrollChange`); the cards and choices on the 41 mm and 45 mm screens; TalkBack; the contacts permission on the
+  locked phone; and Google Messages' bridge finding or starting a conversation for a number sent from the wrist (B2's
+  cascade, as unverified from the phone).
+- **No mockup draws the new-text flow;** `design/screens-r1.html` is unchanged. W-5.1.9's favourites (starred in the
+  Rolodex) do not cross: the contract carries names and ids only.
+- **Not built from release B:** W-5.1.5 (the call note), W-5.1.6 (mail lines), W-5.1.7 (the tile), W-5.1.9 (overnight
+  callers). No buzz yet.
+
+## Chunk B6 totals
+
+- `Watch.Tests`: **1047 passed, 0 failed.** `Tools/FaceStudio.Tests`: 38 passed. `FocusPhone/Codex.Tests`: 3379 passed.
+  `RepoGuards.Tests`: 452 passed. `Storyworthtelling.Updates.Tests`: 194 passed. `leakscan --ci` over the chunk's diff:
+  "no personal-data shapes in the added lines".
+- `Watch/Dash.Wear` and `Watch/Watch.Ui.Wear` compile here with 0 warnings and 0 errors; `FocusPhone/Post.Android`
+  with 0 errors (65 warnings, none in a file this chunk touched).
