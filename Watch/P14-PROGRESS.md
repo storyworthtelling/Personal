@@ -2823,3 +2823,15 @@ written against it).
   carries READ_PHONE_STATE and VIBRATE, `…dash.ArrivalListener` filtered on `/dash/arrived`, `…dash.CallScreen` under
   `BIND_SCREENING_SERVICE`, and `…dash.PeopleTileService` under `BIND_TILE_PROVIDER` with its preview; the Tiles library
   adds androidx's profile installer and startup provider, as androidx libraries do.
+
+### B8 follow-up · an arrival is stamped when the phone had it
+
+Read back over the whole chunk: the wrist stays still for an arrival older than two minutes by its own clock, and Post
+stamped the arrival with the text's own time, so a text the carrier held for minutes (the texts trail's LATE lines)
+would have alerted the phone and never buzzed the wrist. `DashArrivals.For` now takes the moment Post tells the wrist.
+
+- **Red: `FocusPhone/Codex.Tests` 3450 tests, 1 failed, 3449 passed**, `DashArrivalsTests.ItIsWhenThePhoneHadIt` (B8's
+  `ItIsWhenTheTextCame`, turned round): `Assert.Equal() Failure: Values differ`, the text's time nine minutes back.
+- **Green: `Codex.Tests` 3450 passed; `Watch.Tests` 1230 passed.** `FocusPhone/Post.Android` builds with 0 errors (65
+  warnings; the one in a file B8 touched is `SmsNotifications.cs`' own buzz, as before), `Watch/Dash.Wear` with 0
+  warnings and 0 errors.

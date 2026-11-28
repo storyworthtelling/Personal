@@ -43,7 +43,7 @@ public class DashArrivalsTests
     {
         var text = Text(Lee, -1);
 
-        Assert.Equal(WaitingKey(text, PerKeyIdentityResolver.Instance), DashArrivals.For(text, Nobody).Key);
+        Assert.Equal(WaitingKey(text, PerKeyIdentityResolver.Instance), DashArrivals.For(text, Nobody, T0).Key);
     }
 
     [Fact]
@@ -51,8 +51,8 @@ public class DashArrivalsTests
     {
         var text = GroupText(Robin, -1);
 
-        Assert.Equal(WaitingKey(text, PerKeyIdentityResolver.Instance), DashArrivals.For(text, Nobody).Key);
-        Assert.Equal(DashIds.Correspondence(TimelineMerger.GroupThreadKey("mms:17")), DashArrivals.For(text, Nobody).Key);
+        Assert.Equal(WaitingKey(text, PerKeyIdentityResolver.Instance), DashArrivals.For(text, Nobody, T0).Key);
+        Assert.Equal(DashIds.Correspondence(TimelineMerger.GroupThreadKey("mms:17")), DashArrivals.For(text, Nobody, T0).Key);
     }
 
     [Fact]
@@ -67,25 +67,30 @@ public class DashArrivalsTests
             [mail, text], new HashSet<(TimelineItemKind, string)>(), SpamList.From([]), new DeleteBuffer(), new Tombstones(), resolver,
             new ReadState(new Dictionary<string, DateTimeOffset>()), GroupNames.Empty, key => "Lee"));
 
-        Assert.Equal(Assert.Single(relay.People().People).Key, DashArrivals.For(text, Nobody).Key);
+        Assert.Equal(Assert.Single(relay.People().People).Key, DashArrivals.For(text, Nobody, T0).Key);
     }
 
     [Fact]
-    public void ItIsWhenTheTextCame() =>
-        Assert.Equal(T0.AddMinutes(-1), DashArrivals.For(Text(Lee, -1), Nobody).At);
+    public void ItIsWhenThePhoneHadIt()
+    {
+        // A text the carrier held for minutes still arrived just now: the wrist judges how late the telling is, not the text.
+        var arrived = DashArrivals.For(Text(Lee, -9), Nobody, T0);
+
+        Assert.Equal(T0, arrived.At);
+    }
 
     [Fact]
     public void AStarredSenderIsAFavourite()
     {
-        Assert.True(DashArrivals.For(Text(Lee, -1), key => key == Lee).Favourite);
-        Assert.False(DashArrivals.For(Text(Robin, -1), key => key == Lee).Favourite);
+        Assert.True(DashArrivals.For(Text(Lee, -1), key => key == Lee, T0).Favourite);
+        Assert.False(DashArrivals.For(Text(Robin, -1), key => key == Lee, T0).Favourite);
     }
 
     [Fact]
     public void InAGroupTheFavouriteIsWhoeverSentIt()
     {
-        Assert.True(DashArrivals.For(GroupText(Robin, -1), key => key == Robin).Favourite);
-        Assert.False(DashArrivals.For(GroupText(Lee, -1), key => key == Robin).Favourite);
+        Assert.True(DashArrivals.For(GroupText(Robin, -1), key => key == Robin, T0).Favourite);
+        Assert.False(DashArrivals.For(GroupText(Lee, -1), key => key == Robin, T0).Favourite);
     }
 
     [Fact]
@@ -94,7 +99,7 @@ public class DashArrivalsTests
         // A text Post got with no address: nobody to look up, so nobody starred.
         var asked = new List<string>();
 
-        var arrived = DashArrivals.For(Text(string.Empty, -1), key => { asked.Add(key); return true; });
+        var arrived = DashArrivals.For(Text(string.Empty, -1), key => { asked.Add(key); return true; }, T0);
 
         Assert.False(arrived.Favourite);
         Assert.Empty(asked);
@@ -103,7 +108,7 @@ public class DashArrivalsTests
     [Fact]
     public void NoNumberNameOrWordCrosses()
     {
-        var json = Encoding.UTF8.GetString(DashCodec.Encode(DashArrivals.For(GroupText(Robin, -1), Nobody)));
+        var json = Encoding.UTF8.GetString(DashCodec.Encode(DashArrivals.For(GroupText(Robin, -1), Nobody, T0)));
 
         foreach (var payload in new[] { Lee, Robin, "555", "Robin", "Lee", "Running", "mms:17", "group:" })
         {
@@ -113,7 +118,7 @@ public class DashArrivalsTests
 
     [Fact]
     public void ItTravelsOnTheArrivalPath() =>
-        Assert.Equal(WatchIdentity.DashArrivedPath, DashArrivals.For(Text(Lee, -1), Nobody).Path);
+        Assert.Equal(WatchIdentity.DashArrivedPath, DashArrivals.For(Text(Lee, -1), Nobody, T0).Path);
 
     private sealed class OneLee : IIdentityResolver
     {

@@ -39,7 +39,7 @@ internal static class WristArrivals
         try
         {
             var deadline = new RunDeadline(DateTimeOffset.UtcNow + Turn);
-            var arrived = DashArrivals.For(arriving, key => DashStars.IsStarred(context, key));
+            var arrived = DashArrivals.For(arriving, key => DashStars.IsStarred(context, key), DateTimeOffset.UtcNow);
 
             var capabilities = WearableClass.GetCapabilityClient(context);
             var capability = await DashCarrier.BoundedAsync(capabilities.GetCapabilityAsync(WatchIdentity.DashCapability, CapabilityClient.FilterReachable), deadline.Cut(DateTimeOffset.UtcNow, FindWait));

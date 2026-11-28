@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Dash on the watch (P14 E5; W-5.1.1, W-5.1.2): People waiting, a conversation, and a reply by dictation or the
-    keyboard, every one of them asked of Post on the phone over the Data Layer. It keeps no copy of anyone's texts (A9),
+    Dash on the watch (P14 E5; W-5.1.1 to W-5.1.9): People waiting and its tile, a conversation, and a reply by dictation or
+    the keyboard, every one of them asked of Post on the phone over the Data Layer; two short taps when Post says a text came;
+    and unknown callers kept from ringing until they call again. It keeps no copy of anyone's texts (A9),
     holds no key and asks for no vault passphrase (the owner's ruling, 27 Nov 2026). It carries Post's package (PC1):
     the Data Layer delivers only between apps of one package and one signature.
 
@@ -33,6 +34,9 @@
     <!-- The Data Layer (MessageClient, CapabilityClient), Microsoft's binding of play-services-wearable: CLAUDE.md's
          dependency rule 2, and required to talk to the phone at all. The same package and version as the installer. -->
     <PackageReference Include="Xamarin.GooglePlayServices.Wearable" />
+    <!-- The People waiting tile (P14 B8, W-5.1.7): the documented Wear OS Tiles library, Microsoft's binding (rule 2).
+         Its tile request answers a ListenableFuture, made by androidx.concurrent.futures' adapter, named here directly
+         since it otherwise arrives only through another package's range (OneBuildSettingTests' 17 Nov lesson). -->
     <PackageReference Include="Xamarin.AndroidX.Wear.Tiles" />
     <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" />
   </ItemGroup>

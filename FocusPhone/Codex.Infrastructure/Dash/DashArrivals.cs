@@ -7,14 +7,15 @@ namespace Codex.Infrastructure.Dash;
 /// Post telling the wrist a text arrived (P14 B8; WD §7, A12): the one message Post sends the wrist unasked. Where the
 /// phone itself alerts for an arriving text (a spam text never does), Post names its correspondence as People waiting
 /// names it (<see cref="DashIds.Correspondence"/> of a group's thread key, or of a person's own key, which is the first of
-/// their keys People waiting shows a merged person under whenever a text comes from their number), says when it came, and
-/// whether whoever sent it is a favourite, starred in the phone's own contacts. Never a name, a number or a word. Pure:
+/// their keys People waiting shows a merged person under whenever a text comes from their number), says when the phone had
+/// it (not when it was sent: a text the carrier held for minutes still arrived just now, and the wrist judges only how late
+/// the telling is), and whether whoever sent it is a favourite, starred in the phone's own contacts. Never a name, a number or a word. Pure:
 /// the head reads the star, and tells a wrist in reach once.
 /// </summary>
 public static class DashArrivals
 {
-    public static DashArrived For(TimelineItem arriving, Func<string, bool> isStarred) =>
+    public static DashArrived For(TimelineItem arriving, Func<string, bool> isStarred, DateTimeOffset now) =>
         new(DashIds.Correspondence(arriving.GroupId is { } group ? TimelineMerger.GroupThreadKey(group) : arriving.ContactKey),
-            arriving.TimestampUtc,
+            now,
             !string.IsNullOrWhiteSpace(arriving.ContactKey) && isStarred(arriving.ContactKey));
 }
