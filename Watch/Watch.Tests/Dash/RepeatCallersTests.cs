@@ -112,13 +112,88 @@ public class RepeatCallersTests
     }
 
     [Fact]
-    public void EachProcessHasItsOwnSecret()
+    public void TheSealIsWhatKeysTheCaller()
     {
-        var first = CallerKey.NewSecret();
-        var second = CallerKey.NewSecret();
+        // On the watch the seal is a key the platform's keystore holds and won't give out, so a kept digest can't be
+        // turned back into a number anywhere else; what it is sealed with is the head's to choose.
+        var sealedWith = new List<byte[]>();
+        var key = CallerKey.Of("+1 212-555-0101", digits => { sealedWith.Add(digits); return Secret; });
 
-        Assert.Equal(32, first.Length);
-        Assert.NotEqual(first, second);
+        Assert.Equal("2125550101", Encoding.ASCII.GetString(Assert.Single(sealedWith)));
+        Assert.Equal("k" + Convert.ToHexString(Secret)[..32].ToLowerInvariant(), key);
+    }
+
+    [Fact]
+    public void AWithheldCallIsNeverSealed()
+    {
+        var sealedWith = new List<byte[]>();
+
+        Assert.Equal(CallerKey.Withheld, CallerKey.Of(null, digits => { sealedWith.Add(digits); return Secret; }));
+        Assert.Empty(sealedWith);
+    }
+
+    // ---- across a restart: the process can die between two calls minutes apart ----
+
+    [Fact]
+    public void TheCallersCrossARestart()
+    {
+        var callers = new RepeatCallers();
+        callers.Heard(Caller("+1 212-555-0101"), T0);
+
+        var record = callers.Record(T0.AddMinutes(1));
+
+        Assert.Equal(RingVerdict.Ring, RepeatCallers.From(record, T0.AddMinutes(4)).Heard(Caller("+1 212-555-0101"), T0.AddMinutes(4)));
+    }
+
+    [Fact]
+    public void ACallerPastTheWindowIsNotKept()
+    {
+        var callers = new RepeatCallers();
+        callers.Heard(Caller("+1 212-555-0101"), T0);
+
+        Assert.Equal(string.Empty, callers.Record(T0 + RepeatCallers.Window + TimeSpan.FromSeconds(1)));
+        Assert.Equal(RingVerdict.Silence,
+            RepeatCallers.From(callers.Record(T0.AddMinutes(1)), T0.AddMinutes(20)).Heard(Caller("+1 212-555-0101"), T0.AddMinutes(20)));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not a record")]
+    [InlineData("k0123\t1")]
+    [InlineData("+12125550101\t1795364400000")]
+    [InlineData("kffffffffffffffffffffffffffffffff\tsoon")]
+    public void ADamagedRecordRemembersNobody(string? record)
+    {
+        var callers = RepeatCallers.From(record, T0);
+
+        Assert.Equal(string.Empty, callers.Record(T0));
+        Assert.Equal(RingVerdict.Silence, callers.Heard("kffffffffffffffffffffffffffffffff", T0));
+    }
+
+    [Fact]
+    public void TheRecordHoldsKeysAndMomentsOnly()
+    {
+        var callers = new RepeatCallers();
+        callers.Heard(Caller("+1 212-555-0101"), T0);
+        callers.Heard(CallerKey.Withheld, T0.AddMinutes(1));
+
+        var record = callers.Record(T0.AddMinutes(2));
+
+        Assert.All(record.Split('\n'), line => Assert.Matches(@"^(k[0-9a-f]{32}|withheld)\t\d+$", line));
+        Assert.DoesNotContain("5550101", record, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AtMostTheRememberedCrossARestart()
+    {
+        var callers = new RepeatCallers();
+        for (var index = 0; index < RepeatCallers.Remembered + 5; index++)
+        {
+            callers.Heard(Caller($"+1 212-555-{index:0000}"), T0.AddSeconds(index));
+        }
+
+        Assert.Equal(RepeatCallers.Remembered, callers.Record(T0.AddMinutes(1)).Split('\n').Length);
     }
 
     [Fact]
@@ -135,7 +210,4 @@ public class RepeatCallersTests
         // The first has been let go: past 32 other callers within minutes, a second call shows without ringing.
         Assert.Equal(RingVerdict.Silence, callers.Heard(Caller("+1 212-555-0101"), T0.AddMinutes(1)));
     }
-
-    [Fact]
-    public void TheSharedOneIsOne() => Assert.Same(RepeatCallers.Shared, RepeatCallers.Shared);
 }

@@ -2835,3 +2835,23 @@ would have alerted the phone and never buzzed the wrist. `DashArrivals.For` now 
 - **Green: `Codex.Tests` 3450 passed; `Watch.Tests` 1230 passed.** `FocusPhone/Post.Android` builds with 0 errors (65
   warnings; the one in a file B8 touched is `SmsNotifications.cs`' own buzz, as before), `Watch/Dash.Wear` with 0
   warnings and 0 errors.
+
+### B8 follow-up · the callers cross a restart, sealed by the keystore
+
+Read back over the call screening: the platform binds the screening service for each call and lets its process go,
+and on a watch a process two calls apart is more likely dead than not, so a caller remembered in memory alone would
+have meant an unknown number never rings at all. The callers are now kept across a restart, for the window and no
+longer, each a digest sealed by an HMAC key the platform's keystore makes and keeps (`CallerSeal`), with its moment: the
+number itself is never written down, and a kept digest can't be turned back into one off the watch.
+
+- **Tests first:** `RepeatCallersTests` (`TheSealIsWhatKeysTheCaller`, `AWithheldCallIsNeverSealed`,
+  `TheCallersCrossARestart`, `ACallerPastTheWindowIsNotKept`, `ADamagedRecordRemembersNobody` ×6,
+  `TheRecordHoldsKeysAndMomentsOnly`, `AtMostTheRememberedCrossARestart`; `EachProcessHasItsOwnSecret` and the shared
+  instance went with the per-process secret), `WatchInvariantsTests.DashsServicesAreFrozen` with the three new names
+  (`dash-callers`, `heard`, `dash-caller-seal`), `TheWatchReadsNoNumberOfItsOwn` (the seal is the keystore's, and gives
+  out no key material), `TheWristHoldsTheRolodexInMemoryOnly` (the one thing written down is the screening's record) and
+  `TheCallScreenLetsOnlyARepeatCallerRing`.
+- **Red: `Watch.Tests` 1241 tests, 16 failed, 1225 passed:** `RepeatCallersTests` 12 (`NotImplementedException`) and
+  `WatchInvariantsTests` 4 (`Strings differ` 1, `Sub-string not found` 2, `Assert.Single()` 1).
+- **Green: `Watch.Tests` 1240 passed, 0 failed** (B8's `TheSharedOneIsOne` for the callers went). `RepoGuards.Tests` 452
+  passed. **Compiled here:** `Watch/Dash.Wear`, **Build succeeded, 0 warnings, 0 errors.**

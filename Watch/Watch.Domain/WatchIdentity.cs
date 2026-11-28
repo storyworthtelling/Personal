@@ -170,6 +170,17 @@ public static class WatchIdentity
     /// </summary>
     public const string DashCallScreenName = "com.storyworthtelling.focusphone.communication.dash.CallScreen";
 
+    /// <summary>
+    /// What the call screening keeps across a restart (P14 B8): the last few unknown callers, each a keyed digest and a
+    /// moment, for the repeat-caller window and no longer. Never a number.
+    /// </summary>
+    public const string DashCallersPreferences = "dash-callers";
+
+    public const string DashCallersKey = "heard";
+
+    /// <summary>The platform keystore's name for the key that seals a caller; it never leaves the keystore.</summary>
+    public const string DashCallerSealAlias = "dash-caller-seal";
+
     // ---- the installer's registered names ----
 
     public const string UpdateListenerName = "com.storyworthtelling.focusphone.launcher.point.UpdateListenerService";

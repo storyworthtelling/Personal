@@ -212,6 +212,10 @@ public class WatchInvariantsTests
         Assert.Equal("dash-wrist", WatchIdentity.DashCapability);
         Assert.NotEqual(WatchIdentity.PostCapability, WatchIdentity.DashCapability);
         Assert.NotEqual(WatchIdentity.InstallerCapability, WatchIdentity.DashCapability);
+        // What the call screening keeps across a restart, and the keystore key that seals it: renamed, it starts afresh.
+        Assert.Equal("dash-callers", WatchIdentity.DashCallersPreferences);
+        Assert.Equal("heard", WatchIdentity.DashCallersKey);
+        Assert.Equal("dash-caller-seal", WatchIdentity.DashCallerSealAlias);
         foreach (var name in new[] { WatchIdentity.DashArrivalListenerName, WatchIdentity.DashTileName, WatchIdentity.DashCallScreenName })
         {
             Assert.DoesNotContain(name, WatchIdentity.DashComponents);
@@ -471,8 +475,13 @@ public class WatchInvariantsTests
         var elsewhere = DashSources().Where(path => Path.GetFileName(path) != "CallScreen.cs").Select(Code);
         Assert.DoesNotContain(elsewhere, source => source.Contains("GetHandle(", StringComparison.Ordinal));
         Assert.Single(Regex.Matches(screen, @"GetHandle\("));
-        Assert.Contains("CallerKey.Of(details.GetHandle()?.SchemeSpecificPart, Secret)", screen, StringComparison.Ordinal);
-        Assert.Contains("CallerKey.NewSecret()", screen, StringComparison.Ordinal);
+        Assert.Contains("CallerKey.Of(details.GetHandle()?.SchemeSpecificPart, CallerSeal.Digest)", screen, StringComparison.Ordinal);
+        var seal = Code(Dash("CallerSeal.cs"));
+        foreach (var keystore in new[] { "\"AndroidKeyStore\"", "KeyProperties.KeyAlgorithmHmacSha256", "KeyStorePurpose.Sign", "WatchIdentity.DashCallerSealAlias", "Mac.GetInstance(" })
+        {
+            Assert.Contains(keystore, seal, StringComparison.Ordinal);
+        }
+        Assert.DoesNotContain("GetEncoded", seal, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -852,10 +861,22 @@ public class WatchInvariantsTests
     {
         // The brief: the watch holds the Rolodex in memory only for the session. Nothing in Dash writes anything down, and
         // a Rolodex screen rebuilt keeps only the owner's own search, never a contact.
-        var code = DashCode();
+        var code = string.Join("\n", DashSources().Where(path => Path.GetFileName(path) != "CallScreen.cs").Select(Code));
         foreach (var store in new[] { "GetSharedPreferences", "OpenFileOutput", "FilesDir", "CacheDir", "File.Write", "Sqlite", "PersistableBundle" })
         {
             Assert.DoesNotContain(store, code, StringComparison.Ordinal);
+        }
+
+        // The one thing written down (B8): the call screening's last few callers, sealed digests and moments, for the
+        // repeat-caller window, since the process can die between two calls minutes apart.
+        var screen = Code(Dash("CallScreen.cs"));
+        Assert.Single(Regex.Matches(screen, @"GetSharedPreferences\("));
+        Assert.Contains("GetSharedPreferences(WatchIdentity.DashCallersPreferences, FileCreationMode.Private)", screen, StringComparison.Ordinal);
+        Assert.Contains("RepeatCallers.From(", screen, StringComparison.Ordinal);
+        Assert.Contains(".Record(", screen, StringComparison.Ordinal);
+        foreach (var store in new[] { "OpenFileOutput", "FilesDir", "CacheDir", "File.Write", "Sqlite", "PersistableBundle" })
+        {
+            Assert.DoesNotContain(store, screen, StringComparison.Ordinal);
         }
 
         var rolodex = Code(Dash("RolodexActivity.cs"));
@@ -1285,8 +1306,8 @@ public class WatchInvariantsTests
         foreach (var call in new[]
         {
             "[Service(Name = WatchIdentity.DashCallScreenName, Exported = true, Permission = \"android.permission.BIND_SCREENING_SERVICE\")]",
-            "[IntentFilter([CallScreeningService.ServiceInterface])]", ": CallScreeningService", "RepeatCallers.Shared.Heard(", "RingVerdict.Silence",
-            "SetSilenceCall(true)", "RespondToCall(", "CallDirection.Incoming",
+            "[IntentFilter([CallScreeningService.ServiceInterface])]", ": CallScreeningService", "callers.Heard(CallerKey.Of(", "RingVerdict.Silence",
+            "SetSilenceCall(true)", "RespondToCall(", "CallDirection.Incoming", "RepeatCallers.From(", "WatchIdentity.DashCallersKey",
         })
         {
             Assert.Contains(call, screen, StringComparison.Ordinal);
