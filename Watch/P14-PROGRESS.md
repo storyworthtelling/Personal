@@ -2752,6 +2752,86 @@ Every figure below is from a real run on 28 Nov 2026. As before, each red run wa
 new code present only as stubs: methods threw `NotImplementedException`, and new constants were empty strings or zero
 (the two new `DashOutcome` members existed so the tests compiled).
 
+## What it is
+
+**What buzzes, and why only this (WD §7, A12, A35, A11).** Of the four shapes, release B owes one: **Text**, two short
+taps when a text arrives (A12: "every text vibrates"). A call is the watch's own Phone app ringing, in its own pattern,
+which no app can shape; Rest end and Ease off are Beat's (release D); mail never buzzes (A11). Overnight only a
+favourite's text buzzes (WD §7's reading of A12).
+
+- **The contract, `dash/arrived`** (`WatchIdentity.DashArrivedPath`, the twelfth path, frozen; Post → Dash, the one
+  message Post sends the wrist unasked): `{v, kind: arrived, key, at, favourite}`, the correspondence as People waiting
+  names it, the moment the phone had it, and whether its sender is starred in the phone's contacts. Any other field (a
+  name, a number, the words) refuses it. Post's ear does not hear it; nothing answers it.
+- **Post tells the wrist where the phone alerts** (`SmsNotifications.Post`, after the spam check, for both of Post's
+  ways in): `WristArrivals` on the pool finds the wrist by Dash's capability (`dash-wrist`, `Watch/Dash.Wear/Resources/
+  values/wear.xml`) among the nodes in reach, and sends once through the listener's one send (`DashCarrier.SendOnceAsync`,
+  bounded, counted when missed, never queued); no wrist in reach is not told. The key is a group's thread key, or the
+  person's own key, which is the one People waiting shows a merged person under whenever a text comes from their number
+  (`DashArrivals`, pure); the star is the contacts provider's own (`DashStars`, `PhoneLookup.Starred`).
+- **The wrist buzzes once for each** (`TextArrivals`, pure, in memory, 32 remembered): by day for everyone; overnight
+  (`Overnight.During`: whenever the watch's own Do Not Disturb or Bedtime mode holds, on the owner's own schedule, so
+  the watch keeps no hours of its own) only for a favourite, played as a request to talk
+  (`BuzzUsage.CommunicationRequest`), the kind of buzz the watch's Do Not Disturb lets through when it lets calls
+  through; everyone else's text overnight is still (`HapticPlan.ForText`, which also holds a text during a set, ready
+  for Beat). An arrival heard before, or one that crossed more than two minutes late by the wrist's clock, is still.
+- **Dash's ear for it** (`ArrivalListener`, registered `…communication.dash.ArrivalListener`, Play services wakes it for
+  `/dash/arrived` alone): reads the watch's interruption filter, asks `TextArrivals`, plays the token's Text pattern
+  through the kit's `WatchBuzz` (timings and strengths as the tokens give them), logs `DASH dash/arrived: Buzzed` or
+  `Quiet`, and asks the tile to be drawn again. Nothing is posted and nothing is marked. Dash now asks for VIBRATE beside
+  READ_PHONE_STATE (granted at install, no prompt).
+
+**The People waiting tile (W-5.1.7, A72; mock: Tile: People waiting, Tile: nobody waiting).**
+- `PeopleTile` (pure): the newest name and the two before it, newest first, ranked Newest, Earlier, Earliest, and no
+  count however many wait; nobody waiting is the faint dash alone; a phone that couldn't be asked is the faint dash and
+  the trouble's quiet line, never drawn as nobody. The words for TalkBack name who is shown ("Lee, Robin and Juniper’s
+  school are waiting.", "Nobody’s waiting."). The picture's version is a digest of what it shows.
+- `PeopleTileService` (registered `…communication.dash.PeopleTileService`, under `BIND_TILE_PROVIDER`, labelled "People
+  waiting", the launcher icon as its preview): when the system asks, it asks Post for People waiting on the pool within
+  People waiting's own bounds, and answers one picture filling the screen; a tap anywhere opens People waiting. The
+  picture (`TilePicture`) is drawn as the mockup draws it: true black, the dash at 0.62 of the radius centred at 0.66 in
+  Dash's day colour, the newest name at 1.12 in the ink (Glance, SemiBold, wrapping once rather than shrinking, which
+  pushes the earlier two down a line), the next at 1.34 (Line, Medium, the grey at 0.7) and 1.52 (Small, the grey at 0.4),
+  each fitted to 1.4 of the radius; with nobody waiting the dash at 0.35 at the centre. Held in memory, the last four
+  pictures, for the system to read by version; asked again after ten minutes, and whenever a text arrives or People
+  waiting answers or drops a row.
+- **Built with Microsoft's binding of the documented Wear OS Tiles library**, `Xamarin.AndroidX.Wear.Tiles` 1.6.2
+  (published 1 Sep 2026; its central version in `Directory.Packages.props`, beside `Concurrent.Futures`, which Dash now
+  names directly). Its graph pulls ProtoLayout 1.4.2, Kotlin's standard library 2.4.0.1 and coroutines 1.11, and
+  `check-dependency-graph.py Watch/Dash.Wear` finds nothing missing. Read from the binding's own metadata before writing
+  (a `MetadataLoadContext` over the restored packages): **Microsoft's binding of ProtoLayout 1.4.2 has no
+  `DimensionBuilders` at all**, so no ProtoLayout element can be given a width or a height, and the tile is built with the
+  Tiles library's own (deprecated) `androidx.wear.tiles` layout builders, which the binding carries whole and the
+  renderer reads the same. Futures come from `CallbackToFutureAdapter`, the library's public way (`ResolvableFuture` is
+  Google's internal API).
+
+**Overnight and unknown callers (W-5.1.9, A12): where the ringing decision happens.**
+- **The watch's own Telecom decides whether the watch rings**: the system Phone app rings and carries every call (A59),
+  over LTE with the phone at home, and, by Wear OS's own design, a call shown from the phone in reach. Post on the phone
+  can't make the watch quieter (a phone-side decision reaches the watch late or not at all, and only the watch's own
+  Telecom decides its ring), and Flyleaf's policy has no say over ringing: a device owner has no Do Not Disturb or
+  ringer API, and Flyleaf is not on the watch (A68). So it is built on the watch, through the two levers an ordinary app
+  has there: the call-screening role, and the watch's own Do Not Disturb.
+- **Unknown numbers, all day: Dash's call screening** (`CallScreen`, registered `…communication.dash.CallScreen`, under
+  `BIND_SCREENING_SERVICE`; the role asked for once from People waiting, after B7's READ_PHONE_STATE, through the
+  platform's own prompt). The platform binds it only for calls from numbers not in the watch's contacts (unless the app
+  holds READ_CONTACTS, which Dash doesn't ask for), so it sees exactly the unknown callers. A first call is silenced
+  (`SetSilenceCall(true)`: it still shows, can be answered, and is in the call log and the missed-call notice); the same
+  caller again within fifteen minutes rings (`RepeatCallers`, Android's own repeat-caller window, so the day's rule and
+  the night's Do Not Disturb agree). Nothing is blocked, rejected or hidden. A keystore or store that won't answer lets
+  the call ring.
+- **No number is kept, logged, sent or shown.** The one number the wrist ever holds is the one the platform hands the
+  screening, turned at once into a digest of its last ten digits sealed by an HMAC key the platform's keystore makes and
+  keeps (`CallerKey`, `CallerSeal`). The last few callers' sealed digests and moments are kept across a restart in
+  `dash-callers` for the window only, since the process dies between calls. A withheld number is one caller,
+  "withheld", so two withheld calls within minutes ring.
+- **Overnight, for contacts: the watch's own Do Not Disturb**, priority only, calls from starred contacts and repeat
+  callers, which is A12's overnight rule as Android already has it. Contacts' calls never reach the screening, and an app
+  may set Do Not Disturb only with an access Wear OS offers no screen for (a Galaxy Watch project reports granting it by
+  adb only), so **it is a setup step** (below), as the plan allowed. The night it sets is also what Dash's text buzz reads.
+- **Starred contacts cross to the wrist only as each arrival's favourite flag.** The overnight call rule uses the watch's
+  own contacts' stars; the Rolodex on the wrist is unchanged (names and ids, B6).
+
 ## Red 1 · the contract and the wrist's pure half (Watch.Domain)
 
 - **`Watch.Tests`: 1218 tests, 82 failed, 1136 passed.** The 82: `RepeatCallersTests` 19, `PeopleTileTests` 11,
@@ -2855,3 +2935,88 @@ number itself is never written down, and a kept digest can't be turned back into
   `WatchInvariantsTests` 4 (`Strings differ` 1, `Sub-string not found` 2, `Assert.Single()` 1).
 - **Green: `Watch.Tests` 1240 passed, 0 failed** (B8's `TheSharedOneIsOne` for the callers went). `RepoGuards.Tests` 452
   passed. **Compiled here:** `Watch/Dash.Wear`, **Build succeeded, 0 warnings, 0 errors.**
+
+## Decisions made in this chunk (each the owner's to overturn)
+
+- **The one buzz Dash gives is a text's**, two short taps, and Post tells the wrist of each text the phone itself alerts
+  for. This retires B2's "Post sends the wrist nothing it did not ask for" for this one message, and B4's "no
+  `WearableListenerService`": Dash now has one ear Play services wakes, for `dash/arrived` alone (answers still go only
+  to the live ear while an ask waits).
+- **The night is the watch's own Do Not Disturb or Bedtime mode**, on the schedule the owner sets on the watch, not hours
+  kept by Dash. With neither on, the wrist buzzes for every text, night or not.
+- **A favourite's text overnight buzzes as a request to talk**, the vibration class the watch's Do Not Disturb lets
+  through when it lets starred and repeat callers ring; a notification's buzz would be muted with everything else.
+  Read from AOSP's Do Not Disturb as I remember it, not from a device: if it doesn't get through, favourites' texts are
+  quiet overnight like everyone's.
+- **An arrival is stamped when the phone had it, and one that crossed more than two minutes late doesn't buzz.** A text
+  the carrier held still buzzes; a Data Layer delivery that took over two minutes (the cloud relay, a wrist out of
+  reach) is old news. Two minutes is chosen, not measured.
+- **Unknown numbers are silenced, not rejected:** the call still shows on the wrist and can be answered, and is in the
+  call log and the missed-call notice. Fifteen minutes is "a few minutes" because it is Android's own repeat-caller
+  window, which the night's Do Not Disturb uses; A12 may have meant fewer.
+- **Two withheld calls within minutes ring**, since a withheld caller can't be told from another.
+- **The wrist now holds one number for an instant:** an unknown caller's, handed to the call screening by the platform,
+  sealed at once by a keystore key and never kept. This amends B7's "the watch reads no number, ever"; the guard now
+  allows exactly that one read. And **Dash writes one thing down**: the last few unknown callers' sealed digests and
+  moments, for fifteen minutes, because the process dies between two calls (B6's "nothing in Dash writes anything down"
+  now has this one exception, held by its guard).
+- **The tile asks Post each time the system asks for it**, and holds no names between asks; with the phone out of reach
+  it says so under the faint dash ("Your phone isn’t in reach."), which no mockup draws, rather than showing nobody.
+- **The tile is one picture**, so the names are in IBM Plex Mono (a tile's own text is the system's font), with the
+  words for TalkBack on the tile itself.
+- **The tile draws no time at the top**, though the mockup draws "4:20" there: a picture's time would be wrong within the
+  minute, a tile's own text can't be in Plex Mono, and Wear OS may draw its own furniture at a tile's top (its guidelines say
+  the system may draw the app's icon there). Reported, not substituted.
+- **The three names take the three type sizes** (Glance, Line, Small), where the mockup draws 0.13, 0.085 and 0.07 of
+  the radius: WD §5 allows three sizes only. The newest wraps once and is cut after two lines, which a sixty-letter name
+  at Glance can reach; "in full" holds for any name of two lines.
+- **The tile's preview in the tile picker is the launcher icon**, not a drawing of the tile.
+- **The Tiles library's own builders, not ProtoLayout's**, since Microsoft's ProtoLayout binding can't size an element;
+  their deprecation warnings are set aside in the one file, with the reason.
+- **The call-screening role is asked for on every fresh start until it is held**; the platform's own prompt offers "don't
+  ask again" after a refusal.
+
+## Setup steps for the device test plan (W-10.1.1)
+
+None of these is written into a committed test plan yet (W-10.1.1 is release F's); they are here so it can take them.
+- On the watch: allow Dash's call screening when People waiting asks (or, if Wear OS offers it, Settings › Apps ›
+  Default apps › Caller ID and spam). Check that a number not in the contacts shows without ringing, and rings when it
+  calls again within fifteen minutes.
+- On the watch: set Bedtime mode or Do Not Disturb on the owner's schedule, with calls from starred contacts and repeat
+  callers allowed (on the watch if it offers the choice; else on the phone with Do Not Disturb synced to the watch). Check
+  that a starred contact rings overnight, another contact doesn't, and anyone calling twice within fifteen minutes does.
+- Check that the phone's starred contacts are starred on the watch (the watch's Do Not Disturb reads the watch's own).
+- In the Pixel Watch app on the phone: turn off Google Messages' notifications on the watch, so a text buzzes only as
+  Dash's two short taps and can't be answered around Post (A9). Check whether Post's own quiet notification, bridged as a
+  card over the face (WD §10), buzzes the watch too; if it does, the owner chooses between the card and the double buzz.
+- Add the People waiting tile from the watch's tile list, beside Now playing.
+
+## Not done, not verified
+
+- **Nothing here has met a watch or a phone.** Unverified: the arrival crossing to a woken ear with no process running;
+  the Text pattern on the wrist and the communication-request buzz getting through Do Not Disturb overnight; the
+  interruption filter as Bedtime mode sets it; Post's alert path reaching `WristArrivals` for a real text, and
+  `PhoneLookup`'s STARRED for the household's contacts; the tile request waiting up to 35 s for Post (the system's
+  patience for a tile is undocumented here), the PNG read as an inline image with its format undefined, the picture on
+  the 41 mm and 45 mm screens, its tap, and TalkBack; whether Wear OS 6 offers the call-screening role to an app at all
+  (`IsRoleAvailable`; if it doesn't, nothing is asked and unknown numbers ring as before), whether the screening is bound
+  for a call shown from the phone in reach as well as one over LTE, and whether the keystore key is made on the watch;
+  and the first `build-watch.yml` run with the Tiles packages (the DEPENDENCY CHECK, R8 over Kotlin 2.4).
+- **The overnight rule for contacts is a setup step, not code**, and the phone's own ring overnight (with the phone at
+  the bedside) is the phone's own Do Not Disturb, not built: Post can't silence the phone's dialer without taking the
+  call-screening role from Google Phone, which carries its spam screening and the Pixel Watch's Call Screen.
+- **The haptic plan's held texts** (during a set) are wired to nothing yet: Dash buzzes as if no session runs, until Beat
+  tells it otherwise (release D).
+- **A7's low-battery rule** is still not built.
+- **The tile's freshness (10 min), the arrival's two minutes and the 32 remembered** are chosen, not measured.
+
+## Chunk B8 totals
+
+- `Watch.Tests`: **1240 passed, 0 failed.** `Tools/FaceStudio.Tests`: 38 passed. `FocusPhone/Codex.Tests`: 3450
+  passed. `RepoGuards.Tests`: 452 passed. `Storyworthtelling.Updates.Tests`: 194 passed. `leakscan --ci` over the
+  chunk's diff (from B7's last commit): "no personal-data shapes in the added lines".
+- `Watch/Dash.Wear` and `Watch/Watch.Ui.Wear` compile here with 0 warnings and 0 errors; `FocusPhone/Post.Android` with
+  0 errors (65 warnings; the one in a file this chunk touched is `SmsNotifications.cs`' own buzz, there before). Flyleaf's
+  policy was not touched, so `FocusPhone/Flyleaf.Android` was not rebuilt.
+- **Release B's build chunks are done** (W-5.1.8 retired). Left for the release's review and fix round: everything under
+  "Not verified" in B1–B8.
