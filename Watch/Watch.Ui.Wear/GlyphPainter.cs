@@ -5,7 +5,7 @@ using Watch.Domain.Kit;
 namespace Watch.Ui.Wear;
 
 /// <summary>Draws Dash's glyph (WD §3, family A): one short horizontal dash with round ends, glowing in its colour.</summary>
-internal static class GlyphPainter
+public static class GlyphPainter
 {
     public static void Dash(Canvas canvas, float centreX, float centreY, float side, Oklch colour, double alpha)
     {

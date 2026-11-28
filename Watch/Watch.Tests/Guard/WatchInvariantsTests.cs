@@ -421,17 +421,18 @@ public class WatchInvariantsTests
     }
 
     [Fact]
-    public void DashAsksOnlyToHearACallEnd()
+    public void DashAsksOnlyToHearACallEndAndToBuzz()
     {
-        // The Data Layer needs none, and the system's own dictation and keyboard ask for what they need themselves. The
-        // one permission is B7's: the platform tells an app the watch's call state went idle only if it holds
-        // READ_PHONE_STATE. Nothing that reads a number (the call log, the phone's own number) and nothing that buzzes or
+        // The Data Layer needs none, and the system's own dictation and keyboard ask for what they need themselves. B7's:
+        // the platform tells an app the watch's call state went idle only if it holds READ_PHONE_STATE. B8's: the wrist's
+        // two short taps for a text need VIBRATE, a permission granted at install. The call screening role is a role, not a
+        // permission. Nothing that reads a number (the call log, the phone's own number, the contacts) and nothing that
         // posts a notification.
         var manifest = Text(Dash("Properties", "AndroidManifest.xml"));
         var attributes = DashSources().Count(path => Regex.IsMatch(File.ReadAllText(path), @"\[assembly:\s*UsesPermission"));
         var asked = Regex.Matches(manifest, @"<uses-permission\s+android:name=""(?<name>[^""]+)""").Select(match => match.Groups["name"].Value);
 
-        Assert.Equal(["android.permission.READ_PHONE_STATE"], asked);
+        Assert.Equal(["android.permission.READ_PHONE_STATE", "android.permission.VIBRATE"], asked);
         Assert.Equal(0, attributes);
     }
 
@@ -457,13 +458,21 @@ public class WatchInvariantsTests
     public void TheWatchReadsNoNumberOfItsOwn()
     {
         // The watch must never log or show a raw number it didn't get from Post, and Post sends none: so the wrist reads
-        // none at all, from the call state's extras, the call log or the phone's own line.
+        // none from the call state's extras, the call log, the phone's own line or the contacts. The one number the platform
+        // hands it is an unknown caller's, to the call screening (B8, W-5.1.9), which turns it at once into a keyed digest
+        // with a secret that never leaves memory, and keeps, logs and shows nothing else of it.
         var code = DashCode();
-
-        foreach (var reading in new[] { "ExtraIncomingNumber", "CallLog", "Line1Number", "ReadCallLog", "PhoneNumberUtils", "incoming_number" })
+        foreach (var reading in new[] { "ExtraIncomingNumber", "CallLog", "Line1Number", "ReadCallLog", "PhoneNumberUtils", "incoming_number", "ContactsContract" })
         {
             Assert.DoesNotContain(reading, code, StringComparison.Ordinal);
         }
+
+        var screen = Code(Dash("CallScreen.cs"));
+        var elsewhere = DashSources().Where(path => Path.GetFileName(path) != "CallScreen.cs").Select(Code);
+        Assert.DoesNotContain(elsewhere, source => source.Contains("GetHandle(", StringComparison.Ordinal));
+        Assert.Single(Regex.Matches(screen, @"GetHandle\("));
+        Assert.Contains("CallerKey.Of(details.GetHandle()?.SchemeSpecificPart, Secret)", screen, StringComparison.Ordinal);
+        Assert.Contains("CallerKey.NewSecret()", screen, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -511,12 +520,16 @@ public class WatchInvariantsTests
     [Fact]
     public void MailIsSilentAndUnmarked()
     {
-        // A11: never a buzz; WD §1 and the owner's ruling: no unread mark. Nothing in Dash buzzes or posts a notification,
-        // and a mail line draws no mark in Dash's colour and is only read, never opened.
+        // A11: never a buzz; WD §1 and the owner's ruling: no unread mark. Nothing in Dash posts a notification, the one
+        // buzz is a text's (B8), and a mail line draws no mark in Dash's colour and is only read, never opened.
         var code = DashCode();
-        foreach (var buzz in new[] { "Vibrat", "Notification", "HapticFeedback" })
+        foreach (var buzz in new[] { "Vibrat", "HapticFeedback", "Notification.Builder", "NotificationCompat", "NotificationChannel", ".Notify(" })
         {
             Assert.DoesNotContain(buzz, code, StringComparison.Ordinal);
+        }
+        foreach (var mail in new[] { "MailActivity.cs", "MailRowView.cs" })
+        {
+            Assert.DoesNotContain("WatchBuzz", Code(Dash(mail)), StringComparison.Ordinal);
         }
 
         var row = Code(Dash("MailRowView.cs"));
@@ -557,6 +570,9 @@ public class WatchInvariantsTests
     [InlineData("DashAfterCallActivityName")]
     [InlineData("DashMailActivityName")]
     [InlineData("DashCallReceiverName")]
+    [InlineData("DashArrivalListenerName")]
+    [InlineData("DashTileName")]
+    [InlineData("DashCallScreenName")]
     public void EachDashScreenIsRegisteredByItsName(string constant)
     {
         var registered = DashSources().Count(path => File.ReadAllText(path).Contains($"Name = WatchIdentity.{constant}", StringComparison.Ordinal));
@@ -603,14 +619,22 @@ public class WatchInvariantsTests
     [Fact]
     public void DashHearsOnlyItsOwnPaths()
     {
-        // Post answers on the path it was asked on (B2); anything else reaching the wrist's ear is left alone.
-        var ear = Assert.Single(DashSources().Select(Code), source => source.Contains("DashCodec.Decode(", StringComparison.Ordinal));
-        var check = ear.IndexOf("WatchIdentity.DashPaths.Contains(", StringComparison.Ordinal);
-        var decode = ear.IndexOf("DashCodec.Decode(", StringComparison.Ordinal);
+        // Post answers on the path it was asked on (B2); anything else reaching the wrist's ear is left alone. Two ears:
+        // the live one while an ask waits (PostLink), and the one Play services wakes for a text arriving (B8).
+        var ears = DashSources().Select(path => (Name: Path.GetFileName(path), Code: Code(path)))
+            .Where(source => source.Code.Contains("DashCodec.Decode(", StringComparison.Ordinal)).ToList();
+        Assert.Equal(["ArrivalListener.cs", "PostLink.cs"], ears.Select(ear => ear.Name).Order(StringComparer.Ordinal));
 
-        Assert.True(check >= 0 && decode > check, "Dash decodes a message before checking it came on one of its paths.");
-        Assert.Contains("DashLogLines.Receipt(", ear, StringComparison.Ordinal);
-        Assert.Contains("DashEnd.Dash", ear, StringComparison.Ordinal);
+        foreach (var (name, ear) in ears)
+        {
+            var check = name == "PostLink.cs"
+                ? ear.IndexOf("WatchIdentity.DashPaths.Contains(", StringComparison.Ordinal)
+                : ear.IndexOf("WatchIdentity.DashArrivedPath", StringComparison.Ordinal);
+            var decode = ear.IndexOf("DashCodec.Decode(", StringComparison.Ordinal);
+            Assert.True(check >= 0 && decode > check, $"{name} decodes a message before checking the path it came on.");
+            Assert.Contains("DashLogLines.Receipt(", ear, StringComparison.Ordinal);
+            Assert.Contains("DashEnd.Dash", ear, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -1129,5 +1153,160 @@ public class WatchInvariantsTests
         Assert.Matches($@"(?m)^\s+Watch/Dash\.Wear/Dash\.Wear\.csproj {Regex.Escape(WatchIdentity.DashPackage)}\s*$", workflow);
         Assert.Matches($@"(?m)^\s+Watch/Dash\.Wear/Dash\.Wear\.csproj {Regex.Escape(WatchIdentity.DashPackage)}\s*$", workflow);
         Assert.Contains($"FACE_PACKAGE: {WatchIdentity.FacePackage}", workflow, StringComparison.Ordinal);
+    }
+
+    // ---- B8: the text's buzz, the People waiting tile (W-5.1.7) and unknown callers (W-5.1.9) ----
+
+    [Fact]
+    public void DashBuzzesOnlyForAText()
+    {
+        // WD §7: four patterns, one meaning each; Dash's one is a text arriving (A12), two short taps, by the haptic plan,
+        // overnight a favourite's only, and only once for each. Played through the kit, never the vibrator by hand.
+        var buzzing = DashSources().Where(path => Code(path).Contains("WatchBuzz.Play(", StringComparison.Ordinal)).Select(Path.GetFileName).ToList();
+        Assert.Equal(["ArrivalListener.cs"], buzzing);
+
+        var ear = Code(Dash("ArrivalListener.cs"));
+        foreach (var call in new[]
+        {
+            "TextArrivals.Shared.Heard(", "Overnight.During(", "CurrentInterruptionFilter", "HapticAction.Buzz", "buzz.Decision.Pattern", "buzz.Usage",
+            "DashOutcome.Buzzed", "DashOutcome.Quiet", "PeopleTileService.Refresh(",
+        })
+        {
+            Assert.Contains(call, ear, StringComparison.Ordinal);
+        }
+        Assert.DoesNotContain("WatchTokens.Haptics", ear, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheArrivalEarHearsOneThingAndAsksNothing()
+    {
+        // Play services wakes it for dash/arrived alone (Post's answers go to the live ear, PostLink), and it does no Data
+        // Layer work of its own: it buzzes, and asks the tile to be drawn again.
+        var ear = Code(Dash("ArrivalListener.cs"));
+
+        Assert.Contains("[Service(Name = WatchIdentity.DashArrivalListenerName, Exported = true)]", ear, StringComparison.Ordinal);
+        Assert.Contains(": WearableListenerService", ear, StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(ear, @"DataPath = WatchIdentity\.\w+"));
+        Assert.Contains("DataPath = WatchIdentity.DashArrivedPath", ear, StringComparison.Ordinal);
+        foreach (var work in new[] { "AskAsync", "TellAsync", "SendMessageAsync", "StartActivity" })
+        {
+            Assert.DoesNotContain(work, ear, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TheKitBuzzesOnlyTheFourShapes()
+    {
+        // The kit plays a pattern from the tokens, its timings and strengths as they are, and nothing of its own.
+        var buzz = Code(Path.Combine(WatchFiles.RepoRoot(), "Watch", "Watch.Ui.Wear", "WatchBuzz.cs"));
+
+        Assert.Contains("public static bool Play(Context context, HapticPattern pattern, BuzzUsage usage)", buzz, StringComparison.Ordinal);
+        foreach (var call in new[] { "VibrationEffect.CreateWaveform(", "pattern.Timings", "pattern.Strengths", "pattern.Repeats", "VibrationAttributes", "BuzzUsage.CommunicationRequest" })
+        {
+            Assert.Contains(call, buzz, StringComparison.Ordinal);
+        }
+        Assert.DoesNotMatch(@"CreateWaveform\([^)]*\d{2,}", buzz);
+    }
+
+    [Fact]
+    public void ThePeopleWaitingTileIsTheMockups()
+    {
+        // W-5.1.7 (A72; mock: Tile: People waiting, Tile: nobody waiting): a Wear OS tile bound by its registered name, which
+        // asks Post as People waiting does, on the pool, and draws the dash and the names in the watch's own font at the
+        // mockup's places; a tap opens People waiting.
+        var tile = Code(Dash("PeopleTileService.cs"));
+        foreach (var call in new[]
+        {
+            "[Service(Name = WatchIdentity.DashTileName, Exported = true, Permission = \"com.google.android.wearable.permission.BIND_TILE_PROVIDER\"",
+            "TileService.ActionBindTileProvider", "\"androidx.wear.tiles.PREVIEW\"", ": TileService", "Task.Run(() => PostLink.Shared.AskAsync(",
+            "new DashPeopleAsk()", "PeopleTile.Of(", "PeopleTile.Unreached(", "PeopleTile.Freshness", "PeopleTile.Version(", "CallbackToFutureAdapter.GetFuture(",
+            "WatchIdentity.DashPackage", "WatchIdentity.DashPeopleActivityName", "SetContentDescription(", "TilePicture.Draw(", "DashWords.PeopleWaiting",
+        })
+        {
+            Assert.Contains(call, tile, StringComparison.Ordinal);
+        }
+
+        var picture = Code(Dash("TilePicture.cs"));
+        foreach (var call in new[]
+        {
+            "DashLayout.TileGlyphSide", "DashLayout.TileGlyphCentre", "DashLayout.TileNobodyCentre", "DashLayout.TileNameCentre(", "DashLayout.TileNameWidth",
+            "DashLayout.TileQuietCentre", "PeopleTile.AlphaOf(", "PeopleTile.GlyphAlpha(", "GlyphPainter.Dash(", "WatchPaints.Glass(WatchApp.Dash",
+            "WatchType.Glance", "WatchType.Line", "WatchType.Small", "WatchWeight.SemiBold", "WatchTokens.Neutral.Ink", "WatchTokens.Neutral.Soft",
+            "WatchTokens.Ground", "Bitmap.CompressFormat.Png",
+        })
+        {
+            Assert.Contains(call, picture, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TheTileCountsNothingAndKeepsNothing()
+    {
+        // A72: no count; WD §1: nothing anxious. The tile draws names and the dash, never a number of people, a time or a
+        // line of anyone's words, and writes nothing down: the picture is held in memory for the system to read once.
+        var tile = Code(Dash("PeopleTileService.cs")) + Code(Dash("TilePicture.cs"));
+
+        foreach (var count in new[] { "Names.Count}", ".Count.ToString(", "WhenWords", "WatchTimeView", "TextClock", "person.Line", "People.Count", "person.Unread" })
+        {
+            Assert.DoesNotContain(count, tile, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TheTileIsDrawnAgainWhenSomethingChanges()
+    {
+        // A text arriving, and People waiting answering, ask the system to draw the tile again, so it never disagrees with
+        // the screen for long.
+        Assert.Contains("public static void Refresh(Context context)", Code(Dash("PeopleTileService.cs")), StringComparison.Ordinal);
+        Assert.Contains("TileService.GetUpdater(", Code(Dash("PeopleTileService.cs")), StringComparison.Ordinal);
+        Assert.Contains("PeopleTileService.Refresh(", Code(Dash("PeopleActivity.cs")), StringComparison.Ordinal);
+        Assert.Contains("PeopleTileService.Refresh(", Code(Dash("ArrivalListener.cs")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheTileIsBuiltWithMicrosoftsBinding()
+    {
+        // The documented Wear OS Tiles library, through Microsoft's own binding (CLAUDE.md's dependency rule 2), its version
+        // central (OneBuildSettingTests holds that); ResolvableFuture is androidx.concurrent.futures', named directly, as
+        // the 17 Nov lesson asks of a package that otherwise arrives only through another's range.
+        var project = Text(Dash("Dash.Wear.csproj"));
+
+        Assert.Contains("<PackageReference Include=\"Xamarin.AndroidX.Wear.Tiles\" />", project, StringComparison.Ordinal);
+        Assert.Contains("<PackageReference Include=\"Xamarin.AndroidX.Concurrent.Futures\" />", project, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheCallScreenLetsOnlyARepeatCallerRing()
+    {
+        // W-5.1.9 (A12): the platform binds Dash's call screening, by its registered name and under its own permission, for
+        // a call from a number not in the watch's contacts; a first call shows without ringing, the same caller again within
+        // minutes rings. Nothing is blocked, rejected, hidden from the call log or kept from the missed-call notice.
+        var screen = Code(Dash("CallScreen.cs"));
+        foreach (var call in new[]
+        {
+            "[Service(Name = WatchIdentity.DashCallScreenName, Exported = true, Permission = \"android.permission.BIND_SCREENING_SERVICE\")]",
+            "[IntentFilter([CallScreeningService.ServiceInterface])]", ": CallScreeningService", "RepeatCallers.Shared.Heard(", "RingVerdict.Silence",
+            "SetSilenceCall(true)", "RespondToCall(", "CallDirection.Incoming",
+        })
+        {
+            Assert.Contains(call, screen, StringComparison.Ordinal);
+        }
+        foreach (var harsher in new[] { "SetDisallowCall(", "SetRejectCall(", "SetSkipCallLog(", "SetSkipNotification(", "SetRejectedAsMissed(" })
+        {
+            Assert.DoesNotContain(harsher, screen, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void PeopleWaitingAsksForTheScreeningRoleOnce()
+    {
+        // The role is the platform's to give, through its own prompt (which offers "don't ask again" after a refusal), asked
+        // on a fresh start beside B7's READ_PHONE_STATE; refused, unknown numbers ring as they always did.
+        var people = Code(Dash("PeopleActivity.cs"));
+
+        foreach (var call in new[] { "RoleManager.RoleCallScreening", "IsRoleAvailable(", "IsRoleHeld(", "CreateRequestRoleIntent(" })
+        {
+            Assert.Contains(call, people, StringComparison.Ordinal);
+        }
     }
 }

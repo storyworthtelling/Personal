@@ -1,5 +1,6 @@
 using Android;
 using Android.App;
+using Android.App.Roles;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
@@ -31,6 +32,7 @@ public sealed class PeopleActivity : Activity
     private DashGlyphView glyph = null!;
     private const int ActRequest = 1;
     private const int PhoneStateRequest = 2;
+    private const int ScreeningRequest = 3;
 
     private LinearLayout rows = null!;
     private WatchTextView newText = null!;
@@ -85,12 +87,35 @@ public sealed class PeopleActivity : Activity
     }
 
     // The one permission Dash asks for (B7): without it the platform never says the watch's call state went idle, and no
-    // note is offered. The system's own prompt; refused, Dash works as before, and Android stops asking after twice.
+    // note is offered. The system's own prompt; refused, Dash works as before, and Android stops asking after twice. Then
+    // the call screening role (B8), which the platform asks for in its own prompt in turn.
     private void HearCalls()
     {
         if (CheckSelfPermission(Manifest.Permission.ReadPhoneState) != Permission.Granted)
         {
             RequestPermissions([Manifest.Permission.ReadPhoneState], PhoneStateRequest);
+            return;
+        }
+        ScreenCalls();
+    }
+
+    public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)
+    {
+        base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PhoneStateRequest)
+        {
+            ScreenCalls();
+        }
+    }
+
+    // W-5.1.9 (A12): unknown numbers ring only if they call twice within minutes, which the watch decides in the role's
+    // service (CallScreen). The platform's own prompt; after a refusal it offers "don't ask again". Refused, or a watch
+    // that offers no such role, unknown numbers ring as they always did.
+    private void ScreenCalls()
+    {
+        if (GetSystemService(RoleService) is RoleManager roles && roles.IsRoleAvailable(RoleManager.RoleCallScreening) && !roles.IsRoleHeld(RoleManager.RoleCallScreening))
+        {
+            StartActivityForResult(roles.CreateRequestRoleIntent(RoleManager.RoleCallScreening), ScreeningRequest);
         }
     }
 
@@ -127,8 +152,9 @@ public sealed class PeopleActivity : Activity
         base.OnActivityResult(requestCode, resultCode, data);
         if (requestCode == ActRequest && resultCode == Result.Ok && ActActivity.Left(data) is { } gone)
         {
-            // Filed or deleted: the row leaves now (WD §9), and the phone's next answer agrees.
+            // Filed or deleted: the row leaves now (WD §9), and the phone's next answer agrees; so does the tile.
             Draw([.. shown.Where(row => row.Key != gone)]);
+            PeopleTileService.Refresh(this);
         }
     }
 
@@ -148,6 +174,8 @@ public sealed class PeopleActivity : Activity
         {
             Draw(PeopleWaiting.Rows(people, DateTimeOffset.UtcNow, TimeZoneInfo.Local));
             Screens.Say(frame.Status, null);
+            // The tile shows the same people (W-5.1.7): it is asked to be drawn again, and asks the phone itself.
+            PeopleTileService.Refresh(this);
             return;
         }
         // The rows from the last answer stay; the quiet line says why they could not be asked for again.

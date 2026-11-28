@@ -33,6 +33,8 @@
     <!-- The Data Layer (MessageClient, CapabilityClient), Microsoft's binding of play-services-wearable: CLAUDE.md's
          dependency rule 2, and required to talk to the phone at all. The same package and version as the installer. -->
     <PackageReference Include="Xamarin.GooglePlayServices.Wearable" />
+    <PackageReference Include="Xamarin.AndroidX.Wear.Tiles" />
+    <PackageReference Include="Xamarin.AndroidX.Concurrent.Futures" />
   </ItemGroup>
 
   <ItemGroup>

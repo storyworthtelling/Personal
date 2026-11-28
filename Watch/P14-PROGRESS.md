@@ -2786,3 +2786,40 @@ new code present only as stubs: methods threw `NotImplementedException`, and new
 - **Green: `Codex.Tests` 3450 passed, 0 failed. `RepoGuards.Tests` 452 passed. Compiled here:**
   `FocusPhone/Post.Android`, **Build succeeded, 0 errors**; the one warning in a file this step touched is
   `SmsNotifications.cs`' `CS8604` on its own buzz (`Vibrator.Vibrate`), which was there before.
+
+## Red 3 · Dash on the watch: the buzz, the tile, the call screening
+
+Written with no `ArrivalListener`, `PeopleTileService`, `TilePicture` or `CallScreen` in `Watch/Dash.Wear`, no
+`WatchBuzz` in the kit, and `PeopleActivity` and the manifest as B7 left them. The Tiles binding and
+`Concurrent.Futures` were already in Dash's project (they were added to read the binding's metadata before anything was
+written against it).
+
+- **`Watch.Tests`: 1230 tests, 14 failed, 1216 passed**, all 14 in `WatchInvariantsTests`: `DashAsksOnlyToHearACallEndAndToBuzz`
+  (`Collections differ`: no VIBRATE), `TheWatchReadsNoNumberOfItsOwn`, `TheCallScreenLetsOnlyARepeatCallerRing`
+  ("…CallScreen.cs isn’t there." ×2), `ThePeopleWaitingTileIsTheMockups`, `TheTileCountsNothingAndKeepsNothing`,
+  `TheTileIsDrawnAgainWhenSomethingChanges` ("…PeopleTileService.cs isn’t there." ×3), `TheArrivalEarHearsOneThingAndAsksNothing`
+  ("…ArrivalListener.cs isn’t there."), `TheKitBuzzesOnlyTheFourShapes` ("…WatchBuzz.cs isn’t there."), `DashBuzzesOnlyForAText`
+  and `DashHearsOnlyItsOwnPaths` (`Collections differ`), `PeopleWaitingAsksForTheScreeningRoleOnce` (`Sub-string not
+  found`), and `EachDashScreenIsRegisteredByItsName` for the three new names (`Values differ`, 0 for 1). Passing before
+  the head: `MailIsSilentAndUnmarked` (nothing buzzed yet) and `TheTileIsBuiltWithMicrosoftsBinding` (the project
+  already named the packages).
+- **On the way:** a first draft of red 3 read 1230 with 15 failed: `TheTileIsBuiltWithMicrosoftsBinding` also read
+  `Directory.Packages.props`, a file outside `Watch/` that `build-watch.yml` doesn't wake on
+  (`TheWatchWorkflowRunsWhenAnythingTheWatchTestsReadChanges`); the central version is `OneBuildSettingTests`' to hold,
+  so the watch guard no longer reads it. Once the head was written, `TheTileCountsNothingAndKeepsNothing` failed twice
+  on its own words: `.Line` matched `WatchType.Line` and `Unread` matched `DashTrouble.Unreadable`; it now names
+  `person.Line` and `person.Unread`. `ThePeopleWaitingTileIsTheMockups` first asked for `ResolvableFuture.Create()`, which
+  the build warned is Google's internal API (`XAOBS001`); the tile settles its futures through
+  `CallbackToFutureAdapter.GetFuture(`, the library's public way, and the guard asks for that.
+- **Probe, once green:** `DashLog.Info($"DASH arrived {arrived.Key}")` in the ear and `DashLog.Warn(details.GetHandle()…)`
+  in the call screening: `DashLogsCarryNoPayloadTests` 43 tests, 1 failed (`TheWristLogsOnlyDashLines`, naming both
+  lines), and `WatchInvariantsTests` 95 tests, 1 failed (`TheWatchReadsNoNumberOfItsOwn`). The probes were removed.
+- **Green: `Watch.Tests` 1230 passed, 0 failed. `Tools/FaceStudio.Tests` 38 passed. `FocusPhone/Codex.Tests` 3450
+  passed. `RepoGuards.Tests` 452 passed. `Storyworthtelling.Updates.Tests` 194 passed.**
+- **Compiled here** (`-p:AndroidSdkDirectory=/opt/android-sdk-min -p:AndroidUseApkSigner=false`): `Watch/Watch.Ui.Wear`
+  and `Watch/Dash.Wear`, each **Build succeeded, 0 warnings, 0 errors** (Dash's first build had 26: 18 for the Tiles
+  library's own builders, which the tile file sets aside by one scoped `#pragma` with its reason, two `XAOBS001` and six
+  nullability warnings, all fixed). `check-dependency-graph.py Watch/Dash.Wear`: nothing missing. Dash's merged manifest
+  carries READ_PHONE_STATE and VIBRATE, `…dash.ArrivalListener` filtered on `/dash/arrived`, `…dash.CallScreen` under
+  `BIND_SCREENING_SERVICE`, and `…dash.PeopleTileService` under `BIND_TILE_PROVIDER` with its preview; the Tiles library
+  adds androidx's profile installer and startup provider, as androidx libraries do.

@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Dash's manifest (P14 B4). Its screens are declared by attributes under their frozen names (WatchIdentity); what no
-  attribute expresses is here. WatchInvariantsTests reads this file: the package, the watch feature, its one permission
-  (READ_PHONE_STATE, B7), and the system input it may see.
+  attribute expresses is here. WatchInvariantsTests reads this file: the package, the watch feature, its two permissions
+  (READ_PHONE_STATE, B7; VIBRATE, B8), and the system input it may see.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.storyworthtelling.focusphone.communication">
   <!-- A watch app, by Wear OS's own marker. It also keeps this APK off the phone, where it would replace Post. -->
   <uses-feature android:name="android.hardware.type.watch" />
 
-  <!-- The one permission (P14 B7): the platform tells an app the watch's call state went idle, after the watch's own Phone
+  <!-- B7: the platform tells an app the watch's call state went idle, after the watch's own Phone
        app carried a call, only if it holds this. Dash reads the state alone, never a number, and asks Post which call it
        was (W-5.1.5). -->
   <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+  <!-- The wrist's two short taps for a text (P14 B8; WD §7, A12): a permission granted at install, with no prompt. -->
+  <uses-permission android:name="android.permission.VIBRATE" />
 
   <!-- Android 11+ resolves another app's activity only for an intent the app names: the system's dictation, and the
        system's input screen with its keyboard (W-5.1.2). -->
