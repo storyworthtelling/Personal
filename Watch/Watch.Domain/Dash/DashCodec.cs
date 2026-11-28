@@ -7,7 +7,8 @@ namespace Watch.Domain.Dash;
 /// <summary>
 /// Dash's message codec (plan §2.5): UTF-8 JSON with an integer <c>v</c> and a <c>kind</c>, one shape per contract. A
 /// photo's JPEG crosses as base64 in its own message (<c>dash/photo</c>, B5), refused unless it is a JPEG within its budget;
-/// the Rolodex a page at a time (<c>dash/rolodex</c>, B6), each contact refused unless it is an id and a name alone.
+/// the Rolodex a page at a time (<c>dash/rolodex</c>, B6), each contact refused unless it is an id and a name alone; the
+/// call that just ended (<c>dash/call-note</c>, B7) as an id, a name and a length, refused with any other field beside them.
 /// A message is read for the path it arrived on, so an ask on <c>dash/thread</c> is never taken for one on
 /// <c>dash/people</c>. A newer <c>v</c> is refused before anything else is read; a missing, mistyped, over-long or
 /// out-of-place field refuses the whole message.
@@ -33,6 +34,7 @@ public static class DashCodec
     public const string MailKind = "mail";
     public const string PhotoKind = "photo";
     public const string RolodexKind = "rolodex";
+    public const string CallKind = "call";
 
     // Wire words, frozen: the fields.
     public const string PeopleField = "people";
@@ -67,6 +69,8 @@ public static class DashCodec
     public const string EditionField = "edition";
     public const string ContactsField = "contacts";
     public const string ContactField = "contact";
+    public const string EndedField = "ended";
+    public const string LengthField = "length";
 
     // Wire words, frozen, in each enum's order.
     private static readonly string[] MessageTypeWords = ["text", "call", "voicemail", "note"];
@@ -136,6 +140,18 @@ public static class DashCodec
                     WriteOptional(writer, CallField, note.Call);
                     WriteOptional(writer, NumberField, note.Number);
                     writer.WriteString(TextField, note.Text);
+                    if (note.At is { } at)
+                    {
+                        writer.WriteNumber(AtField, at.ToUnixTimeMilliseconds());
+                    }
+                    break;
+                case DashCallAsk ask:
+                    writer.WriteString(KindField, AskKind);
+                    writer.WriteNumber(EndedField, ask.Ended.ToUnixTimeMilliseconds());
+                    break;
+                case DashCall call:
+                    writer.WriteString(KindField, CallKind);
+                    WriteCall(writer, call);
                     break;
                 case DashMail mail:
                     writer.WriteString(KindField, MailKind);
@@ -266,6 +282,19 @@ public static class DashCodec
         writer.WriteEndArray();
     }
 
+    // The moment, then the call, whose name and how long, all three or none: no number has a field to go in.
+    private static void WriteCall(Utf8JsonWriter writer, DashCall call)
+    {
+        writer.WriteNumber(EndedField, call.Ended.ToUnixTimeMilliseconds());
+        if (call.Call is null)
+        {
+            return;
+        }
+        writer.WriteString(CallField, call.Call);
+        WriteOptional(writer, NameField, call.Name);
+        writer.WriteNumber(LengthField, (long)(call.Length ?? TimeSpan.Zero).TotalMilliseconds);
+    }
+
     private static void WriteMail(Utf8JsonWriter writer, DashMail mail)
     {
         writer.WritePropertyName(MailField);
@@ -351,6 +380,8 @@ public static class DashCodec
         (WatchIdentity.DashUndoPath, UndoKind) => Id(root, ActField, DashIds.IsAct, out var undone) ? new DashUndo(undone) : null,
         (WatchIdentity.DashReadPath, ReadKind) => ReadRead(root),
         (WatchIdentity.DashCallNotePath, NoteKind) => ReadNote(root),
+        (WatchIdentity.DashCallNotePath, AskKind) => Instant(root, EndedField, out var ended) ? new DashCallAsk(ended) : null,
+        (WatchIdentity.DashCallNotePath, CallKind) => ReadCall(root),
         (WatchIdentity.DashMailPath, AskKind) => new DashMailAsk(),
         (WatchIdentity.DashMailPath, MailKind) => ReadMail(root),
         (WatchIdentity.DashPhotoPath, AskKind) => Id(root, IdField, DashIds.IsAttachment, out var photo) ? new DashPhotoAsk(photo) : null,
@@ -472,7 +503,48 @@ public static class DashCodec
         {
             return null;
         }
-        return new DashCallNote(call, number, text);
+
+        DateTimeOffset? at = null;
+        if (root.TryGetProperty(AtField, out _))
+        {
+            if (!Instant(root, AtField, out var written))
+            {
+                return null;
+            }
+            at = written;
+        }
+        return new DashCallNote(call, number, text) { At = at };
+    }
+
+    // The call that ended, by its id, with a name and how long it was connected; or the moment alone, for no call. Exactly
+    // those fields: a number, or anything else, beside them refuses the answer rather than reaching the wrist (B7).
+    private static DashCall? ReadCall(JsonElement root)
+    {
+        if (!Instant(root, EndedField, out var ended)
+            || !OptionalId(root, CallField, DashIds.IsMessage, out var call)
+            || !OptionalText(root, NameField, DashLimits.Name, out var name))
+        {
+            return null;
+        }
+
+        var fields = root.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+        string[] allowed = [VersionField, KindField, EndedField, CallField, NameField, LengthField];
+        if (!fields.All(field => allowed.Contains(field, StringComparer.Ordinal)))
+        {
+            return null;
+        }
+        if (call is null)
+        {
+            return fields.Contains(NameField) || fields.Contains(LengthField) ? null : new DashCall(ended, null, null, null);
+        }
+
+        if (!root.TryGetProperty(LengthField, out var said) || said.ValueKind != JsonValueKind.Number
+            || !said.TryGetInt64(out var milliseconds)
+            || milliseconds < 0 || milliseconds > (long)DashLimits.CallLength.TotalMilliseconds)
+        {
+            return null;
+        }
+        return new DashCall(ended, call, name, TimeSpan.FromMilliseconds(milliseconds));
     }
 
     private static DashMail? ReadMail(JsonElement root)

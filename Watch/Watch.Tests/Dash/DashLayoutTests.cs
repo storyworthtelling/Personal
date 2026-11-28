@@ -4,7 +4,7 @@ namespace Watch.Tests.Dash;
 
 /// <summary>
 /// Dash's screens as the mockups draw them (mock: People waiting, A conversation, Replying by voice, A group text with a
-/// photo, Filed with Undo; and the choice before an act, on After the call's layout), in fractions of the round screen's
+/// photo, Filed with Undo, After the call, Mail; and the choice before an act, on After the call's layout), in fractions of the round screen's
 /// radius: every row, bubble, picture, ring, pill and word the mockups place sits inside the circle.
 /// </summary>
 public class DashLayoutTests
@@ -117,15 +117,57 @@ public class DashLayoutTests
     // ---- B6: New text, where the mockup draws People waiting's Mail ----
 
     [Fact]
-    public void NewTextSitsWhereTheMockupDrawsMail()
+    public void MailSitsWhereTheMockupDrawsIt()
     {
         // mock: People waiting draws "Mail" a row's pitch under its third row, at 1.7 of the radius: a row's height of
-        // entry, the gap under the third row, is centred there.
+        // entry, the gap under the third row, is centred there (B7; New text, which B6 put there, follows it).
         var thirdRowFoot = DashLayout.FirstRow + 2 * DashLayout.RowPitch + DashLayout.RowHeight / 2;
         var centre = thirdRowFoot + DashLayout.EntryGap + DashLayout.RowHeight / 2;
 
         Assert.Equal(1.7, centre, 9);
         Assert.True(Inside(1, centre));
         Assert.True(DashLayout.EntryGap > 0);
+    }
+
+    // ---- B7: After the call and Mail, as the mockups draw them ----
+
+    [Fact]
+    public void AfterTheCallIsWhereTheMockupDrawsIt()
+    {
+        // mock: After the call: the head, "Call with Robin" at 0.66, "6 min, just now" at 0.84, Add a note (1.0 wide) at
+        // 1.18 and Not now at 1.48.
+        Assert.Equal((0.66, 0.84, 1.18, 1.0, 1.48),
+            (DashLayout.AfterCallTitleCentre, DashLayout.AfterCallLineCentre, DashLayout.AfterCallPillCentre, DashLayout.AfterCallPillWidth,
+                DashLayout.AfterCallChoiceCentre));
+        Assert.True(DashLayout.GlyphTop + DashLayout.GlyphSide < DashLayout.AfterCallTitleCentre);
+        Assert.True(DashLayout.AfterCallTitleCentre < DashLayout.AfterCallLineCentre);
+        Assert.True(DashLayout.AfterCallLineCentre < DashLayout.AfterCallPillCentre - DashLayout.PillHeight / 2);
+        Assert.True(DashLayout.AfterCallChoiceCentre > DashLayout.AfterCallPillCentre + DashLayout.PillHeight / 2);
+        BoxInside(1 - DashLayout.AfterCallPillWidth / 2, DashLayout.AfterCallPillCentre - DashLayout.PillHeight / 2, DashLayout.AfterCallPillWidth, DashLayout.PillHeight);
+        Assert.True(Inside(1, DashLayout.AfterCallChoiceCentre));
+    }
+
+    [Fact]
+    public void TheChoiceBeforeAnActIsAfterTheCallsLayout()
+    {
+        // B5 laid the choice before an act out as After the call is drawn; it is now named from it.
+        Assert.Equal(
+            (DashLayout.AfterCallTitleCentre, DashLayout.AfterCallPillCentre, DashLayout.AfterCallPillWidth, DashLayout.AfterCallChoiceCentre),
+            (DashLayout.ActTitleCentre, DashLayout.ActPillCentre, DashLayout.ActPillWidth, DashLayout.ActChoiceCentre));
+    }
+
+    [Fact]
+    public void MailLinesAreWhereTheMockupDrawsThem()
+    {
+        // mock: Mail: its name at the top as a conversation's, then each line a subject over who and when, centred at 0.6
+        // and every 0.36 after, the subject fitted to 1.4 of the radius.
+        Assert.Equal((0.6, 0.36, 1.4, 0.05, 0.1),
+            (DashLayout.MailFirst, DashLayout.MailPitch, DashLayout.MailWidth, DashLayout.MailSubjectRise, DashLayout.MailSenderDrop));
+        Assert.True(DashLayout.TitleCentre < DashLayout.MailFirst - DashLayout.MailPitch / 2);
+        for (var line = 0; line < 3; line++)
+        {
+            var centre = DashLayout.MailFirst + line * DashLayout.MailPitch;
+            BoxInside(1 - DashLayout.MailWidth / 2, centre - DashLayout.MailSubjectRise, DashLayout.MailWidth, DashLayout.MailSubjectRise + DashLayout.MailSenderDrop);
+        }
     }
 }

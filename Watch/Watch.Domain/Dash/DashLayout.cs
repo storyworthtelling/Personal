@@ -2,7 +2,7 @@ namespace Watch.Domain.Dash;
 
 /// <summary>
 /// Dash's screens as the mockups place them (Watch/design/screens-r1.html: <c>head</c>, <c>row</c>, <c>bubble</c>,
-/// <c>pill</c>, "Replying by voice"), in fractions of the round screen's radius: 0 is the top or left edge, 1 the
+/// <c>pill</c>, "Replying by voice", "After the call", "Mail"), in fractions of the round screen's radius: 0 is the top or left edge, 1 the
 /// centre, 2 the bottom or right. Words are set at the three token sizes (WD §5), not at the mockups' fractions, so a
 /// row or a pill grows to fit its words and keeps the drawn size as its least; a pill is always a whole touch target.
 /// </summary>
@@ -120,20 +120,54 @@ public static class DashLayout
 
     // ---- B5: the choice before an act, on After the call's layout (no mockup draws it) ----
 
-    public const double ActTitleCentre = 0.66;
+    public const double ActTitleCentre = AfterCallTitleCentre;
 
-    public const double ActPillCentre = 1.18;
+    public const double ActPillCentre = AfterCallPillCentre;
 
-    public const double ActPillWidth = 1.0;
+    public const double ActPillWidth = AfterCallPillWidth;
 
     /// <summary>The quieter choice under the pill ("Delete"), where After the call puts "Not now".</summary>
-    public const double ActChoiceCentre = 1.48;
+    public const double ActChoiceCentre = AfterCallChoiceCentre;
 
-    // ---- B6: New text, at the foot of People waiting where the mockup draws Mail ----
+    // ---- B6, B7: Mail at the foot of People waiting where the mockup draws it, and New text under it ----
 
     /// <summary>
-    /// The gap above New text: it follows the last row as the rows follow each other, so a row's height of it is centred a
-    /// row's pitch under the last row, where the mockup draws Mail (no mockup draws New text).
+    /// The gap above Mail: it follows the last row as the rows follow each other, so a row's height of it is centred a
+    /// row's pitch under the last row, where the mockup draws Mail (B7). New text (B6, which no mockup draws, and which
+    /// stood here until Mail came) follows directly under Mail, each a whole touch target.
     /// </summary>
     public const double EntryGap = RowPitch - RowHeight;
+
+    // ---- B7: After the call (mock), under the head ----
+
+    /// <summary>"Call with Robin".</summary>
+    public const double AfterCallTitleCentre = 0.66;
+
+    /// <summary>"6 min, just now".</summary>
+    public const double AfterCallLineCentre = 0.84;
+
+    /// <summary>Add a note.</summary>
+    public const double AfterCallPillCentre = 1.18;
+
+    public const double AfterCallPillWidth = 1.0;
+
+    /// <summary>Not now.</summary>
+    public const double AfterCallChoiceCentre = 1.48;
+
+    // ---- B7: Mail (mock), its name at <see cref="TitleCentre"/> as a conversation's ----
+
+    /// <summary>The first mail line's centre.</summary>
+    public const double MailFirst = 0.6;
+
+    /// <summary>From one mail line's centre to the next.</summary>
+    public const double MailPitch = 0.36;
+
+    /// <summary>A subject is fitted to this, on one line.</summary>
+    public const double MailWidth = 1.4;
+
+    /// <summary>The subject sits this far above its line's centre.</summary>
+    public const double MailSubjectRise = 0.05;
+
+    /// <summary>Who and when sit this far below it.</summary>
+    public const double MailSenderDrop = 0.1;
 }

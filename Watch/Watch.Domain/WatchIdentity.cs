@@ -130,8 +130,23 @@ public static class WatchIdentity
     /// <summary>A new text: the phone's Rolodex, searched by a name typed or said (P14 B6, W-5.1.2).</summary>
     public const string DashRolodexActivityName = "com.storyworthtelling.focusphone.communication.dash.RolodexActivity";
 
+    /// <summary>After the call: the note offered once a call has ended, dictated on the wrist (P14 B7, W-5.1.5).</summary>
+    public const string DashAfterCallActivityName = "com.storyworthtelling.focusphone.communication.dash.AfterCallActivity";
+
+    /// <summary>The mail lines: subject and sender, people only, never a buzz (P14 B7, W-5.1.6).</summary>
+    public const string DashMailActivityName = "com.storyworthtelling.focusphone.communication.dash.MailActivity";
+
     public static readonly IReadOnlyList<string> DashComponents =
-        [DashPeopleActivityName, DashConversationActivityName, DashReplyActivityName, DashActActivityName, DashRolodexActivityName];
+    [
+        DashPeopleActivityName, DashConversationActivityName, DashReplyActivityName, DashActActivityName, DashRolodexActivityName,
+        DashAfterCallActivityName, DashMailActivityName,
+    ];
+
+    /// <summary>
+    /// Dash's ear for the watch's own call state (P14 B7): the receiver the platform wakes with the phone-state broadcast,
+    /// registered by this name. Not a screen, so not among <see cref="DashComponents"/>.
+    /// </summary>
+    public const string DashCallReceiverName = "com.storyworthtelling.focusphone.communication.dash.CallEndReceiver";
 
     // ---- the installer's registered names ----
 

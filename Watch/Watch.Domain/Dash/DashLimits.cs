@@ -59,4 +59,7 @@ public static class DashLimits
 
     /// <summary>Pages of the Rolodex at most (B6): a book past their contacts is cut, in Post's order.</summary>
     public const int RolodexPages = 20;
+
+    /// <summary>The longest call Post may say a call lasted (B7): a day, past any call a person has.</summary>
+    public static readonly TimeSpan CallLength = TimeSpan.FromHours(24);
 }

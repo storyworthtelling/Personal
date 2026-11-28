@@ -73,6 +73,19 @@ public class DashExchangeTests
     }
 
     [Fact]
+    public void ACallIsAnsweredForItsMoment()
+    {
+        // B7: the wrist asks which call ended at the moment it heard it end; Post's answer, a call or none, carries it back.
+        var asked = DashExchange.Awaits(new DashCallAsk(T0));
+
+        Assert.Equal(asked, DashExchange.Answers(Messages["call"]));
+        Assert.Equal(asked, DashExchange.Answers(Messages["no call"]));
+        Assert.NotEqual(asked, DashExchange.Answers(new DashCall(T0.AddSeconds(1), null, null, null)));
+        Assert.True(asked!.Value.IsOn(WatchIdentity.DashCallNotePath));
+        Assert.Equal(DashWaits.Answer, DashExchange.WaitFor(new DashCallAsk(T0)));
+    }
+
+    [Fact]
     public void APhotoWaitsLongerThanAConversation()
     {
         // Post fetches the picture (through Google Messages, or from the phone's own store) and shrinks it before it answers.
@@ -98,6 +111,8 @@ public class DashExchangeTests
     [InlineData("reply")]
     [InlineData("new text to a contact")]
     [InlineData("read")]
+    [InlineData("call ask")]
+    [InlineData("note on a call")]
     public void WhatTheWristSendsIsNoAnswer(string name) => Assert.Null(DashExchange.Answers(Messages[name]));
 
     [Fact]

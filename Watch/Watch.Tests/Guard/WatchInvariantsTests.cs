@@ -173,6 +173,8 @@ public class WatchInvariantsTests
         "com.storyworthtelling.focusphone.communication.dash.ReplyActivity",
         "com.storyworthtelling.focusphone.communication.dash.ActActivity",
         "com.storyworthtelling.focusphone.communication.dash.RolodexActivity",
+        "com.storyworthtelling.focusphone.communication.dash.AfterCallActivity",
+        "com.storyworthtelling.focusphone.communication.dash.MailActivity",
     ];
 
     [Fact]
@@ -187,6 +189,11 @@ public class WatchInvariantsTests
         Assert.Equal("com.storyworthtelling.focusphone.communication.dash.ActActivity", WatchIdentity.DashActActivityName);
         // B6: a new text, from the Rolodex (W-5.1.2).
         Assert.Equal("com.storyworthtelling.focusphone.communication.dash.RolodexActivity", WatchIdentity.DashRolodexActivityName);
+        // B7: the call note after a system call (W-5.1.5), its ear for the call's end, and the mail lines (W-5.1.6).
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.AfterCallActivity", WatchIdentity.DashAfterCallActivityName);
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.MailActivity", WatchIdentity.DashMailActivityName);
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.CallEndReceiver", WatchIdentity.DashCallReceiverName);
+        Assert.DoesNotContain(WatchIdentity.DashCallReceiverName, WatchIdentity.DashComponents);
         Assert.Equal(ExpectedDashComponents, WatchIdentity.DashComponents);
         Assert.All(WatchIdentity.DashComponents, name => Assert.StartsWith(WatchIdentity.DashPackage + ".dash.", name, StringComparison.Ordinal));
         Assert.DoesNotContain(WatchIdentity.DashListenerName, WatchIdentity.DashComponents);

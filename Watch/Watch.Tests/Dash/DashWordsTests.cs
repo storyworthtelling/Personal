@@ -14,7 +14,8 @@ public class DashWordsTests
         new[]
             {
                 DashWords.Finding, DashWords.Opening, DashWords.Sending, DashWords.TooLong, DashWords.UndoLost, DashWords.OpeningPhoto,
-                DashWords.OpeningContacts, DashWords.NoContacts, DashWords.NoOneByThatName,
+                DashWords.OpeningContacts, DashWords.NoContacts, DashWords.NoOneByThatName, DashWords.Keeping, DashWords.NoteTooLong,
+                DashWords.FindingMail, DashWords.NoMail,
             }
             .Concat(Enum.GetValues<DashTrouble>().Select(DashWords.For))
             .Concat(Enum.GetValues<DashSendOutcome>().Select(DashWords.For).OfType<string>());
@@ -24,7 +25,9 @@ public class DashWordsTests
             DashWords.Reply, DashWords.ReplyToAll, DashWords.Send, DashWords.Keyboard, DashWords.Again, DashWords.To("Lee"), DashWords.File,
             DashWords.Delete, DashWords.TapToUndo, DashWords.Filed("Lee"), DashWords.Deleted("Lee"), DashWords.FileOrDelete,
             DashWords.Caption("Robin", "1 h"), DashWords.Photo("Robin", "1 h"), DashWords.NewText, DashWords.SayAName, DashWords.Everyone,
-            DashWords.WhoTo,
+            DashWords.WhoTo, DashWords.AddANote, DashWords.NotNow, DashWords.NoteOnThisCall, DashWords.Keep, DashWords.CallWith("Robin"),
+            DashWords.CallWith(null), DashWords.CallLine(TimeSpan.FromMinutes(6), "just now"), DashWords.CallLine(null, "just now"), DashWords.Mail,
+            DashWords.NoSubject, DashWords.MailLine(new MailRow("m6666666666666666", "Saturday plans", "Sam", "20 min")),
         ];
 
     [Fact]
@@ -135,5 +138,62 @@ public class DashWordsTests
         // The phone's own Rolodex says the same when a search finds nobody.
         Assert.Equal("No one by that name.", DashWords.NoOneByThatName);
         Assert.Equal("Your phone’s contacts kept changing.", DashWords.For(DashTrouble.Changing));
+    }
+
+    // ---- B7: After the call (mock), the note read back, and Mail (mock) ----
+
+    [Fact]
+    public void AfterTheCallIsTheMockups()
+    {
+        // mock: After the call ("Call with Robin", "6 min, just now", Add a note, Not now).
+        Assert.Equal("Call with Robin", DashWords.CallWith("Robin"));
+        Assert.Equal("6 min, just now", DashWords.CallLine(TimeSpan.FromMinutes(6), "just now"));
+        Assert.Equal("Add a note", DashWords.AddANote);
+        Assert.Equal("Not now", DashWords.NotNow);
+    }
+
+    [Fact]
+    public void ACallerPostCannotNameIsACall()
+    {
+        // Post sends a name or nothing, never a number, so a caller its book doesn't know is just a call.
+        Assert.Equal("A call", DashWords.CallWith(null));
+        Assert.Equal("Just now", DashWords.CallLine(null, "just now"));
+        Assert.Equal("2 min", DashWords.CallLine(null, "2 min"));
+    }
+
+    [Theory]
+    [InlineData(20, "Under a minute")]
+    [InlineData(60, "1 min")]
+    [InlineData(370, "6 min")]
+    [InlineData(3599, "59 min")]
+    [InlineData(3600, "1 h")]
+    [InlineData(4500, "1 h 15 min")]
+    public void ACallsLengthIsShort(int seconds, string words)
+    {
+        Assert.Equal(words, DashWords.Length(TimeSpan.FromSeconds(seconds)));
+    }
+
+    [Fact]
+    public void TheNoteIsThePhonesOwnWords()
+    {
+        // No mockup draws the note read back; the phone's own call note says "Note on this call" and "Keep".
+        Assert.Equal("Note on this call", DashWords.NoteOnThisCall);
+        Assert.Equal("Keep", DashWords.Keep);
+        Assert.Equal("Keeping the note.", DashWords.Keeping);
+        Assert.Equal("That’s too long for one note.", DashWords.NoteTooLong);
+    }
+
+    [Fact]
+    public void MailIsTheMockups()
+    {
+        Assert.Equal("Mail", DashWords.Mail);
+        Assert.Equal("Finding your mail.", DashWords.FindingMail);
+        Assert.Equal("No mail waiting.", DashWords.NoMail);
+    }
+
+    [Fact]
+    public void AMailLineSaysWhatFromWhomAndWhen()
+    {
+        Assert.Equal("Saturday plans, from Sam, 20 min", DashWords.MailLine(new MailRow("m6666666666666666", "Saturday plans", "Sam", "20 min")));
     }
 }

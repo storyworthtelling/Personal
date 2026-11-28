@@ -26,6 +26,8 @@ public class DashLogLinesTests
         new DashMail([new DashMailLine(TextId, SentinelName, SentinelWords, T0)]),
         new DashRolodex(0, 1, Edition, [new DashContact(LeeContact, SentinelName)]),
         new DashSend("send-1", null, [], SentinelWords) { Contact = LeeContact },
+        new DashCall(T0, CallId, SentinelName, TimeSpan.FromMinutes(6)),
+        new DashCallNote(CallId, null, SentinelWords) { At = T0 },
     ];
 
     private static readonly Regex Shape = new(

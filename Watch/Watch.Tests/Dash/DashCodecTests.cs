@@ -113,6 +113,62 @@ public class DashCodecTests
         Assert.True(DashCodec.Decode(WatchIdentity.DashPhotoPath, bytes).Accepted);
     }
 
+    // ---- B7: the call that just ended, and its note (W-5.1.5) ----
+
+    [Fact]
+    public void ACallKeepsEveryField()
+    {
+        var sent = (DashCall)Messages["call"];
+
+        var read = Assert.IsType<DashCall>(DashCodec.Decode(WatchIdentity.DashCallNotePath, DashCodec.Encode(sent)).Message);
+
+        Assert.Equal(sent, read);
+    }
+
+    [Fact]
+    public void ACallCarriesNoNumber()
+    {
+        // The wrist is told which call (an id), whose (a name, never a number) and how long; nothing else.
+        using var document = JsonDocument.Parse(DashCodec.Encode(Messages["call"]));
+        var root = document.RootElement;
+
+        Assert.Equal(["v", "kind", "ended", "call", "name", "length"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("call", root.GetProperty("kind").GetString());
+        Assert.Equal(TimeSpan.FromMinutes(6).TotalMilliseconds, root.GetProperty("length").GetInt64());
+    }
+
+    [Fact]
+    public void NoCallIsItsMomentAlone()
+    {
+        using var document = JsonDocument.Parse(DashCodec.Encode(Messages["no call"]));
+
+        Assert.Equal(["v", "kind", "ended"], document.RootElement.EnumerateObject().Select(property => property.Name));
+        var read = Assert.IsType<DashCall>(DashCodec.Decode(WatchIdentity.DashCallNotePath, DashCodec.Encode(Messages["no call"])).Message);
+        Assert.Equal((T0, (string?)null, (string?)null, (TimeSpan?)null), (read.Ended, read.Call, read.Name, read.Length));
+    }
+
+    [Fact]
+    public void ACallAskIsItsMoment()
+    {
+        using var document = JsonDocument.Parse(DashCodec.Encode(Messages["call ask"]));
+
+        Assert.Equal(["v", "kind", "ended"], document.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(T0, Assert.IsType<DashCallAsk>(DashCodec.Decode(WatchIdentity.DashCallNotePath, DashCodec.Encode(Messages["call ask"])).Message).Ended);
+    }
+
+    [Fact]
+    public void ANoteCarriesTheMomentItWasWritten()
+    {
+        // So a note told again after a lost answer is kept once: Post names it by this moment.
+        var note = Assert.IsType<DashCallNote>(DashCodec.Decode(WatchIdentity.DashCallNotePath, DashCodec.Encode(Messages["note on a call"])).Message);
+        var bare = Assert.IsType<DashCallNote>(DashCodec.Decode(WatchIdentity.DashCallNotePath, DashCodec.Encode(Messages["note on a number"])).Message);
+        using var document = JsonDocument.Parse(DashCodec.Encode(Messages["note on a call"]));
+
+        Assert.Equal(T0.AddMinutes(2), note.At);
+        Assert.Null(bare.At);
+        Assert.Equal(["v", "kind", "call", "text", "at"], document.RootElement.EnumerateObject().Select(property => property.Name));
+    }
+
     // ---- B6: the Rolodex, and a new text to a contact (W-5.1.2) ----
 
     [Fact]
@@ -316,6 +372,22 @@ public class DashCodecTests
         { "/dash/call-note", "{\"v\":1,\"kind\":\"note\",\"text\":\"Hi\"}" },
         { "/dash/call-note", "{\"v\":1,\"kind\":\"note\",\"call\":\"m0123456789abcdef\",\"text\":\"\"}" },
         { "/dash/call-note", "{\"v\":1,\"kind\":\"note\",\"call\":\"c0123456789abcdef\",\"text\":\"Hi\"}" },
+        // B7: the call that just ended is asked by its moment; Post's answer names a call with its length, or nothing.
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"ask\"}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"ask\",\"ended\":\"1\"}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"ask\",\"ended\":-1}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\"}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"name\":\"Robin\"}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"length\":360000}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"call\":\"c0123456789abcdef\",\"length\":360000}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"call\":\"m0123456789abcdef\"}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"call\":\"m0123456789abcdef\",\"length\":-1}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"call\":\"m0123456789abcdef\",\"length\":86400001}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"call\":\"m0123456789abcdef\",\"length\":1.5}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"call\":\"m0123456789abcdef\",\"name\":\"\",\"length\":0}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"call\":\"m0123456789abcdef\",\"name\":7,\"length\":0}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"call\",\"ended\":1,\"call\":\"m0123456789abcdef\",\"number\":\"+12125550101\",\"length\":0}" },
+        { "/dash/call-note", "{\"v\":1,\"kind\":\"note\",\"call\":\"m0123456789abcdef\",\"text\":\"Hi\",\"at\":\"now\"}" },
         // Mail.
         { "/dash/mail", "{\"v\":1,\"kind\":\"mail\"}" },
         { "/dash/mail", "{\"v\":1,\"kind\":\"mail\",\"mail\":[{\"id\":\"m0123456789abcdef\",\"from\":\"\",\"subject\":\"Plans\",\"at\":1}]}" },
@@ -384,6 +456,9 @@ public class DashCodecTests
     [InlineData("rolodex", "/dash/people")]
     [InlineData("people ask", "/dash/rolodex")]
     [InlineData("new text to a contact", "/dash/rolodex")]
+    [InlineData("call", "/dash/people")]
+    [InlineData("call", "/dash/mail")]
+    [InlineData("call ask", "/dash/thread")]
     [InlineData("people ask", "/update/installed")]
     [InlineData("people ask", "/dash/elsewhere")]
     [InlineData("people ask", null)]
@@ -473,6 +548,7 @@ public class DashCodecTests
         Assert.Equal(40 * 1024, DashLimits.PhotoBytes);
         Assert.Equal(200, DashLimits.RolodexPage);
         Assert.Equal(20, DashLimits.RolodexPages);
+        Assert.Equal(TimeSpan.FromHours(24), DashLimits.CallLength);
     }
 
     [Fact]
@@ -482,7 +558,7 @@ public class DashCodecTests
         [
             DashCodec.VersionField, DashCodec.KindField, DashCodec.AskKind, DashCodec.PeopleKind, DashCodec.ThreadKind, DashCodec.SendKind,
             DashCodec.ResultKind, DashCodec.FileKind, DashCodec.DeleteKind, DashCodec.UndoKind, DashCodec.ReadKind, DashCodec.NoteKind,
-            DashCodec.MailKind, DashCodec.PhotoKind, DashCodec.RolodexKind,
+            DashCodec.MailKind, DashCodec.PhotoKind, DashCodec.RolodexKind, DashCodec.CallKind,
         ];
         string[] fields =
         [
@@ -492,14 +568,14 @@ public class DashCodecTests
             DashCodec.ToField, DashCodec.OutcomeField, DashCodec.IdsField, DashCodec.WindowField, DashCodec.ActField,
             DashCodec.ThroughField, DashCodec.CallField, DashCodec.NumberField, DashCodec.MailField, DashCodec.SubjectField,
             DashCodec.JpegField, DashCodec.PageField, DashCodec.PagesField, DashCodec.EditionField, DashCodec.ContactsField,
-            DashCodec.ContactField,
+            DashCodec.ContactField, DashCodec.EndedField, DashCodec.LengthField,
         ];
 
-        Assert.Equal(["v", "kind", "ask", "people", "thread", "send", "result", "file", "delete", "undo", "read", "note", "mail", "photo", "rolodex"], envelope);
+        Assert.Equal(["v", "kind", "ask", "people", "thread", "send", "result", "file", "delete", "undo", "read", "note", "mail", "photo", "rolodex", "call"], envelope);
         Assert.Equal(
             ["people", "key", "name", "line", "at", "unread", "group", "title", "members", "messages", "id", "incoming", "type", "text",
                 "from", "attachments", "to", "outcome", "ids", "window", "act", "through", "call", "number", "mail", "subject", "jpeg",
-                "page", "pages", "edition", "contacts", "contact"],
+                "page", "pages", "edition", "contacts", "contact", "ended", "length"],
             fields);
     }
 

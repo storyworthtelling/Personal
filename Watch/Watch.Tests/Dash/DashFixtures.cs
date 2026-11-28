@@ -64,7 +64,7 @@ internal static class DashFixtures
         ["delete a message"] = new DashDelete("act-4", null, [TextId], TimeSpan.FromMinutes(2)),
         ["undo"] = new DashUndo("act-3"),
         ["read"] = new DashRead(LeeKey, T0),
-        ["note on a call"] = new DashCallNote(CallId, null, "Robin can take Juniper on Thursday."),
+        ["note on a call"] = new DashCallNote(CallId, null, "Robin can take Juniper on Thursday.") { At = T0.AddMinutes(2) },
         ["note on a number"] = new DashCallNote(null, "+1 212-555-0103", "Call back about the dentist."),
         ["photo ask"] = new DashPhotoAsk(PhotoId),
         ["photo"] = new DashPhoto(PhotoId, Jpeg),
@@ -72,6 +72,11 @@ internal static class DashFixtures
         ["rolodex"] = new DashRolodex(0, 2, Edition, [new DashContact(LeeContact, "Lee"), new DashContact(RobinContact, "Robin")]),
         ["empty rolodex"] = new DashRolodex(0, 1, Edition, []),
         ["new text to a contact"] = new DashSend("send-3", null, [], "Running five minutes late.") { Contact = LeeContact },
+        // B7: the call that just ended (W-5.1.5): the wrist asks by the moment it ended, Post names it or says it has none.
+        ["call ask"] = new DashCallAsk(T0),
+        ["call"] = new DashCall(T0, CallId, "Robin", TimeSpan.FromMinutes(6)),
+        ["call with no name"] = new DashCall(T0, CallId, null, TimeSpan.Zero),
+        ["no call"] = new DashCall(T0, null, null, null),
         ["mail ask"] = new DashMailAsk(),
         ["mail"] = new DashMail(
         [

@@ -25,7 +25,8 @@ public enum DashTrouble
 /// went wrong, in the secondary grey, never a buzz. No app is named on the watch (A48), so the phone is "your phone".
 /// The labels are the mockups' (People waiting, A conversation, Replying by voice, A group text with a photo, Filed with
 /// Undo); File and Delete, the choice before an act that no mockup draws, are the phone's own words for the two acts.
-/// No mockup draws a new text either (B6): its words follow the nearest drawn screens, and the phone's Rolodex.
+/// No mockup draws a new text either (B6): its words follow the nearest drawn screens, and the phone's Rolodex. After the
+/// call and Mail are drawn (B7); the note read back is not, and takes the phone's own call note's words.
 /// </summary>
 public static class DashWords
 {
@@ -106,6 +107,63 @@ public static class DashWords
 
     /// <summary>A search that found nobody: the phone's own Rolodex says the same.</summary>
     public const string NoOneByThatName = "No one by that name.";
+
+    // ---- B7: the call note (W-5.1.5; mock: After the call) and the mail lines (W-5.1.6; mock: Mail) ----
+
+    /// <summary>After the call's one action: dictate a note.</summary>
+    public const string AddANote = "Add a note";
+
+    /// <summary>After the call's quieter choice: leave it.</summary>
+    public const string NotNow = "Not now";
+
+    /// <summary>Over the note read back, and the dictation's prompt: the phone's own call note says the same.</summary>
+    public const string NoteOnThisCall = "Note on this call";
+
+    /// <summary>The note read back is kept: the phone's own word for it.</summary>
+    public const string Keep = "Keep";
+
+    /// <summary>A note on its way to the phone.</summary>
+    public const string Keeping = "Keeping the note.";
+
+    /// <summary>A typed note past what one message from the wrist may carry.</summary>
+    public const string NoteTooLong = "That’s too long for one note.";
+
+    /// <summary>People waiting's way to the mail lines, where the mockup draws it, and the Mail screen's name.</summary>
+    public const string Mail = "Mail";
+
+    /// <summary>The mail lines, asked for.</summary>
+    public const string FindingMail = "Finding your mail.";
+
+    /// <summary>The phone has no mail from people waiting.</summary>
+    public const string NoMail = "No mail waiting.";
+
+    /// <summary>A mail line whose mail has no subject.</summary>
+    public const string NoSubject = "No subject";
+
+    /// <summary>After the call's name (mock: "Call with Robin"); a caller the phone's book has no name for is a call.</summary>
+    public static string CallWith(string? name) => name is null ? "A call" : $"Call with {name}";
+
+    /// <summary>Under it (mock: "6 min, just now"): how long, when known, then when.</summary>
+    public static string CallLine(TimeSpan? length, string when) =>
+        length is { } known ? $"{Length(known)}, {when}" : char.ToUpperInvariant(when[0]) + when[1..];
+
+    /// <summary>A call's length in the watch's short words: "Under a minute", "6 min", "1 h 15 min".</summary>
+    public static string Length(TimeSpan length)
+    {
+        if (length < TimeSpan.FromMinutes(1))
+        {
+            return "Under a minute";
+        }
+        var minutes = (int)length.TotalMinutes;
+        if (minutes < 60)
+        {
+            return $"{minutes} min";
+        }
+        return minutes % 60 == 0 ? $"{minutes / 60} h" : $"{minutes / 60} h {minutes % 60} min";
+    }
+
+    /// <summary>A mail line as TalkBack reads it: what, from whom, when.</summary>
+    public static string MailLine(MailRow row) => $"{row.Subject}, from {row.From}, {row.When}";
 
     public static string For(DashTrouble trouble) => trouble switch
     {

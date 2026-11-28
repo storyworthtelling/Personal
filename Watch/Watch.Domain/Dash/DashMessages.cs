@@ -154,9 +154,35 @@ public sealed record DashRead(string Key, DateTimeOffset Through) : DashMessage
 
 /// <summary>
 /// The owner's note on a call: the call as a message id from a conversation (<paramref name="Call"/>), or the number of a
-/// call the watch's own phone app had (<paramref name="Number"/>), never both.
+/// call the watch's own phone app had (<paramref name="Number"/>), never both. The wrist always names a call Post named
+/// (<see cref="CallNoteAttempt"/>, P14 B7) and never a number, since it reads none of its own.
 /// </summary>
 public sealed record DashCallNote(string? Call, string? Number, string Text) : DashMessage
+{
+    public override string Path => WatchIdentity.DashCallNotePath;
+
+    /// <summary>
+    /// The moment the note was written on the wrist (B7), which Post names the note by, so a note told again after a lost
+    /// answer is kept once. Absent from a note written before B7: Post names it by when it arrived.
+    /// </summary>
+    public DateTimeOffset? At { get; init; }
+}
+
+/// <summary>
+/// Dash asking which call ended at <paramref name="Ended"/>, the moment the watch heard its own call state go idle (B7,
+/// W-5.1.5). The watch knows nothing else about the call: the Phone app rang and carried it.
+/// </summary>
+public sealed record DashCallAsk(DateTimeOffset Ended) : DashMessage
+{
+    public override string Path => WatchIdentity.DashCallNotePath;
+}
+
+/// <summary>
+/// Post's answer (B7): the call in its log that ended then, by its message id (<paramref name="Call"/>), with the caller's
+/// name from the phone's address book (null when it has none of its own: never a number) and how long it was connected;
+/// or, with <paramref name="Call"/> null, that Post has no such call, so there is nothing for a note to go on.
+/// </summary>
+public sealed record DashCall(DateTimeOffset Ended, string? Call, string? Name, TimeSpan? Length) : DashMessage
 {
     public override string Path => WatchIdentity.DashCallNotePath;
 }
