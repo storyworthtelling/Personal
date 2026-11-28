@@ -2,7 +2,8 @@ namespace Codex.Infrastructure.Dash;
 
 /// <summary>
 /// The watch-unreachable rule (P14 B2, plan R3: "a quiet line, no buzz"). Post sends the wrist nothing it did not ask
-/// for: an answer goes back once, on the node that asked, and is waited for at most <see cref="ReplyWait"/>. An answer
+/// for but a text arriving (B8, <c>dash/arrived</c>, told once to a wrist in reach by the same send): an answer goes back
+/// once, on the node that asked, and is waited for at most <see cref="ReplyWait"/>. An answer
 /// that does not land is dropped and counted (<see cref="Missed"/>, a count line in the log and never the payload), not
 /// queued and not tried again: the wrist asks again when it is near, an answer kept for later would be stale by then,
 /// and a send heard again is answered from the book without being sent twice. The waits are chosen, not measured.
