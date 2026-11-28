@@ -157,6 +157,27 @@ internal static class Screens
             TaskContinuationOptions.None,
             TaskScheduler.Default);
 
+    /// <summary>
+    /// A tell whose landing the screen says (B7's note): what stood in the way, or null when the phone has it, back on the
+    /// screen's own thread if the screen is still there. The tell itself goes on whether or not the screen does.
+    /// </summary>
+    public static void WhenTold(Activity screen, Task<DashTrouble?> telling, Action<DashTrouble?> show) =>
+        telling.ContinueWith(
+            done =>
+            {
+                var trouble = done.IsFaulted ? Untold(done.Exception!) : done.Result;
+                screen.RunOnUiThread(() =>
+                {
+                    if (!screen.IsFinishing && !screen.IsDestroyed)
+                    {
+                        show(trouble);
+                    }
+                });
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.None,
+            TaskScheduler.Default);
+
     /// <summary>A tell nobody answers: what stood in the way is logged by the link, and anything unforeseen here.</summary>
     public static void Told(Task<DashTrouble?> telling) =>
         telling.ContinueWith(
@@ -164,6 +185,13 @@ internal static class Screens
             CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted,
             TaskScheduler.Default);
+
+    // A tell that stopped with something the link did not foresee: logged by its shape, and said as out of reach.
+    private static DashTrouble? Untold(AggregateException failure)
+    {
+        DashLog.Quiet("DASH a tell to the phone stopped", failure.GetBaseException());
+        return DashTrouble.NoPhone;
+    }
 
     // The same for a gathering of the Rolodex.
     private static RolodexFetch Unfetched(AggregateException failure)

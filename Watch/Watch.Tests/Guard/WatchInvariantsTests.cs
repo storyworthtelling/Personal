@@ -401,14 +401,121 @@ public class WatchInvariantsTests
     }
 
     [Fact]
-    public void DashAsksForNoPermission()
+    public void DashAsksOnlyToHearACallEnd()
     {
-        // The Data Layer needs none, and the system's own dictation and keyboard ask for what they need themselves.
+        // The Data Layer needs none, and the system's own dictation and keyboard ask for what they need themselves. The
+        // one permission is B7's: the platform tells an app the watch's call state went idle only if it holds
+        // READ_PHONE_STATE. Nothing that reads a number (the call log, the phone's own number) and nothing that buzzes or
+        // posts a notification.
         var manifest = Text(Dash("Properties", "AndroidManifest.xml"));
         var attributes = DashSources().Count(path => Regex.IsMatch(File.ReadAllText(path), @"\[assembly:\s*UsesPermission"));
+        var asked = Regex.Matches(manifest, @"<uses-permission\s+android:name=""(?<name>[^""]+)""").Select(match => match.Groups["name"].Value);
 
-        Assert.DoesNotContain("<uses-permission", manifest, StringComparison.Ordinal);
+        Assert.Equal(["android.permission.READ_PHONE_STATE"], asked);
         Assert.Equal(0, attributes);
+    }
+
+    [Fact]
+    public void DashHearsACallEndAndNothingElse()
+    {
+        // W-5.1.5 (A13): the watch's own Phone app carries the call; Dash's receiver hears its state and keeps the end, and
+        // does no work of its own: it asks nothing, tells nothing and opens nothing (Android refuses a screen from the
+        // background), so the offer waits for Dash to be opened.
+        var receiver = Code(Dash("CallEndReceiver.cs"));
+
+        Assert.Contains("[BroadcastReceiver(Name = WatchIdentity.DashCallReceiverName, Exported = true)]", receiver, StringComparison.Ordinal);
+        Assert.Contains("TelephonyManager.ActionPhoneStateChanged", receiver, StringComparison.Ordinal);
+        Assert.Contains("TelephonyManager.ExtraState", receiver, StringComparison.Ordinal);
+        Assert.Contains("AfterCall.Shared.Heard(", receiver, StringComparison.Ordinal);
+        foreach (var work in new[] { "AskAsync", "TellAsync", "StartActivity", "GoAsync", "Task.Run" })
+        {
+            Assert.DoesNotContain(work, receiver, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void TheWatchReadsNoNumberOfItsOwn()
+    {
+        // The watch must never log or show a raw number it didn't get from Post, and Post sends none: so the wrist reads
+        // none at all, from the call state's extras, the call log or the phone's own line.
+        var code = DashCode();
+
+        foreach (var reading in new[] { "ExtraIncomingNumber", "CallLog", "Line1Number", "ReadCallLog", "PhoneNumberUtils", "incoming_number" })
+        {
+            Assert.DoesNotContain(reading, code, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void DashOffersTheNoteAfterACall()
+    {
+        // W-5.1.5 (mock: After the call): People waiting asks once for READ_PHONE_STATE, and on coming back after a call
+        // asks Post which call it was, on the pool, and opens After the call once, for a call Post named.
+        var people = Code(Dash("PeopleActivity.cs"));
+        var after = Code(Dash("AfterCallActivity.cs"));
+
+        foreach (var call in new[] { "AfterCall.Shared.Due(", "new DashCallAsk(", "AfterCallActivity.For(", "AfterCall.Shared.Settle(", "RequestPermissions(", "Manifest.Permission.ReadPhoneState" })
+        {
+            Assert.Contains(call, people, StringComparison.Ordinal);
+        }
+        foreach (var call in new[]
+        {
+            "DashWords.AddANote", "DashWords.NotNow", "DashWords.CallWith(", "DashWords.CallLine(", "AfterCall.LengthOf(", "WhenWords.Relative(",
+            "DashWords.NoteOnThisCall", "DashWords.Keep", "DashWords.Keeping", "CallNoteAttempt.Keep(", "SystemInput.Dictation(this, DashWords.NoteOnThisCall)",
+            "SystemInput.Keyboard(this, DashWords.NoteOnThisCall)", "Task.Run(() => PostLink.Shared.TellAsync(", "DashLayout.AfterCallTitleCentre",
+            "DashLayout.AfterCallLineCentre", "DashLayout.AfterCallPillCentre", "DashLayout.AfterCallPillWidth", "DashLayout.AfterCallChoiceCentre",
+        })
+        {
+            Assert.Contains(call, after, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void DashShowsMailAsTheMockupDrawsIt()
+    {
+        // W-5.1.6 (mock: Mail): asked of Post each time the screen comes back, drawn as subject over who and when, newest
+        // first, at the mockup's places.
+        var mail = Code(Dash("MailActivity.cs"));
+        var row = Code(Dash("MailRowView.cs"));
+
+        foreach (var call in new[] { "new DashMailAsk()", "MailLines.Rows(", "DashWords.Mail", "DashWords.FindingMail", "DashWords.NoMail", "DashLayout.TitleCentre", "DashLayout.MailFirst", "DashLayout.MailPitch" })
+        {
+            Assert.Contains(call, mail, StringComparison.Ordinal);
+        }
+        foreach (var call in new[] { "DashLayout.MailWidth", "DashLayout.MailSubjectRise", "DashLayout.MailSenderDrop", "DashWords.MailLine(", "DashWords.Caption(" })
+        {
+            Assert.Contains(call, row, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void MailIsSilentAndUnmarked()
+    {
+        // A11: never a buzz; WD §1 and the owner's ruling: no unread mark. Nothing in Dash buzzes or posts a notification,
+        // and a mail line draws no mark in Dash's colour and is only read, never opened.
+        var code = DashCode();
+        foreach (var buzz in new[] { "Vibrat", "Notification", "HapticFeedback" })
+        {
+            Assert.DoesNotContain(buzz, code, StringComparison.Ordinal);
+        }
+
+        var row = Code(Dash("MailRowView.cs"));
+        foreach (var mark in new[] { "WatchApp.Dash", "DrawRect(", "DrawRoundRect(", "Clickable = true" })
+        {
+            Assert.DoesNotContain(mark, row, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void PeopleWaitingShowsMailWhereTheMockupDrawsIt()
+    {
+        // mock: People waiting draws Mail at its foot; New text (B6), which no mockup draws, follows under it.
+        var people = Code(Dash("PeopleActivity.cs"));
+        var mail = people.IndexOf("Screens.Choice(this, DashWords.Mail)", StringComparison.Ordinal);
+        var newText = people.IndexOf("Screens.Choice(this, DashWords.NewText)", StringComparison.Ordinal);
+
+        Assert.True(mail >= 0 && newText > mail, "Mail is not drawn above New text at People waiting’s foot.");
+        Assert.Contains("MailActivity.For(", people, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -427,6 +534,9 @@ public class WatchInvariantsTests
     [InlineData("DashReplyActivityName")]
     [InlineData("DashActActivityName")]
     [InlineData("DashRolodexActivityName")]
+    [InlineData("DashAfterCallActivityName")]
+    [InlineData("DashMailActivityName")]
+    [InlineData("DashCallReceiverName")]
     public void EachDashScreenIsRegisteredByItsName(string constant)
     {
         var registered = DashSources().Count(path => File.ReadAllText(path).Contains($"Name = WatchIdentity.{constant}", StringComparison.Ordinal));
@@ -556,7 +666,7 @@ public class WatchInvariantsTests
     {
         // Every ask and tell a screen makes runs on the pool, and only its answer comes back to the screen.
         var screens = DashSources().Where(path => Path.GetFileName(path).EndsWith("Activity.cs", StringComparison.Ordinal)).ToList();
-        Assert.Equal(5, screens.Count);
+        Assert.Equal(7, screens.Count);
 
         var calls = screens.SelectMany(path => Code(path).Split('\n').Where(line => Regex.IsMatch(line, @"\.(AskAsync|TellAsync)\(")).Select(line => (Path: Path.GetFileName(path), Line: line))).ToList();
         Assert.NotEmpty(calls);
@@ -720,6 +830,8 @@ public class WatchInvariantsTests
         Assert.DoesNotContain("new DashSend(", code, StringComparison.Ordinal);
         Assert.DoesNotContain("new DashCallNote(", code, StringComparison.Ordinal);
         Assert.Contains("attempt.Message", code, StringComparison.Ordinal);
+        // B7: a note goes on a call Post named, by its id (CallNoteAttempt), never on a number.
+        Assert.Contains("CallNoteAttempt.Keep(", code, StringComparison.Ordinal);
     }
 
     [Fact]

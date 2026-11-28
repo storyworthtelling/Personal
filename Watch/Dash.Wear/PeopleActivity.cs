@@ -1,5 +1,7 @@
+using Android;
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -17,7 +19,9 @@ namespace Dash.Wear;
 /// comes back, and said as a status sentence while it is on its way; nobody waiting is the faint glyph and nothing
 /// else (mock: nobody waiting) but New text. A tap opens the conversation; a long press offers to file or delete it,
 /// undo-first (W-5.1.4, <see cref="ActActivity"/>), and a row whose act stands leaves at once, before the phone is asked
-/// again. New text, at the foot where the mockup draws Mail, opens the Rolodex (W-5.1.2, B6; <see cref="RolodexActivity"/>).
+/// again. Mail, at the foot where the mockup draws it, opens the mail lines (W-5.1.6, B7; <see cref="MailActivity"/>), and
+/// New text under it the Rolodex (W-5.1.2, B6; <see cref="RolodexActivity"/>). Coming back after a call the watch's own
+/// Phone app carried, it offers the call note once (W-5.1.5, B7; <see cref="AfterCallActivity"/>).
 /// </summary>
 [Activity(Name = WatchIdentity.DashPeopleActivityName, MainLauncher = true, Exported = true, Icon = "@mipmap/ic_launcher")]
 public sealed class PeopleActivity : Activity
@@ -26,11 +30,13 @@ public sealed class PeopleActivity : Activity
     private Frame frame = null!;
     private DashGlyphView glyph = null!;
     private const int ActRequest = 1;
+    private const int PhoneStateRequest = 2;
 
     private LinearLayout rows = null!;
     private WatchTextView newText = null!;
     private bool drawn;
     private IReadOnlyList<PersonRow> shown = [];
+    private bool askingCall;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -46,22 +52,74 @@ public sealed class PeopleActivity : Activity
         var firstTop = DashLayout.FirstRow - DashLayout.RowHeight / 2 - DashLayout.GlyphTop - DashLayout.GlyphSide;
         frame.Column.AddView(rows, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = round.Px(firstTop) });
 
-        // A new text (W-5.1.2, B6) starts at the foot, where the mockup draws Mail, and is there with nobody waiting too.
-        newText = Screens.Choice(this, DashWords.NewText);
-        newText.Weight = WatchWeight.Medium;
-        newText.Click += (_, _) => StartActivity(RolodexActivity.For(this));
+        // Mail (W-5.1.6, B7) at the foot, where the mockup draws it, and a new text (W-5.1.2, B6) under it, which no
+        // mockup draws; both there with nobody waiting too, each a quieter word that is a whole touch target.
         var target = (int)Math.Ceiling(WatchPaints.TouchTarget(this));
-        frame.Column.AddView(newText, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, target)
+        var mail = Screens.Choice(this, DashWords.Mail);
+        mail.Weight = WatchWeight.Medium;
+        mail.Click += (_, _) => StartActivity(MailActivity.For(this));
+        frame.Column.AddView(mail, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, target)
         {
             Gravity = GravityFlags.CenterHorizontal,
             TopMargin = round.Px(DashLayout.EntryGap),
         });
+        newText = Screens.Choice(this, DashWords.NewText);
+        newText.Weight = WatchWeight.Medium;
+        newText.Click += (_, _) => StartActivity(RolodexActivity.For(this));
+        frame.Column.AddView(newText, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, target)
+        {
+            Gravity = GravityFlags.CenterHorizontal,
+        });
+
+        if (savedInstanceState is null)
+        {
+            HearCalls();
+        }
     }
 
     protected override void OnResume()
     {
         base.OnResume();
         Ask();
+        OfferTheNote();
+    }
+
+    // The one permission Dash asks for (B7): without it the platform never says the watch's call state went idle, and no
+    // note is offered. The system's own prompt; refused, Dash works as before, and Android stops asking after twice.
+    private void HearCalls()
+    {
+        if (CheckSelfPermission(Manifest.Permission.ReadPhoneState) != Permission.Granted)
+        {
+            RequestPermissions([Manifest.Permission.ReadPhoneState], PhoneStateRequest);
+        }
+    }
+
+    // After a call the watch's Phone app carried (W-5.1.5): Post says which call ended then, on the pool, and After the call
+    // is offered once, for a call Post named. One Post has no record of is let go; one the phone could not be asked about
+    // is asked about again when People waiting comes back, within the offer's half hour.
+    private void OfferTheNote()
+    {
+        if (askingCall || AfterCall.Shared.Due(DateTimeOffset.UtcNow) is not { } end)
+        {
+            return;
+        }
+        askingCall = true;
+        var context = ApplicationContext!;
+        Screens.WhenAnswered(this, Task.Run(() => PostLink.Shared.AskAsync(context, new DashCallAsk(end.Ended))), reply => Offer(end, reply));
+    }
+
+    private void Offer(CallEnd end, DashReply reply)
+    {
+        askingCall = false;
+        if (reply.Answer is not DashCall call)
+        {
+            return;
+        }
+        AfterCall.Shared.Settle(end);
+        if (call.Call is not null)
+        {
+            StartActivity(AfterCallActivity.For(this, call, end));
+        }
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
