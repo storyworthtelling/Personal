@@ -186,9 +186,10 @@ public partial class ContractPermissionsTests
             .SelectMany(Sources).Count(file => GuardedBy().Matches(File.ReadAllText(file))
                 .Any(match => match.Value.StartsWith("[BroadcastReceiver(", StringComparison.Ordinal) && !IsPlatform(match.Groups["constant"].Value.Trim())));
 
-        // Post, Pulp (three), Flyleaf and Index send; Flyleaf (two), Pulp, Index (two) and Constitution receive.
-        Assert.Equal(6, senders);
-        Assert.Equal(6, receivers);
+        // Post, Pulp (four, with the timed release), Flyleaf and Index send; Flyleaf (three, with the timed release),
+        // Pulp, Index (two) and Constitution receive.
+        Assert.Equal(7, senders);
+        Assert.Equal(7, receivers);
     }
 
     [Fact]

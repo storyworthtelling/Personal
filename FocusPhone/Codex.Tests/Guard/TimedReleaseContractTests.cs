@@ -60,7 +60,8 @@ public class TimedReleaseContractTests
     {
         var receiver = ReadRepoFile("FocusPhone", "Flyleaf.Android", "TimedReleaseReceiver.cs");
         Assert.Contains("Name = TimedReleaseHandoff.Receiver", receiver, StringComparison.Ordinal);
-        Assert.Contains("Permission = TimedReleaseHandoff.Permission", receiver, StringComparison.Ordinal);
+        // The release travels under the locked open's permission, which ContractPermissions.cs already declares and requests.
+        Assert.Contains("Permission = LockedOpenHandoff.Permission", receiver, StringComparison.Ordinal);
         Assert.Contains("[IntentFilter([TimedReleaseHandoff.Action])]", receiver, StringComparison.Ordinal);
         Assert.Contains("TimedReleaseController.Release(", receiver, StringComparison.Ordinal);
     }

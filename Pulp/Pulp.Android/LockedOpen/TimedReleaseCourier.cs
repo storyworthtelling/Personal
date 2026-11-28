@@ -25,7 +25,7 @@ internal static class TimedReleaseCourier
     public static bool Send(Context context, string package, Uri link, int minutes, Action continueWith)
     {
         ArgumentNullException.ThrowIfNull(continueWith);
-        var before = ContractCourier.Before(context, TimedReleaseHandOff.Package, TimedReleaseHandOff.Permission);
+        var before = ContractCourier.Before(context, TimedReleaseHandOff.Package, LockedOpenHandOff.Permission);
         if (before != ContractSendOutcome.Sent)
         {
             HeadLog.Info(LogSources.Contract(Contract), ContractBroadcast.SendLine(Contract, before));
@@ -57,7 +57,7 @@ internal static class TimedReleaseCourier
             main.PostDelayed(() => Resolve(null), (long)TimedReleaseHandOff.AnswerTimeout.TotalMilliseconds);
             context.SendOrderedBroadcast(
                 intent,
-                TimedReleaseHandOff.Permission,
+                LockedOpenHandOff.Permission,
                 new AnswerReceiver(code => Resolve(code)),
                 main,
                 (Result)TimedReleaseHandOff.ResultNoAnswer,

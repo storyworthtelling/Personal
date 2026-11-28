@@ -20,7 +20,7 @@ namespace Flyleaf;
     Name = TimedReleaseHandoff.Receiver,
     Exported = true,
     Enabled = true,
-    Permission = TimedReleaseHandoff.Permission)]
+    Permission = LockedOpenHandoff.Permission)]
 [IntentFilter([TimedReleaseHandoff.Action])]
 public class TimedReleaseReceiver : BroadcastReceiver
 {
