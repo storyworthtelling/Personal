@@ -15,7 +15,8 @@ public class DashWordsTests
             {
                 DashWords.Finding, DashWords.Opening, DashWords.Sending, DashWords.TooLong, DashWords.UndoLost, DashWords.OpeningPhoto,
                 DashWords.OpeningContacts, DashWords.NoContacts, DashWords.NoOneByThatName, DashWords.Keeping, DashWords.NoteTooLong,
-                DashWords.FindingMail, DashWords.NoMail,
+                DashWords.FindingMail, DashWords.NoMail, DashWords.NobodyWaiting, DashWords.Waiting(["Lee"]),
+                DashWords.Waiting(["Lee", "Robin", "Juniper’s school"]),
             }
             .Concat(Enum.GetValues<DashTrouble>().Select(DashWords.For))
             .Concat(Enum.GetValues<DashSendOutcome>().Select(DashWords.For).OfType<string>());
@@ -28,6 +29,7 @@ public class DashWordsTests
             DashWords.WhoTo, DashWords.AddANote, DashWords.NotNow, DashWords.NoteOnThisCall, DashWords.Keep, DashWords.CallWith("Robin"),
             DashWords.CallWith(null), DashWords.CallLine(TimeSpan.FromMinutes(6), "just now"), DashWords.CallLine(null, "just now"), DashWords.Mail,
             DashWords.NoSubject, DashWords.MailLine(new MailRow("m6666666666666666", "Saturday plans", "Sam", "20 min")),
+            DashWords.PeopleWaiting,
         ];
 
     [Fact]
@@ -195,5 +197,30 @@ public class DashWordsTests
     public void AMailLineSaysWhatFromWhomAndWhen()
     {
         Assert.Equal("Saturday plans, from Sam, 20 min", DashWords.MailLine(new MailRow("m6666666666666666", "Saturday plans", "Sam", "20 min")));
+    }
+
+    // ---- B8: the People waiting tile ----
+
+    [Fact]
+    public void TheTileIsTheMockups() => Assert.Equal("People waiting", DashWords.PeopleWaiting);
+
+    [Theory]
+    [InlineData("Lee is waiting.", new[] { "Lee" })]
+    [InlineData("Lee and Robin are waiting.", new[] { "Lee", "Robin" })]
+    [InlineData("Lee, Robin and Juniper’s school are waiting.", new[] { "Lee", "Robin", "Juniper’s school" })]
+    public void TheTileSaysWhoIsWaiting(string words, string[] names) => Assert.Equal(words, DashWords.Waiting(names));
+
+    [Fact]
+    public void NobodyIsWaiting() => Assert.Equal("Nobody’s waiting.", DashWords.NobodyWaiting);
+
+    [Fact]
+    public void TheTileCountsNobody()
+    {
+        // No count (A72): the words name who the tile shows and never how many wait.
+        var said = DashWords.Waiting(["Lee", "Robin", "Juniper’s school"]);
+
+        Assert.DoesNotMatch(@"\d", said);
+        Assert.DoesNotContain("more", said, StringComparison.Ordinal);
+        Assert.DoesNotContain("three", said, StringComparison.Ordinal);
     }
 }

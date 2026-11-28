@@ -91,6 +91,12 @@ public static class WatchTokens
 
         /// <summary>The owner's own message, in the app's quieter glass (mock: A conversation, the day colour at 0.35).</summary>
         public const double Mine = 0.35;
+
+        /// <summary>The tile's second name, fading (mock: Tile: People waiting, the grey at 0.7).</summary>
+        public const double Earlier = 0.7;
+
+        /// <summary>The tile's third name, fainter still (mock: the grey at 0.4).</summary>
+        public const double Earliest = 0.4;
     }
 
     /// <summary>

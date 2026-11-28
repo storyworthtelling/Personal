@@ -170,4 +170,49 @@ public class DashLayoutTests
             BoxInside(1 - DashLayout.MailWidth / 2, centre - DashLayout.MailSubjectRise, DashLayout.MailWidth, DashLayout.MailSubjectRise + DashLayout.MailSenderDrop);
         }
     }
+
+    // ---- B8: the People waiting tile (mock: Tile: People waiting, Tile: nobody waiting) ----
+
+    [Fact]
+    public void TheTileIsWhereTheMockupDrawsIt()
+    {
+        Assert.Equal(0.62, DashLayout.TileGlyphSide);
+        Assert.Equal(0.66, DashLayout.TileGlyphCentre);
+        Assert.Equal(1.0, DashLayout.TileNobodyCentre);
+        Assert.Equal(1.12, DashLayout.TileNewestCentre);
+        Assert.Equal(1.34, DashLayout.TileEarlierCentre);
+        Assert.Equal(1.52, DashLayout.TileEarliestCentre);
+        Assert.Equal(1.4, DashLayout.TileNameWidth);
+        Assert.Equal(DashLayout.TileEarlierCentre, DashLayout.TileQuietCentre);
+    }
+
+    [Theory]
+    [InlineData(TileRank.Newest, 1.12)]
+    [InlineData(TileRank.Earlier, 1.34)]
+    [InlineData(TileRank.Earliest, 1.52)]
+    public void EachNameHasItsPlace(TileRank rank, double centre) => Assert.Equal(centre, DashLayout.TileNameCentre(rank));
+
+    [Fact]
+    public void TheTilesNamesSitInsideTheCircle()
+    {
+        foreach (var rank in Enum.GetValues<TileRank>())
+        {
+            var centre = DashLayout.TileNameCentre(rank);
+            Assert.True(Inside(1 - DashLayout.TileNameWidth / 2, centre) && Inside(1 + DashLayout.TileNameWidth / 2, centre),
+                $"The {rank} name's line runs off the round screen.");
+        }
+    }
+
+    [Fact]
+    public void TheTilesDashSitsAboveItsNames()
+    {
+        BoxInside(1 - DashLayout.TileGlyphSide / 2, DashLayout.TileGlyphCentre - DashLayout.TileGlyphSide / 2, DashLayout.TileGlyphSide, DashLayout.TileGlyphSide);
+        // The dash's stroke is a fraction of its side; its foot is above the newest name.
+        Assert.True(DashLayout.TileGlyphCentre + DashLayout.TileGlyphSide * Watch.Domain.Kit.GlyphGeometry.DashStroke < DashLayout.TileNewestCentre);
+        Assert.True(DashLayout.TileNewestCentre < DashLayout.TileEarlierCentre && DashLayout.TileEarlierCentre < DashLayout.TileEarliestCentre);
+    }
+
+    [Fact]
+    public void NobodysDashIsAtTheCentre() =>
+        BoxInside(1 - DashLayout.TileGlyphSide / 2, DashLayout.TileNobodyCentre - DashLayout.TileGlyphSide / 2, DashLayout.TileGlyphSide, DashLayout.TileGlyphSide);
 }

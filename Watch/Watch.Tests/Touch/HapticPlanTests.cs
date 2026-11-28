@@ -125,4 +125,41 @@ public class HapticPlanTests
             Assert.Same(WatchTokens.Haptics.EaseOff, HapticPlan.For(WatchEvent.EaseOff, state).Pattern);
         }
     }
+
+    // ---- B8: a text arriving, by day and overnight (A12, WD §7) ----
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ByDayEveryTextBuzzes(bool favourite) =>
+        Assert.Same(WatchTokens.Haptics.Text, HapticPlan.ForText(SessionState.None, overnight: false, favourite).Pattern);
+
+    [Fact]
+    public void AtNightOnlyAFavouritesTextBuzzes()
+    {
+        Assert.Same(WatchTokens.Haptics.Text, HapticPlan.ForText(SessionState.None, overnight: true, favourite: true).Pattern);
+        Assert.Equal(HapticDecision.Silent, HapticPlan.ForText(SessionState.None, overnight: true, favourite: false));
+    }
+
+    [Fact]
+    public void AFavouritesTextStillWaitsForTheRest()
+    {
+        Assert.Equal(HapticDecision.Hold, HapticPlan.ForText(SessionState.InSet, overnight: false, favourite: true));
+        Assert.Equal(HapticDecision.Hold, HapticPlan.ForText(SessionState.InSet, overnight: true, favourite: true));
+    }
+
+    [Fact]
+    public void ATextIsAlwaysTwoShortTaps()
+    {
+        foreach (var state in States)
+        {
+            foreach (var overnight in new[] { false, true })
+            {
+                if (HapticPlan.ForText(state, overnight, favourite: true).Pattern is { } pattern)
+                {
+                    Assert.Equal(WatchEvent.Text, HapticPlan.MeaningOf(pattern));
+                }
+            }
+        }
+    }
 }

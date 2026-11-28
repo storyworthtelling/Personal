@@ -136,8 +136,10 @@ public class DashRelayGuardTests
             "DashPeoplePath", "DashThreadPath", "DashSendPath", "DashFilePath", "DashDeletePath", "DashUndoPath", "DashReadPath",
             "DashCallNotePath", "DashMailPath", "DashPhotoPath", "DashRolodexPath",
         ];
-        Assert.Equal(WatchIdentity.DashPaths.Count, paths.Length);
+        // B8: dash/arrived runs the other way, Post telling the wrist a text arrived, so Post's ear doesn't hear it.
+        Assert.Equal(WatchIdentity.DashPaths.Count - 1, paths.Length);
         Assert.All(paths, path => Assert.Contains($"DataPath = WatchIdentity.{path}", listener, StringComparison.Ordinal));
+        Assert.DoesNotContain("WatchIdentity.DashArrivedPath", listener, StringComparison.Ordinal);
     }
 
     [Fact]

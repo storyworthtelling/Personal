@@ -99,4 +99,12 @@ public class NeutralTokensTests
         var unit = channel / 255.0;
         return unit <= 0.04045 ? unit / 12.92 : Math.Pow((unit + 0.055) / 1.055, 2.4);
     }
+
+    [Fact]
+    public void TheTilesEarlierNamesFadeAsDrawn()
+    {
+        // mock: Tile: People waiting draws the second name in the grey at 0.7 and the third at 0.4 (B8).
+        Assert.Equal(0.7, WatchTokens.Light.Earlier);
+        Assert.Equal(0.4, WatchTokens.Light.Earliest);
+    }
 }

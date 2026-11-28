@@ -420,6 +420,17 @@ public class DashCodecTests
         { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\",\"contacts\":[{\"id\":\"p0123456789abcdef\"}]}" },
         { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\",\"contacts\":[{\"id\":\"p0123456789abcdef\",\"name\":\"Lee\",\"number\":\"+12125550101\"}]}" },
         { "/dash/rolodex", "{\"v\":1,\"kind\":\"rolodex\",\"page\":0,\"pages\":1,\"edition\":\"e0123456789abcdef\",\"contacts\":[\"Lee\"]}" },
+        // B8: a text arrived is its correspondence, its moment and whether its sender is a favourite, and nothing else.
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"at\":1,\"favourite\":true}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"key\":\"m0123456789abcdef\",\"at\":1,\"favourite\":true}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"key\":\"c0123456789abcdef\",\"favourite\":true}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"key\":\"c0123456789abcdef\",\"at\":\"now\",\"favourite\":true}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"key\":\"c0123456789abcdef\",\"at\":1}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"key\":\"c0123456789abcdef\",\"at\":1,\"favourite\":\"yes\"}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"key\":\"c0123456789abcdef\",\"at\":1,\"favourite\":true,\"name\":\"Lee\"}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"key\":\"c0123456789abcdef\",\"at\":1,\"favourite\":true,\"number\":\"+12125550101\"}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"arrived\",\"key\":\"c0123456789abcdef\",\"at\":1,\"favourite\":true,\"text\":\"Running late.\"}" },
+        { "/dash/arrived", "{\"v\":1,\"kind\":\"ask\"}" },
         // A new text names one contact, and only a contact: never beside a correspondence or numbers.
         { "/dash/send", "{\"v\":1,\"kind\":\"send\",\"id\":\"send-1\",\"key\":\"c0123456789abcdef\",\"contact\":\"p0123456789abcdef\",\"text\":\"Hi\"}" },
         { "/dash/send", "{\"v\":1,\"kind\":\"send\",\"id\":\"send-1\",\"to\":[\"+12125550101\"],\"contact\":\"p0123456789abcdef\",\"text\":\"Hi\"}" },
@@ -459,6 +470,9 @@ public class DashCodecTests
     [InlineData("call", "/dash/people")]
     [InlineData("call", "/dash/mail")]
     [InlineData("call ask", "/dash/thread")]
+    [InlineData("arrived", "/dash/people")]
+    [InlineData("arrived", "/dash/thread")]
+    [InlineData("people", "/dash/arrived")]
     [InlineData("people ask", "/update/installed")]
     [InlineData("people ask", "/dash/elsewhere")]
     [InlineData("people ask", null)]
@@ -529,6 +543,34 @@ public class DashCodecTests
     }
 
     [Fact]
+    public void AnArrivalKeepsEveryField()
+    {
+        var read = DashCodec.Decode(WatchIdentity.DashArrivedPath, DashCodec.Encode(Messages["arrived"]));
+
+        var arrived = Assert.IsType<DashArrived>(read.Message);
+        Assert.Equal(LeeKey, arrived.Key);
+        Assert.Equal(T0, arrived.At);
+        Assert.True(arrived.Favourite);
+    }
+
+    [Fact]
+    public void AnArrivalCarriesNoWordsNoNameAndNoNumber()
+    {
+        // B8: the wrist needs none of them to buzz, so the wire has no room for them.
+        using var json = System.Text.Json.JsonDocument.Parse(DashCodec.Encode(Messages["arrived"]));
+
+        Assert.Equal(["v", "kind", "key", "at", "favourite"], json.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("arrived", json.RootElement.GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public void AnArrivalTravelsOnItsOwnPath()
+    {
+        Assert.Equal(WatchIdentity.DashArrivedPath, Messages["arrived"].Path);
+        Assert.NotEqual(WatchIdentity.DashPeoplePath, WatchIdentity.DashArrivedPath);
+    }
+
+    [Fact]
     public void TheLimitsAreTheDecidedOnes()
     {
         Assert.Equal(24, DashLimits.People);
@@ -558,7 +600,7 @@ public class DashCodecTests
         [
             DashCodec.VersionField, DashCodec.KindField, DashCodec.AskKind, DashCodec.PeopleKind, DashCodec.ThreadKind, DashCodec.SendKind,
             DashCodec.ResultKind, DashCodec.FileKind, DashCodec.DeleteKind, DashCodec.UndoKind, DashCodec.ReadKind, DashCodec.NoteKind,
-            DashCodec.MailKind, DashCodec.PhotoKind, DashCodec.RolodexKind, DashCodec.CallKind,
+            DashCodec.MailKind, DashCodec.PhotoKind, DashCodec.RolodexKind, DashCodec.CallKind, DashCodec.ArrivedKind,
         ];
         string[] fields =
         [
@@ -568,14 +610,14 @@ public class DashCodecTests
             DashCodec.ToField, DashCodec.OutcomeField, DashCodec.IdsField, DashCodec.WindowField, DashCodec.ActField,
             DashCodec.ThroughField, DashCodec.CallField, DashCodec.NumberField, DashCodec.MailField, DashCodec.SubjectField,
             DashCodec.JpegField, DashCodec.PageField, DashCodec.PagesField, DashCodec.EditionField, DashCodec.ContactsField,
-            DashCodec.ContactField, DashCodec.EndedField, DashCodec.LengthField,
+            DashCodec.ContactField, DashCodec.EndedField, DashCodec.LengthField, DashCodec.FavouriteField,
         ];
 
-        Assert.Equal(["v", "kind", "ask", "people", "thread", "send", "result", "file", "delete", "undo", "read", "note", "mail", "photo", "rolodex", "call"], envelope);
+        Assert.Equal(["v", "kind", "ask", "people", "thread", "send", "result", "file", "delete", "undo", "read", "note", "mail", "photo", "rolodex", "call", "arrived"], envelope);
         Assert.Equal(
             ["people", "key", "name", "line", "at", "unread", "group", "title", "members", "messages", "id", "incoming", "type", "text",
                 "from", "attachments", "to", "outcome", "ids", "window", "act", "through", "call", "number", "mail", "subject", "jpeg",
-                "page", "pages", "edition", "contacts", "contact", "ended", "length"],
+                "page", "pages", "edition", "contacts", "contact", "ended", "length", "favourite"],
             fields);
     }
 

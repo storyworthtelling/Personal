@@ -100,6 +100,7 @@ public class DashExchangeTests
     [InlineData("delete a message")]
     [InlineData("undo")]
     [InlineData("note on a call")]
+    [InlineData("arrived")]
     public void ATellWaitsForNothing(string name) => Assert.Null(DashExchange.Awaits(Messages[name]));
 
     [Theory]
@@ -113,6 +114,7 @@ public class DashExchangeTests
     [InlineData("read")]
     [InlineData("call ask")]
     [InlineData("note on a call")]
+    [InlineData("arrived")]
     public void WhatTheWristSendsIsNoAnswer(string name) => Assert.Null(DashExchange.Answers(Messages[name]));
 
     [Fact]

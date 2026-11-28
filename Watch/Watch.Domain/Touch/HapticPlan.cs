@@ -63,6 +63,13 @@ public static class HapticPlan
     };
 
     /// <summary>
+    /// A text arriving (P14 B8): by day it buzzes as <see cref="For"/> says; overnight (<see cref="Overnight"/>) only a
+    /// favourite's text does, starred in the phone's contacts (A12, WD §7), and it still waits for a rest during a set.
+    /// </summary>
+    public static HapticDecision ForText(SessionState state, bool overnight, bool favourite) =>
+        overnight && !favourite ? HapticDecision.Silent : For(WatchEvent.Text, state);
+
+    /// <summary>
     /// The session moved: leaving a set with texts held releases them as one Text buzz, however many
     /// there were. Anything else is silent.
     /// </summary>

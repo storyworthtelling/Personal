@@ -170,4 +170,39 @@ public static class DashLayout
 
     /// <summary>Who and when sit this far below it.</summary>
     public const double MailSenderDrop = 0.1;
+
+    // ---- B8: the People waiting tile (mock: Tile: People waiting, Tile: nobody waiting) ----
+
+    /// <summary>The dash's side on the tile: far larger than the head's, the glyph leading.</summary>
+    public const double TileGlyphSide = 0.62;
+
+    /// <summary>The dash's centre with someone waiting.</summary>
+    public const double TileGlyphCentre = 0.66;
+
+    /// <summary>With nobody waiting the faint dash sits at the centre, and nothing else.</summary>
+    public const double TileNobodyCentre = 1.0;
+
+    /// <summary>The newest name, in full.</summary>
+    public const double TileNewestCentre = 1.12;
+
+    /// <summary>The name before it, fading.</summary>
+    public const double TileEarlierCentre = 1.34;
+
+    /// <summary>The one before that, fainter.</summary>
+    public const double TileEarliestCentre = 1.52;
+
+    /// <summary>A name's widest line; the newest wraps once to fit, the earlier two are cut.</summary>
+    public const double TileNameWidth = 1.4;
+
+    /// <summary>The quiet line under the faint dash, when the phone couldn't be asked (no mockup draws it).</summary>
+    public const double TileQuietCentre = TileEarlierCentre;
+
+    /// <summary>Where a name of each rank is centred.</summary>
+    public static double TileNameCentre(TileRank rank) => rank switch
+    {
+        TileRank.Newest => TileNewestCentre,
+        TileRank.Earlier => TileEarlierCentre,
+        TileRank.Earliest => TileEarliestCentre,
+        _ => throw new ArgumentOutOfRangeException(nameof(rank), rank, "Not a rank the tile draws."),
+    };
 }

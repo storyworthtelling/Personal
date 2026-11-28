@@ -8,7 +8,8 @@ namespace Watch.Domain.Dash;
 /// Dash's message codec (plan §2.5): UTF-8 JSON with an integer <c>v</c> and a <c>kind</c>, one shape per contract. A
 /// photo's JPEG crosses as base64 in its own message (<c>dash/photo</c>, B5), refused unless it is a JPEG within its budget;
 /// the Rolodex a page at a time (<c>dash/rolodex</c>, B6), each contact refused unless it is an id and a name alone; the
-/// call that just ended (<c>dash/call-note</c>, B7) as an id, a name and a length, refused with any other field beside them.
+/// call that just ended (<c>dash/call-note</c>, B7) as an id, a name and a length, refused with any other field beside them;
+/// a text arriving (<c>dash/arrived</c>, B8) as its correspondence, its moment and a favourite's flag, and nothing more.
 /// A message is read for the path it arrived on, so an ask on <c>dash/thread</c> is never taken for one on
 /// <c>dash/people</c>. A newer <c>v</c> is refused before anything else is read; a missing, mistyped, over-long or
 /// out-of-place field refuses the whole message.
@@ -35,6 +36,7 @@ public static class DashCodec
     public const string PhotoKind = "photo";
     public const string RolodexKind = "rolodex";
     public const string CallKind = "call";
+    public const string ArrivedKind = "arrived";
 
     // Wire words, frozen: the fields.
     public const string PeopleField = "people";
@@ -71,6 +73,7 @@ public static class DashCodec
     public const string ContactField = "contact";
     public const string EndedField = "ended";
     public const string LengthField = "length";
+    public const string FavouriteField = "favourite";
 
     // Wire words, frozen, in each enum's order.
     private static readonly string[] MessageTypeWords = ["text", "call", "voicemail", "note"];
@@ -173,6 +176,12 @@ public static class DashCodec
                 case DashRolodex rolodex:
                     writer.WriteString(KindField, RolodexKind);
                     WriteRolodex(writer, rolodex);
+                    break;
+                case DashArrived arrived:
+                    writer.WriteString(KindField, ArrivedKind);
+                    writer.WriteString(KeyField, arrived.Key);
+                    writer.WriteNumber(AtField, arrived.At.ToUnixTimeMilliseconds());
+                    writer.WriteBoolean(FavouriteField, arrived.Favourite);
                     break;
                 default:
                     throw new ArgumentException($"{message.GetType().Name} is not a Dash message.", nameof(message));
@@ -388,6 +397,7 @@ public static class DashCodec
         (WatchIdentity.DashPhotoPath, PhotoKind) => ReadPhoto(root),
         (WatchIdentity.DashRolodexPath, AskKind) => Count(root, PageField, out var page) && page < DashLimits.RolodexPages ? new DashRolodexAsk(page) : null,
         (WatchIdentity.DashRolodexPath, RolodexKind) => ReadRolodex(root),
+        (WatchIdentity.DashArrivedPath, ArrivedKind) => ReadArrived(root),
         _ => null,
     };
 
@@ -608,6 +618,23 @@ public static class DashCodec
             contacts.Add(new DashContact(id, name));
         }
         return new DashRolodex(page, pages, edition, contacts);
+    }
+
+    // A text arrived (B8): its correspondence, its moment and whether its sender is a favourite, and no field beside them, so
+    // a name, a number or the text's words beside them refuses the message rather than reaching the wrist.
+    private static DashArrived? ReadArrived(JsonElement root)
+    {
+        if (!Id(root, KeyField, DashIds.IsCorrespondence, out var key)
+            || !Instant(root, AtField, out var at)
+            || !Flag(root, FavouriteField, out var favourite))
+        {
+            return null;
+        }
+
+        string[] allowed = [VersionField, KindField, KeyField, AtField, FavouriteField];
+        return root.EnumerateObject().All(property => allowed.Contains(property.Name, StringComparer.Ordinal))
+            ? new DashArrived(key, at, favourite)
+            : null;
     }
 
     // ---- fields ----

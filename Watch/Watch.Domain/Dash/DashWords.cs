@@ -165,6 +165,22 @@ public static class DashWords
     /// <summary>A mail line as TalkBack reads it: what, from whom, when.</summary>
     public static string MailLine(MailRow row) => $"{row.Subject}, from {row.From}, {row.When}";
 
+    // ---- B8: the People waiting tile (W-5.1.7; mock: Tile: People waiting) ----
+
+    /// <summary>The tile's name, in the watch's own list of tiles: the mockup's.</summary>
+    public const string PeopleWaiting = "People waiting";
+
+    /// <summary>The tile with nobody waiting, as TalkBack reads it (the tile itself is the faint dash and nothing else).</summary>
+    public const string NobodyWaiting = "Nobody’s waiting.";
+
+    /// <summary>The tile as TalkBack reads it: the names it shows, newest first, and never how many there are.</summary>
+    public static string Waiting(IReadOnlyList<string> names) => names.Count switch
+    {
+        0 => NobodyWaiting,
+        1 => $"{names[0]} is waiting.",
+        _ => $"{string.Join(", ", names.Take(names.Count - 1))} and {names[^1]} are waiting.",
+    };
+
     public static string For(DashTrouble trouble) => trouble switch
     {
         DashTrouble.NoPhone => "Your phone isn’t in reach.",

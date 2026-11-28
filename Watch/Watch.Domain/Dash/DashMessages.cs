@@ -244,3 +244,16 @@ public sealed record DashRolodex(int Page, int Pages, string Edition, IReadOnlyL
 {
     public override string Path => WatchIdentity.DashRolodexPath;
 }
+
+// ---- dash/arrived (P14 B8) ----
+
+/// <summary>
+/// Post telling the wrist a text just arrived that the phone itself alerts for (a spam text never does), so the wrist can
+/// give its two short taps (WD §7, A12): the correspondence by its id (<see cref="DashIds.Correspondence"/>, the key People
+/// waiting shows it under), when the newest message came, and whether its sender is a favourite, starred in the phone's
+/// contacts (A12's overnight rule). Never a name, a number or a word: the wrist needs none of them to buzz.
+/// </summary>
+public sealed record DashArrived(string Key, DateTimeOffset At, bool Favourite) : DashMessage
+{
+    public override string Path => WatchIdentity.DashArrivedPath;
+}

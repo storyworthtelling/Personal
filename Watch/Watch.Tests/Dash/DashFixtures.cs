@@ -77,6 +77,9 @@ internal static class DashFixtures
         ["call"] = new DashCall(T0, CallId, "Robin", TimeSpan.FromMinutes(6)),
         ["call with no name"] = new DashCall(T0, CallId, null, TimeSpan.Zero),
         ["no call"] = new DashCall(T0, null, null, null),
+        // B8: a text arrived (WD §7, A12): the correspondence, when, and whether its sender is a favourite, and nothing else.
+        ["arrived"] = new DashArrived(LeeKey, T0, Favourite: true),
+        ["arrived from someone"] = new DashArrived(GroupKey, T0.AddMinutes(-1), Favourite: false),
         ["mail ask"] = new DashMailAsk(),
         ["mail"] = new DashMail(
         [

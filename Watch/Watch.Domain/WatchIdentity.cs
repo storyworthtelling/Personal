@@ -83,11 +83,18 @@ public static class WatchIdentity
     /// </summary>
     public const string DashRolodexPath = "/dash/rolodex";
 
+    /// <summary>
+    /// Post → Dash: a text just arrived that the phone itself alerts for, by its correspondence and whether its sender is
+    /// starred in the phone's contacts, and nothing else (P14 B8): the wrist's two short taps (WD §7, A12). Told once, to a
+    /// wrist in reach, and never queued; nothing answers it.
+    /// </summary>
+    public const string DashArrivedPath = "/dash/arrived";
+
     /// <summary>Every Dash path, in the plan's order, then the ones added after it.</summary>
     public static readonly IReadOnlyList<string> DashPaths =
     [
         DashPeoplePath, DashThreadPath, DashSendPath, DashFilePath, DashDeletePath, DashUndoPath, DashReadPath, DashCallNotePath, DashMailPath, DashPhotoPath,
-        DashRolodexPath,
+        DashRolodexPath, DashArrivedPath,
     ];
 
     // ---- the handed-over Google token (plan §2.4, §2.5, P14 W-4.1.2) ----
@@ -103,6 +110,9 @@ public static class WatchIdentity
 
     /// <summary>What Post advertises (its <c>android_wear_capabilities</c>), so Dash can find the phone that carries the texts.</summary>
     public const string PostCapability = "post-relay";
+
+    /// <summary>What Dash advertises (its <c>android_wear_capabilities</c>), so Post can find the wrist to tell it a text arrived (P14 B8).</summary>
+    public const string DashCapability = "dash-wrist";
 
     /// <summary>Post's listener for every Dash path, registered by this name in Post's manifest.</summary>
     public const string DashListenerName = "com.storyworthtelling.focusphone.communication.DashListener";
@@ -147,6 +157,18 @@ public static class WatchIdentity
     /// registered by this name. Not a screen, so not among <see cref="DashComponents"/>.
     /// </summary>
     public const string DashCallReceiverName = "com.storyworthtelling.focusphone.communication.dash.CallEndReceiver";
+
+    /// <summary>Dash's ear for a text arriving (P14 B8): Play services wakes it for <see cref="DashArrivedPath"/> alone.</summary>
+    public const string DashArrivalListenerName = "com.storyworthtelling.focusphone.communication.dash.ArrivalListener";
+
+    /// <summary>The People waiting tile (P14 B8, W-5.1.7; mock: Tile: People waiting), bound by the system by this name.</summary>
+    public const string DashTileName = "com.storyworthtelling.focusphone.communication.dash.PeopleTileService";
+
+    /// <summary>
+    /// Dash's call screening (P14 B8, W-5.1.9; A12): the platform binds it, by this name, for a call from a number not in
+    /// the watch's contacts, and it lets the call ring only when the same caller rang within minutes.
+    /// </summary>
+    public const string DashCallScreenName = "com.storyworthtelling.focusphone.communication.dash.CallScreen";
 
     // ---- the installer's registered names ----
 

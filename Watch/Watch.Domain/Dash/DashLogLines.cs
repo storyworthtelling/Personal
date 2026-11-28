@@ -62,6 +62,12 @@ public enum DashOutcome
 
     /// <summary>A photo Post has, but could not fetch or shrink to fit one message (B5): not answered.</summary>
     Unfetched,
+
+    /// <summary>A text arrived and the wrist gave its two short taps (B8).</summary>
+    Buzzed,
+
+    /// <summary>A text arrived and the wrist stayed still: heard before, too late, or overnight from someone who isn't a favourite (B8).</summary>
+    Quiet,
 }
 
 /// <summary>

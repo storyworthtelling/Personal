@@ -27,7 +27,7 @@ public class WatchInvariantsTests
     private static readonly string[] ExpectedDashPaths =
     [
         "/dash/people", "/dash/thread", "/dash/send", "/dash/file", "/dash/delete", "/dash/undo", "/dash/read", "/dash/call-note", "/dash/mail",
-        "/dash/photo", "/dash/rolodex",
+        "/dash/photo", "/dash/rolodex", "/dash/arrived",
     ];
 
     private static readonly string[] ExpectedInstallerComponents =
@@ -126,6 +126,8 @@ public class WatchInvariantsTests
         Assert.Equal("/dash/photo", WatchIdentity.DashPhotoPath);
         // B6: the phone's whole Rolodex, a page at a time, names and ids only (W-5.1.2).
         Assert.Equal("/dash/rolodex", WatchIdentity.DashRolodexPath);
+        // B8: a text arrived, told to the wrist so it can buzz (WD §7, A12).
+        Assert.Equal("/dash/arrived", WatchIdentity.DashArrivedPath);
         Assert.Equal(ExpectedDashPaths, WatchIdentity.DashPaths);
     }
 
@@ -197,6 +199,24 @@ public class WatchInvariantsTests
         Assert.Equal(ExpectedDashComponents, WatchIdentity.DashComponents);
         Assert.All(WatchIdentity.DashComponents, name => Assert.StartsWith(WatchIdentity.DashPackage + ".dash.", name, StringComparison.Ordinal));
         Assert.DoesNotContain(WatchIdentity.DashListenerName, WatchIdentity.DashComponents);
+    }
+
+    [Fact]
+    public void DashsServicesAreFrozen()
+    {
+        // B8: the ear for a text arriving, the People waiting tile (W-5.1.7) and the call screening (W-5.1.9), each bound by
+        // the platform or Play services by its registered name, and the capability Post finds the wrist by. None is a screen.
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.ArrivalListener", WatchIdentity.DashArrivalListenerName);
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.PeopleTileService", WatchIdentity.DashTileName);
+        Assert.Equal("com.storyworthtelling.focusphone.communication.dash.CallScreen", WatchIdentity.DashCallScreenName);
+        Assert.Equal("dash-wrist", WatchIdentity.DashCapability);
+        Assert.NotEqual(WatchIdentity.PostCapability, WatchIdentity.DashCapability);
+        Assert.NotEqual(WatchIdentity.InstallerCapability, WatchIdentity.DashCapability);
+        foreach (var name in new[] { WatchIdentity.DashArrivalListenerName, WatchIdentity.DashTileName, WatchIdentity.DashCallScreenName })
+        {
+            Assert.DoesNotContain(name, WatchIdentity.DashComponents);
+            Assert.StartsWith(WatchIdentity.DashPackage + ".dash.", name, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

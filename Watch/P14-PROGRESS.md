@@ -2745,3 +2745,25 @@ none (B6's ruling), so there is none to show.
   chunk's diff (from B6's last commit): "no personal-data shapes in the added lines".
 - `Watch/Dash.Wear` and `Watch/Watch.Ui.Wear` compile here with 0 warnings and 0 errors; `FocusPhone/Post.Android`
   with 0 errors and no warning in a file this chunk touched.
+
+# Chunk B8 · the People waiting tile, overnight and unknown callers, and the text buzz (W-5.1.7, W-5.1.9)
+
+Every figure below is from a real run on 28 Nov 2026. As before, each red run was taken with the tests written and the
+new code present only as stubs: methods threw `NotImplementedException`, and new constants were empty strings or zero
+(the two new `DashOutcome` members existed so the tests compiled).
+
+## Red 1 · the contract and the wrist's pure half (Watch.Domain)
+
+- **`Watch.Tests`: 1218 tests, 82 failed, 1136 passed.** The 82: `RepeatCallersTests` 19, `PeopleTileTests` 11,
+  `TextArrivalsTests` 10, `DashWordsTests` 10 (B4's sentence and label lists meeting the stub `Waiting`), `DashCodecTests`
+  9, `DashLayoutTests` 6, `HapticPlanTests` 5, `OvernightTests` 5, `DashLogLinesTests` 3 and `WatchInvariantsTests` 3
+  (`DashPathsAreFrozen`, `DashsServicesAreFrozen`, and B1's `EveryDashPathIsItsOwn` over the stub's empty path),
+  `NeutralTokensTests` 1. First errors: `NotImplementedException` 66, `Assert.Equal() Failure: Values differ` 7, `Strings
+  differ` 4, `Assert.All() Failure: 1 out of 12 items` 2, and one each of `Assert.Throws()`, `Collections differ` and
+  `Assert.True()`. Passing on the stubs: the ten malformed `/dash/arrived` rows (the stub reads nothing there), the
+  wrong-path row for `people` on `/dash/arrived`, the two exchange rows (an arrival is told and answers nothing, which the
+  default already says), `AnArrivalTravelsOnItsOwnPath`, and the two `TheSharedOneIsOne`.
+- **`FocusPhone/Codex.Tests` (the new path is the other way): 3436 tests, 1 failed, 3435 passed**,
+  `PostRegistersItsListenerByName` (twelve paths, eleven heard). The guard now says Post's ear hears every path but
+  `dash/arrived`, and doesn't name it.
+- **Green: `Watch.Tests` 1218 passed, 0 failed. `Codex.Tests` 3436 passed. `RepoGuards.Tests` 452 passed.**
