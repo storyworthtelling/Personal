@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What Dash offers the Data Layer, so Post on the phone can find the wrist to tell it a text arrived
+     (WatchIdentity.DashCapability, P14 B8). The array's name is Wear OS's own. -->
+<resources>
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>dash-wrist</item>
+    </string-array>
+</resources>

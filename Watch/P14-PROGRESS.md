@@ -2767,3 +2767,22 @@ new code present only as stubs: methods threw `NotImplementedException`, and new
   `PostRegistersItsListenerByName` (twelve paths, eleven heard). The guard now says Post's ear hears every path but
   `dash/arrived`, and doesn't name it.
 - **Green: `Watch.Tests` 1218 passed, 0 failed. `Codex.Tests` 3436 passed. `RepoGuards.Tests` 452 passed.**
+
+## Red 2 · Post's half: telling the wrist a text arrived
+
+- **`FocusPhone/Codex.Tests`: 3450 tests, 13 failed, 3437 passed.** The 13: `DashArrivalsTests` 9 (all
+  `NotImplementedException`) and `DashRelayGuardTests` 4: `TheWristIsToldOnceWhileItIsInReach` and
+  `AFavouriteIsStarredInThePhonesContacts` (`Sequence contains no matching element`: no `WristArrivals.cs`, no
+  `DashStars.cs`), `PostAsksForTheWristByItsCapability` (`DirectoryNotFoundException`: Dash has no `values/wear.xml`) and
+  `ATextIsToldToTheWristWherePostAlertsForIt` (`Sub-string not found`). Passing on the stub: the new
+  `AnAnswerArrivingAtPostIsLeftAlone` row (an arrival reaching Post is left alone, the inbox's default).
+- **On the way:** 3450 with 2 failed. `APersonKnownByTwoAddressesIsNamedByTheirThread` expected the arrival to name the
+  thread the identity links merge under, but People waiting names a merged person by the first of their own keys
+  (`TimelineMerger.BuildThread`'s representative), which for a text from their number is the number; the test was wrong
+  about People waiting, and now builds the relay over a number and an address and compares with its row. The first
+  `DashArrivals.For` took the resolver for nothing and went. And `EveryDataLayerWaitIsBounded` named
+  `WristArrivals.cs:50`: the capability call sat on its own line under `BoundedAsync(`; the guard reads a line at a time.
+  The first build of Post failed once, `CS0246` (`RunDeadline` is `Watch.Domain.Updates`'s).
+- **Green: `Codex.Tests` 3450 passed, 0 failed. `RepoGuards.Tests` 452 passed. Compiled here:**
+  `FocusPhone/Post.Android`, **Build succeeded, 0 errors**; the one warning in a file this step touched is
+  `SmsNotifications.cs`' `CS8604` on its own buzz (`Vibrator.Vibrate`), which was there before.

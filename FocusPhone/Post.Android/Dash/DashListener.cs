@@ -68,7 +68,7 @@ public sealed class DashListener : WearableListenerService
 ///
 /// <para>The watch-unreachable rule (<see cref="DashReplies"/>): an answer is sent once and waited for a bounded time;
 /// one that does not land is counted and dropped, never queued or tried again. Post sends the wrist nothing it did not
-/// ask for.</para>
+/// ask for but one thing: a text arriving (B8, <see cref="WristArrivals"/>), told once through the same send.</para>
 /// </summary>
 internal static class DashCarrier
 {
@@ -280,24 +280,32 @@ internal static class DashCarrier
     }
 
     // Once, on the node that asked, waited for a bounded time; a miss is counted and dropped.
-    private static async Task ReplyAsync(Context context, string? node, DashMessage reply, RunDeadline deadline)
+    private static Task ReplyAsync(Context context, string? node, DashMessage reply, RunDeadline deadline) =>
+        SendOnceAsync(context, node, reply, deadline);
+
+    /// <summary>
+    /// The one way Post sends the wrist anything: once, to one node, waited for a bounded time; a miss is counted and
+    /// dropped, never queued or tried again. An answer goes to the node that asked; a text arriving (B8) to the wrist found
+    /// in reach.
+    /// </summary>
+    internal static async Task SendOnceAsync(Context context, string? node, DashMessage message, RunDeadline deadline)
     {
         if (string.IsNullOrEmpty(node))
         {
-            HeadLog.Warn(Tag, DashLogLines.Outcome(reply.Path, DashOutcome.Unreached, Replies.Missed()));
+            HeadLog.Warn(Tag, DashLogLines.Outcome(message.Path, DashOutcome.Unreached, Replies.Missed()));
             return;
         }
 
         try
         {
-            await BoundedAsync(WearableClass.GetMessageClient(context).SendMessageAsync(node, reply.Path, DashCodec.Encode(reply)), deadline.Cut(DateTimeOffset.UtcNow, DashReplies.ReplyWait));
+            await BoundedAsync(WearableClass.GetMessageClient(context).SendMessageAsync(node, message.Path, DashCodec.Encode(message)), deadline.Cut(DateTimeOffset.UtcNow, DashReplies.ReplyWait));
             Replies.Landed();
-            HeadLog.Info(Tag, DashLogLines.Sent(reply.Path));
+            HeadLog.Info(Tag, DashLogLines.Sent(message.Path));
         }
         catch (Exception e) when (e is Java.Lang.Exception or TimeoutException)
         {
-            HeadLog.Warn(Tag, DashLogLines.NotSent(reply.Path, e.GetType().Name));
-            HeadLog.Warn(Tag, DashLogLines.Outcome(reply.Path, DashOutcome.Unreached, Replies.Missed()));
+            HeadLog.Warn(Tag, DashLogLines.NotSent(message.Path, e.GetType().Name));
+            HeadLog.Warn(Tag, DashLogLines.Outcome(message.Path, DashOutcome.Unreached, Replies.Missed()));
         }
     }
 
@@ -313,7 +321,7 @@ internal static class DashCarrier
 
     // A Data Layer call waited for at most its own wait: one that never answers holds nothing. Play services goes on with
     // the call; only the wait ends, and what the call throws after that is read rather than left unobserved.
-    private static async Task<T> BoundedAsync<T>(Task<T> call, TimeSpan wait)
+    internal static async Task<T> BoundedAsync<T>(Task<T> call, TimeSpan wait)
     {
         try
         {

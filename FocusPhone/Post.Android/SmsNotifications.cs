@@ -43,7 +43,7 @@ internal static class SmsNotifications
         var displayName = contactKey is null
             ? "Unknown"
             : ContactNameResolver.DisplayName(context, contactKey);
-        Post(context, contactKey ?? address ?? "sms", displayName, message.Body ?? string.Empty);
+        Post(context, contactKey ?? address ?? "sms", displayName, message.Body ?? string.Empty, arriving);
     }
 
     /// <summary>A text Google Messages announced, decided by <see cref="TextAlerts"/>.</summary>
@@ -53,7 +53,7 @@ internal static class SmsNotifications
         {
             return;
         }
-        Post(context, alert.ThreadKey, alert.Title, alert.Line);
+        Post(context, alert.ThreadKey, alert.Title, alert.Line, latest);
     }
 
     // A text the owner judged spam is still kept (the record is the phone's, not Post's to
@@ -72,8 +72,11 @@ internal static class SmsNotifications
         }
     }
 
-    private static void Post(Context context, string threadKey, string title, string line)
+    private static void Post(Context context, string threadKey, string title, string line, Codex.Domain.Timeline.TimelineItem arriving)
     {
+        // The wrist's two short taps (P14 B8): told where the phone alerts, after the spam check, and only that.
+        WristArrivals.Tell(context, arriving);
+
         var manager = NotificationManagerCompat.From(context)!;
         EnsureChannel(manager);
 

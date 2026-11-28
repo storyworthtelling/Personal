@@ -314,4 +314,64 @@ public class DashRelayGuardTests
         Assert.Contains("DashCodec.Decode(", DashHalf(), StringComparison.Ordinal);
         Assert.Contains("DashCodec.Encode(", DashHalf(), StringComparison.Ordinal);
     }
+
+    // ---- B8: a text arriving, told to the wrist so it can buzz (WD §7, A12) ----
+
+    [Fact]
+    public void ATextIsToldToTheWristWherePostAlertsForIt()
+    {
+        // Where the phone itself alerts for an arriving text, and only there: a spam text never reaches Post's alert, so it
+        // never reaches the wrist either. Both of Post's ways in (the Messages notification and a text it received itself)
+        // go through the one alert.
+        var notifications = Code($"{Post}/SmsNotifications.cs");
+        var alert = Regex.Match(notifications, @"private static void Post\([^)]*\)\s*\{(?<body>[\s\S]*?)\n    \}");
+
+        Assert.True(alert.Success, "SmsNotifications has no Post.");
+        Assert.Contains("WristArrivals.Tell(context, ", alert.Groups["body"].Value, StringComparison.Ordinal);
+        Assert.Equal(2, Regex.Matches(notifications, @"\bPost\(context, ").Count);
+        var spam = notifications.IndexOf("if (IsSpam(context, latest))", StringComparison.Ordinal);
+        var told = notifications.IndexOf("Post(context, alert.ThreadKey", StringComparison.Ordinal);
+        Assert.True(spam >= 0 && told > spam, "A text is told to the wrist before it is judged spam.");
+    }
+
+    [Fact]
+    public void TheWristIsToldOnceWhileItIsInReach()
+    {
+        // The watch-unreachable rule (B2) still holds: the wrist is found by its capability among the nodes in reach, told
+        // once on the pool with every wait bounded, and nothing is queued or tried again.
+        var arrivals = PostSources().Single(source => source.Path == $"{Post}/Dash/WristArrivals.cs").Text;
+
+        foreach (var call in new[]
+        {
+            "WatchIdentity.DashCapability", "CapabilityClient.FilterReachable", "RelayNodes.Choose(", "DashArrivals.For(", "Task.Run(",
+            "DashCarrier.SendOnceAsync(", "DashStars.IsStarred(",
+        })
+        {
+            Assert.Contains(call, arrivals, StringComparison.Ordinal);
+        }
+        foreach (var queue in new[] { "while", "for (", "Retry", "Enqueue", "WorkManager", "Later(" })
+        {
+            Assert.DoesNotContain(queue, arrivals, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void AFavouriteIsStarredInThePhonesContacts()
+    {
+        // A12: favourites are the ones starred in the Rolodex, which is the phone's own address book.
+        var stars = PostSources().Single(source => source.Path == $"{Post}/Dash/DashStars.cs").Text;
+
+        Assert.Contains("ContactsContract.PhoneLookup.ContentFilterUri", stars, StringComparison.Ordinal);
+        Assert.Contains("ContactsContract.PhoneLookup.InterfaceConsts.Starred", stars, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PostAsksForTheWristByItsCapability()
+    {
+        // Dash says where it is by a capability of its own, as Post does for the wrist.
+        var wear = LogLoopSource.File("Watch/Dash.Wear/Resources/values/wear.xml");
+
+        Assert.Matches(@"<string-array\s+name=""android_wear_capabilities""", wear);
+        Assert.Contains($"<item>{WatchIdentity.DashCapability}</item>", wear, StringComparison.Ordinal);
+    }
 }

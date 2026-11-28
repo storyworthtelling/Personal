@@ -117,6 +117,8 @@ public class DashInboxTests
         new DashMail([]),
         new DashPhoto(DashIds.Attachment("sms:2125550101:-2", "part:7"), [0xFF, 0xD8, 0xFF, 0xD9]),
         new DashRolodex(0, 1, DashIds.Edition("none"), []),
+        // B8: dash/arrived runs from Post to the wrist; one reaching Post is left alone.
+        new DashArrived(DashIds.Correspondence("2125550101"), DateTimeOffset.UnixEpoch, Favourite: false),
     ];
 
     // ---- dash/send ----
