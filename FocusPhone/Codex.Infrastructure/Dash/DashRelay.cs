@@ -46,7 +46,8 @@ public sealed record DashNotePlan(DashOutcome Outcome, TimelineItem? Note);
 
 /// <summary>
 /// Post's half of Dash's contracts (P14 W-4.1.1): it answers <c>dash/people</c>, <c>dash/thread</c> and <c>dash/mail</c>
-/// from the timeline as the Mailbox shows it, finds a conversation's photo by its id for <c>dash/photo</c> (B5), and turns
+/// from the timeline as the Mailbox shows it, finds a conversation's photo by its id for <c>dash/photo</c> (B5) and the
+/// call the wrist heard end for <c>dash/call-note</c> (B7), and turns
 /// each act from the wrist into Post's own rules: a send takes the
 /// phone's own route, a file keeps the tombstone rule, a delete is held for the undo window, an undo takes back what its
 /// act took, a read on the watch is a read on the phone (A14), and a call note is kept where Post keeps call notes.
@@ -132,6 +133,37 @@ public sealed partial class DashRelay
             .SelectMany(Shown)
             .SelectMany(item => item.Attachments.Where(attachment => attachment.IsImage).Select(attachment => new DashPhotoPlan(item, attachment)))
             .FirstOrDefault(plan => DashIds.Attachment(plan.Item.SourceId, plan.Attachment.Id) == ask.Id);
+
+    /// <summary>
+    /// How far apart the watch's moment and the phone's call log may be and still be one call (B7): both keep network
+    /// time, so this is for the moment a broadcast takes, not for a wrong clock. Chosen, not measured.
+    /// </summary>
+    public static readonly TimeSpan CallSlack = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// The call the wrist heard end at <see cref="DashCallAsk.Ended"/> (W-5.1.5, A13): among the calls in the log someone
+    /// was on, the one whose end is nearest that moment, by the rule Post's own note offer uses (<see cref="JustEndedCall"/>),
+    /// named by its message id with the caller's name and how long it was connected. A caller the address book has no
+    /// name of its own for is no name, never a number. No such call (one only the watch had, say) is the moment alone.
+    /// </summary>
+    public DashCall CallAt(DashCallAsk ask)
+    {
+        var call = snapshot.Items
+            .Where(item => item.Kind == TimelineItemKind.Call && !IsNote(item))
+            .Select(item => (Item: item, Row: item.CallRow))
+            .Where(entry => entry.Row is { } row && JustEndedCall.Answered(row) && JustEndedCall.EndedAbout(row, ask.Ended, CallSlack))
+            .OrderBy(entry => JustEndedCall.FromMoment(entry.Row!.Value, ask.Ended))
+            .ThenByDescending(entry => entry.Row!.Value.Started)
+            .Select(entry => (TimelineItem?)entry.Item)
+            .FirstOrDefault();
+        if (call is null)
+        {
+            return new DashCall(ask.Ended, null, null, null);
+        }
+
+        var name = Cut(OneLine(snapshot.NameOf(call.ContactKey)), DashLimits.Name);
+        return new DashCall(ask.Ended, DashIds.Message(call.SourceId), RolodexRelay.IsAName(name) ? name : null, call.CallRow!.Value.Connected);
+    }
 
     // ---- what the wrist asks ----
 
@@ -229,9 +261,11 @@ public sealed partial class DashRelay
             number = said;
         }
 
+        // Named by the moment it was written on the wrist (B7), so a note told again is the same note; one from before B7
+        // carries none and is named by when it arrived.
         return number is null
             ? new DashNotePlan(DashOutcome.Unknown, null)
-            : new DashNotePlan(DashOutcome.Kept, Codex.Domain.Post.CallNote.For(number, note.Text.Trim(), now));
+            : new DashNotePlan(DashOutcome.Kept, Codex.Domain.Post.CallNote.For(number, note.Text.Trim(), note.At ?? now));
     }
 
     /// <summary>

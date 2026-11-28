@@ -48,6 +48,10 @@ public class DashRelayTests
     private static TimelineItem Call(string who, int minute, string words = "Missed call") =>
         new(TimelineItemKind.Call, who, T0.AddMinutes(minute), words, Incoming: true, $"call:{who}:{minute}");
 
+    // A call as the call log reads it (B7): began at T0 less <paramref name="beganAgo"/> seconds, connected for so many.
+    private static TimelineItem Logged(string who, int beganAgo, int connected, int type = 1, string id = "41") =>
+        CallRecordMapper.Map(id, who, T0.AddSeconds(-beganAgo).ToUnixTimeMilliseconds(), type, connected);
+
     private static TimelineItem Mail(string from, int minute, MailClass? kind, string subject = "Saturday plans", bool incoming = true) =>
         new(TimelineItemKind.Email, from, T0.AddMinutes(minute), "See you there.", incoming, $"mail:{from}:{minute}")
         {
@@ -830,5 +834,89 @@ public class DashRelayTests
 
         Assert.True(again.Knows("act-1"));
         Assert.Equal(acts.All.Single().Items, again.All.Single().Items);
+    }
+
+    // ---- B7: the call the wrist heard end, and its note (W-5.1.5) ----
+
+    [Fact]
+    public void TheCallThatJustEndedIsNamed()
+    {
+        // Rang ten seconds, talked six minutes, ended at T0, when the wrist heard its own call state go idle.
+        var call = Logged(Lee, beganAgo: 370, connected: 360);
+
+        var answer = Relay(call).CallAt(new DashCallAsk(T0));
+
+        Assert.Equal(new DashCall(T0, DashIds.Message(call.SourceId), "Lee", TimeSpan.FromMinutes(6)), answer);
+    }
+
+    [Fact]
+    public void ACallNobodyWasOnIsNoCall()
+    {
+        Assert.Null(Relay(Logged(Lee, beganAgo: 30, connected: 0, type: 3)).CallAt(new DashCallAsk(T0)).Call);
+        Assert.Null(Relay(Logged(Lee, beganAgo: 30, connected: 0, type: 2)).CallAt(new DashCallAsk(T0)).Call);
+    }
+
+    [Fact]
+    public void ACallLongAgoIsNoCall()
+    {
+        var answer = Relay(Logged(Lee, beganAgo: 3600, connected: 360)).CallAt(new DashCallAsk(T0));
+
+        Assert.Equal(new DashCall(T0, null, null, null), answer);
+    }
+
+    [Fact]
+    public void TheNearestCallIsTheOne()
+    {
+        var earlier = Logged(Robin, beganAgo: 150, connected: 60, id: "40");
+        var nearer = Logged(Lee, beganAgo: 65, connected: 60, id: "41");
+
+        Assert.Equal(DashIds.Message(nearer.SourceId), Relay(earlier, nearer).CallAt(new DashCallAsk(T0)).Call);
+        Assert.Equal(DashIds.Message(earlier.SourceId), Relay(earlier, nearer).CallAt(new DashCallAsk(T0.AddSeconds(-85))).Call);
+    }
+
+    [Fact]
+    public void ACallerTheBookCannotNameHasNoName()
+    {
+        // The book names an unknown number by the number itself; the wrist is told no name rather than a number.
+        var stranger = Logged("2125550199", beganAgo: 70, connected: 60);
+
+        var answer = Relay(stranger).CallAt(new DashCallAsk(T0));
+
+        Assert.Equal(DashIds.Message(stranger.SourceId), answer.Call);
+        Assert.Null(answer.Name);
+        Assert.DoesNotContain("0199", System.Text.Encoding.UTF8.GetString(DashCodec.Encode(answer)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ACallAnsweredOnTheWatchIsTheCall()
+    {
+        // Rung on the phone and taken on the wrist: the phone's log knows the call, if not how long it lasted.
+        var elsewhere = Logged(Lee, beganAgo: 200, connected: 0, type: 7);
+
+        var answer = Relay(elsewhere).CallAt(new DashCallAsk(T0.AddSeconds(-170)));
+
+        Assert.Equal((DashIds.Message(elsewhere.SourceId), (TimeSpan?)TimeSpan.Zero), (answer.Call, answer.Length));
+    }
+
+    [Fact]
+    public void ANoteIsNeverTheCall()
+    {
+        var note = CallNote.For(Lee, "Robin can take Juniper on Thursday.", T0.AddSeconds(-5));
+
+        Assert.Null(Relay(note).CallAt(new DashCallAsk(T0)).Call);
+    }
+
+    [Fact]
+    public void ANoteToldTwiceIsKeptOnce()
+    {
+        // The note carries the moment it was written on the wrist, which names it, so a second telling replaces the first.
+        var call = Logged(Lee, beganAgo: 370, connected: 360);
+        var note = new DashCallNote(DashIds.Message(call.SourceId), null, "Pick up at four.") { At = T0.AddMinutes(1) };
+
+        var first = Relay(call).CallNote(note, T0.AddMinutes(2)).Note!;
+        var again = Relay(call).CallNote(note, T0.AddMinutes(5)).Note!;
+
+        Assert.Equal((first.SourceId, first.TimestampUtc), (again.SourceId, again.TimestampUtc));
+        Assert.Equal(T0.AddMinutes(1), first.TimestampUtc);
     }
 }

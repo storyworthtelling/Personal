@@ -90,8 +90,9 @@ public sealed class RolodexRelay
         return DashRelay.Cut(DashRelay.OneLine(kept.ToString()), DashLimits.Name);
     }
 
-    // A name of its own: some letter in it, no address, and no number however it is written.
-    private static bool IsAName(string name)
+    // A name of its own: some letter in it, no address, and no number however it is written. The relay asks the same of a
+    // caller's name (B7), since the phone names someone it has no name for by their number.
+    internal static bool IsAName(string name)
     {
         if (!name.Any(char.IsLetter) || name.Contains('@', StringComparison.Ordinal))
         {

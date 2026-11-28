@@ -74,4 +74,36 @@ public class CallRecordMapperTests
         Assert.Equal("42", item.SourceId);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(T0Millis), item.TimestampUtc);
     }
+
+    // P14 B7: a call keeps when it began, how long it was connected and its type, so Post can tell the wrist which call
+    // ended when (JustEndedCall), as it tells itself.
+    [Theory]
+    [InlineData(1, 372)]
+    [InlineData(2, 0)]
+    [InlineData(3, 0)]
+    [InlineData(5, 0)]
+    [InlineData(7, 0)]
+    public void Map_ACallKeepsItsRow(int type, long durationSeconds)
+    {
+        var item = Map(type, durationSeconds);
+
+        Assert.Equal(new Codex.Domain.Post.CallLogRow(DateTimeOffset.FromUnixTimeMilliseconds(T0Millis), TimeSpan.FromSeconds(durationSeconds), type), item.CallRow);
+    }
+
+    [Fact]
+    public void Map_AVoicemailIsNoCallRow()
+    {
+        Assert.Null(Map(type: 4).CallRow);
+    }
+
+    // A filed call's ghost is the whole item as JSON (FilingStore): its row comes back with it, whole.
+    [Fact]
+    public void Map_ACallsRowSurvivesItsGhost()
+    {
+        var item = Map(type: 1, durationSeconds: 372);
+
+        var ghost = System.Text.Json.JsonSerializer.Deserialize<TimelineItem>(System.Text.Json.JsonSerializer.Serialize(item));
+
+        Assert.Equal(item.CallRow, ghost!.CallRow);
+    }
 }

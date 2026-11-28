@@ -74,6 +74,13 @@ public record TimelineItem(
     public Post.MailClass? MailClass { get; init; }
 
     /// <summary>
+    /// A call as its call-log row said it (P14 B7): when it began, how long it was connected, and its type, so Post can
+    /// tell which call ended when (<see cref="Post.JustEndedCall"/>), for the wrist as for itself. Null for anything that
+    /// is not a call from the log, a voicemail and a call note among them. Read live from the call log, never cached.
+    /// </summary>
+    public Post.CallLogRow? CallRow { get; init; }
+
+    /// <summary>
     /// The message's HTML body, when it had one. Kept ALONGSIDE the readable text rather
     /// than instead of it: the list and the filter want words, and only the reader wants
     /// markup. Null for anything that arrived as plain text.

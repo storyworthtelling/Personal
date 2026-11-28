@@ -174,6 +174,8 @@ public class DashRelayGuardTests
     [InlineData("ContactPicker.People(")]
     [InlineData("new RolodexRelay(")]
     [InlineData("DashContacts.Rolodex(context)")]
+    [InlineData("CallNote.Settles(")]
+    [InlineData("PendingCallNoteStore.Clear(")]
     public void TheListenerCarriesThePlansThroughPostsOwnCode(string call)
     {
         Assert.Contains(call, DashHalf(), StringComparison.Ordinal);

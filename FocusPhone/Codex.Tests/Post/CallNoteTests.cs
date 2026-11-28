@@ -87,4 +87,15 @@ public class CallNoteTests
         Assert.False(CallNote.IsNote(call));
         Assert.False(CallNote.IsNote(note with { Kind = TimelineItemKind.Message }));
     }
+
+    // P14 B7: a note written on the watch is the note the phone would have asked for, so the phone stops asking.
+    [Fact]
+    public void ANoteSettlesThePhonesOfferForItsNumber()
+    {
+        var note = CallNote.For("2125550101", "Pick up at four.", When);
+
+        Assert.True(CallNote.Settles(note, "+1 212-555-0101"));
+        Assert.False(CallNote.Settles(note, "+1 212-555-0102"));
+        Assert.False(CallNote.Settles(new TimelineItem(TimelineItemKind.Call, "2125550101", When, "Incoming call (01:00)", true, "41"), "+1 212-555-0101"));
+    }
 }

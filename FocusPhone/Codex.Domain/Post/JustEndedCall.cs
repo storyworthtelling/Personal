@@ -94,5 +94,19 @@ public static class JustEndedCall
     /// Whether to read the log again: it is written a moment after the phone goes idle, so a row not there yet (no call,
     /// or the call before it) is worth another look; one that says what the call was is the answer.
     /// </summary>
+    /// <summary>
+    /// Whether the row's call ended at about <paramref name="moment"/>, the moment the watch heard its own call state go
+    /// idle (P14 B7): the same rule as <see cref="Fresh"/>, with <paramref name="slack"/> each way for the watch's clock
+    /// against the phone's.
+    /// </summary>
+    public static bool EndedAbout(CallLogRow row, DateTimeOffset moment, TimeSpan slack)
+    {
+        var sinceItsTalkEnded = moment - (row.Started + row.Connected);
+        return sinceItsTalkEnded >= -slack && sinceItsTalkEnded <= RingAllowance + slack;
+    }
+
+    /// <summary>How far the row's talk ended from <paramref name="moment"/>, so the nearest of two calls is the one meant.</summary>
+    public static TimeSpan FromMoment(CallLogRow row, DateTimeOffset moment) => (moment - (row.Started + row.Connected)).Duration();
+
     public static bool ReadAgain(CallNoteVerdict verdict) => verdict is CallNoteVerdict.NoCall or CallNoteVerdict.TooOld;
 }

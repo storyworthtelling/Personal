@@ -261,14 +261,21 @@ internal static class DashCarrier
         }
     }
 
-    // A note from the wrist is kept where the phone keeps the owner's call notes.
+    // A note from the wrist is kept where the phone keeps the owner's call notes. It is the note the phone's own offer
+    // waits for when that offer is on the same call's number (B7), so the phone stops asking for it.
     private static void Keep(Context context, DashNotePlan plan)
     {
         HeadLog.Info(Tag, DashLogLines.Outcome(WatchIdentity.DashCallNotePath, plan.Outcome));
         if (plan is { Outcome: DashOutcome.Kept, Note: { } note })
         {
-            using var database = TimelineDatabase.Open(context);
-            database.Cache.Upsert([note]);
+            using (var database = TimelineDatabase.Open(context))
+            {
+                database.Cache.Upsert([note]);
+            }
+            if (PendingCallNoteStore.Get(context) is { } pending && CallNote.Settles(note, pending.Number))
+            {
+                PendingCallNoteStore.Clear(context);
+            }
         }
     }
 

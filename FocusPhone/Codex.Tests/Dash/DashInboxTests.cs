@@ -347,6 +347,36 @@ public class DashInboxTests
         Assert.Equal((Lee, "Pick up at four."), (note.Plan.Note!.ContactKey, note.Plan.Note.Snippet));
     }
 
+    // ---- B7: the call the wrist heard end ----
+
+    [Fact]
+    public void TheCallIsAnswered()
+    {
+        var call = CallRecordMapper.Map("41", Lee, T0.AddSeconds(-370).ToUnixTimeMilliseconds(), 1, 360);
+
+        var answer = Assert.IsType<DashAnswer>(DashInbox.Turn(new DashCallAsk(T0), () => Relay(call), NoRolodex, new DashActs(), Now));
+
+        Assert.Equal(new DashCall(T0, DashIds.Message(call.SourceId), "Lee", TimeSpan.FromMinutes(6)), answer.Reply);
+        Assert.Equal((WatchIdentity.DashCallNotePath, DashOutcome.Answered, 1), (answer.Path, answer.Outcome, answer.Count));
+    }
+
+    [Fact]
+    public void NoCallIsAnsweredAsNone()
+    {
+        // The wrist stops waiting and offers nothing: there is no call for a note to go on.
+        var answer = Assert.IsType<DashAnswer>(DashInbox.Turn(new DashCallAsk(T0), () => Relay(Text(Lee, -2)), NoRolodex, new DashActs(), Now));
+
+        Assert.Equal(new DashCall(T0, null, null, null), answer.Reply);
+        Assert.Equal((DashOutcome.Unknown, 0), (answer.Outcome, answer.Count));
+    }
+
+    [Fact]
+    public void PostsAnswerArrivingAtPostIsLeftAlone()
+    {
+        Assert.Equal(new DashNoTurn(WatchIdentity.DashCallNotePath, null),
+            DashInbox.Turn(new DashCall(T0, null, null, null), NoRelay, NoRolodex, new DashActs(), Now));
+    }
+
     // ---- B6: the Rolodex, and a new text to a contact ----
 
     [Fact]

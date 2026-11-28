@@ -85,6 +85,12 @@ public static class DashInbox
                     : new DashNoTurn(message.Path, DashOutcome.Unknown);
             case DashCallNote note:
                 return new DashNoteTurn(relay().CallNote(note, conditions.Now));
+            case DashCallAsk ask:
+                // The call the wrist heard end (B7): named, or the moment alone, so the wrist stops waiting either way.
+                var call = relay().CallAt(ask);
+                return call.Call is null
+                    ? new DashAnswer(message.Path, call, DashOutcome.Unknown, 0)
+                    : new DashAnswer(message.Path, call, DashOutcome.Answered, 1);
             default:
                 // People waiting, a conversation, a send's answer or mail lines: Post's own answers, read only on the wrist.
                 return new DashNoTurn(message.Path, null);

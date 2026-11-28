@@ -32,6 +32,9 @@ public static class CallRecordMapper
             Incoming => $"Incoming call ({duration:mm\\:ss})",
             _ => $"Outgoing call ({duration:mm\\:ss})",
         };
-        return new TimelineItem(TimelineItemKind.Call, contactKey, timestamp, snippet, incoming, id);
+        return new TimelineItem(TimelineItemKind.Call, contactKey, timestamp, snippet, incoming, id)
+        {
+            CallRow = new Post.CallLogRow(timestamp, duration, type),
+        };
     }
 }

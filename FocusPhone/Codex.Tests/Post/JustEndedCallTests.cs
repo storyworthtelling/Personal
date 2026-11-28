@@ -126,4 +126,26 @@ public class JustEndedCallTests
         // again; one that says what the call was is the answer.
         Assert.Equal(again, JustEndedCall.ReadAgain(verdict));
     }
+
+    // ---- P14 B7: the call the wrist heard end, matched by the moment it heard it ----
+
+    [Fact]
+    public void TheWristsMomentFindsTheCallThatEnded()
+    {
+        var row = Row(TimeSpan.FromSeconds(370), TimeSpan.FromMinutes(6));
+
+        Assert.True(JustEndedCall.EndedAbout(row, Now, TimeSpan.FromMinutes(1)));
+        Assert.True(JustEndedCall.EndedAbout(row, Now.AddSeconds(-50), TimeSpan.FromMinutes(1)));
+        Assert.False(JustEndedCall.EndedAbout(row, Now.AddMinutes(10), TimeSpan.FromMinutes(1)));
+        Assert.False(JustEndedCall.EndedAbout(row, Now.AddMinutes(-5), TimeSpan.FromMinutes(1)));
+    }
+
+    [Fact]
+    public void HowFarFromTheMomentIsItsDistance()
+    {
+        var row = Row(TimeSpan.FromSeconds(370), TimeSpan.FromMinutes(6));
+
+        Assert.Equal(TimeSpan.FromSeconds(10), JustEndedCall.FromMoment(row, Now));
+        Assert.Equal(TimeSpan.FromSeconds(20), JustEndedCall.FromMoment(row, Now.AddSeconds(-30)));
+    }
 }

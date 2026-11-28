@@ -30,6 +30,13 @@ public static partial class CallNote
     public static bool IsNote(TimelineItem item) =>
         item.Kind == TimelineItemKind.Call && item.SourceId.StartsWith(SourcePrefix, StringComparison.Ordinal);
 
+    /// <summary>
+    /// Whether a note kept from the watch (P14 B7) is on the call the phone's own offer waits for (<c>PendingCallNoteStore</c>
+    /// holds its number), so the phone stops asking for a note the owner has already written.
+    /// </summary>
+    public static bool Settles(TimelineItem note, string pendingNumber) =>
+        IsNote(note) && note.ContactKey == ContactKeyNormalizer.NormalizePhone(pendingNumber);
+
     public static TimelineItem For(string number, string text, DateTimeOffset when) =>
         new(
             TimelineItemKind.Call,
