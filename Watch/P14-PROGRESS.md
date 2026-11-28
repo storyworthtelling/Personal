@@ -2536,3 +2536,212 @@ READ_CALL_LOG. The receiver's and the blocked check's failures are logged by the
   whether READ_PHONE_STATE had been granted by the launch dialog (if the export shows no `a call ended` line after a
   call, it was not, and the next policy pass now grants it); whether the phone goes off hook at all for a call rung
   here and answered on the watch; and the note card's keyboard opening when the card is raised from the Waiting page.
+
+## What it is
+
+**How the watch learns a call ended (the platform options, and the one chosen).** The watch's own Phone app rings and
+carries every call (A59): a call over LTE with the phone away, and, by Wear OS's own design, one relayed from the phone
+over Bluetooth. Dash is not that app, so it can only be told. The options read:
+- `TelephonyManager.ACTION_PHONE_STATE_CHANGED` to a manifest receiver: documented, one of the implicit-broadcast
+  exceptions (delivered with no process running), a protected broadcast only the platform sends; it needs
+  READ_PHONE_STATE, a runtime permission (the system's prompt names it "make and manage phone calls"). It says idle,
+  ringing or off hook and nothing else; its number extra is filled only for an app that also holds READ_CALL_LOG.
+  **Chosen**, as Post on the phone already does.
+- `TelephonyCallback` / `AudioManager`'s mode listener: need a running process holding a registration, gone when the
+  process is (and the callback needs READ_PHONE_STATE anyway); Dash runs no service.
+- The watch's own call log (`CallLog.Calls`): READ_CALL_LOG, a hard-restricted permission the installer would have to
+  allowlist; not permission-light, and the only route to a number on the watch.
+- `InCallService` (default dialer or the call-companion role), a call-screening role, a notification listener: roles
+  or special access granted in settings, far from permission-light.
+
+So **the watch reads no number at all**: it hears only the call state and asks Post which call it was. A number on the
+wrist could only come from the watch's own platform, which the instruction forbids showing or logging, and Post sends
+none (B6's ruling), so there is none to show.
+
+**The contract (`Watch.Domain/Dash`, on B1's `dash/call-note`):**
+- `DashCallAsk(Ended)`: `{v, kind: ask, ended}`, the moment the watch heard its call state go idle.
+- `DashCall(Ended, Call, Name, Length)`: Post's answer, `{v, kind: call, ended, call, name, length}`: the call's message
+  id (`DashIds.Message`), the caller's name from the phone's book or no name field at all (never a number), and how long
+  it was connected (whole ms, at most `DashLimits.CallLength`, 24 h). With no call, the moment alone. Any field beyond
+  those six refuses the answer, so a number cannot ride along.
+- `DashCallNote` gains an optional `at` (`At`, an init property, so B1's notes stand): the moment the note was written,
+  which Post names it by (`note:<ms>`), so a note told again after a lost answer is kept once.
+- `DashExchange` matches the answer to its ask by the moment; the wait is the ordinary 20 s.
+
+**The wrist's pure half:**
+- `AfterCall`: the platform's states in, one offer out. Off hook then idle is an end, timed from the first off hook;
+  a ring that stops is no end; idle after idle is no end; idle heard by a process that heard nothing before is an end
+  (the one before it died during the call), untimed. One offer at a time, a newer call taking its place; due for
+  `OfferFor` (30 min); settled once offered, or once Post says it has no such call. Held in memory, never written down.
+  `LengthOf`: the phone's talk time when it has one, else the wrist's off hook to idle (which for a call placed counts
+  the ring).
+- `CallNoteAttempt`: a note on a call Post named, by its id and the moment it is written; `Keep` sends the same note
+  again for the same words and a new one for new words; `Check` is a text's bound (4,000 characters). It never names a
+  number.
+- `MailLines`: subject, sender and when, newest first, ties in Post's order; a mail with no subject says "No subject".
+- `DashWords`: the mockup's "Call with Robin", "6 min, just now", Add a note, Not now; "A call" for a caller the book
+  can't name; "Under a minute", "6 min", "1 h 15 min"; the phone's own call-note words over the note read back, "Note
+  on this call" and Keep; "Keeping the note.", "That’s too long for one note."; Mail, "Finding your mail.", "No mail
+  waiting.", and a mail line for TalkBack ("Saturday plans, from Sam, 20 min").
+- `DashLayout`: After the call's places (0.66, 0.84, the pill at 1.18 and 1.0 wide, 1.48), from which B5's act screen
+  now takes its own (it was laid out as After the call); Mail's (the first line at 0.6, every 0.36 after, the subject
+  0.05 above and the sender 0.1 below, fitted to 1.4).
+
+**Post's half:**
+- A call keeps its call-log row on the timeline item (`TimelineItem.CallRow`: began, connected, type; set by
+  `CallRecordMapper`, read live from the call log, and kept whole in a filed call's ghost).
+- `DashRelay.CallAt(ask)`: among the calls someone was on (`JustEndedCall.Answered`, the phone fix's rule), the one
+  whose end is nearest the wrist's moment (`JustEndedCall.EndedAbout`, with `CallSlack` 1 min each way for the two
+  clocks), its name through the Rolodex's own rule for a name of its own (`RolodexRelay.IsAName`, now shared): an
+  unknown caller is named by the book with their number, so the wrist is told no name. A call answered on the watch
+  (type 7, rung on the phone and taken on the wrist) is a call. No match is the moment alone.
+- `DashInbox` answers the ask (`DASH dash/call-note: Answered 1`, or `Unknown`); a note is named by its `At` when it
+  has one (`CallNote.For(number, text, note.At ?? now)`).
+- `DashListener.Keep`: a note kept from the wrist on the number the phone's own offer waits for settles that offer
+  (`CallNote.Settles`, `PendingCallNoteStore.Clear`), so the phone doesn't ask for a note already written.
+
+**Dash on the watch (`Watch/Dash.Wear`):**
+- The manifest asks for READ_PHONE_STATE, Dash's one permission. `CallEndReceiver` (registered
+  `…communication.dash.CallEndReceiver`, `WatchIdentity.DashCallReceiverName`) hears the phone-state broadcast, reads
+  the state alone and hands it to `AfterCall.Shared`; it asks, tells and opens nothing (Android refuses a screen from the
+  background), and logs only "DASH a call ended; the note waits for Dash to open".
+- People waiting asks for the permission once on a fresh start (the system's prompt), and each time it comes back with
+  an offer due it asks Post which call it was, on the pool; a call Post named opens `AfterCallActivity` (registered
+  `…dash.AfterCallActivity`) once; a call Post has no record of is let go; a phone that couldn't be asked is asked
+  again when People waiting next comes back, within the half hour.
+- After the call, as drawn: the head, "Call with Robin" (Glance), "6 min, just now" (Small, the grey), Add a note pinned
+  at 1.18 and 1.0 wide, Not now under it. Add a note opens the system's dictation prompted "Note on this call"; the
+  words come back under "Note on this call" (no mockup draws this half; it follows Replying by voice) with Keep pinned and
+  Keyboard and Again either side. Keep tells Post on the pool by the call's id and the note's moment; "Keeping the note."
+  while it goes; when the phone has it the screen goes; when it didn't, the quiet line says why and Keep goes again as
+  the same note. Not now, or leaving, ends it. The words and the note's moment survive the screen being rebuilt.
+- **Mail and New text, reconciled:** Mail now sits at People waiting's foot exactly where B6 had put New text (a row's
+  pitch under the third row, where the mockup draws Mail), and New text follows directly under Mail, each a quieter
+  word in the grey that is a whole touch target, both there with nobody waiting too.
+- `MailActivity` (registered `…dash.MailActivity`), as drawn: the time, "Mail" where a conversation draws its name,
+  then each line (`MailRowView`): the subject in the ink centred and fitted to 1.4 of the radius on one line, "Sam ·
+  20 min" in the grey under it; no card, no mark, nothing to tap; TalkBack reads the line. "Finding your mail." until
+  the first answer, "No mail waiting." for none, and the quiet line when the phone couldn't be asked again. Asked each
+  time the screen comes back. Silent: nothing in Dash buzzes or posts a notification.
+
+## Tests written first
+
+- `Watch/Watch.Tests/Dash/DashCodecTests.cs`: `ACallKeepsEveryField`, `ACallCarriesNoNumber`, `NoCallIsItsMomentAlone`,
+  `ACallAskIsItsMoment`, `ANoteCarriesTheMomentItWasWritten`, 15 malformed rows (an ask with no or a mistyped moment; an
+  answer with a name or a length and no call, a correspondence's id, no length, a negative, fractional or day-long
+  length, an empty or numeric name, a number beside the call; a note's moment as a word), three wrong-path rows, the
+  frozen words (`call`, `ended`, `length`) and limit; four fixtures in `DashFixtures` (so every round-trip, `v` and
+  log-line theory takes them) and the note fixture with its moment.
+- `DashExchangeTests.ACallIsAnsweredForItsMoment` and two rows; `DashLogLinesTests` (a call and a note with sentinels).
+- `AfterCallTests` (11), `CallNoteAttemptTests` (11 with rows), `MailLinesTests` (5).
+- `DashWordsTests` (`AfterTheCallIsTheMockups`, `ACallerPostCannotNameIsACall`, `ACallsLengthIsShort` ×6,
+  `TheNoteIsThePhonesOwnWords`, `MailIsTheMockups`, `AMailLineSaysWhatFromWhomAndWhen`, and the sentence and label
+  lists); `DashLayoutTests` (`MailSitsWhereTheMockupDrawsIt`, B6's test renamed, `AfterTheCallIsWhereTheMockupDrawsIt`,
+  `TheChoiceBeforeAnActIsAfterTheCallsLayout`, `MailLinesAreWhereTheMockupDrawsThem`); `WatchInvariantsTests.DashsNamesAreFrozen`
+  with the two screens and the receiver.
+- Post: `CallRecordMapperTests` (`Map_ACallKeepsItsRow` ×5, `Map_AVoicemailIsNoCallRow`, and, added during green,
+  `Map_ACallsRowSurvivesItsGhost`), `JustEndedCallTests` (`TheWristsMomentFindsTheCallThatEnded`,
+  `HowFarFromTheMomentIsItsDistance`), `CallNoteTests.ANoteSettlesThePhonesOfferForItsNumber`, `DashRelayTests`
+  (`TheCallThatJustEndedIsNamed`, `ACallNobodyWasOnIsNoCall`, `ACallLongAgoIsNoCall`, `TheNearestCallIsTheOne`,
+  `ACallerTheBookCannotNameHasNoName`, `ACallAnsweredOnTheWatchIsTheCall`, `ANoteIsNeverTheCall`,
+  `ANoteToldTwiceIsKeptOnce`), `DashInboxTests` (`TheCallIsAnswered`, `NoCallIsAnsweredAsNone`,
+  `PostsAnswerArrivingAtPostIsLeftAlone`), `DashRelayGuardTests.TheListenerCarriesThePlansThroughPostsOwnCode` ×2
+  (`CallNote.Settles(`, `PendingCallNoteStore.Clear(`).
+- The head: `WatchInvariantsTests` `DashAsksOnlyToHearACallEnd` (B4's `DashAsksForNoPermission`, now exactly
+  READ_PHONE_STATE), `DashHearsACallEndAndNothingElse`, `TheWatchReadsNoNumberOfItsOwn`, `DashOffersTheNoteAfterACall`,
+  `DashShowsMailAsTheMockupDrawsIt`, `MailIsSilentAndUnmarked`, `PeopleWaitingShowsMailWhereTheMockupDrawsIt`,
+  `EachDashScreenIsRegisteredByItsName` ×3 more, `DashWaitsOffTheMainThread` (seven screens),
+  `TheWristNeverSendsANumber` (now asks for `CallNoteAttempt.Keep(` too); `WatchA11yTests.TheGuardSeesDash` with
+  `MailRowView`.
+
+## Red 1 · the contract and the wrist's pure half (Watch.Domain)
+
+- **`Watch.Tests`: 1120 tests, 64 failed, 1056 passed.** The 64: `DashCodecTests` 19, `DashWordsTests` 15,
+  `AfterCallTests` 10, `CallNoteAttemptTests` 9, `MailLinesTests` 5, `DashLayoutTests` 3, `DashExchangeTests` 1,
+  `DashLogLinesTests` 1, `WatchInvariantsTests.DashsNamesAreFrozen` 1. First errors: `NotImplementedException` 34,
+  `ArgumentException: DashCall is not a Dash message` 12 and `DashCallAsk …` 4, `Assert.Equal() Failure: Values differ`
+  6, `Strings differ` 3, `Assert.All() Failure` 2, and one each of `Assert.Throws()`, `Assert.NotEqual()` and
+  `Collections differ`. Passing on the stubs: 14 of the 15 malformed call rows (the stub reads nothing there; the
+  note's moment as a word failed, the old reader ignoring the field), `AfterCallTests.TheSharedOneIsOne`, and the tells
+  that wait for nothing.
+- **Green: `Watch.Tests` 1120 passed, 0 failed. `Codex.Tests` 3413 passed, `RepoGuards.Tests` 452 passed,
+  `Storyworthtelling.Updates.Tests` 194 passed.**
+
+## Red 2 · Post's half
+
+- **`FocusPhone/Codex.Tests`: 3435 tests, 20 failed, 3415 passed.** The 20: `DashRelayTests` 8, `CallRecordMapperTests`
+  5, `JustEndedCallTests` 2, `DashRelayGuardTests` 2, `DashInboxTests` 2, `CallNoteTests` 1. First errors:
+  `NotImplementedException` 10, `Assert.Equal() Failure: Values differ` 6 (the row missing, and a note told twice named
+  twice), `Assert.IsType()` 2 (the ask not answered), `Sub-string not found` 2. Passing on the stubs:
+  `Map_AVoicemailIsNoCallRow` and `PostsAnswerArrivingAtPostIsLeftAlone` (already the default turn).
+- **Green: `Codex.Tests` 3435 passed, 0 failed** (3436 with the ghost test added during green, which passed at once:
+  reflection-based `System.Text.Json` reads the row through its constructor). `Watch.Tests` 1120 passed;
+  `RepoGuards.Tests` 452 passed. **Compiled here:** `FocusPhone/Post.Android`, **Build succeeded, 0 errors**.
+
+## Red 3 · Dash on the watch
+
+- **`Watch.Tests`: 1129 tests, 12 failed, 1117 passed:** `WatchInvariantsTests` 11 and `WatchA11yTests.TheGuardSeesDash`.
+  First errors: `Values differ` 4 (the three registrations and five screens, not seven), "Watch/Dash.Wear/… isn’t
+  there." 4 (`AfterCallActivity`, `CallEndReceiver`, `MailActivity`, `MailRowView`), "Mail is not drawn above New text
+  at People waiting’s foot." 1, `Collections differ` 1 (no permission), `Sub-string not found` 1,
+  `Assert.All() Failure: 1 out of 4 items` 1 (no `MailRowView`). `TheWatchReadsNoNumberOfItsOwn` passed on B6's head,
+  which reads none.
+- **On the way:** the first build of the head failed once, `CS0104` (`CallState` is also `Android.Telephony.CallState`;
+  the receiver names the domain's by an alias), with one `CS0108` (a helper named `Baseline` hid `View.Baseline`;
+  renamed `BaselineFor`).
+- **Probe, once green:** `DashLog.Info($"DASH kept {words}")` in After the call and a log of
+  `intent.GetStringExtra(TelephonyManager.ExtraIncomingNumber)` in the receiver: `DashLogsCarryNoPayloadTests` 43 tests,
+  1 failed (`TheWristLogsOnlyDashLines`, naming both lines), and `WatchInvariantsTests` 82 tests, 1 failed
+  (`TheWatchReadsNoNumberOfItsOwn`). The probes were removed.
+- **Green: `Watch.Tests` 1129 passed, 0 failed.** **Compiled here:** `Watch/Dash.Wear` and `Watch/Watch.Ui.Wear`, each
+  **Build succeeded, 0 warnings, 0 errors**; Dash's merged manifest carries `READ_PHONE_STATE`, the receiver
+  `…dash.CallEndReceiver` (exported, filtered on `android.intent.action.PHONE_STATE`) and the two new screens.
+
+## Decisions made in this chunk (each the owner's to overturn)
+
+- **The call's end comes from the platform's phone-state broadcast, with READ_PHONE_STATE** (the options are above).
+  Its cost: a permission prompt on the watch that says "make and manage phone calls", which is the platform's name for
+  the group, not what Dash does with it. Refused, there are no call notes from the wrist and nothing else changes.
+- **The note is offered when Dash is next opened, within half an hour, once**, not the moment the call ends: Android
+  does not let an app open a screen from the background, and a notification would be a mark and a buzz WD §1 and §7
+  don't allow. Only People waiting asks (Dash's first screen and its way in). This follows Post's own offer on the phone,
+  which waits behind the dog-ear for the next time Post is opened.
+- **The watch reads no number, ever, and offers a note only on a call Post names.** B1's numbers form of
+  `dash/call-note` stays in the contract, unused, like B6's numbers form of `dash/send`. The cost: a call only the
+  watch had (taken over LTE with no row in the phone's log) is offered nothing. Whether the phone's log has such calls
+  (Fi's type 7, "answered elsewhere") is a device question; when it does, Post finds them.
+- **Post finds the call by when it ended,** by the phone fix's own rule (`JustEndedCall`), within a minute each way for
+  the two clocks, nearest first. A caller the address book has no name of its own for is "A call" on the wrist.
+- **The length shown is the phone's talk time when it has one,** else the wrist's own off hook to idle; none, when the
+  process heard only the end.
+- **A note carries the moment it was written** (a field added to B1's note), so Keep after a lost answer never keeps
+  it twice; and a note kept from the wrist settles the phone's own offer for the same number.
+- **The note is read back before it's kept,** on Replying by voice's layout under the phone's own words ("Note on this
+  call", Keep), though the mockup draws only the offer: dictation gets words wrong, and a note is kept for good.
+- **Mail lines are only read:** not opened, filed or deleted on the wrist (subject and sender only, A11), and seeing them
+  marks nothing read on the phone. Nothing marks a line unread (the owner's ruling).
+- **Mail takes the place the mockup draws for it, and New text moves under it,** each a whole touch target, so the two
+  entries sit about a touch target apart (the mockup draws only Mail).
+- **A call's row now rides on Post's timeline item** (`CallRow`), read live from the call log, and is kept in a filed
+  call's ghost; nothing else on the phone reads it.
+
+## Not done, not verified
+
+- **Nothing here has met a watch or a phone.** Unverified: that the Pixel Watch's PHONE_STATE broadcast fires for a call
+  relayed from the phone over Bluetooth as it does for an LTE call (if it fires only for LTE, the wrist offers notes
+  only for calls it took away from the phone); the permission prompt on Wear OS 6; that the phone's log has a row for a
+  call taken on the watch, and of which type and length; the two clocks within a minute; the offer opening over People
+  waiting as the owner comes back to it; dictation's prompt and the input screen for a note; the layout on the 41 mm and
+  45 mm screens; and TalkBack on all of it.
+- **The 30 minutes, the minute's slack and the 90 s ring allowance are chosen, not measured.**
+- **A7's low-battery rule** ("gives up … the email lines first") is not built: Dash asks for mail whatever the battery.
+- **Not built from release B:** W-5.1.7 (the People waiting tile) and W-5.1.9 (overnight and unknown callers). No buzz
+  yet: the haptic plan is still wired to nothing, and mail is silent by having nothing that buzzes.
+
+## Chunk B7 totals
+
+- `Watch.Tests`: **1129 passed, 0 failed.** `Tools/FaceStudio.Tests`: 38 passed. `FocusPhone/Codex.Tests`: 3436
+  passed. `RepoGuards.Tests`: 452 passed. `Storyworthtelling.Updates.Tests`: 194 passed. `leakscan --ci` over the
+  chunk's diff (from B6's last commit): "no personal-data shapes in the added lines".
+- `Watch/Dash.Wear` and `Watch/Watch.Ui.Wear` compile here with 0 warnings and 0 errors; `FocusPhone/Post.Android`
+  with 0 errors and no warning in a file this chunk touched.
